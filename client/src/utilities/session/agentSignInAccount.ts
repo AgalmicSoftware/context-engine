@@ -14,9 +14,11 @@ import {
 } from '../worker/workerAuthTokenCache.js';
 import {
   AGENT_LINK_PROVIDER,
+  ATTACHED_PASSKEYS_KEY,
   forgetAgentLinkAccount,
   holdAgentLinkAccount,
   isAgentLinkProvider,
+  noteBrowserAttachedAPasskey,
   readAgentLinkAccount,
   setAgentLinkRenewer,
   type AgentLinkAccount,
@@ -27,6 +29,7 @@ import {
   attachPasskeyToAgentAccount,
   detachAgentPasskey,
   isSignInNonce,
+  readAgentSignInState,
   setAgentAccess,
   signInThroughAttachedPasskey,
   type AgentSignInReply,
@@ -45,7 +48,7 @@ const lower = (value: unknown): string =>
     .toLowerCase();
 
 // Which passkeys this browser has attached to an agent's account, by session: no secret, only "look again here".
-const KNOWN_KEY = 'ce:agentLinkPasskeys:v1';
+const KNOWN_KEY = ATTACHED_PASSKEYS_KEY;
 const knownKey = (target: SessionTarget, passkey: string): string =>
   `${target.workerUrl.replace(/\/+$/, '')}|${target.sessionSlug}|${lower(passkey)}`;
 const readKnown = (): string[] => {
@@ -63,8 +66,10 @@ const writeKnown = (entries: string[]): void => {
     /* Storage can be disabled; the Worker's own sign-in reply still says so. */
   }
 };
-export const rememberAttachedPasskey = (target: SessionTarget, passkey: string): void =>
+export const rememberAttachedPasskey = (target: SessionTarget, passkey: string): void => {
   writeKnown([...readKnown().filter((entry) => entry !== knownKey(target, passkey)), knownKey(target, passkey)]);
+  noteBrowserAttachedAPasskey();
+};
 export const forgetAttachedPasskey = (target: SessionTarget, passkey: string): void =>
   writeKnown(readKnown().filter((entry) => entry !== knownKey(target, passkey)));
 export const isAttachedPasskeyKnown = (target: SessionTarget, passkey: unknown): boolean =>
@@ -90,20 +95,31 @@ if (typeof store?.subscribe === 'function') {
   });
 }
 
+// An account a tab is using, and what kind: the person's own, signed in now; an agent's, held without its key;
+// or a passkey account this browser has saved and would sign back in by itself, though it has not yet.
+export type AccountInUse = { address: string; kind: 'own' | 'agent' | 'saved' };
+
+/** The account the tab is signed in as at this moment, or null. */
+export const whoIsHereNow = (): AccountInUse | null => {
+  const live = liveProfile();
+  return live.account ? { address: live.account, kind: isAgentLinkProvider(live.provider) ? 'agent' : 'own' } : null;
+};
+
 /**
  * Who a link's sign-in would replace, asked at the moment it is about to: whoever is signed in now, an agent's
  * account this tab still holds a sign-in for, or a passkey account this browser would sign back in by itself.
- * '' when nobody. An agent's account whose sign-in has ended is nobody: its person came for a new link.
+ * Null when nobody. An agent's account whose sign-in has ended is nobody: its person came for a new link.
  */
-export const whoALinkWouldReplace = async (): Promise<string> => {
+export const whoALinkWouldReplace = async (): Promise<AccountInUse | null> => {
   const account = readAgentLinkAccount();
   const heldLive = account && heldSessionToken(account.workerUrl, account.sessionSlug) ? account.address : '';
   const live = liveProfile();
   const endedAgentAccount =
     !!account && !heldLive && live.account === account.address && isAgentLinkProvider(live.provider);
-  if (live.account && !endedAgentAccount) return live.account;
-  if (heldLive) return heldLive;
-  return lower(await passkeyWallet.restorePasskeyWalletSession({ requireSigner: false }).catch(() => null));
+  if (live.account && !endedAgentAccount) return whoIsHereNow();
+  if (heldLive) return { address: heldLive, kind: 'agent' };
+  const saved = lower(await passkeyWallet.restorePasskeyWalletSession({ requireSigner: false }).catch(() => null));
+  return saved ? { address: saved, kind: 'saved' } : null;
 };
 
 /**
@@ -230,24 +246,17 @@ setAgentLinkRenewer(async (account, { prompt }) => {
 });
 
 /**
- * Attaches a passkey to the account the tab is signed in to from an agent's link: a new passkey, or one the
- * person already has. The passkey signs that it is being attached to this account, and nothing else.
+ * Makes a new passkey for the account the tab is signed in to from an agent's link, and attaches it. The passkey
+ * signs that it is being attached to this account, and nothing else. A passkey the person already uses is not
+ * offered: the Worker refuses one that has an account of its own here, and the site has no words for that yet.
  */
-export const attachPasskeyHere = async ({
-  useExisting,
-}: {
-  useExisting: boolean;
-}): Promise<AgentLinkAccount | null> => {
+export const attachPasskeyHere = async (): Promise<AgentLinkAccount | null> => {
   const account = readAgentLinkAccount();
   if (!account) throw new AgentSignInError('not_signed_in', 'Open the session from your agent’s link first.');
   const target = targetOf(account);
   const token = heldSessionToken(target.workerUrl, target.sessionSlug);
   if (!token) throw new AgentSignInError('sign_in_ended', 'This sign-in has ended. Ask your agent for a new link.');
-  const passkeyAddress = lower(
-    useExisting
-      ? await passkeyWallet.unlockPasskeyWallet({ selectCredential: true })
-      : await passkeyWallet.createPasskeyWallet(),
-  );
+  const passkeyAddress = lower(await passkeyWallet.createPasskeyWallet());
   const client = passkeyWallet.getPasskeyWalletClient();
   let reply: AgentSignInReply;
   try {
@@ -257,15 +266,32 @@ export const attachPasskeyHere = async ({
       token,
       passkeyAddress,
       sign: (message) => client.signMessage(message, passkeyAddress),
-      newPasskey: !useExisting,
+      newPasskey: true,
     });
   } catch (error) {
     // A passkey made for this and then refused is attached to nothing: it is not left as this browser's saved
     // sign-in, where a reload would open its empty account in place of this one.
-    if (!useExisting) await passkeyWallet.logoutPasskeyWallet().catch(() => undefined);
+    await passkeyWallet.logoutPasskeyWallet().catch(() => undefined);
     throw error;
   }
   return enterAgentLinkAccount(target, reply);
+};
+
+/**
+ * Whether the account this tab is in already has a passkey attached, by the Worker's word; null where the Worker
+ * can't be asked.
+ */
+export const heldAccountHasPasskey = async (): Promise<boolean | null> => {
+  const account = readAgentLinkAccount();
+  if (!account) return null;
+  const target = targetOf(account);
+  const token = heldSessionToken(target.workerUrl, target.sessionSlug);
+  if (!token) return null;
+  try {
+    return !!(await readAgentSignInState(target, token)).attachedPasskey;
+  } catch {
+    return null;
+  }
 };
 
 /** Ends the agent's access to the account, or allows it again. */

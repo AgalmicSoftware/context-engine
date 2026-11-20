@@ -70,7 +70,7 @@ export const QUICKSTART_STEPS: readonly QuickstartStep[] = Object.freeze(
     {
       id: 'open-session',
       title: 'Open or create a session',
-      body: 'Follow a shared session link, replace `<slug>` in `/session/<slug>` with the session you want to join, or create a session of your own. On the setup page, “Set up with your AI” lets ChatGPT or Claude ask about your session and fill in the page for you to review.',
+      body: 'Follow a shared session link, replace `<slug>` in `/session/<slug>` with the session you want to join, or create a session of your own. On the setup page, “Set up with AI” lets ChatGPT or Claude ask about your session and fill in the page for you to review.',
       links: [
         { href: '/session/general', label: 'Open /session/general' },
         { href: '/session/new', label: 'Create a session' },
@@ -235,7 +235,7 @@ export const SESSION_AGENT_TOPICS: readonly SessionAgentTopic[] = Object.freeze(
       id: 'keep-out',
       title: 'Keeping your answers and files out',
       summary:
-        'Your answers and files are in until you say otherwise. Turn off “Use my answers and files” in the Session Agent, or untick “Session Agent may use my answers and files” at the foot of the interview dialog.',
+        'Your answers and files are in until you say otherwise. Turn off “Use my answers and files” in the Session Agent, or untick “Session Agent may use my answers and files” beside it in the Context section.',
       points: [
         'It applies from the next question on; answers already given can’t be taken back.',
         'The published results still count your answers, as on the Results page.',

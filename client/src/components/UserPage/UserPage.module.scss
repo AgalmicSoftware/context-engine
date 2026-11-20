@@ -49,13 +49,6 @@ $icon-size-standard: 1.25rem;
       .userInfo {
         margin-bottom: 0;
       }
-      .avatar {
-        width: 48px;
-        height: 48px;
-      }
-      .headerActionsRight:empty {
-        display: none;
-      }
     }
 
     .content,
@@ -78,6 +71,62 @@ $icon-size-standard: 1.25rem;
     }
 
     /* Removed hiding of username in minimized view to meet requirements */
+
+    // The account dialog: who you are on the left, the list of actions on the right; on a phone, a row on top.
+    .addressAndActionsContainer {
+      flex-wrap: nowrap;
+      gap: 24px;
+      padding: 0;
+    }
+    .userInfo {
+      flex: 0 1 40%;
+      flex-direction: column;
+      justify-content: center;
+      min-width: 0;
+      gap: 12px;
+      text-align: center;
+    }
+    .avatarContainer {
+      margin: 0;
+    }
+    .avatar {
+      width: 96px;
+      height: 96px;
+    }
+    .addressColumn {
+      align-items: center;
+    }
+    .copyButton {
+      width: 44px;
+      height: 44px;
+      margin-left: 6px;
+      font-size: 1.5rem;
+    }
+    .headerActionsRight:empty {
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .addressAndActionsContainer {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+      .userInfo {
+        flex: 0 0 auto;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        text-align: left;
+      }
+      .addressColumn {
+        align-items: flex-start;
+      }
+      .avatar {
+        width: 56px;
+        height: 56px;
+      }
+    }
   }
 }
 
@@ -94,11 +143,12 @@ $icon-size-standard: 1.25rem;
   border-radius: var(--ce-radius-10);
 }
 
-/* The session this profile shows; picking another opens the same profile there. */
+/* The session this profile shows, at the top right above the header; picking another opens the same profile there. */
 .sessionSwitchRow {
   display: flex;
+  justify-content: flex-end;
   min-width: 0;
-  margin: -4px 0 16px;
+  margin: 0 0 12px;
 }
 
 .sessionSwitch {
@@ -292,21 +342,60 @@ $icon-size-standard: 1.25rem;
   min-width: 0;
 }
 
-.usernameButton {
-  min-height: 44px;
-  margin-top: 6px;
-  padding: 6px 14px;
-  font-size: 0.95rem;
+/* The full profile's "Set username" over "Bookmarks", right beside the address; on a phone, side by side under it. */
+.addressColumn.addressRow {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.identityActions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+@media (max-width: 600px) {
+  // Stays beside the avatar, with the two buttons wrapping under the address.
+  .addressColumn.addressRow {
+    flex: 1 1 0;
+  }
+  .identityActions {
+    flex-direction: row;
+    // "Change username" and "My Bookmarks" go onto two lines on the narrowest phones.
+    flex-wrap: wrap;
+  }
+}
+
+/* A size below the header's Analyze and Compare buttons, in their look. */
+.identityActionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 0.85rem;
   font-weight: 600;
-  // The look of the header's Compare and Analyze buttons, a size down.
+  line-height: 1.2;
+  white-space: nowrap;
+  text-decoration: none;
+  font-family: var(--ce-font-button);
   background: var(--ce-document-border);
   color: var(--ce-document-text);
   border: 1px solid var(--ce-document-border);
-  border-radius: var(--ce-radius-10);
+  border-radius: var(--ce-radius-8);
   cursor: pointer;
   // The text keeps its colour on hover, so only the edge changes.
-  &:hover {
+  &:hover,
+  &:focus-visible {
+    color: var(--ce-document-text);
     border-color: var(--ce-document-text);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
   }
 }
 
@@ -397,6 +486,12 @@ $icon-size-standard: 1.25rem;
 .leftColumn,
 .rightColumn {
   flex: 1;
+}
+
+// The side column on someone else's page, where their shown picture card sits. Holding nothing (they show no
+// card), it takes no room.
+.cardColumn:empty {
+  display: none;
 }
 
 .surveySection,
@@ -756,6 +851,11 @@ $icon-size-standard: 1.25rem;
 
   .content {
     flex-direction: column;
+  }
+
+  // On a phone the card leads the page: the column gives its boxes to the page, and the card's box goes first.
+  .cardColumn {
+    display: contents;
   }
 
   .compareSection {
@@ -1254,10 +1354,6 @@ $icon-size-standard: 1.25rem;
 
 .analysisDetails {
   margin-top: 8px;
-}
-
-.bookmarksLinkInline {
-  margin-right: 10px;
 }
 
 .headerChevron {

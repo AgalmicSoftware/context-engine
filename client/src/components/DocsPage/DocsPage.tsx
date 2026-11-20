@@ -15,7 +15,7 @@ import buildClusterAnalysisPrompt, { CLUSTER_ANALYSIS_SYSTEM_PROMPT } from '../.
 import buildCompareToolkitPrompt from '../../prompts/compareToolkitPrompt.js';
 import buildPhotoAnalysisPrompt from '../../prompts/photoAnalysisPrompt.js';
 import { rankQuestionsPrompt } from '../../prompts/rankQuestionsPrompt.js';
-import buildUserAnalysisPrompt from '../../prompts/userAnalysisPrompt.js';
+import { buildUserAnalysisPrompt } from '@ce-shared/userAnalysisPrompts.mjs';
 // CSS
 import styles from './DocsPage.module.scss';
 import deploymentModesGraphic from '../../../../docs/assets/readme-architecture-session-worker-mcp.png';
@@ -321,7 +321,12 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
         file: 'clusterAnalysisPrompt.ts',
         content: clusterAnalysisPromptDisplay,
       },
-      { id: 'userAnalysis', title: 'User Analysis', file: 'userAnalysisPrompt.ts', content: userAnalysisPromptDisplay },
+      {
+        id: 'userAnalysis',
+        title: 'User Analysis',
+        file: 'userAnalysisPrompts.mjs',
+        content: userAnalysisPromptDisplay,
+      },
       { id: 'aiRewrite', title: 'AI Rewrite', file: 'aiRewritePrompt.ts', content: aiRewritePrompt },
     ],
     [clusterAnalysisPromptDisplay, compareToolkitPromptDisplay, photoAnalysisPromptDisplay, userAnalysisPromptDisplay],

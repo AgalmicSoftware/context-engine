@@ -11,6 +11,7 @@ import { mapInterviewEvidenceToResponses } from './sessionInterview';
 import * as savedAnswersLoader from './sessionInterviewSavedAnswers';
 import { createPileViewRuntimeStrategy, receiveTranscriptClaim } from './SurveyPileViewMode';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
+import { TRANSCRIPT_SHARING_OFFERED } from './sessionInterviewResearch';
 
 // Each scenario drives the real pile and modal with real timers, close to Jest's 5s default.
 jest.setTimeout(20_000);
@@ -54,6 +55,13 @@ const SESSION_CONFIG = {
   __registry: { registryChainId: 11155420, sessionIdHex: '0x00112233445566778899aabbccddeeff' },
 };
 let sessionConfig = SESSION_CONFIG;
+const WORKER_STORED = {
+  storageProfile: {
+    backend: 'cloudflare',
+    resources: { responses: 'active' },
+    payloadAccessControl: { gate: 'none', encryption: 'none' },
+  },
+};
 const packet = (responses) => ({
   version: 1,
   sessionSlug: 'edge',
@@ -296,6 +304,148 @@ it('does not upload a draft removed after a failed interview submit', async () =
   expect(pile.engine().getPendingEditStats().total).toBe(0);
 });
 
+it('shows the responder’s own words beside a translated draft, and never uploads them', async () => {
+  sessionConfig = { ...SESSION_CONFIG, interviewMode: { researchDetail: 'full', shareDraftChangesByDefault: true } };
+  const upload = mockSession();
+  const pile = await mountWithInterview(null);
+  await openInterview(pile);
+  await speak([
+    {
+      questionId: 'q1',
+      answer: 'Agree',
+      additionalComments: 'Only with outside audits (translated from French)',
+      confidence: 0.9,
+      spokenOriginal: { language: 'French', additionalComments: 'Seulement avec des audits externes' },
+    },
+    {
+      questionId: 'q3',
+      answer: 'Disagree',
+      additionalComments: 'Too slow (translated from French)',
+      confidence: 0.8,
+      spokenOriginal: { language: 'French', additionalComments: 'Seulement trop lent' },
+    },
+  ]);
+  expect(
+    screen.getByText(/Your comment in your words \(French\): Seulement avec des audits externes/),
+  ).toBeInTheDocument();
+  // A dismissed draft is kept for research at full detail, without the person's words.
+  fireEvent.click(screen.getByRole('button', { name: 'Remove draft for Q3' }));
+  // A refused upload leaves the page draft and the kept review (written as the page goes) in place.
+  upload.mockRejectedValueOnce(new Error('User rejected the request.'));
+  await submitDrafts();
+  act(() => {
+    window.dispatchEvent(new Event('pagehide'));
+  });
+  const kept = [sessionStorage, localStorage].flatMap((store) =>
+    Object.keys(store).map((key) => `${key}=${store.getItem(key) || ''}`),
+  );
+  expect(kept.join('\n')).toMatch(/Too slow/);
+  expect(kept.join('\n')).not.toMatch(/Seulement|spokenOriginal/);
+  await submitDrafts();
+  const rows = upload.mock.calls[1][2];
+  expect(rows[0].additional.value).toBe('Only with outside audits (translated from French)');
+  expect(rows[0].interviewProvenance.unselectedPredictions?.map((entry) => entry.questionId)).toEqual(['q3']);
+  // Not in the answer, nor with the research sharing kept beside it.
+  expect(JSON.stringify(rows)).not.toMatch(/Seulement|spokenOriginal/);
+});
+
+// Sharing a transcript is held back for now; these run again once the box is offered.
+const whileTranscriptOffered = TRANSCRIPT_SHARING_OFFERED ? it : it.skip;
+
+(TRANSCRIPT_SHARING_OFFERED ? it.skip : it)(
+  'offers no transcript box while sharing is held back, and sends none',
+  async () => {
+    sessionConfig = { ...SESSION_CONFIG, interviewMode: { shareDraftChangesByDefault: true }, ...WORKER_STORED };
+    const upload = mockSession();
+    const pile = await mountWithInterview(null);
+    await openInterview(pile);
+    await speak([
+      { questionId: 'q1', answer: 'Agree', confidence: 0.9 },
+      { questionId: 'q3', answer: 'Disagree', confidence: 0.8 },
+    ]);
+    fireEvent.click(screen.getByText('AI submission info'));
+    expect(screen.queryByLabelText('Let admins read this interview’s transcript')).not.toBeInTheDocument();
+    await submitDrafts();
+    const records = upload.mock.calls[0][2].map((row) => row.interviewProvenance);
+    expect(JSON.stringify(records)).not.toMatch(/transcript|interviewId|Here is what I think now/);
+  },
+  40000,
+);
+
+whileTranscriptOffered.each([false, true])(
+  'shares the voice interview transcript only when ticked (ticked: %s)',
+  async (ticked) => {
+    sessionConfig = { ...SESSION_CONFIG, interviewMode: { shareDraftChangesByDefault: true }, ...WORKER_STORED };
+    const upload = mockSession();
+    const pile = await mountWithInterview(null);
+    await openInterview(pile);
+    await speak([
+      { questionId: 'q1', answer: 'Agree', confidence: 0.9 },
+      { questionId: 'q3', answer: 'Disagree', confidence: 0.8 },
+    ]);
+    fireEvent.click(screen.getByText('AI submission info'));
+    const box = screen.getByLabelText('Let admins read this interview’s transcript');
+    expect(box).not.toBeChecked();
+    if (ticked) fireEvent.click(box);
+    // Without research sharing there is nothing to attach it to, so the box goes too.
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON));
+    expect(screen.queryByLabelText('Let admins read this interview’s transcript')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON));
+
+    await submitDrafts();
+
+    const records = upload.mock.calls[0][2].map((row) => row.interviewProvenance);
+    const carrying = records.filter((record) => record.transcript);
+    if (!ticked) {
+      expect(JSON.stringify(records)).not.toMatch(/transcript|interviewId|Here is what I think now/);
+      return;
+    }
+    expect(carrying).toHaveLength(1);
+    expect(carrying[0].transcript).toContain('Here is what I think now.');
+    expect(new Set(records.map((record) => record.interviewId)).size).toBe(1);
+    expect(records[0].interviewId).toMatch(/^interview-/);
+    // Another round asks again: the earlier tick doesn't share the longer transcript.
+    await speak([{ questionId: 'q1', answer: 'Disagree', confidence: 0.9 }]);
+    if (!screen.queryByLabelText('Let admins read this interview’s transcript'))
+      fireEvent.click(screen.getByText('AI submission info'));
+    expect(screen.getByLabelText('Let admins read this interview’s transcript')).not.toBeChecked();
+  },
+  40000,
+);
+
+// Submitting the AI's drafts, then talking: the next upload sends only the voice drafts, so the transcript rides on one.
+whileTranscriptOffered(
+  'keeps a transcript ticked after AI drafts were submitted with an answer the next upload sends',
+  async () => {
+    sessionConfig = { ...SESSION_CONFIG, interviewMode: { shareDraftChangesByDefault: true }, ...WORKER_STORED };
+    const upload = mockSession();
+    await mountWithInterview(packet([{ questionId: 'q1', answer: 'Agree', confidence: 0.8, evidence: 'Said so' }]));
+    await submitDrafts();
+    expect(uploadedRows(upload, 0)).toEqual([['q1', 'Agree']]);
+    await speak([{ questionId: 'q3', answer: 'Disagree', confidence: 0.8 }]);
+    if (!screen.queryByLabelText('Let admins read this interview’s transcript'))
+      fireEvent.click(screen.getByText('AI submission info'));
+    fireEvent.click(screen.getByLabelText('Let admins read this interview’s transcript'));
+    await submitDrafts();
+    const rows = upload.mock.calls[1][2];
+    expect(rows.map((row) => row.questionID)).toEqual(['q3']);
+    expect(rows[0].interviewProvenance.transcript).toContain('Here is what I think now.');
+  },
+  40000,
+);
+
+// An Arweave session publishes answers whole, so admins couldn't be the only readers.
+it('offers no transcript box where answers are stored on Arweave', async () => {
+  sessionConfig = { ...SESSION_CONFIG, interviewMode: { shareDraftChangesByDefault: true } };
+  mockSession();
+  const pile = await mountWithInterview(null);
+  await openInterview(pile);
+  await speak([{ questionId: 'q1', answer: 'Agree', confidence: 0.9 }]);
+  fireEvent.click(screen.getByText('AI submission info'));
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).toBeChecked();
+  expect(screen.queryByLabelText('Let admins read this interview’s transcript')).not.toBeInTheDocument();
+}, 40000);
+
 it('keeps an unsaved pile comment when the AI proposes no comment', async () => {
   const upload = mockSession();
   await mountWithInterview(
@@ -359,7 +509,7 @@ it('treats an unsaved pile answer as answered, so the interview leaves its draft
   expect(screen.queryByText(/answer.*on the page.*submitted yet/)).not.toBeInTheDocument();
 });
 
-it('names every submitted response once the saved name box is ticked', async () => {
+it('writes no name into submitted responses and withdraws a saved one', async () => {
   const upload = mockSession([savedNamedQ1], { late: true });
   await mountWithInterview(
     packet([
@@ -370,19 +520,14 @@ it('names every submitted response once the saved name box is ticked', async () 
   await answerBeforeSavedAnswersLoad({ q1: 'Disagree' });
   expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
   fireEvent.click(screen.getByText('AI submission info'));
-  const name = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME);
-  expect(name).toHaveAttribute('aria-checked', 'mixed');
-  fireEvent.click(name);
-  expect(name.closest('label')).toHaveTextContent(
-    'Include “Participant A” as the responder name with submitted responses',
-  );
+  expect(screen.queryByText(/as the responder name/)).not.toBeInTheDocument();
 
   await submitDrafts();
 
   expect(upload).toHaveBeenCalledTimes(1);
-  expect(upload.mock.calls[0][2].map((row) => [row.questionID, row.responderName]).sort()).toEqual([
-    ['q1', 'Participant A'],
-    ['q3', 'Participant A'],
+  expect(upload.mock.calls[0][2].map((row) => [row.questionID, 'responderName' in row]).sort()).toEqual([
+    ['q1', false],
+    ['q3', false],
   ]);
 });
 
@@ -392,10 +537,6 @@ it('undoes a rejected draft but keeps its name withdrawal for the next pile Subm
   const pile = await mountWithInterview(packet([{ questionId: 'q1', answer: 'Unsure', confidence: 0.8 }]));
   await answerBeforeSavedAnswersLoad({ q1: 'Disagree' });
   expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
-  fireEvent.click(screen.getByText('AI submission info'));
-  const name = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME);
-  expect(name).toBeChecked();
-  fireEvent.click(name);
 
   await submitDrafts();
   await act(async () => pile.engine().closeSessionVoiceModeModal());
@@ -486,8 +627,6 @@ it('keeps a withdrawal from a rejected interview upload through Clear changes', 
   const pile = await mountWithInterview(packet([{ questionId: 'q1', answer: 'Unsure', confidence: 0.8 }]));
   await answerBeforeSavedAnswersLoad({ q1: 'Disagree' });
   expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
-  fireEvent.click(screen.getByText('AI submission info'));
-  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME));
   await submitDrafts();
   await act(async () => pile.engine().closeSessionVoiceModeModal());
   await settle(300);
@@ -524,8 +663,6 @@ it('stores every kept withdrawal on Clear changes, not only the cards near the c
   );
   await answerBeforeSavedAnswersLoad(Object.fromEntries(questionIds.map((id) => [id, 'Disagree'])));
   expect(screen.getAllByText('Changes your earlier answer: Agree')).toHaveLength(questionIds.length);
-  fireEvent.click(screen.getByText('AI submission info'));
-  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME));
   await submitDrafts();
   await act(async () => pile.engine().closeSessionVoiceModeModal());
   await settle(300);
@@ -565,8 +702,6 @@ it('makes every stored withdrawal pending after a reload, and uploads them all',
   );
   await answerBeforeSavedAnswersLoad(Object.fromEntries(questionIds.map((id) => [id, 'Disagree'])));
   expect(screen.getAllByText('Changes your earlier answer: Agree')).toHaveLength(questionIds.length);
-  fireEvent.click(screen.getByText('AI submission info'));
-  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME));
   await submitDrafts();
   await act(async () => pile.engine().closeSessionVoiceModeModal());
   await settle(300);
@@ -705,7 +840,13 @@ it.each([
 
     const rows = upload.mock.calls[0][2];
     expect(rows.map((row) => [row.questionID, row.answer.value])).toEqual([['q1', 'Disagree']]);
-    expect(rows[0].interviewProvenance).toMatchObject({ predictionCondition: 'shown', draftOrigin: 'voice_interview' });
+    expect(rows[0].interviewProvenance).toMatchObject({
+      predictionCondition: 'shown',
+      draftOrigin: 'voice_interview',
+      voiceModel: 'gpt-live-1.1',
+      voiceBriefRevision: 'ce-voice-brief-3',
+      mappingPromptVersion: 'ce-interview-mapping-v3',
+    });
     expect(rows[0].interviewProvenance.unselectedPredictions?.map((entry) => entry.questionId)).toEqual(unselected);
   },
   40000,

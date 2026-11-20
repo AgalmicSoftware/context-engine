@@ -101,6 +101,36 @@ const measureRow = (page) =>
       }
       return cut.join(', ');
     };
+    // Submit's count: its digits, whether they show whole inside the button and clear of the word, and whether
+    // the brackets round them are drawn.
+    const submitCount = (button) => {
+      const count = button.querySelector('[class*="_pileSubmitButtonCount_"]');
+      const label = button.querySelector('[class*="_pileSubmitButtonLabel_"]');
+      if (!count || !label) return null;
+      const textBox = (node) => {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        return range.getBoundingClientRect();
+      };
+      const digits = [...count.childNodes].find((node) => node.nodeType === Node.TEXT_NODE);
+      const box = textBox(digits);
+      const word = textBox(label.firstChild);
+      const edge = button.getBoundingClientRect();
+      return {
+        digits: digits.textContent,
+        shown:
+          box.width > 0 &&
+          box.left >= edge.left + button.clientLeft &&
+          box.right <= edge.right - button.clientLeft &&
+          box.top >= edge.top + button.clientTop &&
+          box.bottom <= edge.bottom - button.clientTop,
+        // A glyph box is taller than its letters; the count is clear when it ends above the word's small letters,
+        // or sits past the word's end (give or take a pixel of side bearing).
+        overWord: box.right > word.left + 1 && box.left < word.right - 1 && box.bottom > word.top + word.height * 0.3,
+        at: `count ${box.left.toFixed(1)},${box.top.toFixed(1)} to ${box.right.toFixed(1)},${box.bottom.toFixed(1)}; word ${word.left.toFixed(1)},${word.top.toFixed(1)} to ${word.right.toFixed(1)},${word.bottom.toFixed(1)}`,
+        brackets: [...count.querySelectorAll('span')].some((bracket) => getComputedStyle(bracket).display !== 'none'),
+      };
+    };
     const controls = [...row.querySelectorAll('button')]
       .filter((button) => !button.closest('[class*="_pileActionButtonGroup_"]') && shown(button))
       .map((button) => {
@@ -114,6 +144,7 @@ const measureRow = (page) =>
           height: box.height,
           // The Submit count may wrap out of sight; the word must show whole.
           clipped: cutText(button),
+          count: submitCount(button),
         };
       });
     const card = document.querySelector('[class*="_pileCardContainer_"]').getBoundingClientRect();
@@ -500,6 +531,23 @@ async function runTheme(browser, baseUrl, browserName, theme, pass, failures) {
           `${where('answered')}: Submit should show in the row`,
         ),
       );
+      // The count always shows: small, without its brackets, in the button's corner and clear of the word.
+      const submitCount = answered.controls.find((control) => /^Submit/.test(control.name))?.count;
+      check(() => assert(submitCount, `${where('answered')}: Submit should carry its count`));
+      if (submitCount) {
+        check(() =>
+          assert(
+            /^\d+$/.test(submitCount.digits) && !submitCount.brackets,
+            `${where('answered')}: Submit's count should show as digits without brackets (${submitCount.digits})`,
+          ),
+        );
+        check(() =>
+          assert(
+            submitCount.shown && !submitCount.overWord,
+            `${where('answered')}: Submit should show its count (${submitCount.digits}) whole and clear of its word (${submitCount.at})`,
+          ),
+        );
+      }
       check(() =>
         assert(
           !states[`end of set ${size.name}`].controls.some((control) => /^Submit/.test(control.name)),

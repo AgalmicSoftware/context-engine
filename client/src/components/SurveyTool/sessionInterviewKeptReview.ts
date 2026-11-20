@@ -50,6 +50,9 @@ export const keptReviewOwner = (account: unknown, signedIn: boolean): string => 
   return signedIn && address ? `account:${address}` : 'browser';
 };
 
+const withoutSpokenOriginal = ({ spokenOriginal: _words, ...draft }: InterviewDraftResponse): InterviewDraftResponse =>
+  draft;
+
 const keyFor = (sessionSlug: string, owner: string) => `${KEY_PREFIX}${sessionSlug.trim().toLowerCase()}:${owner}`;
 
 const storage = (): Storage | null => {
@@ -278,7 +281,17 @@ export const useKeptInterviewReview = (packet: InterviewPrefillPacket | null, cl
       latest.current = { review: null, json: '' };
       return;
     }
-    const review = { ...parts, packet, ownEvidenceIds: [...ownEvidenceIds], hidden };
+    // The person's own words in another language stay in page memory; the kept review has the English drafts.
+    const review = {
+      ...parts,
+      drafts: parts.drafts.map(withoutSpokenOriginal),
+      editedDrafts: Object.fromEntries(
+        Object.entries(parts.editedDrafts).map(([id, draft]) => [id, withoutSpokenOriginal(draft)]),
+      ),
+      packet,
+      ownEvidenceIds: [...ownEvidenceIds],
+      hidden,
+    };
     latest.current = { review, json: JSON.stringify(review) };
   };
   return { ...initial, ownEvidenceIds, keep };

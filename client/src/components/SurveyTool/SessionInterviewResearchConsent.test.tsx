@@ -2,7 +2,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds';
 import React from 'react';
 import fs from 'fs';
 import path from 'path';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SessionInterviewResearchConsent, { SessionInterviewResearchShare } from './SessionInterviewResearchConsent';
 import type { InterviewPrefillPacket } from './sessionInterview';
 
@@ -80,9 +80,7 @@ describe('SessionInterviewResearchConsent', () => {
     );
   });
 
-  it('leaves the line out when it has a choice or something to show', () => {
-    renderConsent({ showProvenance: false, children: <label>Name choice</label> });
-    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED)).not.toBeInTheDocument();
+  it('leaves the line out when it has something to show', () => {
     renderConsent({ showProvenance: false, includeComparison: true });
     renderConsent({ includeProvenance: false });
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED)).not.toBeInTheDocument();
@@ -106,13 +104,11 @@ describe('SessionInterviewResearchConsent', () => {
 
   it('links to the branch documentation and shows selected/unselected counts when opted in', () => {
     renderConsent({ includeComparison: true, revisionCount: 3, researchDetail: 'full' });
-    fireEvent.click(screen.getByRole('group', { name: 'AI prefill metadata' }).querySelector('summary')!);
-    expect(screen.getByRole('group', { name: 'AI prefill metadata' }).querySelector('summary')).toHaveTextContent(
-      'AI prefill metadata',
-    );
-    expect(screen.getByRole('group', { name: 'AI prefill metadata' }).querySelector('summary')).not.toHaveTextContent(
-      'gpt-example',
-    );
+    // Shown at once: nothing to open first.
+    const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
+    expect(metadata.tagName).toBe('DIV');
+    expect(metadata.querySelector('details, summary')).toBeNull();
+    expect(metadata).toHaveTextContent('gpt-example');
     expect(screen.getByText(/1 selected draft and 2 unselected drafts/i)).toBeInTheDocument();
     expect(screen.getByText(/Reviewed final values and which fields changed/i)).toBeInTheDocument();
     const link = screen.getByRole('link', { name: 'How research data is handled' });
@@ -122,13 +118,11 @@ describe('SessionInterviewResearchConsent', () => {
     );
   });
 
-  it('uses compact option copy and keeps model details inside the expandable metadata', () => {
+  it('uses compact option copy and shows the model details at once', () => {
     renderConsent();
     expect(screen.getByLabelText(/Include platform\/model provenance/i)).toBeChecked();
     expect(screen.queryByText(/with submitted responses/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'AI prefill metadata' }).querySelector('summary')).not.toHaveTextContent(
-      'gpt-example',
-    );
+    expect(screen.getByRole('group', { name: 'AI prefill metadata' })).toHaveTextContent('gpt-example');
   });
 
   it('scrolls metadata with the other choices and keeps the help control transparent', () => {
@@ -138,10 +132,7 @@ describe('SessionInterviewResearchConsent', () => {
       /\.optionGroup\s*\{[\s\S]*?padding:\s*8px;[\s\S]*?border:\s*1px solid color-mix\(in srgb, var\(--ce-text-inverse\) 14%, transparent\);[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-text-inverse\) 5%, transparent\);/,
     );
     // The submission panel scrolls as one region, so the metadata has no scroll of its own.
-    expect(scss).not.toMatch(/\.metadata\[open\]\s*\{[^}]*max-height/);
-    expect(scss).toMatch(
-      /\.metadata\[open\] summary\s*\{[\s\S]*?position:\s*sticky;[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-surface-sunken\) 92%, transparent\);/,
-    );
+    expect(scss).not.toMatch(/\.metadata\s*\{[^}]*max-height/);
     expect(scss).toMatch(
       /\.researchHelp\s*\{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;[\s\S]*?cursor:\s*help;/,
     );
@@ -199,6 +190,86 @@ describe('SessionInterviewResearchShare', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Funded by Example.');
   });
 
+  it('names the grant, links to it, and stays open long enough to reach a link', async () => {
+    jest.useFakeTimers();
+    try {
+      render(<SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />);
+      const what = screen.getByRole('button', { name: 'What’s this? About sharing for research' });
+      fireEvent.mouseEnter(what);
+      const tooltip = await screen.findByRole('tooltip');
+      expect(tooltip).toHaveTextContent(
+        'Response drafts and changes used for research, funded by grant from the Cosmos Institute and FIRE, about how AI represents people’s preferences. It keeps the AI’s drafted answers and compares them to your final answers. Only the session’s admins see it.',
+      );
+      expect(within(tooltip).getByRole('link', { name: 'About the grant' })).toHaveAttribute(
+        'href',
+        'https://www.fire.org/news/fire-and-cosmos-institute-launch-1-million-grant-program-ai-advances-truth-seeking',
+      );
+      // The pointer leaves for the tooltip: it is still there well after reactstrap's usual 50 ms, and staying
+      // over it keeps it.
+      fireEvent.mouseLeave(what);
+      act(() => jest.advanceTimersByTime(1500));
+      expect(screen.getByRole('tooltip')).toBeInTheDocument();
+      fireEvent.mouseEnter(screen.getByTestId('ce-interview-research-what-tip'));
+      act(() => jest.advanceTimersByTime(5000));
+      expect(screen.getByRole('tooltip')).toBeInTheDocument();
+      // Leaving both, it goes after 2 s.
+      fireEvent.mouseLeave(screen.getByTestId('ce-interview-research-what-tip'));
+      act(() => jest.advanceTimersByTime(2100));
+      await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('lets the keyboard reach its links, and Escape close it', async () => {
+    // Stands in for the Interview dialog, which closes on Escape and wraps Tab.
+    const dialogKeyDown = jest.fn();
+    const dialogKeyUp = jest.fn();
+    render(
+      <div onKeyDown={dialogKeyDown} onKeyUp={dialogKeyUp}>
+        <SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />
+        <button type="button" hidden>
+          Hidden
+        </button>
+        <button type="button">After</button>
+      </div>,
+    );
+    const what = screen.getByRole('button', { name: 'What’s this? About sharing for research' });
+    act(() => what.focus());
+    const tooltip = await screen.findByRole('tooltip');
+    fireEvent.keyDown(what, { key: 'Tab' });
+    const [doc, grant] = within(tooltip).getAllByRole('link');
+    expect(doc).toHaveFocus();
+    // Moving between its links keeps it open.
+    act(() => grant.focus());
+    fireEvent.keyDown(grant, { key: 'Tab' });
+    expect(screen.getByRole('button', { name: 'After' })).toHaveFocus();
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+    act(() => what.focus());
+    await screen.findByRole('tooltip');
+    fireEvent.keyDown(what, { key: 'Escape' });
+    fireEvent.keyUp(what, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+    // None of the keys it handled reached the dialog.
+    expect(dialogKeyDown).not.toHaveBeenCalled();
+    expect(dialogKeyUp).not.toHaveBeenCalled();
+    // With the tooltip closed, Escape is the dialog's again.
+    fireEvent.keyDown(what, { key: 'Escape' });
+    fireEvent.keyUp(what, { key: 'Escape' });
+    expect(dialogKeyUp).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns Tab to its button when nothing follows it', async () => {
+    render(<SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />);
+    const what = screen.getByRole('button', { name: 'What’s this? About sharing for research' });
+    act(() => what.focus());
+    const tooltip = await screen.findByRole('tooltip');
+    const links = within(tooltip).getAllByRole('link');
+    act(() => links[links.length - 1].focus());
+    fireEvent.keyDown(links[links.length - 1], { key: 'Tab' });
+    expect(what).toHaveFocus();
+  });
+
   it('names itself shortly, with what it shares behind “What’s this?”', () => {
     render(<SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />);
     expect(screen.getByLabelText('Share for research')).toBeChecked();
@@ -219,7 +290,6 @@ describe('SessionInterviewResearchShare', () => {
 
 it('explains that current drafts use current attribution while preserving consent', () => {
   renderConsent({ preserveSavedProvenance: true });
-  fireEvent.click(screen.getByText('AI prefill metadata', { selector: 'summary' }));
   expect(screen.getByText(/Selected AI drafts use this interview’s source metadata/i)).toBeInTheDocument();
 });
 
@@ -281,10 +351,10 @@ describe('AI draft text for admins', () => {
     expect(screen.getByText(/Drafted text is not kept/)).toBeInTheDocument();
   });
 
-  it('says beside Share for research that the agent mirror evaluation is for admins alone', () => {
+  it('says beside Share for research what the research is, and that it is for admins alone', () => {
     render(<SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />);
     expect(screen.getByText(/Includes the AI’s predicted answers/)).toHaveTextContent(
-      /^For the agent mirror evaluation, which measures how well your AI predicts you\. Only the session’s admins see it\./,
+      /^Response drafts and changes used for research, funded by grant from the Cosmos Institute and FIRE, .* Only the session’s admins see it\. Includes/,
     );
   });
 
@@ -294,6 +364,33 @@ describe('AI draft text for admins', () => {
     rerender(<SessionInterviewResearchShare included disabled={false} draftTextOffered onChange={jest.fn()} />);
     expect(screen.getByText(/Includes the AI’s predicted answers/)).toHaveTextContent(
       /lets the session’s admins, and nobody else, read the AI’s drafted text; you can turn that off on its own/,
+    );
+  });
+
+  it('says beside the transcript box when only its first part would be kept', () => {
+    const { rerender } = renderConsent({
+      includeComparison: true,
+      transcript: false,
+      transcriptText: 'Robin: audits.',
+    });
+    expect(screen.getByLabelText('Let admins read this interview’s transcript')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-interview-transcript-cut')).not.toBeInTheDocument();
+    rerender(
+      <SessionInterviewResearchConsent
+        packet={packet}
+        includeProvenance
+        includeComparison
+        onProvenanceChange={jest.fn()}
+        coverageDetails={[]}
+        selectedCount={1}
+        unselectedCount={2}
+        disabled={false}
+        transcript={false}
+        transcriptText={'Robin: '.repeat(10_000)}
+      />,
+    );
+    expect(screen.getByTestId('ce-session-interview-transcript-cut')).toHaveTextContent(
+      'This transcript is long, so only its first part would be kept.',
     );
   });
 });

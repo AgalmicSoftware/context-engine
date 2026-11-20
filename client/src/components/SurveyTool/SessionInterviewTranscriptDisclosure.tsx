@@ -42,7 +42,8 @@ export default function SessionInterviewTranscriptDisclosure({
             showTranscript ? '' : styles.sessionInterviewTranscriptCaretCollapsed
           }`}
         />
-        <strong className={compact ? styles.sessionListeningSrOnly : undefined}>Transcript</strong>
+        <strong>Transcript</strong>
+        {compact ? <span aria-hidden="true">·</span> : null}
         <span>{wordCount} words</span>
       </button>
     </section>

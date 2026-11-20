@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import SessionContextSources from './SessionContextSources';
+import { AGENT_MARK_LABEL } from '../Shared/AgentMark';
 import {
   addContextLink,
   readContextSourceBlob,
@@ -131,8 +132,11 @@ describe('the Context section for participants', () => {
     expect(within(itemOf('agent')).getByText('Added by 0xbbbb…0002')).toBeInTheDocument();
     // A name that says it is an agent's is shown as given, not marked twice.
     expect(within(itemOf('says')).getByText('Added by Wren’s agent (AI agent, trial)')).toBeInTheDocument();
-    // The mark is a label of its own, which a name cannot supply or remove.
-    for (const name of ['kami', 'agent', 'says']) expect(within(itemOf(name)).getByText('Agent')).toBeInTheDocument();
+    // The mark is a robot of its own, which a name cannot supply or remove.
+    for (const name of ['kami', 'agent', 'says']) {
+      expect(within(itemOf(name)).getByRole('button', { name: AGENT_MARK_LABEL })).toBeInTheDocument();
+      expect(within(itemOf(name)).queryByText('Agent')).toBeNull();
+    }
     expect(screen.queryByText(/\(agent\)/)).toBeNull();
   });
 

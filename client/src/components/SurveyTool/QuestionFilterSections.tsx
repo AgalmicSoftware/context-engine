@@ -7,6 +7,7 @@ import {
   faChevronDown,
   faClipboard,
   faFilter,
+  faFolderOpen,
   faQuestionCircle,
   faRobot,
   faSpinner,
@@ -20,8 +21,6 @@ import LazyFallback from '../Shared/LazyFallback';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { lazyWithRetry } from '../../utilities/ui/lazyImportRetry.js';
 import {
-  QUESTION_FILTER_ACTIONS_STYLE,
-  QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
   QUESTION_FILTER_DISABLED_TEXT_SPACING_STYLE,
   QUESTION_FILTER_SBT_SPINNER_STYLE,
   buildQuestionFilterAiCombineRowClassName,
@@ -29,9 +28,6 @@ import {
   buildQuestionFilterTagBubbleClassName,
   buildQuestionFilterTypeButtonClassName,
   buildQuestionFilterTypePillClassName,
-  resolveQuestionFilterBookmarkIconStyle,
-  resolveQuestionFilterClearIconStyle,
-  resolveQuestionFilterCopyIconStyle,
   resolveQuestionFilterSectionBodyStyle,
   resolveQuestionFilterSectionHeaderStyle,
 } from './questionFilterDisplayHelpers';
@@ -664,9 +660,11 @@ type FilterActionsProps = {
   onBookmarkCurrentFilter: () => void;
   onClearFilters: () => void;
   onCopyFilterUrl: () => void;
+  onToggleLoadInput: () => void;
+  showLoadInput: boolean;
 };
 
-function QuestionFilterActionIcons({
+function QuestionFilterActions({
   copiedUrlSuccess,
   filterBookmarkedFeedback,
   isCurrentFilterBookmarked,
@@ -674,33 +672,57 @@ function QuestionFilterActionIcons({
   onBookmarkCurrentFilter,
   onClearFilters,
   onCopyFilterUrl,
+  onToggleLoadInput,
+  showLoadInput,
 }: FilterActionsProps): JSX.Element {
+  const isBookmarked = isCurrentFilterBookmarked || filterBookmarkedFeedback;
   return (
-    <span style={QUESTION_FILTER_ACTIONS_STYLE}>
-      <FontAwesomeIcon
-        icon={faTimes}
+    <div className={styles.filterSummaryActions}>
+      <button
+        type="button"
+        className={styles.filterAction}
         data-testid={E2E_TESTIDS.QUESTION_FILTER_CLEAR_ALL}
-        onClick={!isDefault ? onClearFilters : undefined}
-        className={styles.clearFilterIcon}
+        disabled={isDefault}
+        onClick={onClearFilters}
         title={isDefault ? 'No filters to clear' : 'Clear current filters'}
-        style={resolveQuestionFilterClearIconStyle(isDefault)}
-      />
-      <FontAwesomeIcon
-        icon={copiedUrlSuccess ? faCheck : faClipboard}
-        onClick={!isDefault && !copiedUrlSuccess ? onCopyFilterUrl : undefined}
-        style={resolveQuestionFilterCopyIconStyle(isDefault, copiedUrlSuccess)}
+      >
+        <FontAwesomeIcon icon={faTimes} className={styles.clearActionIcon} />
+        Clear
+      </button>
+      <button
+        type="button"
+        className={styles.filterAction}
+        disabled={isDefault}
+        onClick={copiedUrlSuccess ? undefined : onCopyFilterUrl}
         title={isDefault ? 'No custom filters to copy' : copiedUrlSuccess ? 'URL Copied!' : 'Copy Filter URL'}
-      />
-      <FontAwesomeIcon
-        icon={faBookmark}
-        onClick={!isDefault ? onBookmarkCurrentFilter : undefined}
-        style={resolveQuestionFilterBookmarkIconStyle(isDefault, isCurrentFilterBookmarked, filterBookmarkedFeedback)}
+      >
+        <FontAwesomeIcon
+          icon={copiedUrlSuccess ? faCheck : faClipboard}
+          className={copiedUrlSuccess ? styles.copiedActionIcon : undefined}
+        />
+        {copiedUrlSuccess ? 'Copied' : 'Copy'}
+      </button>
+      <button
+        type="button"
+        className={styles.filterAction}
+        disabled={isDefault}
+        onClick={onBookmarkCurrentFilter}
         title={isDefault ? 'No custom filters to bookmark' : 'Bookmark Current Filter'}
-      />
-      {filterBookmarkedFeedback && !copiedUrlSuccess && (
-        <span style={QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE}>Filter Bookmarked!</span>
-      )}
-    </span>
+      >
+        <FontAwesomeIcon icon={faBookmark} className={isBookmarked ? styles.bookmarkedActionIcon : undefined} />
+        Bookmark
+      </button>
+      <button
+        type="button"
+        className={styles.filterAction}
+        aria-expanded={showLoadInput}
+        onClick={onToggleLoadInput}
+        title="Load a saved filter"
+      >
+        <FontAwesomeIcon icon={faFolderOpen} />
+        Load
+      </button>
+    </div>
   );
 }
 
@@ -710,7 +732,7 @@ type LoadFilterControlsProps = {
   onLoadFilter: () => void;
 };
 
-export function QuestionFilterLoadFilterControls({
+function QuestionFilterLoadFilterControls({
   filterUrlInput,
   onFilterUrlInputChange,
   onLoadFilter,
@@ -736,57 +758,46 @@ export function QuestionFilterLoadFilterControls({
 
 type FilterSummaryControlsProps = FilterActionsProps &
   LoadFilterControlsProps & {
-    showLoadInput: boolean;
     summaryItems: FilterSummaryItem[];
   };
 
 export function QuestionFilterSummaryControls({
-  copiedUrlSuccess,
-  filterBookmarkedFeedback,
   filterUrlInput,
-  isCurrentFilterBookmarked,
-  isDefault,
-  onBookmarkCurrentFilter,
-  onClearFilters,
-  onCopyFilterUrl,
   onFilterUrlInputChange,
   onLoadFilter,
-  showLoadInput,
   summaryItems,
+  ...actionProps
 }: FilterSummaryControlsProps): JSX.Element {
   return (
     <div className={styles.filterSummaryContainer}>
       <div className={styles.filterSummaryLabel}>
-        <span>Current Filters:</span>
-        <div className={styles.filterSummaryActions}>
-          <QuestionFilterActionIcons
-            copiedUrlSuccess={copiedUrlSuccess}
-            filterBookmarkedFeedback={filterBookmarkedFeedback}
-            isCurrentFilterBookmarked={isCurrentFilterBookmarked}
-            isDefault={isDefault}
-            onBookmarkCurrentFilter={onBookmarkCurrentFilter}
-            onClearFilters={onClearFilters}
-            onCopyFilterUrl={onCopyFilterUrl}
-          />
+        <span>
+          Current Filters:
+          {actionProps.filterBookmarkedFeedback && !actionProps.copiedUrlSuccess && (
+            <span className={styles.bookmarkFeedback}>Filter Bookmarked!</span>
+          )}
+        </span>
+        <QuestionFilterActions {...actionProps} />
+      </div>
+
+      {summaryItems.length > 0 && (
+        <div className={styles.summaryItemsRow}>
+          {summaryItems.map((item, index) => (
+            <button
+              key={index}
+              type="button"
+              className={styles.filterBubble}
+              onClick={item.onRemove}
+              aria-label={`Remove filter: ${item.label}`}
+            >
+              <span>{item.label}</span>
+              <FontAwesomeIcon icon={faTimes} className={styles.removeIcon} />
+            </button>
+          ))}
         </div>
-      </div>
+      )}
 
-      <div className={styles.summaryItemsRow}>
-        {summaryItems.map((item, index) => (
-          <button
-            key={index}
-            type="button"
-            className={styles.filterBubble}
-            onClick={item.onRemove}
-            aria-label={`Remove filter: ${item.label}`}
-          >
-            <span>{item.label}</span>
-            <FontAwesomeIcon icon={faTimes} className={styles.removeIcon} />
-          </button>
-        ))}
-      </div>
-
-      {showLoadInput && (
+      {actionProps.showLoadInput && (
         <QuestionFilterLoadFilterControls
           filterUrlInput={filterUrlInput}
           onFilterUrlInputChange={onFilterUrlInputChange}

@@ -408,6 +408,10 @@ function SessionInterviewDraftCardContent({
             }
           />
         )}
+        {/* Their own words when they answered in another language, beside the English draft; never submitted. */}
+        {draft.spokenOriginal?.answer && !blindNote ? (
+          <EarlierNote label={`Your words (${draft.spokenOriginal.language})`} text={draft.spokenOriginal.answer} />
+        ) : null}
         <div className={styles.footerShell}>
           <div className={`${styles.controlsRow} ${quadraticStyles.footerRow}`}>
             <SurveyQuestionsFullQuestionSliderSection
@@ -463,6 +467,12 @@ function SessionInterviewDraftCardContent({
                       onChoose={onCommentsChange}
                     />
                   </>
+                ) : null}
+                {draft.spokenOriginal?.additionalComments && !blindNote ? (
+                  <EarlierNote
+                    label={`Your comment in your words (${draft.spokenOriginal.language})`}
+                    text={draft.spokenOriginal.additionalComments}
+                  />
                 ) : null}
                 <AdditionalCommentsInlineRow
                   lockControl={renderFieldLock?.(draft.questionId, 'additional')}

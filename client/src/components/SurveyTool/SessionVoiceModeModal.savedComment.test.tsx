@@ -342,8 +342,8 @@ describe('what someone encrypted stays out of review and every AI', () => {
       const heard = await talk();
       expect(heard.instructions).toContain('Drafted answer');
       expect(heard.instructions).not.toContain('Secret reason');
-      expect(heard.reviewed).toContain('"questionId":"q-text"');
-      expect(heard.reviewed).not.toContain('Secret reason');
+      // The drafter isn't sent an AI-drafted question's draft at all.
+      expect(heard.reviewed).not.toContain('"questionId":"q-text"');
 
       // Kept, it is submitted exactly as it was.
       await submit();
@@ -381,6 +381,6 @@ describe('what someone encrypted stays out of review and every AI', () => {
       expect(heard.instructions).not.toContain(typed);
       expect(heard.reviewed).not.toContain(typed);
     }
-    expect(heard.reviewed).toContain('"questionId":"q-text"');
+    expect(heard.reviewed).not.toContain('"questionId":"q-text"');
   });
 });

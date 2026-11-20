@@ -29,21 +29,23 @@ a line for each of Claude Code, Codex, Gemini CLI, Hermes Agent, Cursor and the
 OpenAI Agents SDK, and the [MCP README](../mcp/README.md) sets a host up in the
 same words. A chat app on a website or a phone can't add tools, so it can't
 join; it can draft the person's answers for them to review, from the session's
-**Let your AI draft your answers** prompt. The guide then tells an agent to ask
-the person it works for which way to take part. As itself, it joins through the MCP with the
+**Let your AI draft your answers** prompt. An agent with no tools and no shell
+opens with one short reply: it gives the link back for the person to answer
+themselves, and offers to draft their answers for review. With tools, the guide tells
+an agent to ask the person it works for which way to take part. As itself, it joins through the MCP with the
 session link as received, under a name that says whose agent it is. On their
 behalf, it answers as them with a key they make in the account menu under
-**Your AI agent**, **Full submit**, which needs **Agents (HTTP
+**Your AI agent**, **Answer for me**, which needs **Agents (HTTP
 API)** on. **Make a key** puts the key, which ends with the person's sign-in
 (within 4 hours) and works only in that session, into the one prompt they copy;
 the prompt names the session, tells the agent never to repeat the key, and
-gives the MCP install line in case the agent wants it. With **Ask me if I approve**
+gives the MCP install line in case the agent wants it. With **Ask me before submitting**
 ticked (the default), it asks the agent to show its answers in the chat and
 submit once the person says yes there; unticked, to submit without asking
 again and then say what it submitted. The guide treats that copied prompt as
 the person's approval, and otherwise keeps "submit only the answers they
 approve". Its other choice,
-**Predict responses**, copies the session's draft-your-answers
+**Suggest answers**, copies the session's draft-your-answers
 prompt, named for the session, with the same MCP line and no key. From the
 link alone, an agent can also suggest answers for a public session: the guide
 says how, and the MCP's `get_interview_catalog` and `make_review_link` do it
@@ -130,7 +132,9 @@ existing rules.
    pseudonymous Agree, Unsure and Disagree answers per participant.
 2. Share the session link. `https://contextengine.sh/session/<slug>` works
    once the site lists the session in `/known-sessions.json`; otherwise add
-   `?worker=<worker origin>`. An invitation made for people, such as an
+   `?worker=<worker origin>`. Give the entry an `interviewCatalog`, the whole
+   address of the session's question catalog, so a chat AI that fetches only
+   addresses it was shown can draft answers from the link. An invitation made for people, such as an
    interview link (`mode=interview`), works as it is. A group link
    (`&joinGroup=<id>`) names the group
    without joining it: the agent reads the session's instructions first, then

@@ -87,6 +87,63 @@ Similarity between a prediction and an answer runs from 0 to 1:
 - **Rating error:** the mean absolute difference between a predicted and a
   given rating, as a share of the question's scale (7 against 9 on 0–10 is
   0.2), per person and then across people.
+- **Quadratic vote strength:** the quadratic row of the table above scores only
+  the direction of the votes. How strongly someone voted is scored beside it,
+  never inside the Mirror Score, so scores already collected stay comparable.
+  Strength is the length of the vote vector in votes, the square root of the
+  credits spent; the whole budget spent is the most, √credits. The match is
+  1 − |strength of the draft − strength of the answer| ÷ √credits
+  (`quadraticIntensitySimilarity`): 1 for the same strength, 0 for no votes
+  against the whole budget spent. A budget that can't be spent exactly never
+  quite reaches 0: on 99 credits one option takes at most 9 votes, so no votes
+  against those scores 0.10. On 99 credits:
+  - 2 votes against 9 on the same option: direction 1, strength
+    1 − 7 ÷ 9.95 = 0.30;
+  - nothing against 3 and −2 (13 credits): direction 0.5, strength
+    1 − 3.61 ÷ 9.95 = 0.64;
+  - 3 against −3 on the same option: direction 0, strength 1.
+
+  Votes, not credits, because they are what people choose: in credits,
+  1 vote against 3 would differ by only 8 of 99. Spreading or stacking the same
+  credits (5 and 5, or 7 and 1) is the same strength; which options get them is
+  the direction's part. It covers all drafts, shown ones included, so where
+  people mostly accept shown drafts it is high partly for that reason; the
+  report doesn't split it by condition. The report gives it per person
+  (`participants[].quadraticIntensity`) and overall (`quadraticIntensity`),
+  and its lift over guessing the median of everyone else's strengths
+  (`baselines.quadraticIntensity`), the best single guess under this distance,
+  as the median is for ratings. It is not the strength of their mean votes,
+  which shrinks wherever people vote in different directions and would flatter
+  the AI.
+- **Quadratic vote match:** the votes themselves, option by option, sizes
+  included (`quadraticVoteAgreement`). The difference is the mean absolute
+  difference in votes per option between the draft and the answer. The match
+  is 1 − the summed difference ÷ the most two answers within the budget can
+  differ: twice the most votes the credits buy, spread as evenly as whole
+  votes allow, one answer against its reverse. On 99 credits over three
+  options the most is 17 votes (6, 6 and 5), so 34. On those 99 credits:
+  - 2 votes against 9 on the same option: 7 apart, 2.33 per option, match
+    1 − 7 ÷ 34 = 0.79;
+  - 3 against −3: 6 apart, match 0.82, though the strength match is 1;
+  - 5 and 5 against 7 and 1: 6 apart, match 0.82, though the strength match
+    is 1;
+  - 6, 6 and 5 against −6, −6 and −5: match 0.
+
+  Like strength it covers all drafts, shown ones included, and stays outside
+  the Mirror Score. The report gives the difference and the match per person
+  (`participants[].quadraticVoteDifference`, `quadraticVoteMatch`) and overall
+  (`quadraticVotes.difference`, `quadraticVotes.match`), and the match's lift
+  over guessing everyone else's mean votes, the group's centre
+  (`baselines.quadraticVotes`).
+- **Quadratic vote totals:** per quadratic question, the drafts' total votes
+  per option against the final answers' total votes per option, the quantity
+  the Results chart shows (final even for hidden drafts, which the other
+  measures score against the answer given before the draft was shown), with the difference (`quadraticTotals`: `drafted`,
+  `actual`, `difference`). They sum over the people with a draft; Session
+  Wrapped predictions are left out, since Results doesn't count them. A
+  question is withheld when fewer people drafted than the minimum, and also
+  when 1 to one less than the minimum answered without a draft, since the
+  Results totals minus these totals would show those people's votes.
 - **Calibration:** for choice predictions with a stated confidence, the share
   kept unchanged in each tenth of the confidence range, plus the Brier score
   and expected calibration error. Prefill confidences are 0–1; Wrapped

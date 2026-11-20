@@ -92,6 +92,27 @@ it('keeps Submit readable on the narrowest phone rows', () => {
   );
 });
 
+// The arrows sit against the counter, with no margin between: each icon is drawn at the counter's side of its
+// 44px target, and its keyboard ring pulled in to the target's edge. The room goes to Submit, whose count always shows,
+// small and without brackets, in the button's top corner.
+it('closes the phone arrows up to the counter and keeps the Submit count in view', () => {
+  const counter = css.match(/\.pileInteractionUnit \.pileNav \.pileNavCounterText\s*\{([^{}]*)\}/)?.[1] || '';
+  expect(counter).toMatch(/margin: 0;/);
+  expect(css).toMatch(
+    /\.pileInteractionUnit \.pileNav \.pileNavArrow:first-child\s*\{\s*justify-content: flex-end;\s*padding-right: 4px;/,
+  );
+  expect(css).toMatch(
+    /\.pileInteractionUnit \.pileNav \.pileNavArrow:last-child\s*\{\s*justify-content: flex-start;\s*padding-left: 4px;/,
+  );
+  expect(css).toMatch(
+    /\.pileInteractionUnit \.pileControls \.pileNav \.pileNavArrow:focus-visible\s*\{\s*outline-offset: -1px;/,
+  );
+  expect(css).toMatch(/\.pileInteractionUnit \.pileFooter \.pileSubmitButtonCountBracket\s*\{\s*display: none;/);
+  expect(css).toMatch(
+    /\.pileInteractionUnit \.pileFooter \.pileSubmitButtonCount\s*\{\s*position: absolute;\s*top: 3px;\s*right: 5px;/,
+  );
+});
+
 // The counter gives way to Submit's word: one line, then its numbers stacked, then gone. A row that was a hair too
 // tight in another platform's rendering of the same font cut the word ("Submit" lost its end at 375px). Its form
 // now comes from the row's width against what the row needs in the font in use, never from a width in pixels.

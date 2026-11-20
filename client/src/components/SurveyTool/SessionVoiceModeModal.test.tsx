@@ -7,6 +7,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   buildExternalInterviewKickoff,
   hashInterviewQuestions,
+  INTERVIEW_PREFILL_PASTE_NOTE,
   mapInterviewEvidenceToResponses,
   type InterviewDraftResponse,
 } from './sessionInterview';
@@ -255,14 +256,15 @@ describe('SessionVoiceModeModal', () => {
     view.rerender(<SessionVoiceModeModal {...props} />);
     await expectReadableDraftText('Draft answer for What matters?', 'My unsaved edit');
     expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledTimes(1);
-    // Discard sits in the microphone's row, in its left column (SurveyTool.styles.test.ts checks the
-    // placement), and explains itself on hover, and to screen readers.
+    // Discard leads the row under the microphone, the transcript after it (SurveyTool.styles.test.ts
+    // checks the styling), and explains itself on hover, and to screen readers.
     const discard = screen.getByRole('button', { name: 'Discard interview' });
     const microphone = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START);
     expect(discard).toHaveClass('sessionInterviewDiscard');
-    expect(discard.parentElement).toHaveClass('sessionInterviewPrimaryAction');
-    expect(discard.parentElement).toBe(microphone.parentElement);
-    expect(document.querySelector('.sessionInterviewSideActions')).toBeNull();
+    expect(discard).toHaveTextContent('Discard');
+    expect(discard.parentElement).toHaveClass('sessionInterviewMicRow');
+    expect(discard.parentElement?.previousElementSibling).toBe(microphone);
+    expect(discard.parentElement?.firstElementChild).toBe(discard);
     expect(document.querySelector('.modal-footer')).toBeNull();
     expect(discard).toHaveAccessibleDescription(/Responses you’ve submitted are kept\.$/);
     fireEvent.mouseOver(discard);
@@ -490,7 +492,7 @@ describe('SessionVoiceModeModal', () => {
         false,
         '',
         expect.arrayContaining([expect.objectContaining({ questionId: 'q1', answer: 'Agent: A reviewed answer' })]),
-        {},
+        { includeResponderName: false },
       ),
     );
   });
@@ -505,13 +507,50 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByText(/Speak with an AI interviewer/)).not.toBeInTheDocument();
     fireEvent.focus(help);
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Stopping prepares drafts for your review');
+    expect(screen.getByRole('tooltip')).toHaveTextContent('You can answer in the language you prefer.');
     fireEvent.blur(help);
+    // Beside it, flags that screen readers name by language, not country.
+    const languages = within(screen.getByRole('list', { name: 'Some languages you can answer in' }));
+    expect(languages.getAllByRole('img').map((flag) => flag.textContent)).toEqual([
+      'English',
+      'Portuguese',
+      'German',
+      'French',
+      'Hindi',
+      'Japanese',
+      'Korean',
+    ]);
+    expect(languages.getByRole('img', { name: 'English' })).not.toHaveAccessibleDescription();
+    expect(languages.getByRole('img', { name: 'English' }).closest('.modal-header')).not.toBeNull();
     await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
     fireEvent.focus(screen.getByRole('button', { name: 'Interview status: Ready' }));
     expect(status).toHaveTextContent('Ready');
     expect(screen.getByRole('button', { name: 'Interview status: Ready' })).toHaveAttribute('data-tone', 'ready');
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Voice setup ready.');
+    // Led by the status in full, which a phone may cut short in the pill.
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      /^Ready\. Voice setup ready\. Click to check again\.$/,
+    );
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Start voice interview');
+  });
+
+  it('says the questions are loading until the pile settles, and no questions only after', () => {
+    const { rerender } = render(
+      <SessionVoiceModeModal {...baseProps} mode="interview" questionPool={[]} questionLoad="loading" />,
+    );
+    const status = () => screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS);
+    const none = () => screen.queryByText('No accessible questions are available for this interview.');
+    expect(status()).toHaveTextContent('Loading questions…');
+    expect(none()).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Interview status: Loading questions…' })).toHaveAttribute(
+      'data-tone',
+      'busy',
+    );
+    rerender(<SessionVoiceModeModal {...baseProps} mode="interview" questionPool={[]} questionLoad="failed" />);
+    expect(status()).toHaveTextContent("Questions didn't load");
+    expect(none()).not.toBeInTheDocument();
+    rerender(<SessionVoiceModeModal {...baseProps} mode="interview" questionPool={[]} />);
+    expect(status()).toHaveTextContent('No questions');
+    expect(none()).toBeInTheDocument();
   });
 
   it('submits reviewed values and retains edited unselected predictions only as consented metadata', async () => {
@@ -556,11 +595,9 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByRole('button', { name: 'What’s this? About sharing for research' })).toHaveAccessibleDescription(
       /drafts you did not select/,
     );
+    // Inside AI submission info the metadata shows at once, with nothing more to open.
     const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
-    expect(metadata).not.toHaveAttribute('open');
-    expect(metadata.querySelector('summary')).toHaveTextContent('AI prefill metadata');
-    fireEvent.click(metadata.querySelector('summary')!);
-    expect(metadata).toHaveAttribute('open');
+    expect(metadata.querySelector('details, summary')).toBeNull();
     expect(metadata).toHaveTextContent('Claude');
     expect(metadata).toHaveTextContent('example');
     expect(metadata).toHaveTextContent('Self-reported');
@@ -1176,7 +1213,7 @@ describe('SessionVoiceModeModal', () => {
       'Left out 2 drafts for questions you’ve already answered.',
     );
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).toHaveTextContent(
-      'Your AI drafted 1 answer · Claude, self-reported',
+      'Your AI drafted 1 answer',
     );
     expect(screen.getByRole('group', { name: 'AI prefill metadata' })).toHaveTextContent(
       '1 selected draft and 0 unselected drafts',
@@ -1261,6 +1298,28 @@ describe('SessionVoiceModeModal', () => {
     expect(within(paste).getByRole('alert')).toHaveTextContent('different session');
   });
 
+  // An AI with no code tool links #prefill=paste: the box opens with no error.
+  it('opens on the paste box, without an error, when the AI asks for a paste', async () => {
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        initialError={INTERVIEW_PREFILL_PASTE_NOTE}
+        onImportPrefillJson={() => ''}
+      />,
+    );
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_PASTE)).toBeInTheDocument();
+    expect(screen.queryByText(INTERVIEW_PREFILL_PASTE_NOTE)).not.toBeInTheDocument();
+    expect(screen.queryByText('Error')).not.toBeInTheDocument();
+    expect(screen.getByText('Paste drafts')).toBeInTheDocument();
+    // Talking instead leaves the note behind; the paste box stays.
+    mockVoiceRound('Responder: Hello.');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    expect(screen.queryByText('Paste drafts')).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_PASTE)).toBeInTheDocument();
+  });
+
   it.each([
     [{ suggestQuestions: true }, true],
     [{}, false],
@@ -1289,7 +1348,7 @@ describe('SessionVoiceModeModal', () => {
     },
   );
 
-  it('after a submit, a voice interview adds drafts only for new questions and keeps updating submitted ones', async () => {
+  it('after a submit, a voice interview adds drafts only for new questions and leaves the AI draft as it was', async () => {
     let instructions = '';
     mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
       instructions = options.instructions;
@@ -1357,7 +1416,8 @@ describe('SessionVoiceModeModal', () => {
     expect(instructions).not.toContain('Ask which earlier answer');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
     await expectReadableDraftText('Draft answer for Third question?', 'New answer');
-    await expectReadableDraftText('Draft answer for What matters?', 'Refined answer');
+    // The AI prefill's submitted draft stays its own, whatever the voice round drafts for it.
+    await expectReadableDraftText('Draft answer for What matters?', 'Drafted one');
     expect(screen.queryByText('Second question?')).not.toBeInTheDocument();
     expect(screen.getAllByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT)).toHaveLength(2);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
@@ -1365,45 +1425,25 @@ describe('SessionVoiceModeModal', () => {
     );
   });
 
-  it('keeps a voice correction to an AI-prefill draft when the saved answer loads after login', async () => {
+  it('leaves an AI-prefill draft for the person to correct, whatever the voice round drafts', async () => {
     mockVoiceRound('Responder: Actually, I disagree.');
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([
       { questionId: 'q1', answer: 'Disagree', confidence: 0.9 },
     ]);
-    const onLoadSavedResponses = jest.fn().mockResolvedValue({
-      answers: { q1: { value: 'Agree' } },
-      additionalComments: {},
-      importance: {},
-      conviction: {},
-    });
-    const onSubmitResponses = jest.fn().mockResolvedValue({ status: 'login-required' });
-    const props = {
-      ...baseProps,
-      mode: 'interview' as const,
-      onLoadSavedResponses,
-      onSubmitResponses,
-      prefillPacket: aiPrefill([{ questionId: 'q1', answer: 'Agree' }]),
-    };
-    const view = render(<SessionVoiceModeModal {...props} account="" loginComplete={false} />);
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        prefillPacket={aiPrefill([{ questionId: 'q1', answer: 'Agree' }])}
+      />,
+    );
     await expectReadableDraftText('Draft answer for What matters?', 'Agree');
     await speak();
-    await expectReadableDraftText('Draft answer for What matters?', 'Disagree');
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
-    await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
-    // Signing in loads the earlier "Agree": the spoken correction stays, says what it changes,
-    // and the queued submit waits for the person to check it.
-    view.rerender(<SessionVoiceModeModal {...props} />);
-    await waitFor(() =>
-      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent(
-        'Saved answers loaded. Check drafts that change an earlier answer or comment, then submit.',
-      ),
-    );
-    await expectReadableDraftText('Draft answer for What matters?', 'Disagree');
-    expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeEnabled();
-    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).not.toBeInTheDocument();
-    expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
-    expect(onSubmitResponses).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalled());
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    // Its guess is what research compares the person's answer with, so only the person changes it.
+    await expectReadableDraftText('Draft answer for What matters?', 'Agree');
+    expect(mockedMapInterviewEvidenceToResponses.mock.calls[0][0].previousResponses).toEqual([]);
   });
 
   it('leaves out an answered question even when the voice mapper hands back its AI-prefill guess', async () => {
@@ -1428,12 +1468,10 @@ describe('SessionVoiceModeModal', () => {
     await expectReadableDraftText('Draft answer for Second question?', 'Agree');
     await speak();
     await waitFor(() => expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalled());
-    // The mapper never hears the guess for the answered question.
-    expect(
-      mockedMapInterviewEvidenceToResponses.mock.calls[0][0].prefillPacket?.responses?.map(
-        ({ questionId }) => questionId,
-      ),
-    ).toEqual(['q2']);
+    // The mapper hears neither the guess for the answered question nor the drafted one's, and drafts only q1.
+    const [request] = mockedMapInterviewEvidenceToResponses.mock.calls[0];
+    expect(request.prefillPacket?.responses).toEqual([]);
+    expect(request.questions.map(({ id }) => id)).toEqual(['q1']);
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
     expect(draftIds()).toEqual(['q2']);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
@@ -1474,7 +1512,8 @@ describe('SessionVoiceModeModal', () => {
       ]),
     );
     await expectReadableDraftText('Draft answer for Third question?', 'New three');
-    await expectReadableDraftText('Draft answer for Second question?', 'Refined two');
+    // The AI-drafted q2 isn't redrafted.
+    await expectReadableDraftText('Draft answer for Second question?', 'Drafted two');
     expect(draftIds()).toEqual(['q2', 'q3']);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
       'Left out 1 draft for a question you’ve already answered.',
@@ -1548,7 +1587,7 @@ describe('SessionVoiceModeModal', () => {
     },
   );
 
-  it('gives the voice interviewer only unanswered questions and their drafts, or every question once all are answered', async () => {
+  it('gives the voice interviewer only undrafted unanswered questions, or every question once all are answered', async () => {
     mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
       options.onRecordingState?.('recording');
       return {
@@ -1562,7 +1601,11 @@ describe('SessionVoiceModeModal', () => {
     const props = {
       ...baseProps,
       mode: 'interview' as const,
-      questionPool: [...baseProps.questionPool, { id: 'q2', prompt: 'Second question?', type: 'freeform' }],
+      questionPool: [
+        ...baseProps.questionPool,
+        { id: 'q2', prompt: 'Second question?', type: 'freeform' },
+        { id: 'q3', prompt: 'Third question?', type: 'freeform' },
+      ],
       prefillPacket: {
         version: 1 as const,
         sessionSlug: 'demo',
@@ -1581,8 +1624,11 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
     await screen.findByLabelText('Pause interview');
     const open = mockedStartSessionRealtimeInterview.mock.calls[0][0].instructions;
-    expect(open).toContain('[q2]');
+    // q2's draft is background for the open q3; the drafted q2 itself is not to be asked.
+    expect(open).toContain('[q3]');
     expect(open).toContain('EVIDENCE-q2');
+    expect(open).not.toContain('[q2]');
+    expect(open).toContain('drafts use:\n- (q2) Second question?');
     expect(open).not.toContain('[q1]');
     expect(open).not.toContain('EVIDENCE-q1');
     first.unmount();
@@ -1591,7 +1637,7 @@ describe('SessionVoiceModeModal', () => {
     render(
       <SessionVoiceModeModal
         {...props}
-        existingResponseSlice={{ answers: { q1: { value: 'Saved' }, q2: { value: 'Saved' } } }}
+        existingResponseSlice={{ answers: { q1: { value: 'Saved' }, q2: { value: 'Saved' }, q3: { value: 'Saved' } } }}
       />,
     );
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE);
@@ -1600,6 +1646,7 @@ describe('SessionVoiceModeModal', () => {
     const answered = mockedStartSessionRealtimeInterview.mock.calls[1][0].instructions;
     expect(answered).toContain('[q1]');
     expect(answered).toContain('[q2]');
+    expect(answered).toContain('[q3]');
     expect(answered).toContain('Ask which earlier answer, if any, the responder wants to change');
     expect(answered).not.toContain('Already answered (reference only');
     expect(answered).not.toContain('EVIDENCE-q1');
@@ -2589,7 +2636,9 @@ describe('SessionVoiceModeModal', () => {
         .map((paragraph) => paragraph.textContent)
         .join(' ')
         .replace(/\s+/g, ' '),
-    ).toContain('Fetch this URL: worker.example/agent/interview-catalog…');
+    ).toContain(
+      'Fetch this URL with a plain HTTP GET; that is all this needs, with no MCP, sign-in or tool to install: worker.example/agent/interview-catalog…',
+    );
     const codeBlock = displayedPrompt.querySelector('pre code');
     expect(codeBlock).toBeInTheDocument();
     expect(codeBlock?.textContent).toContain('\n  "version": 1,');
@@ -2731,7 +2780,9 @@ describe('SessionVoiceModeModal', () => {
     const toggle = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE);
     const startControl = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START);
     expect(startControl.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(toggle.closest('.sessionInterviewSideActions')).not.toBeNull();
+    // Right of Discard in the row under the microphone.
+    expect(toggle.closest('.sessionInterviewMicRow')?.lastElementChild).toContainElement(toggle);
+    expect(toggle).toHaveTextContent(/^Transcript·\d+ words$/);
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Include self-reported AI platform/)).not.toBeInTheDocument();
     // Sharing for research starts on, so its metadata is there to read.
@@ -2762,7 +2813,7 @@ describe('SessionVoiceModeModal', () => {
         true,
         '',
         expect.any(Array),
-        {},
+        { includeResponderName: false },
       ),
     );
   });
@@ -2865,7 +2916,7 @@ describe('SessionVoiceModeModal', () => {
         true,
         '',
         expect.any(Array),
-        {},
+        { includeResponderName: false },
       ),
     );
     expect(baseProps.onClose).not.toHaveBeenCalled();
@@ -3099,14 +3150,9 @@ describe('SessionVoiceModeModal', () => {
       window.HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
     }
     const panel = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PANEL);
-    const coverage = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_RESEARCH_COVERAGE);
-    expect(coverage).toHaveTextContent('Self-reported agent research coverage');
-    expect(coverage).toHaveTextContent('History chats: 8 used');
-    expect(coverage).toHaveTextContent('Memories: 4 used / 20 searched');
-    expect(coverage).toHaveTextContent('Connected sources: 1 used / 3 searched');
-    expect(coverage).toHaveTextContent('15 user statements used');
-    expect(coverage).toHaveTextContent('Chat search did not expose a total scanned count.');
-    const footer = coverage.nextElementSibling;
+    // Research coverage shows once, in the AI submission info's metadata, not again under the responses.
+    expect(screen.queryByText('Self-reported agent research coverage')).not.toBeInTheDocument();
+    const footer = screen.getByRole('group', { name: 'Response submission' });
     expect(footer).toContainElement(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
     expect(panel.lastElementChild).toBe(footer);
     const responderContext = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT);
@@ -3114,8 +3160,10 @@ describe('SessionVoiceModeModal', () => {
     expect(responderContext.closest('details')).not.toHaveAttribute('open');
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)).not.toBeInTheDocument();
     const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
-    fireEvent.click(metadata.querySelector('summary')!);
+    expect(metadata).toHaveTextContent('History chats: 8 used');
     expect(metadata).toHaveTextContent('Memories: 4 used / 20 searched');
+    expect(metadata).toHaveTextContent('Connected sources: 1 used / 3 searched');
+    expect(metadata).toHaveTextContent('15 user statements used');
     expect(metadata).toHaveTextContent('Chat search did not expose a total scanned count.');
     await expectReadableDraftText('Draft answer for What matters?', 'A cautious prediction');
     expect(screen.queryByLabelText('AI-estimated confidence: 22%')).not.toBeInTheDocument();
@@ -3147,7 +3195,7 @@ describe('SessionVoiceModeModal', () => {
         true,
         '',
         expect.any(Array),
-        {},
+        { includeResponderName: false },
       ),
     );
   });
@@ -3186,11 +3234,11 @@ describe('SessionVoiceModeModal', () => {
     render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
 
     await expectReadableDraftText('Draft answer for What matters?', 'Predicted answer from memory');
-    // A prefill link opens on its drafts, with a status line, and the interview talks them through.
+    // A prefill link opens on its drafts, with a status line, and the interview asks about the rest.
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).toHaveTextContent(
-      'Your AI drafted 1 answer · Claude, self-reported',
+      'Your AI drafted 1 answer',
     );
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Talk through your drafts');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Add more by voice');
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toBeEnabled();
     await editReadableDraftText('Draft answer for What matters?', 'Reviewed correction before speaking');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
@@ -3220,7 +3268,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).toHaveTextContent(
       /^Your AI drafted 1 answer$/,
     );
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Talk through your drafts');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Add more by voice');
   });
 
   it('sends only the reviewed responder context to the interviewer and the draft mapper', async () => {
@@ -3386,7 +3434,7 @@ describe('SessionVoiceModeModal', () => {
           original: expect.objectContaining({ answer: [3, -4] }),
         }),
       ],
-      {},
+      { includeResponderName: false },
     );
   });
 
@@ -3469,7 +3517,6 @@ describe('SessionVoiceModeModal', () => {
     const includeComparison = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
     expect(includeComparison).toBeChecked();
     const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
-    fireEvent.click(metadata.querySelector('summary')!);
     expect(metadata).toHaveTextContent('Platform');
     expect(metadata).toHaveTextContent('Claude');
     expect(metadata).toHaveTextContent('Question set');
@@ -3491,14 +3538,14 @@ describe('SessionVoiceModeModal', () => {
         true,
         '',
         expect.any(Array),
-        { includePredictionComparison: true },
+        { includePredictionComparison: true, includeResponderName: false },
       ),
     );
     expect(baseProps.onClose).not.toHaveBeenCalled();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Responses submitted');
   });
 
-  it('keeps an imported responder name private until the responder opts in', async () => {
+  it('never writes an imported name into the answers', async () => {
     const prefillPacket = {
       version: 1 as const,
       sessionSlug: 'demo',
@@ -3508,11 +3555,10 @@ describe('SessionVoiceModeModal', () => {
       responderContext: { name: 'Ada Example' },
       responses: [{ questionId: 'q1', answer: 'Draft answer', confidence: 0.8 }],
     };
-    const first = render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
 
-    const includeName = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME);
-    expect(includeName).not.toBeChecked();
-    expect(screen.getByText(/Include “Ada Example” as the responder name/i)).toBeInTheDocument();
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    expect(screen.queryByText(/as the responder name/i)).toBeNull();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
     await waitFor(() =>
       expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
@@ -3523,28 +3569,7 @@ describe('SessionVoiceModeModal', () => {
         true,
         '',
         expect.any(Array),
-        {},
-      ),
-    );
-    first.unmount();
-
-    jest.clearAllMocks();
-    jest
-      .mocked(useInterviewReadiness)
-      .mockReturnValue({ state: 'ready', detail: 'Voice setup ready.', retry: jest.fn() });
-    render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
-    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME));
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
-    await waitFor(() =>
-      expect(baseProps.onRecordProvenance).toHaveBeenCalledWith(
-        expect.any(Array),
-        prefillPacket.source,
-        prefillPacket,
-        true,
-        true,
-        'Ada Example',
-        expect.any(Array),
-        { includeResponderName: true },
+        { includeResponderName: false },
       ),
     );
   });
@@ -3932,6 +3957,7 @@ describe('Interview cancellation and recovery', () => {
 
   it('maps new speech instead of reusing imported response predictions', async () => {
     sessionMock();
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([{ questionId: 'q2', answer: 'New evidence' }]);
     render(
       <SessionVoiceModeModal
         {...baseProps}
@@ -3943,6 +3969,7 @@ describe('Interview cancellation and recovery', () => {
           responderContext: {},
           responses: [{ questionId: 'q1', answer: 'Old prediction', confidence: 0.5 }],
         }}
+        questionPool={[...baseProps.questionPool, { id: 'q2', prompt: 'Next?', type: 'freeform' }]}
       />,
     );
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
@@ -3955,7 +3982,8 @@ describe('Interview cancellation and recovery', () => {
         expect.objectContaining({ transcript: 'Responder: New evidence.' }),
       ),
     );
-    await expectReadableDraftText('Draft answer for What matters?', 'New evidence');
+    await expectReadableDraftText('Draft answer for Next?', 'New evidence');
+    await expectReadableDraftText('Draft answer for What matters?', 'Old prediction');
   });
   it('opens the interview and personal AI prompt with the newest unanswered breakout questions', async () => {
     const props = {

@@ -5,7 +5,7 @@ import {
 } from './surveyToolResponsePayloadController';
 import { getConvictionFromSlice, getImportanceFromSlice } from './surveyToolResponseState';
 import { planDraftTextSync } from './sessionInterviewDraftText';
-import { buildSavedInterviewConsent } from './sessionInterviewConsent';
+import { buildSavedInterviewConsent, capInterviewTranscript } from './sessionInterviewConsent';
 
 const defaultOpts = (overrides: Partial<BuildResponsePayloadOptions> = {}): BuildResponsePayloadOptions => ({
   isStandalone: false,
@@ -838,6 +838,84 @@ describe('research detail tiers', () => {
       }),
     ).responses![0].interviewProvenance as Record<string, unknown>;
 
+  describe('a shared interview transcript', () => {
+    const voice = { researchTier: 'minimal', draftOrigin: 'voice_interview', interviewId: 'interview-1' };
+    const upload = (
+      encrypted: Record<string, boolean>,
+      record: Record<string, unknown> = provenance(voice),
+      transcripts: Record<string, unknown> = { 'interview-1': 'Responder: Robin said audits.' },
+    ) =>
+      buildResponsePayload(
+        defaultOpts({
+          questionPool: ['q1', 'q2', 'q3'].map((id) => ({ id, type: 'binary', prompt: id })),
+          surveyResponseState: {
+            answers: Object.fromEntries(
+              ['q1', 'q2', 'q3'].map((id) => [id, { value: 'Agree', encrypted: !!encrypted[id] }]),
+            ),
+            additionalComments: {},
+            importance: {},
+            conviction: {},
+            interviewProvenance: { q1: record, q2: record, q3: record },
+            interviewTranscripts: transcripts,
+          } as never,
+        }),
+      ).responses!.map((row) => row.interviewProvenance as Record<string, unknown>);
+
+    it('rides on the first answer, and the others name the interview', () => {
+      const records = upload({});
+      expect(records.map((record) => Boolean(record.transcript))).toEqual([true, false, false]);
+      expect(records[0].transcript).toBe('Responder: Robin said audits.');
+      expect(records.map((record) => record.interviewId)).toEqual(['interview-1', 'interview-1', 'interview-1']);
+    });
+
+    it('rides on an answer this upload sends, not on one left as saved', () => {
+      const records = buildResponsePayload(
+        defaultOpts({
+          questionPool: ['q1', 'q2', 'q3'].map((id) => ({ id, type: 'binary', prompt: id })),
+          includeQuestionIds: new Set(['q3']),
+          refuseWithheldConsent: true,
+          surveyResponseState: {
+            answers: Object.fromEntries(['q1', 'q2', 'q3'].map((id) => [id, { value: 'Agree' }])),
+            interviewProvenance: { q1: provenance(voice), q2: provenance(voice), q3: provenance(voice) },
+            interviewTranscripts: { 'interview-1': 'Responder: Robin said audits.' },
+          } as never,
+        }),
+      ).responses!.map((row) => (row.interviewProvenance as Record<string, unknown>).transcript);
+      expect(records).toEqual([undefined, undefined, 'Responder: Robin said audits.']);
+    });
+
+    it('keeps at most 64 KiB as stored, cut between characters', () => {
+      expect(capInterviewTranscript('Robin: audits.')).toBe('Robin: audits.');
+      for (const unit of ['a', 'ж', '"', '\n', '😀']) {
+        const kept = capInterviewTranscript(unit.repeat(70_000));
+        expect(new TextEncoder().encode(JSON.stringify(kept)).length - 2).toBeLessThanOrEqual(64 * 1024);
+        expect(kept.length).toBeGreaterThan(0);
+        expect(Array.from(kept).every((char) => char === unit)).toBe(true);
+      }
+    });
+
+    // The conversation may repeat what an encrypted answer says.
+    it('is kept nowhere while any answer is encrypted', () => {
+      expect(upload({ q2: true }).some((record) => 'transcript' in record)).toBe(false);
+    });
+
+    it('stays with its answer when a reload has dropped the page’s copy', () => {
+      const records = upload({}, provenance({ ...voice, transcript: 'Responder: Robin said audits.' }), {});
+      expect(records.map((record) => record.transcript)).toEqual([
+        'Responder: Robin said audits.',
+        undefined,
+        undefined,
+      ]);
+    });
+
+    it('goes nowhere without research sharing, and also rides on a talked-through prefill', () => {
+      const off = upload({}, provenance({ ...voice, includePredictionComparison: false }));
+      expect(JSON.stringify(off)).not.toMatch(/Robin|interview-1/);
+      const prefill = upload({}, provenance({ ...voice, draftOrigin: 'external_prefill' }));
+      expect(prefill[0].transcript).toBe('Responder: Robin said audits.');
+    });
+  });
+
   it('saves a minimal record with no AI notes, drafted text or skipped-question drafts', () => {
     const record = submit(provenance({ researchTier: 'minimal' }));
     expect(record).toMatchObject({
@@ -850,6 +928,24 @@ describe('research detail tiers', () => {
     });
     expect(record.unselectedPredictions).toBeUndefined();
     expect(JSON.stringify(record)).not.toMatch(/nurse|hospital|Basis|Guess|My own note/);
+  });
+
+  it('keeps the drafting prompt, voice model and interviewer revision of a voice draft', () => {
+    const versions = {
+      mappingPromptVersion: 'ce-interview-mapping-v3',
+      voiceModel: 'gpt-live-1.1',
+      voiceBriefRevision: 'ce-voice-brief-3',
+    };
+    const voice = { researchTier: 'minimal', draftOrigin: 'voice_interview', ...versions };
+    expect(submit(provenance(voice))).toMatchObject(versions);
+    // The copied prompt's wording stays with research even when AI attribution isn't shared.
+    const prefill = submit(
+      provenance({ researchTier: 'minimal', promptRevision: 'ce-prefill-prompt-2', includeAiProvenance: false }),
+    );
+    expect(prefill).toMatchObject({ promptRevision: 'ce-prefill-prompt-2' });
+    expect(prefill).not.toHaveProperty('source');
+    const off = submit(provenance({ ...voice, includePredictionComparison: false, includeAiProvenance: true }));
+    expect(off).not.toHaveProperty('voiceBriefRevision');
   });
 
   it('keeps a known draft origin and drops an unknown one', () => {

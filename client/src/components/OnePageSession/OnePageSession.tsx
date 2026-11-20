@@ -2148,6 +2148,11 @@ class OnePageSession extends Component<any, any> {
     }
   }
 
+  // A built risk matrix's note opens its atlas topic as an atlas link does.
+  handleRequestedAtlasNodeOpen = (nodeId: string) => {
+    this.setState({ showResults: true, resultsViewMode: 'debateAtlas', requestedAtlasNodeId: nodeId });
+  };
+
   handleRequestedAtlasNodeClose = () => {
     if (this.state.requestedAtlasNodeId) this.setState({ requestedAtlasNodeId: null });
   };
@@ -2560,6 +2565,7 @@ class OnePageSession extends Component<any, any> {
         embeddedAtlasNodeId={this.state.embeddedAtlasNodeId}
         embeddedAtlasReturnState={this.state.embeddedAtlasReturnState}
         requestedAtlasNodeId={this.state.requestedAtlasNodeId}
+        onRequestedAtlasNodeOpen={this.handleRequestedAtlasNodeOpen}
         onRequestedAtlasNodeClose={this.handleRequestedAtlasNodeClose}
         embeddedGroupsSessionConfig={embeddedGroupsSessionConfig}
         embeddedGroupsSessionSlug={embeddedGroupsSessionSlug}

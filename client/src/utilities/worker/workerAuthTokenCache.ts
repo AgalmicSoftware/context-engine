@@ -219,8 +219,60 @@ export const buildTokenCacheEnvelope = ({
   token: toStr(token).trim(),
 });
 
+// Sign-ins this page replaced without ending them at their Worker, as after a refused scope. Each still stands
+// there until it runs out, and with it any key an agent was given from it, so they are kept to be ended when the
+// person signs their agents out. Saved as a sign-in is: in this tab only, and never used after a sign-out or
+// account switch.
+const REPLACED_KEY = 'ce:workerTokensReplaced:v1';
+const MAX_REPLACED = 24;
+type HeldToken = { sessionSlug: string; token: string; workerUrl: string };
+type ReplacedToken = HeldToken & { expiresAt: number };
+let replacedTokens: ReplacedToken[] | null = null;
+
+const unexpiredSignIn = (record: unknown, nowSeconds: number): ReplacedToken | null => {
+  const entry = record as TokenCacheEntry | null;
+  const token = toStr(entry?.token).trim();
+  const workerUrl = normalizeWorkerUrl(entry?.workerUrl);
+  const expiresAt = Number(entry?.expiresAt || 0);
+  return token && workerUrl && expiresAt > nowSeconds
+    ? { workerUrl, sessionSlug: normalizeSessionSlug(entry?.sessionSlug), token, expiresAt }
+    : null;
+};
+
+const readReplacedTokens = (nowSeconds: number): ReplacedToken[] => {
+  if (!replacedTokens) {
+    const saved = typeof window === 'undefined' ? null : readSavedRecord(REPLACED_KEY);
+    replacedTokens = Array.isArray(saved) ? saved.flatMap((entry) => unexpiredSignIn(entry, 0) || []) : [];
+  }
+  return replacedTokens.filter((entry) => entry.expiresAt > nowSeconds);
+};
+
+const saveReplacedTokens = (list: ReplacedToken[]): void => {
+  replacedTokens = list.slice(-MAX_REPLACED);
+  try {
+    if (!replacedTokens.length) tabStorage()?.removeItem(REPLACED_KEY);
+    else if (tabGeneration) {
+      tabStorage()?.setItem(REPLACED_KEY, JSON.stringify({ generation: tabGeneration, record: replacedTokens }));
+    }
+  } catch (_) {}
+};
+
+// Before a held sign-in is dropped or written over: if it still stands, it is remembered as replaced.
+const setAsideSignIn = (key: string, keptToken = ''): void => {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const entry = unexpiredSignIn(readTokenCache(key), nowSeconds);
+  if (!entry || entry.token === keptToken) return;
+  const list = readReplacedTokens(nowSeconds);
+  if (!list.some((known) => known.token === entry.token)) saveReplacedTokens([...list, entry]);
+};
+
+/** Sign-ins this page replaced that may still stand at their Workers. */
+export const listReplacedTokens = (nowSeconds = Math.floor(Date.now() / 1000)): HeldToken[] =>
+  readReplacedTokens(nowSeconds).map(({ workerUrl, sessionSlug, token }) => ({ workerUrl, sessionSlug, token }));
+
 export const writeTokenCache = (key: string, payload: unknown): void => {
   if (typeof window === 'undefined') return;
+  setAsideSignIn(key, toStr((payload as TokenCacheEntry | null)?.token).trim());
   try {
     window.localStorage.removeItem(key);
   } catch (_) {}
@@ -233,7 +285,7 @@ export const writeTokenCache = (key: string, payload: unknown): void => {
   } catch (_) {}
 };
 
-export const clearTokenCache = (key: string): void => {
+const dropTokenCache = (key: string): void => {
   tokenMemoryCache.delete(key);
   if (typeof window === 'undefined') return;
   try {
@@ -244,10 +296,16 @@ export const clearTokenCache = (key: string): void => {
   } catch (_) {}
 };
 
+export const clearTokenCache = (key: string): void => {
+  if (typeof window !== 'undefined') setAsideSignIn(key);
+  dropTokenCache(key);
+};
+
 export const clearAllTokenCaches = (): void => {
   tokenMemoryCache.clear();
   purgePersistedTokenCache();
   forEachTabTokenKey((key) => tabStorage()?.removeItem(key));
+  saveReplacedTokens([]);
 };
 
 /** This page's unexpired sign-ins, so a sign-out can end each one at its Worker. */
@@ -266,6 +324,21 @@ export const listHeldTokens = (
     }
   });
   return held;
+};
+
+/** Forgets one sign-in, held or replaced, as when it was ended at its Worker: the page then signs in afresh. */
+export const forgetHeldToken = (token: unknown): void => {
+  const ended = toStr(token).trim();
+  if (!ended) return;
+  const keys = new Set(tokenMemoryCache.keys());
+  forEachTabTokenKey((key) => keys.add(key));
+  keys.forEach((key) => {
+    if (toStr((readTokenCache(key) as TokenCacheEntry | null)?.token).trim() === ended) dropTokenCache(key);
+  });
+  const replaced = readReplacedTokens(0);
+  if (replaced.some((entry) => entry.token === ended)) {
+    saveReplacedTokens(replaced.filter((entry) => entry.token !== ended));
+  }
 };
 
 /** The page has learned who is signed in, as after a reload: this tab's saved sign-ins for them still count. */

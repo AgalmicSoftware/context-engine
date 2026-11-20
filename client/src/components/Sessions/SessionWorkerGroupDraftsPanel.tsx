@@ -3,11 +3,16 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
 import WorkerGroupCreateForm from '../Shared/WorkerGroupCreateForm';
 import styles from './SessionWizard.module.scss';
-import type { PendingWorkerGroupDraft } from './sessionWizardPendingWorkerGroups';
+import { SetupHelp, setupHelpId } from './setup/SetupPrimitives';
+import { MAX_PENDING_WORKER_GROUP_DRAFTS, type PendingWorkerGroupDraft } from './sessionWizardPendingWorkerGroups';
+
+const GROUPS_HELP =
+  'Each group gets the same choices and fields as when you create one on the session page. Groups are made after this session’s Worker is deployed and verified.';
 
 type SessionWorkerGroupDraftsPanelProps = {
   drafts?: PendingWorkerGroupDraft[];
   memberCeiling: number;
+  /** Adds an empty group, named in its own form. */
   onAdd: (label: string) => void;
   onRemove: (groupId: string) => void;
   onUpdate: (groupId: string, patch: Partial<PendingWorkerGroupDraft>) => void;
@@ -28,7 +33,6 @@ const SessionWorkerGroupDraftsPanel = ({
   onRemove,
   onUpdate,
 }: SessionWorkerGroupDraftsPanelProps) => {
-  const [newGroupLabel, setNewGroupLabel] = useState('');
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
@@ -38,6 +42,15 @@ const SessionWorkerGroupDraftsPanel = ({
       return next.size === current.size ? current : next;
     });
   }, [drafts]);
+
+  // After Create group, the new group's name, so the next step is where focus lands.
+  const [focusNewest, setFocusNewest] = useState(false);
+  useEffect(() => {
+    if (!focusNewest || !drafts.length) return;
+    setFocusNewest(false);
+    const newest = drafts.length - 1;
+    document.getElementById(`${getDraftDomId(drafts[newest].groupId, newest)}-input`)?.focus();
+  }, [drafts, focusNewest]);
 
   const toggleDraftCollapsed = (groupId: string) => {
     setCollapsedGroupIds((current) => {
@@ -51,49 +64,31 @@ const SessionWorkerGroupDraftsPanel = ({
     });
   };
 
-  const addGroup = () => {
-    const label = newGroupLabel.trim();
-    if (!label) return;
-    onAdd(label);
-    setNewGroupLabel('');
-  };
-
   return (
     <div className={styles.pendingWorkerGroups} data-testid="ce-new-worker-group-drafts">
       <div className={styles.pendingWorkerGroupsHeader}>
         <div>
-          <strong>Groups to create</strong>
+          <span className={styles.pendingWorkerGroupsTitle}>
+            <strong>Groups to create</strong>
+            <SetupHelp id="ce-new-worker-groups" label="Groups to create" help={GROUPS_HELP} />
+          </span>
           <span>{drafts.length ? `${drafts.length} queued` : 'Optional'}</span>
         </div>
-        <p>Draft Groups now; they are created after this session&rsquo;s Worker is deployed and verified.</p>
       </div>
 
       <div className={styles.pendingWorkerGroupAddRow}>
-        <label htmlFor="ce-new-worker-group-name">Group name</label>
-        <div>
-          <input
-            id="ce-new-worker-group-name"
-            value={newGroupLabel}
-            maxLength={120}
-            placeholder="e.g. Research team"
-            onChange={(event) => setNewGroupLabel(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                addGroup();
-              }
-            }}
-            data-testid="ce-new-worker-group-name"
-          />
-          <button
-            type="button"
-            onClick={addGroup}
-            disabled={!newGroupLabel.trim() || drafts.length >= 100}
-            data-testid="ce-new-worker-group-add"
-          >
-            <FontAwesomeIcon icon={faPlus} /> Add Group
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            onAdd('');
+            setFocusNewest(true);
+          }}
+          disabled={drafts.length >= MAX_PENDING_WORKER_GROUP_DRAFTS}
+          aria-describedby={setupHelpId('ce-new-worker-groups')}
+          data-testid="ce-new-worker-group-add"
+        >
+          <FontAwesomeIcon icon={faPlus} aria-hidden="true" /> Create group
+        </button>
       </div>
 
       {drafts.length ? (
@@ -158,6 +153,7 @@ const SessionWorkerGroupDraftsPanel = ({
                     joinModeTestId="ce-new-worker-group-draft-join-mode"
                     label={draft.label}
                     labelTestId="ce-new-worker-group-draft-label"
+                    idPrefix={draftDomId}
                     memberVisibility={draft.memberVisibility}
                     memberVisibilityTestId="ce-new-worker-group-draft-visibility"
                     removalAuth={draft.removalAuth}

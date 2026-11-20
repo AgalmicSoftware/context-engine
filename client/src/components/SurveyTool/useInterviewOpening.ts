@@ -15,11 +15,9 @@ export function useInterviewOpening({
 }) {
   const settings = normalizeInterviewSettings((config as { interviewMode?: unknown })?.interviewMode);
   const [opening, setOpening] = useState('');
-  const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
   useEffect(() => {
     setOpening('');
-    setNotice('');
     setLoading(false);
     if (settings.openingMode === 'owner' || !workerUrl || !hasQuestions) return;
     const controller = new AbortController();
@@ -36,15 +34,10 @@ export function useInterviewOpening({
         return response.json();
       })
       .then((value) => {
-        if (active) {
-          setOpening(String(value.openingPrompt || ''));
-          if (value.warning) setNotice(String(value.warning));
-        }
+        if (active) setOpening(String(value.openingPrompt || ''));
       })
-      .catch(() => {
-        if (active)
-          setNotice('A saved opening is unavailable. The interview will start directly with a session question.');
-      })
+      // Without an opening the interview starts from a session question; that is not the participant's concern.
+      .catch(() => {})
       .finally(() => {
         clearTimeout(timeout);
         if (active) setLoading(false);
@@ -58,7 +51,6 @@ export function useInterviewOpening({
   return {
     opening: settings.openingMode === 'owner' ? settings.openingPrompt : opening,
     steeringPrompt: settings.steeringPrompt,
-    notice,
     loading: settings.openingMode === 'auto' && loading,
   };
 }

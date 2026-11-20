@@ -25,8 +25,7 @@ const LOOP_FILES: Record<string, { video: string; poster: string }> = {
   },
 };
 
-// These two loops show roadmap work. The use-case section marks them with an asterisk and a footnote; the films
-// themselves are left as they are.
+// These two loops show roadmap work, so a line above each says so; the films themselves are left as they are.
 const FUTURE_LOOPS = new Set(['corporate', 'digital-groups']);
 
 /** Whether a use case's loop shows features that are not built yet. */
@@ -56,6 +55,9 @@ const UseCaseLoop = ({ slug, title }: UseCaseLoopProps) => {
   if (!files || failed) return null;
   return (
     <figure className={styles.useCaseLoop}>
+      {showsFutureFeatures(slug) ? (
+        <p className={styles.useCaseLoopNotice}>This animation shows future features.</p>
+      ) : null}
       <video
         className={styles.useCaseLoopVideo}
         src={buildPublicRoute(files.video)}
@@ -73,7 +75,6 @@ const UseCaseLoop = ({ slug, title }: UseCaseLoopProps) => {
         aria-label={`${title}: an illustrative animation`}
         data-testid="ce-about-use-case-loop"
       />
-      <figcaption className={styles.useCaseLoopCaption}>An illustration, not a real deployment.</figcaption>
     </figure>
   );
 };

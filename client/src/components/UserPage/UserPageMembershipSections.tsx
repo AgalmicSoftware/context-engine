@@ -12,6 +12,8 @@ type UserPageMembershipSectionsArgs = {
   isSimulated: boolean;
   onChainProfileEnabled?: boolean;
   provider: unknown;
+  /** The picture card the page's person shows on it. It leads the side column, above their groups. */
+  savedCard?: React.ReactNode;
   sessionConfig: unknown;
   sbtSectionProps: Omit<React.ComponentProps<typeof UserPageSbtSection>, 'account' | 'provider' | 'wrapColumn'>;
 };
@@ -23,6 +25,7 @@ export const renderUserPageMembershipSections = ({
   isSimulated,
   onChainProfileEnabled,
   provider,
+  savedCard = null,
   sessionConfig,
   sbtSectionProps,
 }: UserPageMembershipSectionsArgs): React.ReactNode => {
@@ -38,9 +41,13 @@ export const renderUserPageMembershipSections = ({
 
   // Someone else's groups can't be shown yet, so their page leaves the section out. "Own" is the
   // signed-in account matching the address in the URL, checked on every render; signed out isn't.
-  if (!isOwner && !showOnChainSbts) return null;
+  // Their shown card, if they have one, is all that column then holds; with none it is left out.
+  if (!isOwner && !showOnChainSbts) {
+    return savedCard ? <div className={`${styles.rightColumn} ${styles.cardColumn}`}>{savedCard}</div> : null;
+  }
   return (
-    <div className={styles.rightColumn}>
+    <div className={savedCard ? `${styles.rightColumn} ${styles.cardColumn}` : styles.rightColumn}>
+      {savedCard}
       {isOwner && (
         <UserPageWorkerGroupSection
           account={account}

@@ -1,6 +1,7 @@
 /** @file UserPage.analysisCache.test.jsx */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import UserPage from './UserPage';
+import UserPageHeader from './UserPageHeader';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
@@ -74,6 +75,10 @@ const makeInstance = (props = {}) => {
   });
 
   instance._isMounted = true;
+  // These tests are about what Analyze does with a session's entries, which they set in state. Which entries a
+  // session has is read from its own stores, and is tested with real stores further down.
+  instance.readSessionSourcesFromStores = instance.deriveSessionSources;
+  instance.deriveSessionSources = jest.fn(() => instance.state);
   instance.setState = jest.fn((update, cb) => {
     const patch = typeof update === 'function' ? update(instance.state, instance.props) : update;
     if (patch && typeof patch === 'object') {
@@ -85,7 +90,35 @@ const makeInstance = (props = {}) => {
   return instance;
 };
 
+// Entries as the page lists them: each names the session it came from.
+const ENTRY_LISTS = [
+  'sbtList',
+  'questionResponseInfo',
+  'surveyResponseInfo',
+  'questionCreationInfo',
+  'surveyCreationInfo',
+];
+const tagSession = (instance, slug = instance.props.activeSessionSlug ?? '') => {
+  const tag = (entry) => ({ ...entry, slug, sessionSlug: slug });
+  instance.state = {
+    ...instance.state,
+    ...Object.fromEntries(ENTRY_LISTS.map((key) => [key, (instance.state[key] || []).map(tag)])),
+  };
+  return instance;
+};
+// One group in the page's session, for tests about which session's AI is asked: there must be something to ask about.
+const withAnEntry = (instance) => {
+  instance.state = {
+    ...instance.state,
+    sbtList: [{ sbtInfo: { name: 'Session Badge', sbtAddress: '0x00000000000000000000000000000000000000cc' } }],
+  };
+  return tagSession(instance);
+};
+
 let analysisCacheTestSeq = 0;
+
+// The page's header element; the session switch, where shown, comes before it.
+const renderedHeader = (instance) => instance.render().props.children.find((child) => child?.type === UserPageHeader);
 
 const makeAnalysisCacheInstance = (props = {}) => {
   analysisCacheTestSeq += 1;
@@ -105,6 +138,7 @@ const makeAnalysisCacheInstance = (props = {}) => {
     username: 'Cache Test User',
     sbtList: [
       {
+        slug,
         sbtInfo: {
           name: 'Cache Badge',
           sbtAddress: '0x00000000000000000000000000000000000000cc',
@@ -116,6 +150,8 @@ const makeAnalysisCacheInstance = (props = {}) => {
         id: 'q1',
         type: 'freeform',
         prompt: 'What should be cached?',
+        slug,
+        sessionSlug: slug,
       },
     ],
     detailedQuestionResponses: {
@@ -233,6 +269,7 @@ describe('UserPage analysis cache and routing', () => {
       account: '0x00000000000000000000000000000000000000bb',
       activeSessionSlug: 'active-slug',
     });
+    withAnEntry(instance);
     analyzeUserOpinions.mockResolvedValueOnce({
       summary: 'summary',
       details: 'details',
@@ -259,6 +296,245 @@ describe('UserPage analysis cache and routing', () => {
     );
   });
 
+  describe("only the page's own session", () => {
+    const mine = '0x00000000000000000000000000000000000000aa';
+    // Each test starts with no session kept in this browser.
+    beforeEach(async () => {
+      for (const store of ['questionsCache', 'surveysCache', 'sbtCache', 'userCache']) {
+        await cacheScripts.clearCacheNamespace(store);
+      }
+    });
+    const publicField = (value) => ({ value, encrypted: false, encryptionAudience: 'self', encryptedPortion: '' });
+    const answer = (value, comment = '') => ({ answer: publicField(value), additional: publicField(comment) });
+    const question = (id, prompt, sessionSlug) => ({ id, type: 'freeform', prompt, creator: '0xother', sessionSlug });
+    // Two sessions kept in this browser. The same slate is seeded in both, so "q-shared" has one id in both.
+    const seedStores = async ({ page, elsewhere, networkID, pageAnswers, elsewhereAnswers }) => {
+      const store = (slug, answers, extra = {}) =>
+        cacheScripts.writeCache('questionsCache', slug, {
+          [networkID]: {
+            questions: {
+              'q-shared': question('q-shared', 'A question seeded in both sessions', slug),
+              ...extra,
+            },
+            questionResponses: Object.fromEntries(
+              Object.entries(answers).map(([id, value]) => [id, { [mine]: value }]),
+            ),
+          },
+        });
+      // The page's session is written first, so its record of the shared question is the one the page keeps.
+      await store(page, pageAnswers, { 'q-here': question('q-here', 'A question only in this session', page) });
+      await store(elsewhere, elsewhereAnswers, {
+        'q-there': question('q-there', 'A question only in the private session', elsewhere),
+      });
+    };
+    const realInstance = (slug, props = {}) => {
+      const { instance, networkID } = makeAnalysisCacheInstance({
+        viewAddress: mine,
+        account: mine,
+        activeSessionSlug: slug,
+        ...props,
+      });
+      instance.deriveSessionSources = instance.readSessionSourcesFromStores;
+      return { instance, networkID };
+    };
+    // Everything one session can hold for me: an answer with a comment, a survey answer, a question and a survey
+    // I made, and a group I am in.
+    const seedWholeSession = async (slug, networkID, word) => {
+      await cacheScripts.writeCache('questionsCache', slug, {
+        [networkID]: {
+          questions: {
+            'q-shared': question('q-shared', 'A question seeded in both sessions', slug),
+            'q-in-survey': question('q-in-survey', `A survey question, ${word}`, slug),
+            'q-made': { ...question('q-made', `A question I made, ${word}`, slug), creator: mine },
+          },
+          questionResponses: { 'q-shared': { [mine]: answer(`MY ANSWER ${word}`, `my comment ${word}`) } },
+        },
+      });
+      await cacheScripts.writeCache('surveysCache', slug, {
+        [networkID]: {
+          surveys: {
+            's-answered': { id: 's-answered', title: `A survey I answered, ${word}`, questionIDs: ['q-in-survey'] },
+            's-made': { id: 's-made', title: `A survey I made, ${word}`, questionIDs: ['q-in-survey'], creator: mine },
+          },
+          surveyResponses: {
+            's-answered': {
+              [mine]: { responses: [{ questionID: 'q-in-survey', ...answer(`MY SURVEY ANSWER ${word}`) }] },
+            },
+          },
+        },
+      });
+    };
+    // The group store keeps only what its own checks accept, so each session's group list is handed to the
+    // page as that store would return it: one source per session, under the session's name.
+    const withGroups = (instance, networkID, bySlug) => {
+      const readStores = instance._dgReadAll;
+      instance._dgReadAll = (name) =>
+        name !== 'sbtCache'
+          ? readStores(name)
+          : Object.entries(bySlug).map(([slug, word], index) => {
+              const group = `0xc${index}${'0'.repeat(38)}`;
+              const entry = {
+                sbtAddress: group,
+                sbtInfo: { name: `A group I am in, ${word}` },
+                mintedAddresses: [mine],
+              };
+              return { slug, data: { [networkID]: { sbtList: { [group]: entry } } } };
+            });
+    };
+    const sentToTheAi = async (instance) => {
+      await instance.analyzeUser();
+      expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+      return JSON.stringify(analyzeUserOpinions.mock.calls[0][0]);
+    };
+    const ALL_OF_IT = [
+      'MY ANSWER',
+      'my comment',
+      'MY SURVEY ANSWER',
+      'A survey I answered',
+      'A question I made',
+      'A survey I made',
+      'A group I am in',
+    ];
+
+    it.each([
+      ['its plain link', (slug) => ({ slug, props: {} })],
+      [
+        'a link that names its Worker',
+        (slug) => ({ slug, props: { sessionConfig: { slug, corsWorkerUrl: 'https://worker.example' } } }),
+      ],
+      // The route's name is not the session's own: its stores sit under the name in its config.
+      [
+        'an alias route',
+        (slug) => ({
+          slug: `${slug}-alias`,
+          props: { sessionConfig: { slug, corsWorkerUrl: 'https://worker.example' } },
+        }),
+      ],
+    ])(
+      'sends all I have in this session when it is opened by %s, and nothing from the session beside it',
+      async (_name, open) => {
+        const stores = `own-whole-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+        const { slug, props } = open(stores);
+        const { instance, networkID } = realInstance(slug, props);
+        await seedWholeSession(stores, networkID, 'HERE');
+        // The same slate, and so the same ids, in another session kept in this browser, with different answers.
+        await seedWholeSession(`${stores}-private`, networkID, 'ELSEWHERE');
+        withGroups(instance, networkID, { [stores]: 'HERE', [`${stores}-private`]: 'ELSEWHERE' });
+        const text = await sentToTheAi(instance);
+        for (const piece of ALL_OF_IT) expect(text).toContain(`${piece}${piece.startsWith('A ') ? ', HERE' : ' HERE'}`);
+        expect(text).not.toContain('ELSEWHERE');
+      },
+    );
+
+    it('never sends an answer given elsewhere, even to a question both sessions share', async () => {
+      const page = `own-session-${Date.now()}`;
+      const elsewhere = `${page}-private`;
+      const { instance, networkID } = realInstance(page);
+      await seedStores({
+        page,
+        elsewhere,
+        networkID,
+        pageAnswers: { 'q-here': answer('SAID HERE', 'a comment made here') },
+        // Answered only in the private session: the shared question, and one of its own.
+        elsewhereAnswers: {
+          'q-shared': answer('SAID IN PRIVATE', 'PRIVATE COMMENT'),
+          'q-there': answer('ALSO PRIVATE'),
+        },
+      });
+      // The page's own merge of every session does hold the private answer under the shared question's id,
+      // which is why the analysis cannot be sorted out of the page's lists afterwards.
+      const merged = instance._collectUnifiedCacheData({ networkID, viewAddressLower: mine });
+      expect(JSON.stringify(merged.combinedQuestionResponses['q-shared'])).toContain('SAID IN PRIVATE');
+      const alone = instance._collectUnifiedCacheData({ networkID, viewAddressLower: mine, onlySlugs: [page] });
+      expect(alone.combinedQuestionResponses['q-shared']).toBeUndefined();
+
+      const own = instance.deriveSessionSources();
+      expect(own.questionResponseInfo.map((entry) => entry.id)).toEqual(['q-here']);
+      expect(Object.keys(own.detailedQuestionResponses)).toEqual(['q-here']);
+
+      readSavedAnalysisCard.mockResolvedValue({ status: 'none' });
+      analyzeUserOpinions.mockResolvedValueOnce({
+        summary: 'summary',
+        details: 'details',
+        name: 'name',
+        historicalAlignment: { figure: 'Elinor Ostrom (1933–2012)', reasoning: 'r' },
+      });
+      // A model that, against its brief, names the shared question for the card.
+      analyzeUserCard.mockResolvedValueOnce({
+        title: 'A title',
+        matchNote: '',
+        tastes: {},
+        answers: { ownWords: { questionId: 'q-shared', quote: 'SAID IN PRIVATE' }, yesNo: { questionId: 'q-here' } },
+      });
+      await instance.analyzeUser();
+      await waitFor(() => expect(analyzeUserCard).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(instance.state.analysisCardPending).toBe(false));
+
+      for (const call of [analyzeUserOpinions, analyzeUserFirstRead, analyzeUserCard]) {
+        const text = JSON.stringify(call.mock.calls[0][0]);
+        expect(text).toContain('SAID HERE');
+        expect(text).toContain('a comment made here');
+        expect(text).not.toMatch(/PRIVATE|private session/);
+        expect(call.mock.calls[0][0].questions.map((entry) => entry.id)).toEqual(['q-here']);
+      }
+      // Neither the card on screen nor the one saved to my page holds any of it.
+      expect(JSON.stringify([instance.state.analysisCard, publishSavedAnalysisCard.mock.calls])).not.toMatch(/PRIVATE/);
+    });
+
+    it('reads my answer to a shared question from this session, whichever session answered last', async () => {
+      const page = `own-session-shared-${Date.now()}`;
+      const { instance, networkID } = realInstance(page);
+      await seedStores({
+        page,
+        elsewhere: `${page}-private`,
+        networkID,
+        // The private session's answer is the newer one, so it is the one the page's own merge keeps.
+        pageAnswers: { 'q-shared': { ...answer('WHAT I SAID HERE'), ts: 1000 } },
+        elsewhereAnswers: { 'q-shared': { ...answer('WHAT I SAID IN PRIVATE'), ts: 2000 } },
+      });
+      const merged = instance._collectUnifiedCacheData({ networkID, viewAddressLower: mine });
+      expect(JSON.stringify(merged.combinedQuestionResponses['q-shared'])).toContain('WHAT I SAID IN PRIVATE');
+      const own = instance.deriveSessionSources();
+      expect(own.questionResponseInfo.map((entry) => entry.id)).toEqual(['q-shared']);
+      await instance.analyzeUser();
+      const text = JSON.stringify(analyzeUserOpinions.mock.calls[0][0]);
+      expect(text).toContain('WHAT I SAID HERE');
+      expect(text).not.toContain('PRIVATE');
+    });
+
+    it("asks the AI nothing when this session's stores cannot be read, and never falls back to the page's lists", async () => {
+      const { instance } = makeAnalysisCacheInstance({ viewAddress: mine, account: mine });
+      instance.deriveSessionSources = () => {
+        throw new Error('store unreadable');
+      };
+      await instance.analyzeUser();
+      expect(analyzeUserOpinions).not.toHaveBeenCalled();
+      expect(analyzeUserFirstRead).not.toHaveBeenCalled();
+      expect(instance.state.analysisError).toBe('There is nothing from this session to analyze for this account.');
+    });
+
+    it('asks the AI nothing when I have nothing in this session, whatever other sessions hold', async () => {
+      const page = `own-session-empty-${Date.now()}`;
+      const { instance, networkID } = realInstance(page);
+      await seedStores({
+        page,
+        elsewhere: `${page}-private`,
+        networkID,
+        pageAnswers: {},
+        elsewhereAnswers: { 'q-shared': answer('SAID IN PRIVATE'), 'q-there': answer('ALSO PRIVATE') },
+      });
+      await instance.analyzeUser();
+      expect(analyzeUserOpinions).not.toHaveBeenCalled();
+      expect(analyzeUserFirstRead).not.toHaveBeenCalled();
+      expect(checkSponsoredAccess).not.toHaveBeenCalled();
+      expect(instance.state).toMatchObject({
+        analyzing: false,
+        showAnalysisModal: true,
+        analysisError: 'There is nothing from this session to analyze for this account.',
+      });
+    });
+  });
+
   it('sends public answers but never an Only me answer this browser decrypted', async () => {
     const { instance, slug, networkID, addressLower } = makeAnalysisCacheInstance({ provider: 'wagmi' });
     const lockedResponse = {
@@ -282,6 +558,7 @@ describe('UserPage analysis cache and routing', () => {
       ],
       detailedQuestionResponses: { ...instance.state.detailedQuestionResponses, q2: lockedResponse },
     };
+    tagSession(instance);
     cryptoUtils.decryptSingleField.mockResolvedValue({
       answers: { q2: { value: 'private plaintext' } },
       additionalComments: {},
@@ -329,6 +606,7 @@ describe('UserPage analysis cache and routing', () => {
         q2: lockedComment,
       },
     };
+    tagSession(instance);
     cryptoUtils.decryptSingleField.mockResolvedValue({
       answers: {},
       additionalComments: { q2: { value: 'only-me remark' } },
@@ -723,6 +1001,7 @@ describe('UserPage analysis cache and routing', () => {
   it("shows and saves no saved card in a session other than the page's own", async () => {
     const own = '0x00000000000000000000000000000000000000bb';
     const instance = makeInstance({ viewAddress: own, account: own, activeSessionSlug: 'active-slug' });
+    withAnEntry(instance);
     matchedAnalysis();
     // The Worker that will write the card is asked whether the card is on; a card saved there is not this page's.
     readSavedAnalysisCard.mockResolvedValueOnce({ status: 'ready', card: SAVED_CARD, savedAt: 1763460000000 });
@@ -783,6 +1062,7 @@ describe('UserPage analysis cache and routing', () => {
     const own = '0x00000000000000000000000000000000000000e5';
     const { instance } = makeAnalysisCacheInstance({ viewAddress: own, account: own });
     if (props.activeSessionSlug === '') instance.props = { ...instance.props, activeSessionSlug: '', sessionSlug: '' };
+    tagSession(instance);
     matchedAnalysis();
     // This page's copy of the session still says the card is on; the Worker knows better.
     readSavedAnalysisCard.mockResolvedValueOnce({ status: 'off' });
@@ -824,6 +1104,7 @@ describe('UserPage analysis cache and routing', () => {
   it("makes no card where the page's own session turned it off, though the AI answers from another", async () => {
     const own = '0x00000000000000000000000000000000000000c3';
     const instance = makeInstance({ viewAddress: own, account: own, activeSessionSlug: 'active-slug' });
+    withAnEntry(instance);
     matchedAnalysis();
     jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['active-slug', 'open-slug']);
     jest
@@ -850,6 +1131,7 @@ describe('UserPage analysis cache and routing', () => {
     // Not the account above, whose analysis in this session is cached by now.
     const own = '0x00000000000000000000000000000000000000dd';
     const instance = makeInstance({ viewAddress: own, account: own, activeSessionSlug: '' });
+    withAnEntry(instance);
     matchedAnalysis();
     readSavedAnalysisCard.mockResolvedValueOnce({ status: 'ready', card: SAVED_CARD, savedAt: 1763460000000 });
     analyzeUserCard.mockResolvedValueOnce({ title: 'Trusts plain tools over grand plans' });
@@ -1101,7 +1383,7 @@ describe('UserPage analysis cache and routing', () => {
     async (_, props, networkID) => {
       const { instance, slug, addressLower } = makeAnalysisCacheInstance(props);
       analyzeUserOpinions.mockResolvedValueOnce({ summary: 'Original analysis' });
-      const view = render(instance.render().props.children[0]);
+      const view = render(renderedHeader(instance));
 
       fireEvent.click(screen.getByRole('button', { name: 'Analyze' }));
       await waitFor(() => {
@@ -1112,7 +1394,7 @@ describe('UserPage analysis cache and routing', () => {
       expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
 
       const { instance: reopened } = makeAnalysisCacheInstance({ ...props, activeSessionSlug: slug });
-      view.rerender(reopened.render().props.children[0]);
+      view.rerender(renderedHeader(reopened));
       fireEvent.click(screen.getByRole('button', { name: 'Analyze' }));
       await waitFor(() => expect(reopened.state.analysisServedFromCache).toBe(true));
       expect(reopened.state.aiAnalysis).toBe('Original analysis');
@@ -1120,7 +1402,7 @@ describe('UserPage analysis cache and routing', () => {
 
       reopened.state.detailedQuestionResponses.q1.answer.value = 'A changed answer';
       analyzeUserOpinions.mockResolvedValueOnce({ summary: 'Updated analysis' });
-      view.rerender(reopened.render().props.children[0]);
+      view.rerender(renderedHeader(reopened));
       fireEvent.click(screen.getByRole('button', { name: 'Analyze' }));
       await waitFor(() => expect(reopened.state.aiAnalysis).toBe('Updated analysis'));
       expect(reopened.state.analysisServedFromCache).toBe(false);
@@ -1135,7 +1417,7 @@ describe('UserPage analysis cache and routing', () => {
         );
       });
 
-      view.rerender(reopened.render().props.children[0]);
+      view.rerender(renderedHeader(reopened));
       fireEvent.click(screen.getByRole('button', { name: 'Analyze' }));
       await waitFor(() => expect(reopened.state.analysisServedFromCache).toBe(true));
       expect(reopened.state.aiAnalysis).toBe('Updated analysis');
@@ -1286,6 +1568,7 @@ describe('UserPage analysis cache and routing', () => {
       account: '0x00000000000000000000000000000000000000bb',
       activeSessionSlug: inScopeSlug,
     });
+    withAnEntry(instance);
     jest
       .spyOn(cacheScripts, 'listNamespaceSlugsSync')
       .mockImplementation((namespace) => (namespace === 'userCache' ? [staleCacheSlug, inScopeSlug] : []));
@@ -1532,6 +1815,7 @@ describe('UserPage analysis cache and routing', () => {
       account: '0x00000000000000000000000000000000000000bb',
       activeSessionSlug: 'missing-session-slug',
     });
+    withAnEntry(instance);
     jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['missing-session-slug']);
     jest.spyOn(instance, '_getSessionConfigForSlugExact').mockReturnValue(null);
 
@@ -1552,6 +1836,7 @@ describe('UserPage analysis cache and routing', () => {
       account: '0x00000000000000000000000000000000000000bb',
       activeSessionSlug: 'rxc',
     });
+    withAnEntry(instance);
     jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['rxc']);
     const exactSpy = jest.spyOn(instance, '_getSessionConfigForSlugExact');
     const demoSpy = jest.spyOn(contractScriptsModule, 'getDemoSessionConfigBySlug').mockReturnValue({
@@ -1585,6 +1870,7 @@ describe('UserPage analysis cache and routing', () => {
       activeSessionSlug: 'demo-interview',
       sessionConfig,
     });
+    withAnEntry(instance);
     jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['demo-interview']);
     checkSponsoredAccess.mockResolvedValue({
       status: 'no-gate',
@@ -1709,6 +1995,7 @@ describe('UserPage analysis cache and routing', () => {
     const firstRun = instance.analyzeUser();
     await waitFor(() => expect(analyzeUserOpinions).toHaveBeenCalledTimes(1));
     switchAnalysisProfile(instance, { viewAddress: '0x00000000000000000000000000000000000000dd' });
+    withAnEntry(instance);
     const secondRun = instance.analyzeUser();
     await waitFor(() => expect(analyzeUserOpinions).toHaveBeenCalledTimes(2));
     const secondTimer = instance.analysisTimer;
@@ -1788,6 +2075,35 @@ describe('UserPage analysis cache and routing', () => {
     await run;
     expect(instance.state).toMatchObject({ analysisDetails: '', analyzing: false, showAnalysisModal: true });
     expect(instance.analysisTimer).toBeNull();
+  });
+  it('offers Analyze user in the account dialog, which gives the page no sign-in or cache props', async () => {
+    const me = '0x00000000000000000000000000000000000000aa';
+    const dialogProps = { minimized: true, account: me, viewAddress: me, sessionConfig: { slug: 'dialog-slug' } };
+    const { instance } = makeAnalysisCacheInstance({
+      ...dialogProps,
+      activeSessionSlug: 'dialog-slug',
+      isSurveyCacheReady: undefined,
+      isQuestionCacheReady: undefined,
+      isResponsesCacheReady: undefined,
+      isSBTCacheReady: undefined,
+    });
+    const offered = () => {
+      const view = render(renderedHeader(instance));
+      const button = view.queryByRole('button', { name: 'Analyze user' });
+      view.unmount();
+      return !!button;
+    };
+    try {
+      expect(offered()).toBe(false);
+      instance.componentDidMount();
+      await waitFor(() => expect(instance.state.aiAvailable).toBe(true));
+      expect(offered()).toBe(true);
+      // No button where the page finds no AI it may use.
+      instance.state = { ...instance.state, aiAvailable: false };
+      expect(offered()).toBe(false);
+    } finally {
+      instance.componentWillUnmount();
+    }
   });
   it('a delayed cache lookup cannot hydrate a different profile', async () => {
     const { instance } = makeAnalysisCacheInstance();

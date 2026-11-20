@@ -480,19 +480,12 @@ $modal-cta-text: var(--ce-action-submit-text);
   background: transparent;
 }
 
-// Under the use-case buttons: what the asterisk on two of them means.
-.useCaseFootnote {
-  margin: -6px 0 0;
-  font-size: 0.82rem;
+// Above the two loops that show future work; full strength, as it sits inside the section's own card.
+.useCaseLoopNotice {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
   color: $text-color;
-  opacity: 0.85;
-}
-
-.useCaseLoopCaption {
-  margin-top: 6px;
-  font-size: 0.82rem;
-  color: $text-color;
-  opacity: 0.85;
 }
 
 .useCaseDetailText {

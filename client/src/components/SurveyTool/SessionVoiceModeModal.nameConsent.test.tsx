@@ -38,62 +38,8 @@ jest.mock('../../utilities/worker/corsProxy.js', () => ({
 }));
 jest.mock('../../utilities/audio/realtimeInterviewClient', () => ({ startSessionRealtimeInterview: jest.fn() }));
 
-it('offers no responder name and sends none where the session keeps names', async () => {
-  jest
-    .mocked(useSessionNames)
-    .mockReturnValue({ status: 'unavailable', source: null, names: {}, answerNamesShown: false, signIn: null });
+it('offers no answer name and sends none, even when the imported context names someone', async () => {
   const onRecordProvenance = jest.fn();
-  const onSubmitResponses = jest.fn(async () => ({ status: 'submitted' as const }));
-  try {
-    render(
-      <SessionVoiceModeModal
-        isOpen
-        mode="interview"
-        onSelectMode={jest.fn()}
-        onClose={jest.fn()}
-        toggleLoginModal={jest.fn()}
-        sessionSlug="demo"
-        account="0x0000000000000000000000000000000000000001"
-        loginComplete
-        workerUrl="https://worker.example"
-        questionPool={[{ id: 'q1', prompt: 'Proceed?', type: 'binary' }]}
-        prefillPacket={{
-          version: 1,
-          sessionSlug: 'demo',
-          questionSetHash: 'a'.repeat(64),
-          promptVersion: 'ce-interview-brief-v4',
-          source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
-          responderContext: { name: 'Fixture Responder' },
-          responses: [{ questionId: 'q1', answer: 'Agree', confidence: 0.8 }],
-        }}
-        onApplyAnswer={jest.fn()}
-        onApplyAdditional={jest.fn()}
-        onApplyImportance={jest.fn()}
-        onApplyConviction={jest.fn()}
-        onRecordProvenance={onRecordProvenance}
-        onSubmitResponses={onSubmitResponses}
-      />,
-    );
-    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
-    fireEvent.click(screen.getByText('AI submission info'));
-    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME)).toBeNull();
-    expect(screen.queryByText(/as the responder name/)).toBeNull();
-
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
-    await waitFor(() => expect(onRecordProvenance).toHaveBeenCalledTimes(1));
-    expect(onRecordProvenance.mock.calls[0][5]).toBe('');
-    expect(onRecordProvenance.mock.calls[0][7]).toMatchObject({ includeResponderName: false });
-  } finally {
-    jest
-      .mocked(useSessionNames)
-      .mockReturnValue({ status: 'unavailable', source: null, names: {}, answerNamesShown: true, signIn: null });
-  }
-});
-
-it('the responder-name consent is locked while a submission that already carries it is in flight', async () => {
-  const onRecordProvenance = jest.fn();
-  // The pile upload is waiting on a wallet signature.
-  const onSubmitResponses = jest.fn(() => new Promise<never>(() => {}));
   render(
     <SessionVoiceModeModal
       isOpen
@@ -120,26 +66,87 @@ it('the responder-name consent is locked while a submission that already carries
       onApplyImportance={jest.fn()}
       onApplyConviction={jest.fn()}
       onRecordProvenance={onRecordProvenance}
-      onSubmitResponses={onSubmitResponses}
+      onSubmitResponses={jest.fn(async () => ({ status: 'submitted' as const }))}
     />,
   );
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   fireEvent.click(screen.getByText('AI submission info'));
-  const nameConsent = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME);
-  fireEvent.click(nameConsent);
-  expect(nameConsent).toBeChecked();
+  expect(screen.queryByText(/as the responder name/)).toBeNull();
+  // This session has no place for names, so no username box either.
+  expect(screen.queryByLabelText('Username (optional)')).toBeNull();
 
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
-  await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
-  // The in-flight submission already recorded the name.
-  expect(onRecordProvenance.mock.calls[0][5]).toBe('Fixture Responder');
-  // The research consent checkboxes are locked for the same reason...
-  expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).toBeDisabled();
-  // ...but the name consent can still be unticked, showing a choice the upload will not honour.
-  expect(nameConsent).toBeDisabled();
+  await waitFor(() => expect(onRecordProvenance).toHaveBeenCalledTimes(1));
+  expect(onRecordProvenance.mock.calls[0][5]).toBe('');
+  expect(onRecordProvenance.mock.calls[0][7]).toEqual({ includeResponderName: false });
 });
 
-it('uses saved per-question choices and forwards only explicit consent changes', async () => {
+it('puts a username box under the drafts where the session keeps names, apart from the answers', async () => {
+  const setOwn = jest.fn(async (name: string) => name);
+  const names = {
+    status: 'empty' as const,
+    source: {
+      enabled: true,
+      readAll: jest.fn(async () => ({})),
+      readAllOrFail: jest.fn(async () => ({})),
+      hasSignIn: jest.fn(async () => true),
+      signIn: jest.fn(async () => {}),
+      setOwn,
+    },
+    names: {},
+    answerNamesShown: false,
+    signIn: null,
+  };
+  jest.mocked(useSessionNames).mockReturnValue(names);
+  const onRecordProvenance = jest.fn();
+  try {
+    render(
+      <SessionVoiceModeModal
+        isOpen
+        mode="interview"
+        onSelectMode={jest.fn()}
+        onClose={jest.fn()}
+        toggleLoginModal={jest.fn()}
+        sessionSlug="demo"
+        account="0x0000000000000000000000000000000000000001"
+        loginComplete
+        workerUrl="https://worker.example"
+        questionPool={[{ id: 'q1', prompt: 'Proceed?', type: 'binary' }]}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          questionSetHash: 'a'.repeat(64),
+          promptVersion: 'ce-interview-brief-v4',
+          source: { platform: 'claude', modelId: 'claude-example', verification: 'self_reported' },
+          responderContext: { name: 'Robin' },
+          responses: [{ questionId: 'q1', answer: 'Agree', confidence: 0.8 }],
+        }}
+        onApplyAnswer={jest.fn()}
+        onApplyAdditional={jest.fn()}
+        onApplyImportance={jest.fn()}
+        onApplyConviction={jest.fn()}
+        onRecordProvenance={onRecordProvenance}
+        onSubmitResponses={jest.fn(async () => ({ status: 'submitted' as const }))}
+      />,
+    );
+    const review = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    const box = screen.getByLabelText('Username (optional)');
+    expect(box).toHaveValue('Robin');
+    expect(review.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save username' }));
+    await waitFor(() => expect(setOwn).toHaveBeenCalledWith('Robin'));
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(onRecordProvenance).toHaveBeenCalledTimes(1));
+    expect(onRecordProvenance.mock.calls[0][5]).toBe('');
+  } finally {
+    jest
+      .mocked(useSessionNames)
+      .mockReturnValue({ status: 'unavailable', source: null, names: {}, answerNamesShown: true, signIn: null });
+  }
+});
+
+it('uses saved per-question choices and withdraws a saved answer name', async () => {
   const record = jest.fn();
   render(
     <SessionVoiceModeModal
@@ -188,12 +195,11 @@ it('uses saved per-question choices and forwards only explicit consent changes',
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   fireEvent.click(screen.getByText('AI submission info'));
   expect(screen.getByLabelText(/Include platform\/model provenance/i)).toHaveAttribute('aria-checked', 'mixed');
-  const name = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME);
-  expect(name).toHaveAttribute('aria-checked', 'mixed');
-  fireEvent.click(name);
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
   await waitFor(() => expect(record).toHaveBeenCalledTimes(1));
-  expect(record.mock.calls[0][7]).toEqual({ includeResponderName: true });
+  // A name an earlier answer carried is withdrawn; nothing else is forced.
+  expect(record.mock.calls[0][5]).toBe('');
+  expect(record.mock.calls[0][7]).toEqual({ includeResponderName: false });
 });
 
 const researchReviewProps = () => ({
@@ -240,7 +246,7 @@ it.each([
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
   await waitFor(() => expect(props.onRecordProvenance).toHaveBeenCalledTimes(1));
   expect(props.onRecordProvenance.mock.calls[0][4]).toBe(expected);
-  expect(props.onRecordProvenance.mock.calls[0][7]).toEqual({});
+  expect(props.onRecordProvenance.mock.calls[0][7]).toEqual({ includeResponderName: false });
 });
 
 it('shows research sharing ticked on the submission bar, beside the closed submission info', async () => {
@@ -286,7 +292,10 @@ it('uses late-loaded defaults without overwriting an explicit participant choice
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
   await waitFor(() => expect(props.onRecordProvenance).toHaveBeenCalledTimes(1));
   expect(props.onRecordProvenance.mock.calls[0][4]).toBe(false);
-  expect(props.onRecordProvenance.mock.calls[0][7]).toEqual({ includePredictionComparison: false });
+  expect(props.onRecordProvenance.mock.calls[0][7]).toEqual({
+    includePredictionComparison: false,
+    includeResponderName: false,
+  });
 });
 
 it.each([true, false])('preserves saved research consent %s over the opposite session default', async (saved) => {
@@ -305,7 +314,7 @@ it.each([true, false])('preserves saved research consent %s over the opposite se
   );
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
   await waitFor(() => expect(props.onRecordProvenance).toHaveBeenCalledTimes(1));
-  expect(props.onRecordProvenance.mock.calls[0][7]).toEqual({});
+  expect(props.onRecordProvenance.mock.calls[0][7]).toEqual({ includeResponderName: false });
 });
 
 it('retains an explicit decline through login and uses the next session’s own default', async () => {
@@ -339,7 +348,7 @@ it('keeps a declined AI draft text choice through login', async () => {
   // The decline reaches what is saved, not only the checkbox.
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
   await waitFor(() => expect(props.onRecordProvenance).toHaveBeenCalledTimes(1));
-  expect(props.onRecordProvenance.mock.calls[0][7]).toEqual({ includeDraftText: false });
+  expect(props.onRecordProvenance.mock.calls[0][7]).toEqual({ includeDraftText: false, includeResponderName: false });
 });
 
 it('keeps no AI draft text when the setting turns on after the person read that none is kept', async () => {
@@ -352,10 +361,10 @@ it('keeps no AI draft text when the setting turns on after the person read that 
   expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_DRAFT_TEXT)).not.toBeInTheDocument();
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
   await waitFor(() => expect(props.onRecordProvenance).toHaveBeenCalledTimes(1));
-  expect(props.onRecordProvenance.mock.calls[0][7]).toEqual({ includeDraftText: false });
+  expect(props.onRecordProvenance.mock.calls[0][7]).toEqual({ includeDraftText: false, includeResponderName: false });
 });
 
-it('keeps provenance and the name inside AI submission info, before its metadata, and sharing on its bar', async () => {
+it('keeps provenance inside AI submission info, before its metadata, and sharing on its bar', async () => {
   render(
     <SessionVoiceModeModal
       isOpen
@@ -385,19 +394,12 @@ it('keeps provenance and the name inside AI submission info, before its metadata
   );
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   const submissionInfo = screen.getByText('AI submission info').closest('details')!;
-  const choices = [
-    screen.getByLabelText('Include platform/model provenance'),
-    screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME),
-  ];
-  const group = choices[0].closest('label')!.parentElement!;
-  for (const choice of choices) {
-    expect(submissionInfo).toContainElement(choice);
-    expect(group).toContainElement(choice);
-  }
+  const provenance = screen.getByLabelText('Include platform/model provenance');
+  expect(submissionInfo).toContainElement(provenance);
   expect(submissionInfo).not.toContainElement(
     screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON),
   );
-  const metadata = screen.getByText('AI prefill metadata');
+  const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
   expect(submissionInfo).toContainElement(metadata);
-  expect(choices[1].compareDocumentPosition(metadata) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(provenance.compareDocumentPosition(metadata) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });

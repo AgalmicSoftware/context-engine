@@ -294,7 +294,7 @@ try {
           console.error(await page.locator('body').innerText(), failures);
           throw error;
         });
-        await page.getByRole('heading', { name: 'Groups (4)' }).waitFor();
+        await page.getByRole('heading', { name: 'Suggested groups (3)' }).waitFor();
         await page.waitForFunction(() =>
           [...document.querySelectorAll('.modal')].some((element) => Number(getComputedStyle(element).opacity) === 1),
         );
@@ -302,30 +302,27 @@ try {
         const names = await section
           .locator('label strong')
           .evaluateAll((elements) => elements.map((element) => element.textContent));
-        assert.deepEqual(names, ['Reverse Alignment Salon', 'd/acc', 'UK residents', 'Builders']);
-        assert.equal(await box(/Reverse Alignment Salon/).isChecked(), true);
+        // The link's group stays in the link's own notice, never in this list.
+        assert.deepEqual(names, ['d/acc', 'UK residents', 'Builders']);
         assert.equal(await box(/d\/acc/).isChecked(), false);
         assert.equal(await box(/UK residents/).isChecked(), false);
         assert.equal(await box(/Builders/).isChecked(), false);
-        await section.getByText('From your link.').waitFor();
         // Each group's image shows beside its name, loaded, with no text of its own.
         await page.waitForFunction(
           () =>
             [...document.querySelectorAll('[data-testid^="ce-session-interview-group-image-"]')].filter(
               (image) => image.complete && image.naturalWidth > 0,
-            ).length === 4,
+            ).length === 3,
         );
         assert.deepEqual(
           await section
             .locator('label img')
             .evaluateAll((elements) => elements.map((element) => element.getAttribute('alt'))),
-          ['', '', '', ''],
+          ['', '', ''],
         );
         await section.getByText('Your AI: Lives in the UK').waitFor();
         const submit = page.getByTestId('ce-session-interview-apply');
-        await expectSubmitLabel(page, 'submit and join');
-        // The link's own notice stands aside while its group is listed here.
-        assert.equal(await page.getByTestId('ce-session-worker-group-auto-join').count(), 0);
+        await expectSubmitLabel(page, 'submit responses');
         const rows = section.locator('label');
         let lowest = Infinity;
         for (let index = 0; index < (await rows.count()); index += 1) {
@@ -341,9 +338,7 @@ try {
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
         await box(/Builders/).check();
         await box(/Builders/).uncheck();
-        await box(/Reverse Alignment Salon/).uncheck();
         await expectSubmitLabel(page, 'submit responses');
-        await box(/Reverse Alignment Salon/).check();
         await box(/d\/acc/).check();
         await box(/UK residents/).check();
         await expectSubmitLabel(page, 'submit and join');
@@ -362,7 +357,7 @@ try {
         }
         assert.deepEqual(failures, []);
         console.log(
-          `PASS Groups before submit ${theme} ${width}: ticks, link, Submit and join, lowest contrast ${lowest}`,
+          `PASS Groups before submit ${theme} ${width}: ticks, no link row, Submit and join, lowest contrast ${lowest}`,
         );
         await page.close();
       }
@@ -371,13 +366,13 @@ try {
       {
         const { page, failures } = await run('in');
         const section = page.getByTestId('ce-session-interview-group-recommendations');
-        await page.getByRole('heading', { name: 'Groups (4)' }).waitFor();
+        await page.getByRole('heading', { name: 'Suggested groups (3)' }).waitFor();
         await section.getByRole('checkbox', { name: /d\/acc/ }).check();
         await section.getByRole('checkbox', { name: /UK residents/ }).check();
         const before = joined.length;
         await page.getByTestId('ce-session-interview-apply').click();
-        await section.getByText('Joined Reverse Alignment Salon and d/acc.').waitFor();
-        assert.deepEqual(joined.slice(before), ['salon', 'dacc']);
+        await section.getByText('Joined d/acc.').waitFor();
+        assert.deepEqual(joined.slice(before), ['dacc']);
         const alert = section.getByRole('alert');
         assert.equal(await alert.innerText(), 'Couldn’t join UK residents: it is full.');
         const retry = section.getByRole('button', {
@@ -396,7 +391,7 @@ try {
           });
         }
         assert.deepEqual(failures, []);
-        console.log(`PASS Groups after submit ${theme} ${width}: joined two, one full, lowest contrast ${lowest}`);
+        console.log(`PASS Groups after submit ${theme} ${width}: joined one, one full, lowest contrast ${lowest}`);
         await page.close();
       }
 

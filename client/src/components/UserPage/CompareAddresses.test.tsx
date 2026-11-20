@@ -255,8 +255,43 @@ describe('CompareAddresses subject routes', () => {
     expect(
       await screen.findByText('Local comparison · AI summary unavailable: The AI reply could not be read.'),
     ).toBeVisible();
-    expect(await screen.findByText('Statistical axes')).toBeVisible();
+    // The local placement names no dimensions, so none are drawn.
+    await waitFor(() => expect(screen.queryByText(/Loading dimensions/)).not.toBeInTheDocument());
+    expect(screen.queryByText('Where they stand')).not.toBeInTheDocument();
     expect(screen.queryByText('Model: example')).not.toBeInTheDocument();
+  });
+
+  it('draws the headline and titled cards, and keeps a sentence whose sides name someone not compared', async () => {
+    seedWorkerAnswers();
+    mockRunCompareToolkit.mockImplementation(async (task: unknown) =>
+      task === 'compare'
+        ? {
+            headline: 'Both answered here; they split on the shared question.',
+            agreements: [{ title: 'Same session', text: 'Both answered in this session.' }],
+            disagreements: [
+              {
+                title: 'Shared question',
+                text: 'A agrees and B disagrees.',
+                sides: [
+                  { who: ['A'], view: 'agrees' },
+                  { who: ['C'], view: 'disagrees' },
+                ],
+              },
+            ],
+            generation: { model: 'example', provider: 'example', source: 'reported' },
+          }
+        : null,
+    );
+    render(
+      <MemoryRouter initialEntries={[comparisonPath]}>
+        <CompareAddress activeSessionSlug="alpha" sessionCachesReady />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('Both answered here; they split on the shared question.')).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Same session' })).toBeVisible();
+    expect(screen.getByText('A agrees and B disagrees.')).toBeVisible();
+    expect(screen.getByText('Model: example')).toBeVisible();
+    expect(screen.queryByText('Local comparison · AI summary unavailable')).not.toBeInTheDocument();
   });
 
   it('sends the session settings the page holds with both AI requests', async () => {
@@ -490,7 +525,7 @@ describe('CompareAddresses subject routes', () => {
         jest.advanceTimersByTime(2000);
       });
       expect(screen.getByTestId('ce-compare-run')).toHaveTextContent('2s');
-      expect(screen.getByText(/Loading chart/)).toHaveTextContent('2s');
+      expect(screen.getByText(/Loading dimensions/)).toHaveTextContent('2s');
       expect(screen.getByText(/Loading summary/)).toHaveTextContent('2s');
       await act(async () => {
         jest.advanceTimersByTime(28000);
@@ -498,7 +533,6 @@ describe('CompareAddresses subject routes', () => {
       rerender(view(true));
       expect(screen.getByRole('button', { name: 'Retry loading session data' })).toBeEnabled();
       expect(screen.getByText(/No clear similarities/)).not.toBeVisible();
-      expect(screen.getByText(/no shared canonical question IDs/)).not.toBeVisible();
       expect(mockRunCompareToolkit).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole('button', { name: 'Retry loading session data' }));
       expect(screen.getByTestId('ce-compare-run')).toHaveTextContent('0s');

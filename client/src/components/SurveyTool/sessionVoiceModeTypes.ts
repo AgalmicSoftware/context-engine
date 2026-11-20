@@ -5,7 +5,7 @@ import type { InterviewSubmitResult } from './sessionInterviewDraftSubmit';
 import type { InterviewConsentOverrides } from './sessionInterviewConsent';
 import type { InterviewSavedAnswerLoader } from './useInterviewSavedAnswers';
 import type { InterviewDraftResponse, InterviewPrefillPacket, SessionVoiceMode } from './sessionInterview';
-import type { SessionInterviewModalRecord } from './sessionInterviewModalState';
+import type { InterviewQuestionLoad, SessionInterviewModalRecord } from './sessionInterviewModalState';
 import type { ClaimFrame, TranscriptClaim } from './sessionTranscriptClaim';
 
 type InterviewDraftApplicationProps = InterviewQuestionControls & {
@@ -53,6 +53,8 @@ export type SessionInterviewPanelBaseProps = InterviewDraftApplicationProps & {
   loginModalToggled?: boolean;
   toggleLoginModal?: (open?: boolean) => void;
   isResponsesCacheReady?: boolean;
+  // Why the pool is still empty: absent once the session's questions have loaded.
+  questionLoad?: InterviewQuestionLoad;
   responseReadinessContextToken?: string;
   submitContextToken?: string;
 };

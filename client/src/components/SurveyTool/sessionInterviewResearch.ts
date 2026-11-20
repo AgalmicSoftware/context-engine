@@ -2,6 +2,7 @@ import { responseValuesEqual as valuesEqual } from './responseValueEquality';
 import { interviewDraftFieldValue } from './sessionInterviewReviewState';
 import { hasDraftValue } from './sessionInterviewModalState';
 import type { InterviewDraftResponse } from './sessionInterview';
+import { usesCloudflareSessionStorage } from '../../utilities/storage/sessionStorageConfig';
 type RecordValue = Record<string, unknown>;
 const record = (value: unknown): RecordValue =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as RecordValue) : {};
@@ -288,3 +289,17 @@ export const redactInterviewEncryptedRatings = (
     ]),
   );
 };
+
+/**
+ * Whether an interview's transcript may be offered for sharing: only where the Session Worker keeps the answers,
+ * as an Arweave session publishes them whole. Each round asks again: starting one clears the tick.
+ */
+export const transcriptShareable = (sessionConfig: unknown, transcript: string): boolean =>
+  Boolean(transcript.trim()) && usesCloudflareSessionStorage(sessionConfig, { resource: 'responses' });
+
+/** Sharing a transcript is held back for now: the box is not offered, so no transcript rides on an answer. */
+export const TRANSCRIPT_SHARING_OFFERED = false;
+
+/** Whether the box is offered for this interview's transcript. */
+export const transcriptOfferable = (sessionConfig: unknown, transcript: string): boolean =>
+  TRANSCRIPT_SHARING_OFFERED && transcriptShareable(sessionConfig, transcript);

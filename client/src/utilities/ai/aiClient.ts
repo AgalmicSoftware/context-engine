@@ -82,6 +82,7 @@ import {
 } from './aiClientTranscriptionWorkerTransport.js';
 import type { KnownSpeaker } from '../audio/speakerTranscript';
 import { enqueueAiCallWithRetry } from './aiClientQueue.js';
+import { normalizeUserAnalysisBreakdown } from './userAnalysisBreakdown';
 
 import { createLogger } from '../logging.js';
 import type { UnknownRecord } from '../session/sessionTypes.js';
@@ -653,8 +654,8 @@ export async function analyzeClusterOpinions(
  */
 export async function analyzeUserOpinions(userData: unknown, opts: unknown = {}) {
   try {
-    const { default: buildUserAnalysisPrompt, USER_ANALYSIS_RESPONSE_FORMAT } =
-      await import('../../prompts/userAnalysisPrompt.js');
+    const { buildUserAnalysisPrompt, USER_ANALYSIS_RESPONSE_FORMAT } =
+      await import('@ce-shared/userAnalysisPrompts.mjs');
     const prompt = buildUserAnalysisPrompt(userData);
     const aiCallOpts = { ...withAiTaskTypeFallback(opts, 'summarize'), response_format: USER_ANALYSIS_RESPONSE_FORMAT };
     const { text: raw, generation } = await enqueueAiCallWithRetry(() =>
@@ -677,7 +678,8 @@ export async function analyzeUserOpinions(userData: unknown, opts: unknown = {})
       reasoning: readParsedLegacyString(ha, 'reasoning').trim() || '',
     };
 
-    return { name, summary, details, historicalAlignment, generation };
+    const breakdown = normalizeUserAnalysisBreakdown(parsed.breakdown, userData);
+    return { name, summary, details, historicalAlignment, breakdown, generation };
   } catch (err) {
     // User-triggered analysis requests need the real Worker failure so the UI can
     // explain why analysis did not run instead of presenting a synthetic result.
@@ -703,8 +705,8 @@ export async function analyzeUserOpinions(userData: unknown, opts: unknown = {})
  * @param {{name?, summary?, details?, figure?, reasoning?}} analysis - what the analysis said
  */
 export async function analyzeUserCard(userData: unknown, analysis: unknown = {}, opts: unknown = {}) {
-  const { default: buildUserAnalysisCardPrompt, USER_ANALYSIS_CARD_RESPONSE_FORMAT } =
-    await import('../../prompts/userAnalysisCardPrompt.js');
+  const { buildUserAnalysisCardPrompt, USER_ANALYSIS_CARD_RESPONSE_FORMAT } =
+    await import('@ce-shared/userAnalysisPrompts.mjs');
   const prompt = buildUserAnalysisCardPrompt(userData, asRecord(analysis));
   const aiCallOpts = {
     ...withAiTaskTypeFallback(opts, 'summarize'),

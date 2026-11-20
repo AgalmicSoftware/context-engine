@@ -104,7 +104,7 @@ describe('SessionWizard template links', () => {
   it('opens the link an AI writes (#setup=) for review, then creates nothing until Create', async () => {
     window.history.replaceState({}, '', `/new#setup=${encodeLinkJson(SESSION_SETUP_EXAMPLE)}`);
     renderSessionWizard();
-    expect(screen.getByTestId('ce-setup-with-ai')).toHaveTextContent('Set up with your AI');
+    expect(screen.getByTestId('ce-setup-with-ai')).toHaveTextContent('Set up with AI');
     const notice = await screen.findByTestId('ce-template-link-notice', {}, { timeout: 8000 });
     expect(window.location.hash).toBe('');
     expect(within(notice).getByTestId('ce-template-changes')).toHaveTextContent('sessionName: (empty) → Library hours');

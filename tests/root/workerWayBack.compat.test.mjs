@@ -607,22 +607,24 @@ describe('putting a session back on a released Worker bundle', () => {
 
 // The agents release: a person signed in from their agent's link, a passkey attached, the agent's access ended,
 // agents switched off for the session, and a saved card's drawn pages. All of it is new keys beside what a session
-// already stores, so the bundle this release is pinned to reads none of it and changes none of it.
-describe('the agents release, back on the pinned bundle', () => {
+// already stores, so the bundle from before it (0.9.21) reads none of it and changes none of it. Later pins
+// know these keys, so the drill stays on that bundle.
+const beforeAgents = bundleRef('refs/tags/worker-bundles-bc8989ba9541c7a2f13af35304756e3f15e7a81c', 'a bundle from before agents');
+describe('the agents release, back on the bundle before it', () => {
   let tempDir;
   let released;
   const testResponse = globalThis.Response;
   beforeAll(async () => {
     globalThis.Response = (await fetch('data:,')).constructor;
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-way-back-agents-'));
-    if (pinned) released = await loadBundle(pinned, tempDir);
+    if (beforeAgents) released = await loadBundle(beforeAgents, tempDir);
   }, 120000);
   afterAll(async () => {
     globalThis.Response = testResponse;
     if (tempDir) await fs.rm(tempDir, { recursive: true, force: true });
   });
 
-  (pinned ? it : it.skip)('ignores the passkey, the cancellation and the switch there, rewrites nothing, and has them again here', async () => {
+  (beforeAgents ? it : it.skip)('ignores the passkey, the cancellation and the switch there, rewrites nothing, and has them again here', async () => {
     const session = await drill();
     try {
       const agentHeaders = { [AGENT_CLIENT_HEADER]: 'mcp/0.8.0' };
@@ -685,7 +687,7 @@ describe('the agents release, back on the pinned bundle', () => {
       const before = storedData();
       expect(before).toContain('agentParticipationEnabled');
 
-      // Back on the pinned bundle: none of it is read. The agent's own key signs in again; the passkey is only itself.
+      // Back on the bundle before agents: none of it is read. The agent's own key signs in again; the passkey is only itself.
       const previous = session.released(released);
       expect(storedData()).toBe(before);
       const agentThere = await signIn(agent, agentHeaders);

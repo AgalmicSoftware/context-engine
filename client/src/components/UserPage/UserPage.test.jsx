@@ -752,6 +752,17 @@ describe('UserPage survey route boundaries', () => {
         findSwitch(makeInstance({ viewAddress, sessionConfig, showSessionSwitch: true, minimized: true }).render()),
       ).toBeUndefined();
     });
+
+    it('sits above the header, as the first thing on the page', () => {
+      const tree = makeInstance({
+        viewAddress: '0x00000000000000000000000000000000000000aa',
+        showSessionSwitch: true,
+        sessionConfig: { slug: 'meadow' },
+      }).render();
+      const children = [tree.props.children].flat(Infinity).filter(Boolean);
+      expect(getNodeTypeName(children[0])).toBe('UserPageSessionSwitch');
+      expect(getNodeTypeName(children[1])).toBe('UserPageHeader');
+    });
   });
 });
 

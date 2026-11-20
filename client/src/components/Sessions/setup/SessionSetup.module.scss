@@ -48,10 +48,13 @@
 .pageHeader {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
   gap: 8px 16px;
   margin-bottom: 8px;
+}
+
+.pageActions {
+  margin-left: auto;
 }
 
 .section {
@@ -276,6 +279,45 @@
   min-width: 0;
 }
 
+.headerPicture {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.headerPicturePreview {
+  max-width: 100%;
+  max-height: 96px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-4, 4px);
+  object-fit: contain;
+}
+
+// "Set up with AI" in the page header: its button sits beside the title and
+// its choices, once opened, take a line of their own under the header's row.
+.aiSetup {
+  display: contents;
+}
+
+.aiSetupToggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.aiSetupChoices {
+  order: 1;
+  flex-basis: 100%;
+
+  // .banner's display would otherwise show it while closed.
+  &[hidden] {
+    display: none;
+  }
+}
+
 .bannerTitle {
   // A global heading colour would otherwise make it unreadable on dark themes.
   color: var(--ce-panel-text);
@@ -310,6 +352,55 @@
 .buttonRow {
   display: flex;
   flex-wrap: wrap;
+  gap: 8px;
+}
+
+// The new question's type: the site's question-type tiles, in this page's colours so the title
+// reads on its cards in every theme. The pressed tile is the chosen type.
+.typeTiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.typeTile {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 84px;
+  padding: 12px 8px;
+  border: 1.5px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-10, 10px);
+  background: var(--ce-control-face);
+  color: var(--ce-panel-text);
+  font: inherit;
+  cursor: pointer;
+
+  &[aria-pressed='true'] {
+    border: 2px solid var(--ce-action-accent);
+    background: color-mix(in srgb, var(--ce-action-accent) 10%, var(--ce-control-face));
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-action-accent);
+    outline-offset: 2px;
+  }
+}
+
+.typeTileTitle {
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+// A row of "Add …" buttons, with its "?" after the last.
+.addRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
 
@@ -419,7 +510,84 @@ a.button {
   border: 0;
 }
 
+// /new: each section a numbered card, with larger labels and larger small print.
+.newPage {
+  counter-reset: setup-step;
+  gap: 14px;
+
+  .section {
+    counter-increment: setup-step;
+    background: var(--ce-card-bg);
+    border: 1px solid var(--ce-card-border);
+    border-radius: var(--ce-radius-12, 12px);
+    padding: 16px;
+  }
+
+  .sectionTitle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 1.3rem;
+
+    &::before {
+      content: counter(setup-step);
+      display: inline-grid;
+      place-items: center;
+      flex-shrink: 0;
+      min-width: 2rem;
+      height: 2rem;
+      border-radius: var(--ce-radius-8, 8px);
+      background: var(--ce-action-accent);
+      color: var(--ce-action-accent-text);
+      font-size: 1rem;
+    }
+  }
+
+  .fieldLabel {
+    font-size: 1rem;
+  }
+
+  .sectionSummary,
+  .hint,
+  .statusText {
+    font-size: 0.95rem;
+  }
+
+  .button,
+  .moreButton {
+    font-size: 0.95rem;
+    padding: 7px 14px;
+  }
+}
+
 @media (max-width: 480px) {
+  .newPage .section {
+    padding: 14px 12px;
+  }
+
+  // Room for "Set up with AI" beside the title on a phone.
+  .newPage .pageHeader {
+    column-gap: 8px;
+  }
+
+  .newPage .pageTitle {
+    font-size: 1.2rem;
+  }
+
+  // An entry's Remove above its fields, so the fields keep the card's width.
+  .newPage .listRow {
+    flex-wrap: wrap;
+
+    > .listRowBody {
+      flex-basis: 100%;
+      order: 1;
+    }
+
+    > .button {
+      margin-left: auto;
+    }
+  }
+
   .pageTitle {
     font-size: 1.35rem;
   }

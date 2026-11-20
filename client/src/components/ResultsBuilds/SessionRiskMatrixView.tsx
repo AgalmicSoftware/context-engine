@@ -2,21 +2,36 @@ import React, { useMemo } from 'react';
 
 import RiskMatrix from '../MainContent/RiskMatrix';
 import ResultsBuildPanel from './ResultsBuildPanel';
+import type { DebateAtlasBuild } from '../../domains/debateAtlas/debateAtlasTypes';
 import type { ResultsBuildSummary } from '../../domains/resultsBuilds/resultsBuildWorkerClient';
+import { listAtlasTopics } from '../../domains/riskMatrix/riskMatrixAtlasTopic';
 import type { RiskMatrixBuild } from '../../domains/riskMatrix/riskMatrixTypes';
 
 type Props = {
   build: RiskMatrixBuild;
   builds: ResultsBuildSummary[];
   onSelectBuild: (id: string) => void;
+  /** The session's built atlas, when it has one: a note links to the topic holding its questions. */
+  atlas?: DebateAtlasBuild | null;
+  onOpenAtlasTopic?: ((nodeId: string) => void) | null;
 };
 
 // A built risk matrix replaces the demo's: read-only, with the
 // areas the AI named and its notes on where two of them meet.
-export default function SessionRiskMatrixView({ build, builds, onSelectBuild }: Props) {
+export default function SessionRiskMatrixView({
+  build,
+  builds,
+  onSelectBuild,
+  atlas = null,
+  onOpenAtlasTopic = null,
+}: Props) {
   const categories = useMemo(
     () => build.areas.map(({ name, subareas }) => ({ name, subcategories: subareas })),
     [build.areas],
+  );
+  const atlasTopics = useMemo(
+    () => (atlas && onOpenAtlasTopic ? listAtlasTopics(atlas) : null),
+    [atlas, onOpenAtlasTopic],
   );
 
   return (
@@ -33,6 +48,8 @@ export default function SessionRiskMatrixView({ build, builds, onSelectBuild }: 
         categories={categories}
         initialComments={build.notes}
         commentEyebrow="AI note"
+        atlasTopics={atlasTopics}
+        onOpenAtlasNode={atlasTopics ? onOpenAtlasTopic : null}
         readOnly
         embedded
       />

@@ -150,6 +150,7 @@ describe('the address a section toggle restores', () => {
       '/session/a?x=1#other=1',
     );
     expect(removeOnePageSessionInterviewIntent('/session/a#prefill=abc')).toBe('/session/a');
+    expect(removeOnePageSessionInterviewIntent('/session/a#prefillz=abc&other=1')).toBe('/session/a#other=1');
     expect(removeOnePageSessionInterviewIntent('/session/a?x=1#other=1')).toBe('/session/a?x=1#other=1');
   });
 });

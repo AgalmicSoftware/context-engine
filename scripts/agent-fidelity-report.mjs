@@ -148,7 +148,26 @@ export const renderFidelityMarkdown = (report) => {
     ['Anchoring: exact-match rate shown minus hidden', anchoring.exactMatchShift, signed],
     ["Cohen's kappa, choice predictions", report.agreement?.choiceKappa],
     ['Rating error, as a share of the scale', report.agreement?.ratingError],
+    ['Quadratic vote strength match', report.quadraticIntensity],
+    ['Lift in vote strength over the median strength', baselines.quadraticIntensity?.lift],
+    ['Quadratic votes: mean difference per option, in votes', report.quadraticVotes?.difference],
+    ['Quadratic vote match, option by option', report.quadraticVotes?.match],
+    ["Lift in vote match over everyone else's mean votes", baselines.quadraticVotes?.lift],
   ].filter(([, result]) => result);
+  const totalsSections = (report.quadraticTotals ?? []).map((question) =>
+    question.suppressed
+      ? `### ${question.questionId}\n\nWithheld: ${fewer} drafted, or 1 to ${minimum - 1} answered without a draft.`
+      : `### ${question.questionId} (${question.participants} people)\n\n` +
+        table(
+          ['Option', 'Drafted votes', 'Answered votes', 'Drafted minus answered'],
+          question.options.map((option) => [
+            option.option,
+            String(option.drafted),
+            String(option.actual),
+            `${option.difference > 0 ? '+' : ''}${option.difference}`,
+          ]),
+        ),
+  );
   const conditionLabel = { shown: 'shown', blind: 'hidden until answered', separate: 'made separately' };
   const shownCell = (result, format = decimal) =>
     !result ? '–' : result.suppressed && !result.participants ? '–' : result.suppressed && result.participants >= minimum ? 'withheld' : cell(result, format);
@@ -244,7 +263,23 @@ export const renderFidelityMarkdown = (report) => {
       'Lift compares it with guessing the most common answer among everyone else. The hidden-draft score is the least biased; ' +
       'the shown-draft score also counts drafts people accepted without strong views.',
     '',
+    'For quadratic questions the Mirror Score counts only the direction of the votes. Vote strength match is scored ' +
+      "beside it, not in it: how closely the AI guessed how strongly each person voted, whatever on, from 0 (no votes " +
+      "against the whole budget spent) to 1, over all drafts, shown ones included. Its lift compares that with guessing " +
+      "the median strength among everyone else. Vote match compares the votes themselves, option by option, sizes " +
+      'included: the mean difference in votes per option, and 1 minus the summed difference over the most two answers ' +
+      "within the budget can differ. Its lift compares that with guessing everyone else's mean votes.",
+    '',
     `Correction rate (choice drafts shown and changed): ${cell(report.correctionRate, percent)} (${interval(report.correctionRate, percent)}).`,
+    '',
+    '## Quadratic vote totals',
+    '',
+    "For each quadratic question, the drafts' total votes per option against the final answers' totals, as Results charts " +
+      'them, over the people with a draft, shown drafts included. Session Wrapped predictions are left out, as Results ' +
+      'leaves them out. A question is withheld when fewer people drafted than the minimum, or when 1 to one less than ' +
+      'the minimum answered without a draft, since the Results totals minus these would show their votes.',
+    '',
+    totalsSections.join('\n\n') || 'No quadratic drafts were shared for research.',
     '',
     '## Where drafts came from',
     '',

@@ -1,0 +1,6 @@
+// What a group shows in place of a picture it has none of, or one that won't load.
+@mixin group-image-placeholder {
+  background:
+    radial-gradient(circle at 50% 44%, color-mix(in srgb, var(--ce-action-accent) 20%, transparent), transparent 32%),
+    color-mix(in srgb, var(--ce-document-text) 76%, transparent);
+}

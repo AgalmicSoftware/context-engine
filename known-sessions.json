@@ -2,29 +2,34 @@
   "eddy26": {
     "worker": "https://ce-eddy26-d9702b0d3c41.agalmic.workers.dev",
     "sessionId": "0x864a48dfbde5a8ef4b5ac60a2980d842",
-    "name": "EDDY 2026 - Bridging theory and practice"
+    "name": "EDDY 2026 - Bridging theory and practice",
+    "interviewCatalog": "https://ce-eddy26-d9702b0d3c41.agalmic.workers.dev/agent/interview-catalog?slug=eddy26&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Feddy26"
   },
   "rxc-ra-2": {
     "worker": "https://ce-rxc-ra-2.agalmic.workers.dev",
     "sessionId": "0x2a0ca72ac1a303b8bfc427aafc06cdcd",
     "name": "Reverse Alignment",
-    "title": "Reverse Alignment Salon"
+    "title": "Reverse Alignment Salon",
+    "interviewCatalog": "https://ce-rxc-ra-2.agalmic.workers.dev/agent/interview-catalog?slug=rxc-ra-2&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Frxc-ra-2"
   },
   "rxc-ra-test-5": {
     "worker": "https://ce-rxc-ra-test-5.agalmic.workers.dev",
     "sessionId": "0xb55d194c42422fd61bedc21fda1c7cdc",
     "name": "Reverse Alignment",
-    "title": "RA test"
+    "title": "RA test",
+    "interviewCatalog": "https://ce-rxc-ra-test-5.agalmic.workers.dev/agent/interview-catalog?slug=rxc-ra-test-5&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Frxc-ra-test-5"
   },
   "rxc-ra-agent-test-1": {
     "worker": "https://ce-rxc-ra-agent-test-1.agalmic.workers.dev",
     "sessionId": "0xc55b68bcf1c61717dd0eb73849873aa7",
     "name": "Agent trial (test)",
-    "title": "RA agent test"
+    "title": "RA agent test",
+    "interviewCatalog": "https://ce-rxc-ra-agent-test-1.agalmic.workers.dev/agent/interview-catalog?slug=rxc-ra-agent-test-1&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Frxc-ra-agent-test-1"
   },
   "demo-sh": {
     "worker": "https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev",
     "sessionId": "0xb822b3eca85bdc35cf83cb947bceb6b2",
-    "name": "Demo Session"
+    "name": "Demo Session",
+    "interviewCatalog": "https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/agent/interview-catalog?slug=demo-sh&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Fdemo-sh"
   }
 }

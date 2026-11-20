@@ -24,9 +24,11 @@ type UserPageSavedAnalysisCardProps = {
   loadOptions: () => Promise<Record<string, unknown> | null>;
 };
 
-// The card a person saved on their page, shown to every signed-in visitor without pressing Analyze. Nothing shows
-// while it loads, when there is none, when it was withdrawn, or when it cannot be read. On my own page I can take
-// it off here, without making a new card first.
+// The card a person saved on their page, shown to every signed-in visitor without pressing Analyze, in the page's
+// side column. Nothing shows while it loads, when there is none, when it was withdrawn, or when it cannot be read:
+// a card that is not shown to others is not kept, so its own person sees none here either. On my own page I see
+// my card as a visitor does and can take it off here, without making a new card first; a new one is made from
+// the Analyze box.
 const UserPageSavedAnalysisCard = ({
   viewAddress,
   account,

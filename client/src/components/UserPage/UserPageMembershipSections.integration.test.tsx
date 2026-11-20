@@ -83,3 +83,52 @@ it('loads the owner’s joined group and drops the section on account change wit
   expect(screen.queryByText(/Group memberships/)).not.toBeInTheDocument();
   expect(fetchSpy).toHaveBeenCalledTimes(2);
 });
+
+it("leads the side column with the page's shown card, on someone else's page and on my own", () => {
+  const other = '0x00000000000000000000000000000000000000bb';
+  const withCard = (viewer: string, savedCard: React.ReactNode, onChainProfileEnabled = false) =>
+    renderUserPageMembershipSections({
+      account: viewer,
+      activeSessionSlug: sessionConfig.slug,
+      isOwner: viewer === account,
+      isSimulated: false,
+      onChainProfileEnabled,
+      provider: 'passkey_eoa',
+      savedCard,
+      sessionConfig,
+      sbtSectionProps: {
+        heading: 'SBTs',
+        onRefreshSbtData: jest.fn(),
+        sbtDisplayState: {},
+        sbtEmptyText: '',
+        sbtEntries: [],
+      },
+    });
+  jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 200 }));
+
+  // Someone else's page in a session with no groups to show: the column holds their card and nothing else.
+  const view = render(<>{withCard(other, <section aria-label="Picture card">their card</section>)}</>);
+  const column = screen.getByRole('region', { name: 'Picture card' }).parentElement as HTMLElement;
+  expect(column.className).toBe('rightColumn cardColumn');
+  expect(column.childElementCount).toBe(1);
+
+  // They show no card: the component draws nothing, so the column is empty and the style gives it no room.
+  const Nothing = () => null;
+  view.rerender(<>{withCard(other, <Nothing />)}</>);
+  expect(view.container.querySelector('.cardColumn')?.childNodes).toHaveLength(0);
+  view.rerender(<>{withCard(other, null)}</>);
+  expect(view.container.querySelector('.rightColumn')).toBeNull();
+
+  // Where groups are on the chain the card leads the column.
+  view.rerender(<>{withCard(other, <section aria-label="Picture card">their card</section>, true)}</>);
+  expect(view.container.querySelector('.cardColumn')?.firstElementChild).toBe(
+    screen.getByRole('region', { name: 'Picture card' }),
+  );
+
+  // My own page: my shown card leads my own column, above my groups.
+  view.rerender(<>{withCard(account, <section aria-label="Picture card">my card</section>)}</>);
+  const mine = screen.getByRole('region', { name: 'Picture card' });
+  expect(mine.parentElement?.className).toBe('rightColumn cardColumn');
+  expect(mine.parentElement?.firstElementChild).toBe(mine);
+  expect(mine.parentElement?.childElementCount).toBeGreaterThan(1);
+});

@@ -24,7 +24,12 @@ import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 
 // AI comparison sections use the toolkit; drilldown stays local to cached comparison data.
 import { runCompareToolkit } from 'utilities/ai/aiClient.js';
-import { normalizeCompareBullets } from 'utilities/ai/aiCompareContracts.js';
+import {
+  compareSummaryFromParagraphs,
+  readCompareSummary,
+  type CompareSummary,
+} from 'utilities/ai/aiCompareContracts.js';
+import { participantLetter } from './CompareParticipantDot';
 
 // Keep small deterministic helpers (labels/bookmarks/builders) from utilities
 import {
@@ -138,11 +143,6 @@ interface CompareUser {
   [key: string]: unknown;
 }
 
-interface ComparisonBullets {
-  agreements: string[];
-  disagreements: string[];
-}
-
 interface CompareCompassAxis {
   id?: string;
   label?: string;
@@ -232,7 +232,7 @@ const CompareAddress = ({
   const [axesSource, setAxesSource] = useState<'ai' | 'fallback' | 'mock'>('fallback');
 
   // Bullets + visuals fed by the unified bundle
-  const [comparisonResult, setComparisonResult] = useState<ComparisonBullets | null>(null);
+  const [comparisonResult, setComparisonResult] = useState<CompareSummary | null>(null);
   const [compassData, setCompassData] = useState<CompareCompassData | null>(null);
   const [subjectCompatibility, setSubjectCompatibility] =
     useState<CompareSubjectCompatibility>(EMPTY_SUBJECT_COMPATIBILITY);
@@ -584,14 +584,13 @@ const CompareAddress = ({
           { users, ...aiScope },
           { throwOnError: true },
         );
-        const validSummary =
-          bulletsRaw &&
-          Array.isArray(bulletsRaw.agreements) &&
-          Array.isArray(bulletsRaw.disagreements) &&
-          [...bulletsRaw.agreements, ...bulletsRaw.disagreements].every((item) => typeof item === 'string');
-        const bullets = normalizeCompareBullets(validSummary ? bulletsRaw : null, fallbackBullets(users), 3);
+        const summary = readCompareSummary(
+          bulletsRaw,
+          users.map((_, index) => participantLetter(index)),
+        );
+        const validSummary = !!summary;
         if (!isStale()) {
-          setComparisonResult(bullets);
+          setComparisonResult(summary || compareSummaryFromParagraphs(fallbackBullets(users)));
           if (!validSummary) setAiUnavailableReason(AI_REPLY_UNREADABLE);
           const metadata = validSummary && bulletsRaw && 'generation' in bulletsRaw ? bulletsRaw.generation : null;
           setGeneration(
@@ -602,13 +601,9 @@ const CompareAddress = ({
         }
       } catch (err) {
         accountLog.error('compare bullets failed:', err);
-        const fallback = fallbackBullets(users);
         if (!isStale()) {
           setAiUnavailableReason(describeCompareAiFailure(err));
-          setComparisonResult({
-            agreements: (fallback.agreements || []).slice(0, 12),
-            disagreements: (fallback.disagreements || []).slice(0, 12),
-          });
+          setComparisonResult(compareSummaryFromParagraphs(fallbackBullets(users)));
         }
       } finally {
         if (!isStale()) setBulletsLoading(false);
@@ -798,6 +793,8 @@ const CompareAddress = ({
       }),
     [currentUsers, bookmarks, nicknameByAddress, sessionNames],
   );
+  const viewerCompared =
+    !!account && currentUsers.some((user) => String(user.cacheSubjectId || '').toLowerCase() === account.toLowerCase());
 
   return (
     <div className={styles.compareSection} ref={sectionRef}>
@@ -918,13 +915,13 @@ const CompareAddress = ({
             bulletsLoading={bulletsLoading}
             compassLoading={compassLoading}
             opinionComparable={subjectCompatibility.opinionComparable}
+            sharedQuestionCount={subjectCompatibility.sharedQuestionIds.length}
+            viewerCompared={viewerCompared}
           />
         </div>
       </Collapse>
     </div>
   );
 };
-
-export { OpinionCompass2D } from './ComparePresentation';
 
 export default CompareAddress;

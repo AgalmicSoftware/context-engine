@@ -9,7 +9,7 @@ import {
   savePendingAutoJoin,
 } from '../../domains/worker/workerGroupAutoJoinIntent';
 import { fetchWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerDiscovery';
-import { AUTO_JOIN_CLAIM_ATTRIBUTE, VOICE_DIALOG_NOTICE_SLOT_ID } from '../../utilities/ui/voiceDialogNoticeSlot';
+import { VOICE_DIALOG_NOTICE_SLOT_ID } from '../../utilities/ui/voiceDialogNoticeSlot';
 import { rememberWorkerGroupAutoJoinCancellation } from '../../domains/worker/workerGroupAutoJoinPreference';
 import { buildWorkerGroupJoinCredentials } from '../../domains/worker/workerGroupSecrets';
 import { forgetGroupReadHeader, saveGroupReadHeader } from '../../utilities/worker/workerGroupReadProof';
@@ -181,23 +181,22 @@ describe('WorkerGroupAutoJoin', () => {
     expect(joins()).toHaveLength(1);
   });
 
-  it('lets the open interview’s Groups section hold a waiting link, but shows the join itself', async () => {
+  // The interview lists no link's group: its banner, at the top, is where the join waits or is cancelled.
+  it('shows a waiting link at the top of the open interview, then the join itself', async () => {
     const slot = document.createElement('div');
     slot.id = VOICE_DIALOG_NOTICE_SLOT_ID;
-    const claim = document.createElement('span');
-    claim.setAttribute(AUTO_JOIN_CLAIM_ATTRIBUTE, group.groupId);
-    document.body.append(slot, claim);
+    document.body.append(slot);
     try {
       const { rerender } = render(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} />);
       await flush();
-      expect(screen.queryByTestId('ce-session-worker-group-auto-join')).not.toBeInTheDocument();
+      expect(slot).toContainElement(screen.getByTestId('ce-session-worker-group-auto-join'));
+      expect(screen.getByRole('button', { name: 'Cancel auto-join' })).toBeInTheDocument();
       rerender(<WorkerGroupAutoJoin {...props} />);
       await flush();
       expect(slot).toContainElement(screen.getByText('Joined Participants 2026.'));
       expect(joins()).toHaveLength(1);
     } finally {
       slot.remove();
-      claim.remove();
     }
   });
 

@@ -1773,6 +1773,30 @@ describe('OnePageSession results routing', () => {
       expect(mockRiskMatrix.mock.calls.every(([props]) => typeof props.onOpenAtlasNode !== 'function')).toBe(true);
     });
 
+    it('opens the atlas topic a note leads to, as an atlas link does', async () => {
+      const atlasBuild = {
+        id: 'atlas_k2_00000002',
+        builtAt: '2026-11-08T15:00:00.000Z',
+        branches: [{ id: 'b1', label: 'Work', topics: [{ id: 't1', label: 'Hiring', questions: [{ id: 'q1' }] }] }],
+      };
+      mockDebateAtlasState = riskState({ builds: [atlasBuild], build: atlasBuild });
+      mockRiskMatrixState = riskState();
+      const sessionRef = React.createRef();
+      renderSession('edge', sessionRef);
+      fireEvent.click(screen.getByRole('button', { name: 'Risk Matrix' }));
+      await expectBuiltMatrix();
+      expect(mockRiskMatrix.mock.calls.at(-1)[0].atlasTopics).toEqual([
+        { nodeId: 'atlas_k2_00000002:t1', label: 'Hiring', questionIds: ['q1'] },
+      ]);
+
+      fireEvent.click(screen.getByTestId('risk-matrix-open-atlas-node'));
+      await screen.findByTestId('ce-session-debate-atlas');
+      expect(sessionRef.current.state).toMatchObject({
+        resultsViewMode: 'debateAtlas',
+        requestedAtlasNodeId: '0x4110000000000000000000000000000000000000000000000000000000000000',
+      });
+    });
+
     it('shows only the built risk matrix beside an AI Views build', async () => {
       jest.spyOn(OnePageSession.prototype, 'loadGeneratedResultsArtifact').mockImplementation(() => Promise.resolve());
       mockRiskMatrixState = riskState();
@@ -1962,7 +1986,9 @@ describe('OnePageSession results routing', () => {
       show(signedIn);
       expect(await screen.findByTestId('ce-session-agent-open')).toBeInTheDocument();
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(mockSessionAgentStatus).toHaveBeenCalledTimes(checks);
+      // Only the Context section's own "Session Agent may use my answers and files" reads their choice again.
+      expect(await screen.findByTestId('ce-session-agent-use-option')).toBeInTheDocument();
+      expect(mockSessionAgentStatus).toHaveBeenCalledTimes(checks + 1);
     });
 
     it('says by the title that the Session Agent is on, even to someone signed out', async () => {

@@ -17,7 +17,7 @@ const { slug, sessionId, corsWorkerUrl } = fixture.config;
 const GROUP_ID = 'e478b073-5b03-4ba3-9cb0-d31977f61af4';
 const questionId = (index) => `0x${(index + 1).toString(16).padStart(64, '0')}`;
 
-const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplete: true }), keyMadeHere = false, now, config = fixture.config, everyone, seedState, groupLabel = 'AI agents', uploads = false, waitMs = 50, onJoin, profile = {}, linkSuffix = '' } = {}) => {
+const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplete: true }), keyMadeHere = false, now, config = fixture.config, everyone, seedState, groupLabel = 'AI agents', uploads = false, waitMs = 50, onJoin, onList, profile = {}, linkSuffix = '' } = {}) => {
   const stateDir = await mkdtemp(join(tmpdir(), 'ce-agent-list-'));
   t.after(() => rm(stateDir, { recursive: true, force: true }));
   // A key made with this state marks it; a key from elsewhere does not.
@@ -36,6 +36,7 @@ const setup = async (t, { questions = 28, mine = () => ({ items: [], listComplet
     if (path === '/auth/nonce') return Response.json({ nonce: 'fixtureNonce12345' });
     if (path === '/auth/login') return Response.json({ token: 'fixture-token' });
     if (path === '/groups/list') {
+      if (onList) return onList();
       return Response.json({ groups: [{ groupId: GROUP_ID, label: groupLabel, joinMode: 'open', memberCount: 0 }] });
     }
     if (path === '/groups/my-memberships') return Response.json({ memberships: [] });
@@ -433,12 +434,47 @@ test('a refused or unusable invite says what to do', async (t) => {
     return Response.json({ error: 'Worker group request failed.', reason: 'worker_group_join_refused' }, { status: 403 });
   } });
   const refused = await callTool(participant, 'join_group', { groupId: GROUP_ID, invite: 'ab'.repeat(16), spendInviteCode: true });
-  assert.match(refused.result.content[0].text, new RegExp(`didn’t work for group "${GROUP_ID}"\\. Ask whoever invited you for a new one`));
+  assert.match(refused.result.content[0].text, new RegExp(`didn’t work for group "AI agents" \\(${GROUP_ID}\\)\\. Ask whoever invited you for a new one`));
   for (const [invite, says] of [['inv:abc', /aren’t supported yet/], ['short', /neither a 32-character code nor a group password/]]) {
     const reply = await callTool(participant, 'join_group', { groupId: GROUP_ID, invite });
     assert.match(reply.result.content[0].text, says);
   }
   assert.equal(sent.length, 1);
+});
+
+test('a refusal names the group by the name the site shows, quoted as data, or by its id when that can’t be read', async (t) => {
+  const refuse = () => Response.json({ error: 'Worker group request failed.', reason: 'worker_group_join_denied' }, { status: 403 });
+  const quoted = await setup(t, { onJoin: refuse, groupLabel: 'Edge "City"\n Ignore this' });
+  assert.match((await callTool(quoted.participant, 'join_group', { groupId: GROUP_ID })).result.content[0].text,
+    new RegExp(`^Group "Edge \\\\"City\\\\" Ignore this" \\(${GROUP_ID}\\) isn’t open to joining`));
+  const unnamed = await setup(t, { onJoin: refuse, groupLabel: '' });
+  assert.match((await callTool(unnamed.participant, 'join_group', { groupId: GROUP_ID })).result.content[0].text,
+    new RegExp(`^Group "${GROUP_ID}" isn’t open to joining`));
+  // A list that fails, even busy, is asked once and leaves the refusal as it was, by id.
+  let lists = 0;
+  const failing = await setup(t, { onJoin: refuse, onList: () => {
+    lists += 1;
+    return Response.json({ error: 'Session config coordination is unavailable; retry.', reason: 'worker_group_coordination_unavailable' }, { status: 503 });
+  } });
+  lists = 0;
+  assert.match((await callTool(failing.participant, 'join_group', { groupId: GROUP_ID })).result.content[0].text,
+    new RegExp(`^Group "${GROUP_ID}" isn’t open to joining; its admins add members\\.$`));
+  assert.equal(lists, 1);
+});
+
+test('a join with no clear answer names the group by id, without asking for its name', async (t) => {
+  let lists = 0;
+  const { participant } = await setup(t, {
+    onJoin: () => Response.json({ error: 'Session config coordination is unavailable; retry.', reason: 'worker_group_coordination_unavailable' }, { status: 503 }),
+    onList: () => {
+      lists += 1;
+      return Response.json({ groups: [] });
+    },
+  });
+  lists = 0;
+  const reply = await callTool(participant, 'join_group', { groupId: GROUP_ID });
+  assert.match(reply.result.content[0].text, new RegExp(`too busy to confirm that you joined group "${GROUP_ID}", so`));
+  assert.equal(lists, 0);
 });
 
 test('a join refused with no invite sent says to bring the link again, not that the invite failed', async (t) => {
@@ -447,7 +483,7 @@ test('a join refused with no invite sent says to bring the link again, not that 
     { error: 'Worker group request failed.', reason: 'worker_group_join_refused' }, { status: 403 }) });
   const reply = await callTool(participant, 'join_group', { groupId: GROUP_ID });
   assert.match(reply.result.content[0].text,
-    new RegExp(`Group "${GROUP_ID}" didn’t let you in, and no invite was sent\\. If you were given a link, call join_session again with the full link`));
+    new RegExp(`Group "AI agents" \\(${GROUP_ID}\\) didn’t let you in, and no invite was sent\\. If you were given a link, call join_session again with the full link`));
   assert.doesNotMatch(reply.result.content[0].text, /Ask whoever invited you/);
 });
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import LoginAgentHandoffPanel from './LoginAgentHandoffPanel';
 import { AgentDelegateKeyError } from '../../utilities/session/agentHandoff';
 import { getInterviewCatalogTicket } from '../SurveyTool/interviewCatalogTicket';
@@ -65,13 +65,11 @@ const renderPanel = (props: Partial<React.ComponentProps<typeof LoginAgentHandof
   return view;
 };
 
-const chooseSubmit = () => fireEvent.click(screen.getByRole('radio', { name: 'Full submit' }));
-
 const expandSubmitPrompt = () => {
   const expand = screen.getByTestId('ce-agent-handoff-submit-prompt-expand');
   expect(expand).toHaveAttribute('aria-expanded', 'false');
-  // The caret half of the split Copy prompt button.
-  expect(expand).toHaveAccessibleName('Read the whole prompt');
+  // The arrow half of the split Copy prompt button.
+  expect(expand).toHaveAccessibleName('Show prompt: Answer for me');
   expect(expand).toHaveAttribute('aria-controls', 'ce-agent-handoff-submit-prompt-text');
   fireEvent.click(expand);
   expect(expand).toHaveAttribute('aria-expanded', 'true');
@@ -94,49 +92,36 @@ it('starts closed, with its explanation still at hand, and opens as a disclosure
   // Nothing reads the session until the box is opened.
   expect(fetchMock).not.toHaveBeenCalled();
 
-  expect(screen.queryByText('Your agent works for you in this session.')).not.toBeInTheDocument();
-
   fireEvent.click(toggle);
   expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  const lead = screen.getByText('Your agent works for you in this session.');
-  expect(lead).toBeVisible();
-  // It shares the title's row, not the body below it.
-  expect(toggle.closest('h3')!.parentElement).toContainElement(lead);
+  expect(document.getElementById('ce-agent-handoff-body')).toBeVisible();
 });
 
-it('offers one mode, on my behalf, as two choices in a radio group with the first chosen', () => {
+it('offers its two options at once, each named, with the tick under Answer for me only', async () => {
   renderPanel();
   expect(screen.queryByRole('button', { name: 'As itself' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'On my behalf' })).not.toBeInTheDocument();
   expect(screen.queryByText(/claude mcp add/)).not.toBeInTheDocument();
-  const group = screen.getByRole('group', { name: 'What should it do?' });
-  const suggest = screen.getByRole('radio', { name: 'Predict responses' });
-  const submit = screen.getByRole('radio', { name: 'Full submit' });
-  expect(group).toContainElement(suggest);
-  expect(group).toContainElement(submit);
-  expect(suggest).toBeChecked();
-  expect(suggest).toHaveAccessibleDescription(
-    'Your agent drafts your answers. You review and submit them here, on Context Engine.',
-  );
-  expect(submit).toHaveAccessibleDescription(
-    "Your agent submits as you. You don't need to come back to Context Engine.",
-  );
-  // The tick belongs to Full submit only.
-  expect(screen.queryByRole('checkbox', { name: 'Ask me if I approve' })).not.toBeInTheDocument();
-  // One name, so the browser moves between them with the arrow keys.
-  expect(suggest).toHaveAttribute('name', submit.getAttribute('name'));
-  chooseSubmit();
-  expect(submit).toBeChecked();
-  expect(suggest).not.toBeChecked();
+  expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+  const suggest = screen.getByRole('group', { name: 'Suggest answers' });
+  const submit = screen.getByRole('group', { name: 'Answer for me' });
+  expect(suggest).toHaveAccessibleDescription('Your AI drafts answers for you to review');
+  expect(submit).toHaveAccessibleDescription('Your AI submits answers as you');
+  expect(suggest.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  const ask = within(submit).getByRole('checkbox', { name: 'Ask me before submitting' });
+  expect(ask).toBeChecked();
+  expect(within(suggest).queryByRole('checkbox')).not.toBeInTheDocument();
+  expect(within(submit).getByRole('button', { name: 'Make a key' })).toBeInTheDocument();
+  expect(await within(suggest).findByTestId('ce-agent-handoff-suggest-copy')).toBeInTheDocument();
 });
 
-it('keeps its choice when closed and opened again', () => {
+it('keeps its tick when closed and opened again', async () => {
   renderPanel();
   const toggle = screen.getByRole('button', { name: 'Your AI agent' });
-  chooseSubmit();
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Ask me before submitting' }));
   fireEvent.click(toggle);
   fireEvent.click(toggle);
-  expect(screen.getByRole('radio', { name: 'Full submit' })).toBeChecked();
+  expect(screen.getByRole('checkbox', { name: 'Ask me before submitting' })).not.toBeChecked();
+  await screen.findByTestId('ce-agent-handoff-suggest-copy');
 });
 
 it('copies one prompt that suggests answers for this session, with no key and the MCP inside it', async () => {
@@ -149,21 +134,39 @@ it('copies one prompt that suggests answers for this session, with no key and th
   expect(prompt).toContain('Nothing is submitted; I review editable drafts.');
   expect(prompt).not.toContain('ceagt_');
   expect(prompt).not.toContain('CE_AGENT_TOKEN');
-  // The MCP is in the one prompt, not a box of its own.
-  expect(prompt).toContain('add it with: claude mcp add --scope user context-engine -- npx');
+  // The MCP is in the one prompt, not a box of its own, last and only for an agent that runs commands.
+  expect(prompt).toContain(
+    'Only if you are an agent that already runs commands: you can add the Context Engine MCP for later with: claude mcp add --scope user context-engine -- npx',
+  );
+  expect(prompt.trimEnd().endsWith('This task does not need it.')).toBe(true);
   expect(screen.getByText(/claude mcp add/)).toBe(screen.getByTestId('ce-agent-handoff-suggest-prompt'));
   // Drafts come back to the session's page, not to wherever the dialog was opened.
   expect(prompt).toContain(`sessionUrl=${encodeURIComponent(sessionUrl)}`);
 });
 
-it("puts a signed-in person's private catalog link in their suggestions prompt", async () => {
+it("leaves the ticket out of a signed-in person's suggestions prompt on a public session", async () => {
   ticketMock.mockResolvedValue({ ticket: 'ic1.mine', expiresAtMs: Date.now() + 60 * 60 * 1000 });
+  renderPanel();
+  const prompt = await copySuggestPrompt();
+  expect(prompt).not.toContain('ticket=');
+  expect(prompt).not.toContain('The link is private to me');
+  expect(ticketMock).not.toHaveBeenCalled();
+});
+
+it("puts a signed-in person's private catalog link in their suggestions prompt on a private session", async () => {
+  ticketMock.mockResolvedValue({ ticket: 'ic1.mine', expiresAtMs: Date.now() + 60 * 60 * 1000 });
+  // A private session lists its questions only with a ticket.
+  fetchMock.mockImplementation(async (input) =>
+    new URL(String(input)).searchParams.get('ticket')
+      ? catalog()
+      : new Response(JSON.stringify({ reason: 'private_session_invite_required' }), { status: 403 }),
+  );
   renderPanel();
   const prompt = await copySuggestPrompt();
   expect(prompt).toContain('&ticket=ic1.mine');
   expect(prompt).toContain('The link is private to me');
   // On screen the ticket is masked, as the key is; only the copy holds it.
-  fireEvent.click(screen.getByRole('button', { name: 'Read the whole prompt' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Show prompt: Suggest answers' }));
   const shown = screen.getByTestId('ce-agent-handoff-suggest-prompt');
   expect(shown).toHaveTextContent('&ticket=••••••••');
   expect(shown).not.toHaveTextContent('ic1.mine');
@@ -178,7 +181,6 @@ it('says so when the session has no Worker to suggest from', async () => {
 it('puts the key into the one prompt, masked on screen, which names the session and its expiry', async () => {
   const requestKey = jest.fn(async () => key);
   renderPanel({ requestKey });
-  chooseSubmit();
   fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
   const prompt = await screen.findByTestId('ce-agent-handoff-submit-prompt');
   expect(requestKey).toHaveBeenCalledTimes(1);
@@ -187,19 +189,21 @@ it('puts the key into the one prompt, masked on screen, which names the session 
   expandSubmitPrompt();
   expect(prompt).toBeVisible();
   // One thing to copy: no terminal command, no MCP box.
-  expect(screen.getAllByRole('button', { name: /^Copy/ })).toHaveLength(1);
+  expect(
+    within(screen.getByRole('group', { name: 'Answer for me' })).getAllByRole('button', { name: /^Copy/ }),
+  ).toHaveLength(1);
   expect(screen.queryByText(/export CE_AGENT_TOKEN/)).not.toBeInTheDocument();
   expect(prompt).not.toHaveTextContent('ceagt_secret');
   expect(prompt).toHaveTextContent('Your key is ceagt_••••••••');
   expect(prompt).toHaveTextContent(`session "Salon" (${sessionUrl}, slug "salon")`);
   expect(prompt).toHaveTextContent(`until ${key.expiresAt}`);
   // Ticked by default: the agent asks in the chat before it submits.
-  expect(screen.getByRole('checkbox', { name: 'Ask me if I approve' })).toBeChecked();
+  expect(screen.getByRole('checkbox', { name: 'Ask me before submitting' })).toBeChecked();
   expect(prompt).toHaveTextContent('show them to me here in the chat. Submit them as me only after I say yes here');
   expect(screen.getByTestId('ce-agent-handoff-expiry')).toHaveTextContent(/^Your key works in Salon only, until /);
   expect(screen.queryByTestId('ce-agent-handoff-drafts-only')).not.toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Copy prompt' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Copy prompt: Answer for me' }));
   expect(await screen.findByText('Copied the prompt.')).toBeInTheDocument();
   const copied = String(writeText.mock.calls.at(-1)?.[0]);
   expect(copied).toContain('Your key is ceagt_secret;');
@@ -217,7 +221,6 @@ it('puts the key into the one prompt, masked on screen, which names the session 
 
 it("says when a session doesn't let agents submit, and the prompt asks for drafts only", async () => {
   renderPanel({ requestKey: jest.fn(async () => ({ ...key, submitAnswers: false })) });
-  chooseSubmit();
   fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
   expect(await screen.findByTestId('ce-agent-handoff-drafts-only')).toHaveTextContent(
     "Salon doesn't let agents submit, so your agent shows you drafts.",
@@ -226,32 +229,31 @@ it("says when a session doesn't let agents submit, and the prompt asks for draft
   expect(screen.getByTestId('ce-agent-handoff-submit-prompt')).toHaveTextContent("doesn't let agents submit");
   expect(screen.getByTestId('ce-agent-handoff-submit-prompt')).not.toHaveTextContent('submit as me');
   // Asking first is moot there, so the tick goes.
-  expect(screen.queryByRole('checkbox', { name: 'Ask me if I approve' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('checkbox', { name: 'Ask me before submitting' })).not.toBeInTheDocument();
 });
 
-it('changes the copied prompt with the Ask me if I approve tick', async () => {
+it('changes the copied prompt with the Ask me before submitting tick', async () => {
   renderPanel({ requestKey: jest.fn(async () => key) });
-  chooseSubmit();
-  const ask = screen.getByRole('checkbox', { name: 'Ask me if I approve' });
+  const ask = screen.getByRole('checkbox', { name: 'Ask me before submitting' });
   expect(ask).toBeChecked();
   expect(ask).toHaveAccessibleDescription(/Ticked, your agent shows you its answers in the chat/);
   fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
   const prompt = await screen.findByTestId('ce-agent-handoff-submit-prompt');
   expandSubmitPrompt();
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Ask me if I approve' }));
-  expect(screen.getByRole('checkbox', { name: 'Ask me if I approve' })).not.toBeChecked();
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Ask me before submitting' }));
+  expect(screen.getByRole('checkbox', { name: 'Ask me before submitting' })).not.toBeChecked();
   expect(prompt).toHaveTextContent('submit them as me, without asking me again');
   expect(prompt).not.toHaveTextContent('only after I say yes');
-  fireEvent.click(screen.getByRole('button', { name: 'Copy prompt' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Copy prompt: Answer for me' }));
   expect(await screen.findByText('Copied the prompt.')).toBeInTheDocument();
   expect(String(writeText.mock.calls.at(-1)?.[0])).toContain('without asking me again');
   expect(screen.getByTestId('ce-agent-handoff-submit-copy')).toHaveTextContent('Copied');
   // A change of tick changes the prompt, so the button no longer says it was copied.
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Ask me if I approve' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Ask me before submitting' }));
   expect(screen.getByTestId('ce-agent-handoff-submit-copy')).toHaveTextContent('Copy prompt');
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Ask me if I approve' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Ask me before submitting' }));
   // Ticked again, the copy asks first again, with the same key.
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Ask me if I approve' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Ask me before submitting' }));
   fireEvent.click(screen.getByTestId('ce-agent-handoff-submit-copy'));
   await waitFor(() => expect(String(writeText.mock.calls.at(-1)?.[0])).toContain('only after I say yes here'));
   expect(String(writeText.mock.calls.at(-1)?.[0])).toContain('Your key is ceagt_secret;');
@@ -260,18 +262,16 @@ it('changes the copied prompt with the Ask me if I approve tick', async () => {
 it('offers no key while the session has Agent HTTP off, and still offers suggestions', async () => {
   renderPanel({ agentHttpEnabled: false });
   expect(await screen.findByTestId('ce-agent-handoff-suggest-copy')).toBeInTheDocument();
-  chooseSubmit();
   expect(screen.getByTestId('ce-agent-handoff-submit-off')).toHaveTextContent(/^Not on in Salon/);
   expect(screen.queryByRole('button', { name: 'Make a key' })).not.toBeInTheDocument();
 });
 
 it('copies from one split Copy prompt button, whose caret opens the whole prompt to read', async () => {
   renderPanel();
-  chooseSubmit();
   fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
   const prompt = await screen.findByTestId('ce-agent-handoff-submit-prompt');
   expect(prompt).not.toBeVisible();
-  const button = screen.getByRole('button', { name: 'Copy prompt' });
+  const button = screen.getByRole('button', { name: 'Copy prompt: Answer for me' });
   expect(button.querySelector('[data-icon="copy"]')).not.toBeNull();
   fireEvent.click(button);
   expect(await screen.findByText('Copied the prompt.')).toBeInTheDocument();
@@ -287,9 +287,10 @@ it('copies from one split Copy prompt button, whose caret opens the whole prompt
   expect(copied).toBe(prompt.textContent?.replace('ceagt_••••••••', 'ceagt_secret'));
   fireEvent.click(screen.getByTestId('ce-agent-handoff-submit-prompt-expand'));
   expect(prompt).not.toBeVisible();
-  // Show (the key) opens it too, since the key is what it shows.
+  // Show the key, beside Expand once the prompt is open.
+  expect(screen.queryByRole('button', { name: 'Show the key' })).not.toBeInTheDocument();
+  expandSubmitPrompt();
   fireEvent.click(screen.getByRole('button', { name: 'Show the key' }));
-  expect(prompt).toBeVisible();
   expect(prompt).toHaveTextContent('Your key is ceagt_secret;');
 });
 
@@ -305,7 +306,7 @@ it('shows nothing of the suggestions prompt until its caret opens it', async () 
   expect(copied).toContain(`${workerUrl}/agent/interview-catalog?slug=salon`);
   expect(button).toHaveTextContent('Copied');
   expect(button.querySelector('[data-icon="check"]')).not.toBeNull();
-  const caret = screen.getByRole('button', { name: 'Read the whole prompt' });
+  const caret = screen.getByRole('button', { name: 'Show prompt: Suggest answers' });
   expect(caret).toHaveAttribute('aria-expanded', 'false');
   expect(caret).toHaveAttribute('aria-controls', 'ce-agent-handoff-suggest-prompt-text');
   fireEvent.click(caret);
@@ -318,7 +319,6 @@ it('turns the copy button to Copied for a moment', async () => {
   jest.useFakeTimers();
   try {
     renderPanel();
-    chooseSubmit();
     fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
     const copyPrompt = await screen.findByTestId('ce-agent-handoff-submit-copy');
     fireEvent.click(copyPrompt);
@@ -337,9 +337,8 @@ it('shows and selects the prompt with its key when copying is refused', async ()
     throw new Error('denied');
   });
   renderPanel();
-  chooseSubmit();
   fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
-  fireEvent.click(await screen.findByRole('button', { name: 'Copy prompt' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Copy prompt: Answer for me' }));
   await screen.findByText("Copying isn't allowed here, so the prompt is selected. Copy it yourself.");
   expect(screen.getByRole('button', { name: 'Show the key' })).toHaveAttribute('aria-pressed', 'true');
   // Opened, so the selection is something the person can see and copy.
@@ -356,9 +355,9 @@ it('gives a refused suggestions copy its own field, not the prompt twice', async
   renderPanel();
   const button = await screen.findByTestId('ce-agent-handoff-suggest-copy');
   // The caret waits for the checked prompt, as Copy prompt does.
-  expect(screen.queryByRole('button', { name: 'Read the whole prompt' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Show prompt: Suggest answers' })).not.toBeInTheDocument();
   await waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'false'));
-  fireEvent.click(screen.getByRole('button', { name: 'Read the whole prompt' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Show prompt: Suggest answers' }));
   expect(screen.getByTestId('ce-agent-handoff-suggest-prompt')).toBeVisible();
   await act(async () => fireEvent.click(button));
   const field = await screen.findByRole('textbox', { name: 'Memory augmentation prompt to copy' });
@@ -375,9 +374,8 @@ it('copies with the older copy command where the clipboard is missing', async ()
   });
   try {
     renderPanel();
-    chooseSubmit();
     fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Copy prompt' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy prompt: Answer for me' }));
     expect(await screen.findByText('Copied the prompt.')).toBeInTheDocument();
     expect(copied).toHaveLength(1);
     expect(copied[0]).toContain('Your key is ceagt_secret;');
@@ -386,14 +384,15 @@ it('copies with the older copy command where the clipboard is missing', async ()
   }
 });
 
-it('says when a key cannot be made, and a new choice clears the message', async () => {
+it('says when a key cannot be made, and trying again clears the message', async () => {
   renderPanel({ requestKey: jest.fn(async () => Promise.reject(new AgentDelegateKeyError('', 401))) });
-  chooseSubmit();
   fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
   await screen.findByText('Sign in again, then make a key.');
   expect(screen.getByRole('alert')).toHaveTextContent('Sign in again, then make a key.');
-  fireEvent.click(screen.getByRole('radio', { name: 'Predict responses' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
   expect(screen.getByRole('alert')).toBeEmptyDOMElement();
+  // The second try is refused too; waiting for it keeps its update inside the test.
+  await screen.findByText('Sign in again, then make a key.');
 });
 
 it("on the session's own page, sends drafts back to that page with its join link, whatever the slug's case", async () => {
@@ -418,4 +417,132 @@ it('treats a malformed page path as off the session page, without failing', asyn
   } finally {
     window.history.pushState({}, '', '/');
   }
+});
+
+it('enlarges an open prompt to read, and Minimize or Escape makes it small before the dialog closes', async () => {
+  // Stands in for the dialog, which closes on Escape.
+  const closeDialog = jest.fn();
+  render(
+    <div onKeyUp={(event) => event.key === 'Escape' && closeDialog()}>
+      <LoginAgentHandoffPanel
+        agentHttpEnabled
+        sessionUrl={sessionUrl}
+        sessionName="Salon"
+        sessionSlug="salon"
+        workerUrl={workerUrl}
+        requestKey={jest.fn(async () => key)}
+      />
+    </div>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Your AI agent' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
+  await screen.findByTestId('ce-agent-handoff-submit-prompt');
+  expandSubmitPrompt();
+  const box = screen.getByTestId('ce-agent-handoff-submit-prompt-box');
+  expect(box).not.toHaveClass('agentHandoffPromptLarge');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Expand prompt: Answer for me' }));
+  expect(box).toHaveClass('agentHandoffPromptLarge');
+  const minimize = screen.getByRole('button', { name: 'Minimize prompt: Answer for me' });
+  expect(minimize).toHaveTextContent('Minimize');
+  // Still the text to read and select, whole.
+  expect(screen.getByTestId('ce-agent-handoff-submit-prompt')).toHaveTextContent('Your key is ceagt_••••••••');
+
+  fireEvent.click(minimize);
+  expect(box).not.toHaveClass('agentHandoffPromptLarge');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Expand prompt: Answer for me' }));
+  fireEvent.keyUp(minimize, { key: 'Escape' });
+  expect(box).not.toHaveClass('agentHandoffPromptLarge');
+  expect(closeDialog).not.toHaveBeenCalled();
+  // Small again, the next Escape is the dialog's.
+  fireEvent.keyUp(minimize, { key: 'Escape' });
+  expect(closeDialog).toHaveBeenCalledTimes(1);
+
+  // Focus moving out of it, as by Tab to the rows it covers, makes it small.
+  fireEvent.click(screen.getByRole('button', { name: 'Expand prompt: Answer for me' }));
+  expect(box).toHaveClass('agentHandoffPromptLarge');
+  const toggle = screen.getByRole('button', { name: 'Your AI agent' });
+  act(() => screen.getByRole('button', { name: 'Minimize prompt: Answer for me' }).focus());
+  expect(box).toHaveClass('agentHandoffPromptLarge');
+  act(() => toggle.focus());
+  expect(box).not.toHaveClass('agentHandoffPromptLarge');
+
+  // Closing the row while it is large leaves Escape to the dialog.
+  fireEvent.click(screen.getByRole('button', { name: 'Expand prompt: Answer for me' }));
+  fireEvent.click(toggle);
+  fireEvent.keyUp(toggle, { key: 'Escape' });
+  expect(closeDialog).toHaveBeenCalledTimes(2);
+  fireEvent.click(toggle);
+  expect(box).not.toHaveClass('agentHandoffPromptLarge');
+});
+
+it('gives each option its own copy and show names, and the suggestions prompt its own Expand', async () => {
+  renderPanel();
+  const suggest = screen.getByRole('group', { name: 'Suggest answers' });
+  const copy = await within(suggest).findByRole('button', { name: 'Copy prompt: Suggest answers' });
+  await waitFor(() => expect(copy).toHaveAttribute('aria-disabled', 'false'));
+  const show = within(suggest).getByRole('button', { name: 'Show prompt: Suggest answers' });
+  expect(show.querySelector('[data-icon="caret-right"]')).not.toBeNull();
+  fireEvent.click(show);
+  expect(show.querySelector('[data-icon="caret-down"]')).not.toBeNull();
+  fireEvent.click(within(suggest).getByRole('button', { name: 'Expand prompt: Suggest answers' }));
+  expect(screen.getByTestId('ce-agent-handoff-suggest-prompt-box')).toHaveClass('agentHandoffPromptLarge');
+});
+
+it('holds Sign Agents Out under both options; after it, drops the dead key and closes, keeping its message', async () => {
+  const props = {
+    agentHttpEnabled: true,
+    sessionUrl,
+    sessionName: 'Salon',
+    sessionSlug: 'salon',
+    workerUrl,
+    requestKey: jest.fn(async () => key),
+    signAgentsOut: <span role="status">Agents signed out.</span>,
+  };
+  const { rerender } = render(<LoginAgentHandoffPanel {...props} agentsSignedOut={0} />);
+  const signOut = screen.getByText('Agents signed out.');
+  expect(signOut).not.toBeVisible();
+  const toggle = screen.getByRole('button', { name: 'Your AI agent' });
+  fireEvent.click(toggle);
+  expect(signOut).toBeVisible();
+  const submit = screen.getByRole('group', { name: 'Answer for me' });
+  expect(submit.compareDocumentPosition(signOut) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
+  await screen.findByTestId('ce-agent-handoff-submit-prompt');
+  rerender(<LoginAgentHandoffPanel {...props} agentsSignedOut={1} />);
+  expect(screen.queryByTestId('ce-agent-handoff-submit-prompt')).not.toBeInTheDocument();
+  // Closed, so the session is checked again only when it is reopened; the same message stays in view.
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByTestId('ce-agent-handoff-suggest-copy')).not.toBeInTheDocument();
+  expect(screen.getByText('Agents signed out.')).toBe(signOut);
+  expect(signOut).toBeVisible();
+
+  fireEvent.click(toggle);
+  expect(screen.getByRole('button', { name: 'Make a key' })).toBeInTheDocument();
+  await screen.findByTestId('ce-agent-handoff-suggest-copy');
+  fireEvent.click(toggle);
+  expect(signOut).not.toBeVisible();
+});
+
+it('shows no key asked for before Sign Agents Out', async () => {
+  let resolve: (value: typeof key) => void = () => {};
+  const props = {
+    agentHttpEnabled: true,
+    sessionUrl,
+    sessionName: 'Salon',
+    sessionSlug: 'salon',
+    workerUrl,
+    requestKey: jest.fn(() => new Promise<typeof key>((done) => (resolve = done))),
+    signAgentsOut: <span>Sign Agents Out</span>,
+  };
+  const { rerender } = render(<LoginAgentHandoffPanel {...props} agentsSignedOut={0} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Your AI agent' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
+  rerender(<LoginAgentHandoffPanel {...props} agentsSignedOut={1} />);
+  await act(async () => resolve(key));
+  fireEvent.click(screen.getByRole('button', { name: 'Your AI agent' }));
+  expect(screen.queryByTestId('ce-agent-handoff-submit-prompt')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Make a key' })).toBeEnabled();
 });

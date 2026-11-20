@@ -23,6 +23,13 @@ import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities
 import { getSessionWizardWorkerSettlementStorageKey } from './sessionWizardWorkerSettlement';
 import { readSessionWizardPendingSbtDraftsCache } from './hooks/usePendingSbtDrafts';
 
+// jsdom can't decode pictures; the shrinking itself is tested on its own.
+const SHRUNK_HEADER = 'data:image/webp;base64,c2hydW5r';
+jest.mock('./sessionHeaderInlineImage', () => ({
+  ...jest.requireActual('./sessionHeaderInlineImage'),
+  shrinkHeaderImageToDataUrl: jest.fn(async () => SHRUNK_HEADER),
+}));
+
 const MISSING_WORKER_MESSAGE =
   'Enter your Cloudflare API token, or verify a Worker you deployed from the Cloudflare dashboard.';
 
@@ -85,6 +92,40 @@ const enableGeneralInfoLogging = () => {
 };
 
 const readWizardCache = () => JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
+
+// A Worker that deploys and keeps the config Create writes, for the Centralized picture tests.
+const mockPictureSessionWorker = () => {
+  const workerUrl = 'https://picture-session-worker.example.test';
+  const written = { config: null };
+  window.history.replaceState({}, '', '/new');
+  global.fetch = jest.fn(async (url, init = {}) => {
+    const normalizedUrl = String(url);
+    if (normalizedUrl.endsWith('/deploy')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          workerUrl,
+          configVerified: true,
+          writesSessionConfig: true,
+          writesSessionSecrets: true,
+        }),
+      };
+    }
+    if (normalizedUrl.endsWith('/admin/set-config')) {
+      written.config = JSON.parse(String(init.body || '{}')).config;
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    }
+    if (normalizedUrl.endsWith('/session-config')) {
+      const { litCredentials: _privateLitDescriptor, ...publicConfig } = written.config || {};
+      if (publicConfig.ai) publicConfig.ai = { models: publicConfig.ai.models };
+      return { ok: true, status: 200, json: async () => ({ config: publicConfig }) };
+    }
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  });
+  return written;
+};
 
 describe('SessionWizard publish boundary rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
@@ -487,6 +528,74 @@ describe('SessionWizard publish boundary rendering', () => {
 
       expect(countConfigWrites()).toBe(configWritesAfterDeploy);
       expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('keeps a Centralized session’s uploaded picture, shrunk, in the config it creates, not in the draft', async () => {
+    const originalFetch = global.fetch;
+    const written = mockPictureSessionWorker();
+
+    try {
+      renderLoggedInSessionWizard();
+      const imageBar = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_INLINE_BAR);
+      fireEvent.click(within(imageBar).getByRole('button', { name: 'Upload image' }));
+      fireEvent.change(imageBar.querySelector('input[type="file"]'), {
+        target: { files: [new File(['header'], 'header.png', { type: 'image/png' })] },
+      });
+      await waitFor(() =>
+        expect(screen.getByRole('img', { name: 'Session header preview' })).toHaveAttribute('src', SHRUNK_HEADER),
+      );
+      await deployVerifiedCustomWorker({
+        sessionName: 'Picture Session',
+        sessionInfo: 'A session with an uploaded header picture.',
+        openaiKey: 'sk-existing-worker',
+      });
+      // Checked before Create, which clears the saved draft.
+      await waitFor(() => expect(readWizardCache().draft?.sessionName).toBe('Picture Session'));
+      expect(sessionStorage.getItem('ce:sessionWizardDraft:v1')).not.toContain(SHRUNK_HEADER);
+      const publishButton = await getCreateButton();
+      await waitFor(() => expect(publishButton).not.toBeDisabled());
+      fireEvent.click(publishButton);
+      await waitFor(() => expect(publishButton).toHaveTextContent('Session created'), { timeout: 8000 });
+      expect(written.config.sessionHeaderImg).toBe(SHRUNK_HEADER);
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('keeps a typed image link when the file chooser is closed or a file is refused', async () => {
+    const originalFetch = global.fetch;
+    const written = mockPictureSessionWorker();
+    const link = 'https://pictures.example.test/header.png';
+
+    try {
+      renderLoggedInSessionWizard();
+      const imageBar = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_INLINE_BAR);
+      fireEvent.click(within(imageBar).getByRole('button', { name: 'URL' }));
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL), {
+        target: { value: link },
+      });
+      fireEvent.click(within(imageBar).getByRole('button', { name: 'Upload image' }));
+      // Some browsers report a closed chooser as a change with no file.
+      fireEvent.change(imageBar.querySelector('input[type="file"]'), { target: { files: [] } });
+      fireEvent.click(within(imageBar).getByRole('button', { name: 'Upload image' }));
+      fireEvent.change(imageBar.querySelector('input[type="file"]'), {
+        target: { files: [new File(['notes'], 'notes.txt', { type: 'text/plain' })] },
+      });
+      expect(within(imageBar).getByRole('button', { name: 'Upload image' })).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toHaveValue(link);
+      await deployVerifiedCustomWorker({
+        sessionName: 'Linked Picture Session',
+        sessionInfo: 'A session with a linked header picture.',
+        openaiKey: 'sk-existing-worker',
+      });
+      const publishButton = await getCreateButton();
+      await waitFor(() => expect(publishButton).not.toBeDisabled());
+      fireEvent.click(publishButton);
+      await waitFor(() => expect(publishButton).toHaveTextContent('Session created'), { timeout: 8000 });
+      expect(written.config.sessionHeaderImg).toBe(link);
     } finally {
       global.fetch = originalFetch;
     }

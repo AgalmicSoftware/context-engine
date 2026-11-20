@@ -15,6 +15,8 @@ const AGENT_CLIENT = 'contextengine-mcp';
 // followed through redirects, and read defensively.
 
 const REQUEST_TIMEOUT_MS = 20_000;
+// For a read that only adds detail, such as a group's name in a refusal.
+const QUICK_REQUEST_TIMEOUT_MS = 3_000;
 const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 // Stored records are small (the Worker caps a question at 128 KiB).
 const MAX_RECORD_BYTES = 256 * 1024;
@@ -501,10 +503,15 @@ export const createWorkerClient = ({
   });
   const leaveGroup = (groupId, { signal } = {}) => request('/groups/leave', { method: 'POST', auth: true, signal, body: { sessionId, groupId } });
 
-  /** The groups this agent may see, with their member counts. Signed out, a private session lists the one group `joinGroup` names. */
-  const listGroups = async ({ joinGroup = '' } = {}) => {
+  /** The groups this agent may see, with their member counts. Signed out, a private session lists the one group `joinGroup` names.
+   * `quick` asks once, briefly: no waiting out a busy session. */
+  const listGroups = async ({ joinGroup = '', signal, quick = false } = {}) => {
     const query = new URLSearchParams({ sessionId, ...(joinGroup ? { joinGroup } : {}) });
-    const data = await request(`/groups/list?${query}`, { auth: true });
+    const data = await request(`/groups/list?${query}`, {
+      auth: true,
+      signal,
+      ...(quick ? { timeoutMs: QUICK_REQUEST_TIMEOUT_MS, busyRetries: COORDINATOR_RETRY_DELAYS_MS.length } : {}),
+    });
     return Array.isArray(data?.groups) ? data.groups.filter(isRecord) : [];
   };
 

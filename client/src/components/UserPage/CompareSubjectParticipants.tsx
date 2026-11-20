@@ -1,7 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 import styles from './UserPage.module.scss';
-import { ParticipantMarker, participantLetter } from './ComparePresentation';
+import { ParticipantDot } from './CompareParticipantDot';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -54,8 +54,7 @@ const CompareSubjectParticipants = ({
           aria-label={`${label}, ${provenanceLabel}`}
           style={{ alignItems: 'center', display: 'inline-flex', gap: 6, maxWidth: '100%', whiteSpace: 'normal' }}
         >
-          <ParticipantMarker index={index} />
-          <strong>{participantLetter(index)}</strong>
+          <ParticipantDot index={index} />
           <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
             {label} <span className={styles.pillAddress}>({provenanceLabel})</span>
           </span>

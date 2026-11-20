@@ -97,6 +97,7 @@ import {
   isUserPageGateAccessContext,
   isUserPageQuestionPayloadEncrypted,
   isUserPageResponsePayloadEncrypted,
+  isUserPageCacheSourceOfSession,
   mergeUserPageQuestionCacheSource,
   mergeUserPageSbtCacheEntryIntoAggregate,
   mergeUserPageSurveyCacheSource,
@@ -126,7 +127,6 @@ import {
   resolveUserPageBookmarkButtonDisplayState,
   resolveUserPageBookmarkNickname,
   resolveUserPageBookmarkStatus,
-  resolveUserPageBookmarksLinkDisplayState,
   resolveUserPageCopyIconDisplayState,
   resolveUserPageInlineEnteredIndicatorDisplayState,
   resolveUserPageFullProfileModalDisplayState,
@@ -161,6 +161,7 @@ import {
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import UserPageAnalysisModal from './UserPageAnalysisModal';
 import UserPageSavedAnalysisCard from './UserPageSavedAnalysisCard';
+import { buildAnalyzeLinkHref } from './userPageAnalyzeLink';
 import UserPageComparePanel from './UserPageComparePanel';
 import { resolveCompareCachesReady } from './compareSessionRuntime';
 import UserPageDeepScanStatusIndicator from './UserPageDeepScanStatusIndicator';
@@ -298,6 +299,8 @@ type CacheRefreshOptions = {
 type UnifiedCacheAggregateInput = {
   networkID?: unknown;
   viewAddressLower?: unknown;
+  /** Read the stores kept under these names alone (one session's own names), not every session in the browser. */
+  onlySlugs?: readonly unknown[];
 };
 
 type CacheNetworkBucket = UnknownRecord & {
@@ -784,15 +787,12 @@ class UserPage extends Component<any, any> {
       expandedSurveyResponses: {},
       expandedSurveysCreated: {},
 
-      // NEW: section collapsibles
       showSectionSurveyResponsesOpen: true,
       showSectionSurveysCreatedOpen: true,
       showSectionQuestionResponsesOpen: true,
       showSectionQuestionsCreatedOpen: true,
 
-      // NEW: nickname (inline, header actions; visible on any user page)
       nicknameInput: '',
-      // NEW: inline edit toggle for nickname
       isEditingNickname: false,
 
       // NEW: Track deep search status to prevent "No Data" flash
@@ -1289,6 +1289,8 @@ class UserPage extends Component<any, any> {
       subscribeWorkerSessionToken(() => void this.loadSessionNames()),
     ];
     void this.loadSessionNames();
+    // The account dialog's page gets no cache props, so its "Analyze user" button asks about AI here.
+    if (this.props.minimized) void this._checkAiAvailability();
     try {
       if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
         window.addEventListener(PROFILE_SCAN_REPORT_EVENT, this.handleBackgroundProfileScanReport);
@@ -2040,12 +2042,16 @@ class UserPage extends Component<any, any> {
     };
   };
 
-  _collectUnifiedCacheData = ({ networkID, viewAddressLower }: UnifiedCacheAggregateInput): unknown =>
+  _collectUnifiedCacheData = ({ networkID, viewAddressLower, onlySlugs }: UnifiedCacheAggregateInput): unknown =>
     measureSync('ce.userPage.aggregateCacheData', () => {
-      const surveysCaches = this._dgReadAll('surveysCache');
-      const questionsCaches = this._dgReadAll('questionsCache');
-      const sbtCaches = this._dgReadAll('sbtCache');
-      const userCaches = this._dgReadAll('userCache');
+      const read = (name: string): NamespaceCacheSourceEntry[] =>
+        this._dgReadAll(name).filter(
+          ({ slug }) => !onlySlugs || onlySlugs.some((own) => isUserPageCacheSourceOfSession(slug, own)),
+        );
+      const surveysCaches = read('surveysCache');
+      const questionsCaches = read('questionsCache');
+      const sbtCaches = read('sbtCache');
+      const userCaches = read('userCache');
       const viewAddressKey = String(viewAddressLower || '').toLowerCase();
 
       const combinedSurveys: EntityCacheMap = {};
@@ -2246,6 +2252,30 @@ class UserPage extends Component<any, any> {
         userCaches,
       };
     });
+
+  /**
+   * What the page's own session alone holds for this page's person: the page's own lists, derived the same way
+   * but from that session's stores only. The page merges every session kept in this browser, and the same
+   * question in two sessions has one id with the newest answer winning, so the merged lists cannot be sorted by
+   * session afterwards. The analysis reads these, so an answer given elsewhere never reaches this session's AI
+   * or card. A session's stores sit under its own slug, which a route may reach by another name: both of the
+   * page's names for its session are read, and no other session's.
+   */
+  deriveSessionSources = (): SurveySectionResult & QuestionSectionResult & SbtSectionResult => {
+    const viewAddressLower = String(this.props.viewAddress || '').toLowerCase();
+    const networkID = this.props.network?.id != null ? this.props.network.id.toString() : '';
+    const configured = this.props.sessionConfig?.slug;
+    const onlySlugs = [
+      this.getActiveSessionSlug(),
+      ...(typeof configured === 'string' && configured ? [configured] : []),
+    ];
+    const aggregate = this._collectUnifiedCacheData({ networkID, viewAddressLower, onlySlugs }) as UnknownRecord;
+    return {
+      ...(this._deriveSurveySection(aggregate, viewAddressLower, createGateAccessContext()) as SurveySectionResult),
+      ...(this._deriveQuestionSection(aggregate, viewAddressLower, createGateAccessContext()) as QuestionSectionResult),
+      ...(this._deriveSbtSection(aggregate, viewAddressLower) as SbtSectionResult),
+    };
+  };
 
   _deriveSurveySection = (
     aggregate: unknown,
@@ -3432,13 +3462,10 @@ class UserPage extends Component<any, any> {
       detailedSurveyResponses,
       detailedQuestionResponses,
 
-      // NEW: section toggles
       showSectionSurveyResponsesOpen,
       showSectionSurveysCreatedOpen,
       showSectionQuestionResponsesOpen,
       showSectionQuestionsCreatedOpen,
-
-      // NEW: Deep scan flag
       isDeepScanning,
     } = this.state;
 
@@ -3688,10 +3715,6 @@ class UserPage extends Component<any, any> {
     const avatarDisplayState = resolveUserPageAvatarDisplayState({
       blockieUrl,
     });
-    const bookmarksLinkDisplayState = resolveUserPageBookmarksLinkDisplayState({
-      baseClassName: styles.bookmarksLink,
-      inlineClassName: styles.bookmarksLinkInline,
-    });
     const createdQuestionWrapperClassName = buildUserPageCreatedQuestionWrapperClassName({
       baseClassName: styles.createdQuestionWrapper,
       bolderClassName: styles.createdQuestionBolder,
@@ -3699,19 +3722,30 @@ class UserPage extends Component<any, any> {
 
     return (
       <div className={rootClassName}>
+        {/* The session this profile shows, at the top right above the header. */}
+        {!minimized && this.props.showSessionSwitch && (
+          <UserPageSessionSwitch
+            viewAddress={String(propViewAddress || '')}
+            sessionSlug={this.getProfileSessionSlug()}
+            sessionConfig={this.props.sessionConfig}
+          />
+        )}
+
         <UserPageHeader
           addressDisplay={addressDisplay}
+          accountMenuRows={this.props.accountMenuRows}
           privateLabelTag={
             !isOwner && nicknameToUse ? (theirSessionName ? `your label: ${nicknameToUse}` : 'your label') : ''
           }
           usernameSavedTo={this.state.sessionNamesSource?.enabled ? 'session' : 'device'}
           analyzeButtonDisplayState={analyzeButtonDisplayState}
+          analyzeLinkReady={!isQuestionLoadingAny && !isSurveyLoadingAny && !isSbtLoadingAny}
           avatarDisplayState={avatarDisplayState}
           bookmarkButtonDisplayState={bookmarkButtonDisplayState}
           bookmarksHref={buildPublicRoute('/bookmarks')}
-          bookmarksLinkDisplayState={bookmarksLinkDisplayState}
           compareButtonDisplayState={compareButtonDisplayState}
           copyIconDisplayState={copyIconDisplayState}
+          analyzeLinkHref={buildAnalyzeLinkHref(this, !!minimized && isOwner)}
           explorerUrl={explorerUrl}
           headerActionVisibility={headerActionVisibility}
           headerBookmarkClassName={headerBookmarkClassName}
@@ -3752,14 +3786,6 @@ class UserPage extends Component<any, any> {
           usernameErrorDisplayState={usernameErrorDisplayState}
         />
 
-        {!minimized && this.props.showSessionSwitch && (
-          <UserPageSessionSwitch
-            viewAddress={String(propViewAddress || '')}
-            sessionSlug={this.getProfileSessionSlug()}
-            sessionConfig={this.props.sessionConfig}
-          />
-        )}
-
         <UserPageComparePanel collapseOpen={collapseOpen} minimized={minimized}>
           <CompareAddressSection
             activeSessionSlug={this.getProfileSessionSlug()}
@@ -3772,16 +3798,6 @@ class UserPage extends Component<any, any> {
             scanSpecificUserProfile={this.props.scanSpecificUserProfile}
           />
         </UserPageComparePanel>
-
-        {!minimized && (
-          <UserPageSavedAnalysisCard
-            viewAddress={propViewAddress}
-            account={account}
-            pageSlug={String(this.props.activeSessionSlug || this.props.sessionSlug || '')}
-            profileKey={analysisProfileKey(this.props)}
-            loadOptions={this.resolveSavedAnalysisCardOptions}
-          />
-        )}
 
         {!minimized && (
           <div className={styles.content}>
@@ -3872,6 +3888,16 @@ class UserPage extends Component<any, any> {
               isSimulated,
               onChainProfileEnabled: this.props.onChainProfileEnabled,
               provider,
+              // The shown card leads the side column, on my own page as on anyone else's.
+              savedCard: (
+                <UserPageSavedAnalysisCard
+                  viewAddress={propViewAddress}
+                  account={account}
+                  pageSlug={String(this.props.activeSessionSlug || this.props.sessionSlug || '')}
+                  profileKey={analysisProfileKey(this.props)}
+                  loadOptions={this.resolveSavedAnalysisCardOptions}
+                />
+              ),
               sessionConfig: this.props.sessionConfig,
               sbtSectionProps: {
                 heading: `${t('minted')} ${t('sbts')}:`,
@@ -3898,6 +3924,7 @@ class UserPage extends Component<any, any> {
 
         <UserPageAnalysisModal
           aiAnalysis={aiAnalysis}
+          analysisBreakdown={this.state.analysisBreakdown}
           analysisCacheStatusState={analysisCacheStatusState}
           analysisCard={this.state.analysisCard}
           analysisCardPending={this.state.analysisCardPending}

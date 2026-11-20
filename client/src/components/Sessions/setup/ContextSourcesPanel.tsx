@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Input } from 'reactstrap';
 
 import { CONTEXT_CARD_COST_USD } from '@ce-shared/contextCards.mjs';
@@ -8,6 +8,7 @@ import {
   resolveContextFileType,
 } from '@ce-shared/sessionContextSources.mjs';
 import ContextAccessPicker, { contextGroupsLabel } from './ContextAccessPicker';
+import AgentMark from '../../Shared/AgentMark';
 import ContextCardChips from '../../OnePageSession/ContextCardChips';
 import ContextCardEditor, { CONTEXT_CARD_HELP } from '../../OnePageSession/ContextCardEditor';
 import {
@@ -63,28 +64,45 @@ export const describeCardCost = (count: number): string => {
 /** True for a PDF or an image: a file whose text is the session’s AI’s reading of it. */
 export const isAiReadSource = (source: Pick<ContextSource, 'mime'>) => contextFileIsReadByAi(source.mime);
 
-/** One line about a source: who may read it, who added it, and what the AI has of it. */
-export const describeContextSource = (
-  source: ContextSource,
-  { groups = [], adder = '' }: { groups?: ContextGroup[]; adder?: string } = {},
-): string =>
-  [
-    source.adminsOnly
-      ? 'Admins only'
-      : source.lockedGroupIds.length
-        ? contextGroupsLabel(source.lockedGroupIds, groups)
-        : 'Everyone in the session',
-    ...(adder ? [`Added by ${adder}`] : []),
-    // Apart from the name, which an agent chooses.
-    ...(source.addedByAgent ? ['Agent'] : []),
-    source.kind === 'link'
-      ? `Read ${formatDate(source.fetchedAt)}`.trim()
-      : isAiReadSource(source)
-        ? source.reading
-          ? `Read by AI (${source.reading.model}, ${formatDate(source.reading.at)})`
-          : 'Not read by AI'
-        : 'Text file',
-  ].join(' · ');
+type DescribeOptions = { groups?: ContextGroup[]; adder?: string };
+
+/** The parts of a source's line: who may read it, who added it when known, and what the AI has of it. */
+export const contextSourceParts = (source: ContextSource, { groups = [], adder = '' }: DescribeOptions = {}) => [
+  source.adminsOnly
+    ? 'Admins only'
+    : source.lockedGroupIds.length
+      ? contextGroupsLabel(source.lockedGroupIds, groups)
+      : 'Everyone in the session',
+  ...(adder ? [`Added by ${adder}`] : []),
+  source.kind === 'link'
+    ? `Read ${formatDate(source.fetchedAt)}`.trim()
+    : isAiReadSource(source)
+      ? source.reading
+        ? `Read by AI (${source.reading.model}, ${formatDate(source.reading.at)})`
+        : 'Not read by AI'
+      : 'Text file',
+];
+
+/** One line about a source, as text. */
+export const describeContextSource = (source: ContextSource, options: DescribeOptions = {}): string =>
+  contextSourceParts(source, options).join(' · ');
+
+// The robot follows who added the source (or who may read it, when that isn't known), apart from the name, which
+// an agent chooses.
+const ContextSourceLine = ({ source, ...options }: DescribeOptions & { source: ContextSource }) => {
+  const markAfter = options.adder ? 1 : 0;
+  return (
+    <>
+      {contextSourceParts(source, options).map((part, index) => (
+        <Fragment key={part}>
+          {index ? ' · ' : ''}
+          {part}
+          {source.addedByAgent && index === markAfter ? <AgentMark /> : null}
+        </Fragment>
+      ))}
+    </>
+  );
+};
 
 type Props = {
   sessionSlug: string;
@@ -196,10 +214,11 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
                   <span className={styles.readOnlyValue}>{source.url}</span>
                 ) : null}
                 <span className={styles.hint}>
-                  {describeContextSource(source, {
-                    groups,
-                    adder: contextAdderLabel(source, sessionConfig, account),
-                  })}
+                  <ContextSourceLine
+                    source={source}
+                    groups={groups}
+                    adder={contextAdderLabel(source, sessionConfig, account)}
+                  />
                 </span>
                 <ContextCardChips card={source.card} title={source.title || source.url || 'Untitled'} />
                 {editingCard === source.id ? (

@@ -41,7 +41,9 @@ jest.mock('components/UserPage/UserPage', () => (props) => (
     data-active-session-slug={props.activeSessionSlug || ''}
     data-network-chain-id={props.networkChainId || ''}
     data-session-config-chain-id={props.sessionConfig?.networkChainId || ''}
-  />
+  >
+    <ul>{props.accountMenuRows}</ul>
+  </div>
 ));
 
 jest.mock('../Shared/CETooltip', () => ({
@@ -1063,7 +1065,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       'explainers',
       'appearance',
     ]);
-    expect(within(cells[0]).getByRole('button', { name: 'Config Advanced' })).toHaveAttribute('aria-expanded', 'true');
+    expect(within(cells[0]).getByRole('button', { name: 'Config' })).toHaveAttribute('aria-expanded', 'true');
     expect(within(cells[2]).getByRole('button', { name: /Explainers/ })).toBeInTheDocument();
     expect(within(cells[3]).getByRole('button', { name: /^Appearance/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Demo Mode/ })).not.toBeInTheDocument();
@@ -1373,7 +1375,8 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getModalDisplay());
 
-    const profileShell = screen.getByTestId('mock-user-page').closest(`.${styles.accountModalProfileShell}`);
+    // The profile loads lazily; the dialog's rows then sit in its list.
+    const profileShell = (await screen.findByTestId('mock-user-page')).closest(`.${styles.accountModalProfileShell}`);
 
     expect(profileShell).toBeTruthy();
     expect(screen.getByTestId('mock-user-page')).toHaveAttribute('data-view-address', WAGMI_ADDRESS);

@@ -1,4 +1,4 @@
-import React, { Suspense, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { Button, CardBody, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -10,11 +10,15 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { MetaMaskLoginButton } from '../../app/runtime/walletUiRuntime.js';
 import { copyText } from '../../utilities/ui/copyText';
+import { buildCopyPageLink } from '../../utilities/ui/arrivalLink';
 import styles from './Account.module.scss';
+import { AccountMenu, AccountMenuRow } from './AccountMenu';
+import { countUnsentAnswers } from 'components/UserPage/userPageAnalyzeLink';
 const AgentAccountAccessPanel = React.lazy(() => import('./AgentAccountAccessPanel'));
 import { PASSKEYS_UNAVAILABLE_MESSAGE, type PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
 
-// For a browser without passkeys: the same page, to paste into one that has them.
+// For a browser without passkeys: the same page, to paste into one that has them. The link is the one the person
+// arrived with: the app has by now taken a group's invite and any drafted answers out of the address.
 const CopyPageLink = () => {
   const [copied, setCopied] = useState<boolean | null>(null);
   return (
@@ -26,10 +30,11 @@ const CopyPageLink = () => {
         className={styles.passkeyCopyLink}
         data-testid="ce-passkey-copy-link"
         onClick={async () => {
-          const done = await copyText(window.location.href);
+          const link = buildCopyPageLink();
+          const done = await copyText(link);
           setCopied(done);
           // Offers the link to copy by hand, where the browser shows prompts.
-          if (!done) window.prompt('Copy this link', window.location.href);
+          if (!done) window.prompt('Copy this link', link);
         }}
       >
         {copied ? 'Link copied' : 'Copy link'}
@@ -48,6 +53,7 @@ type AccountUserPageProps = {
   activeSessionSlug?: string;
   sessionConfig?: unknown;
   networkChainId?: unknown;
+  accountMenuRows?: React.ReactNode;
 };
 
 type LoginModalDisplayBodyProps = {
@@ -79,6 +85,17 @@ type LoginModalDisplayBodyProps = {
 const AccountUserPage = React.lazy(() => import('components/UserPage/UserPage')) as React.LazyExoticComponent<
   React.ComponentType<AccountUserPageProps>
 >;
+
+// Shown only once the profile is slow to load: a quick load would otherwise swap its rows, Disconnect among
+// them, for the profile's own list just as they are clicked.
+export const SlowFallback = ({ children }: { children: React.ReactNode }) => {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setShown(true), 1000);
+    return () => clearTimeout(timer);
+  }, []);
+  return shown ? <>{children}</> : null;
+};
 
 const LoginModalDisplayBody = ({
   account,
@@ -228,13 +245,43 @@ const LoginModalDisplayBody = ({
   }
 
   if (loginComplete) {
+    // The dialog's rows follow the profile's own two ("Analyze user", "Set username") in one list. While the
+    // profile is slow to load, Bookmarks and Disconnect show on their own, so "Disconnect" is always there; the agent row
+    // waits, so it mounts once and keeps what was chosen or made in it.
+    // Disconnect discards this account's unsent answers, so with any it asks once first.
+    const disconnect = () => {
+      const unsent = countUnsentAnswers(account || '');
+      const question =
+        unsent === 1
+          ? 'You have 1 unsent answer. Disconnect and discard it?'
+          : `You have ${unsent} unsent answers. Disconnect and discard them?`;
+      if (unsent > 0 && !window.confirm(question)) return;
+      handleLogout();
+    };
+    const menuRows = (agentRow: React.ReactNode) => (
+      <>
+        <AccountMenuRow icon={faBookmark} onClick={openBookmarks}>
+          Bookmarks
+        </AccountMenuRow>
+        {agentRow ? <li className={`${styles.accountMenuItem} ${styles.accountMenuAgentRow}`}>{agentRow}</li> : null}
+        <AccountMenuRow icon={faSignOutAlt} onClick={disconnect} danger testId="ce-account-disconnect">
+          Disconnect
+        </AccountMenuRow>
+      </>
+    );
     return (
       <CardBody id={styles.accountModalCard}>
         <div id={styles.accountModalPanel}>
           <div className={styles.accountModalBody}>
-            {account && (
+            {account ? (
               <div className={styles.accountModalProfileShell}>
-                <Suspense fallback={null}>
+                <Suspense
+                  fallback={
+                    <SlowFallback>
+                      <AccountMenu>{menuRows(null)}</AccountMenu>
+                    </SlowFallback>
+                  }
+                >
                   <AccountUserPage
                     viewAddress={account}
                     account={account}
@@ -244,22 +291,21 @@ const LoginModalDisplayBody = ({
                     activeSessionSlug={activeSessionSlug}
                     sessionConfig={activeSessionConfig}
                     networkChainId={activeSessionNetworkChainId || undefined}
+                    accountMenuRows={menuRows(renderAgentHandoffPanel())}
                   />
                 </Suspense>
               </div>
+            ) : (
+              <AccountMenu>{menuRows(renderAgentHandoffPanel())}</AccountMenu>
             )}
             <div className={styles.accountModalControls}>
-              <Button color="secondary" size="sm" onClick={openBookmarks} className={styles.walletButton}>
-                <FontAwesomeIcon icon={faBookmark} /> Bookmarks
-              </Button>
-              <Button color="danger" size="sm" onClick={handleLogout} className={styles.disconnectButton}>
-                <FontAwesomeIcon icon={faSignOutAlt} /> Disconnect
-              </Button>
-            </div>
-            {renderAgentHandoffPanel()}
-            <div className={styles.accountModalControls}>
               <Suspense fallback={null}>
-                <AgentAccountAccessPanel provider={provider} buttonClassName="btn btn-secondary btn-sm" />
+                <AgentAccountAccessPanel
+                  provider={provider}
+                  // The dialog's own button look, as Bookmarks has: a bare .btn-secondary is pale text on this panel.
+                  buttonClassName={`btn btn-secondary btn-sm ${styles.walletButton}`}
+                  primaryButtonClassName={`btn btn-primary btn-sm ${styles.walletButton}`}
+                />
               </Suspense>
             </div>
           </div>

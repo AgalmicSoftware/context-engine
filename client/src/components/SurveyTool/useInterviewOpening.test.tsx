@@ -63,11 +63,12 @@ it('uses owner text without generation', () => {
   expect(result.current.opening).toBe('What is your AI expertise?');
   expect(global.fetch).not.toHaveBeenCalled();
 });
-it('falls back visibly when generation fails', async () => {
+it('falls back quietly when generation fails', async () => {
   global.fetch = jest.fn().mockRejectedValue(new Error('offline'));
   const { result } = renderHook(() => useInterviewOpening(options));
   await waitFor(() => expect(result.current.loading).toBe(false));
-  expect(result.current.notice).toMatch(/start directly with a session question/);
+  expect(result.current).toEqual(expect.objectContaining({ opening: '', loading: false }));
+  expect(result.current).not.toHaveProperty('notice');
 });
 it('aborts on close and rejects a late completion', async () => {
   let resolve!: (value: unknown) => void;

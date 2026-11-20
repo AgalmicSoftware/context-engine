@@ -6,7 +6,7 @@ import { KNOWN_SESSION_CONFIGS, KNOWN_SESSIONS } from './knownSessionsFile';
 import { parseSessionWorkerDiscoveryOrigin } from './sessionWorkerDiscovery';
 
 const FILE = path.resolve(__dirname, '../../../../known-sessions.json');
-const FIELDS = new Set(['worker', 'sessionId', 'name', 'title']);
+const FIELDS = new Set(['worker', 'sessionId', 'name', 'title', 'interviewCatalog']);
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
@@ -38,6 +38,11 @@ const knownSessionsProblems = (raw: string): string[] => {
     if (!origin || origin !== entry.worker) problems.push(`${slug}: worker is not an HTTPS Worker origin`);
     if (typeof entry.sessionId !== 'string' || !/^0x(?!0{32})[0-9a-f]{32}$/.test(entry.sessionId)) {
       problems.push(`${slug}: sessionId is not 0x and 32 hex digits`);
+    }
+    // The catalog address is written out whole, and only ever the one the session's page builds.
+    const catalog = `${String(entry.worker)}/agent/interview-catalog?slug=${encodeURIComponent(slug)}&sessionUrl=${encodeURIComponent(`https://contextengine.sh/session/${slug}`)}`;
+    if ('interviewCatalog' in entry && entry.interviewCatalog !== catalog) {
+      problems.push(`${slug}: interviewCatalog is not the session's catalog address`);
     }
     for (const field of ['name', 'title']) {
       if (field in entry && (typeof entry[field] !== 'string' || !String(entry[field]).trim())) {
@@ -122,6 +127,15 @@ describe('known-sessions.json', () => {
       'fixture: sessionId is not 0x and 32 hex digits',
     ],
     ['another field', fileText({ fixture: entry({ admin: '0xabc' }) }), 'fixture: unexpected admin'],
+    [
+      "a catalog address for another session's page",
+      fileText({
+        fixture: entry({
+          interviewCatalog: `${WORKER}/agent/interview-catalog?slug=fixture&sessionUrl=${encodeURIComponent('https://contextengine.sh/session/other')}`,
+        }),
+      }),
+      "fixture: interviewCatalog is not the session's catalog address",
+    ],
     ['an empty name', fileText({ fixture: entry({ name: ' ' }) }), 'fixture: name is not a name'],
     ['an empty title', fileText({ fixture: entry({ title: '' }) }), 'fixture: title is not a name'],
     ['an entry that is not an object', fileText({ fixture: WORKER }), 'fixture: not an object'],

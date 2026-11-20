@@ -9,6 +9,7 @@ import SessionWizardSponsoredStatus from './SessionWizardSponsoredStatus';
 import WorkerPanel, { type WorkerPanelProps } from './WorkerPanel';
 import SetupCreatePanel from './setup/SetupCreatePanel';
 import { SetupAiSection } from './setup/SetupAiSection';
+import { SETUP_CONTEXT_FILE_INPUT_ID } from './setup/SetupContextSources';
 import {
   SetupBasicsSection,
   SetupContextSection,
@@ -31,7 +32,7 @@ export type SessionWizardShellProps = {
   templateActions?: React.ReactNode;
   /** "This draft came from a link", with its differences. */
   templateNotice?: React.ReactNode;
-  /** "Set up with your AI": a prompt whose answer fills in this page. */
+  /** "Set up with AI": a prompt whose answer fills in this page. */
   aiSetup?: React.ReactNode;
   draft: Record<string, unknown>;
   updateDraftValue: (path: string[], value: unknown) => void;
@@ -115,14 +116,14 @@ const SessionWizardShell = ({
 
   return (
     <div className={styles.groupWizard}>
-      <div className={setupStyles.page}>
+      <div className={`${setupStyles.page} ${setupStyles.newPage}`}>
         {recoveryKeyDialog}
         <header className={setupStyles.pageHeader}>
           <h1 className={setupStyles.pageTitle}>New session</h1>
-          {templateActions}
+          {aiSetup}
+          {templateActions ? <div className={setupStyles.pageActions}>{templateActions}</div> : null}
         </header>
         {templateNotice}
-        {aiSetup}
         <SessionWizardSponsoredStatus {...sponsoredStatusProps} />
         <SetupBasicsSection
           draft={draft}
@@ -131,7 +132,12 @@ const SessionWizardShell = ({
           link={slugPreview}
           headerImage={renderField('sessionHeader', draft.sessionHeader, [])}
         />
-        <SetupContextSection {...section('context')} sources={contextSources} publisher={contextPublisher} />
+        <SetupContextSection
+          {...section('context')}
+          sources={contextSources}
+          publisher={contextPublisher}
+          fileInputId={contextSources ? SETUP_CONTEXT_FILE_INPUT_ID : ''}
+        />
         <SetupQuestionsSection {...section('questions')} publisher={questionsPublisher} suggest={questionsSuggest} />
         <SetupParticipationSection {...section('participation')} workerHosted={isWorkerCanonical} />
         <SetupResultsSection {...section('results')} {...policy} />

@@ -111,53 +111,61 @@ const UserPageAnalysisCard = ({ card, picture = null }: UserPageAnalysisCardProp
   ];
   if (video) choices.push(['video', `Video (${video.extension.toUpperCase()}), moving between the pages`]);
 
+  const turn = (to: 1 | 2, sign: string): React.ReactElement => (
+    <button
+      type="button"
+      className={styles.turn}
+      onClick={() => setPage(to)}
+      disabled={page === to}
+      aria-label={`Show page ${to} of the card`}
+    >
+      {sign}
+    </button>
+  );
+
   return (
     <div className={styles.card}>
-      <div className={styles.stage}>
-        <button
-          type="button"
-          className={styles.turn}
-          onClick={() => setPage(1)}
-          disabled={page === 1}
-          aria-label="Show page 1 of the card"
-        >
-          ‹
-        </button>
-        <canvas
-          ref={preview}
-          className={styles.preview}
-          width={CARD_WIDTH / 2}
-          height={CARD_HEIGHT / 2}
-          role="img"
-          aria-label={`Picture card, page ${page} of 2: ${card.title}. Closest historical match: ${card.figure}.`}
-        />
-        <button
-          type="button"
-          className={styles.turn}
-          onClick={() => setPage(2)}
-          disabled={page === 2}
-          aria-label="Show page 2 of the card"
-        >
-          ›
-        </button>
-      </div>
-      <div className={styles.actions}>
-        <UncontrolledDropdown direction="up">
-          <DropdownToggle caret className={styles.download} disabled={!ready || !!busy}>
-            Download
-          </DropdownToggle>
-          <DropdownMenu>
-            {choices.map(([kind, text]) => (
-              <DropdownItem key={kind} onClick={() => void download(kind)}>
-                {text}
-              </DropdownItem>
-            ))}
-          </DropdownMenu>
-        </UncontrolledDropdown>
-        <p className={styles.status} role="status">
-          {error || busy || (waiting ? 'Drawing the picture. The card can be saved when it is ready…' : '')}
+      {/* Shown once it is whole: a card that appears and then redraws itself with its picture reads as a fault. */}
+      {ready ? null : (
+        <p className={styles.drawing} role="status">
+          {error || 'Drawing the card…'}
         </p>
-      </div>
+      )}
+      <canvas
+        ref={preview}
+        className={styles.preview}
+        hidden={!ready}
+        width={CARD_WIDTH / 2}
+        height={CARD_HEIGHT / 2}
+        role="img"
+        aria-label={`Picture card, page ${page} of 2: ${card.title}. Historical match: ${card.figure}.`}
+      />
+      {ready ? (
+        <div className={styles.actions}>
+          {turn(1, '‹')}
+          {/* A card is saved as a file only by the person it is about. */}
+          {card.own ? (
+            <UncontrolledDropdown direction="up">
+              <DropdownToggle tag="button" type="button" caret className={styles.download} disabled={!!busy}>
+                Download
+              </DropdownToggle>
+              <DropdownMenu>
+                {choices.map(([kind, text]) => (
+                  <DropdownItem key={kind} onClick={() => void download(kind)}>
+                    {text}
+                  </DropdownItem>
+                ))}
+              </DropdownMenu>
+            </UncontrolledDropdown>
+          ) : null}
+          {turn(2, '›')}
+        </div>
+      ) : null}
+      {ready && (error || busy) ? (
+        <p className={styles.status} role="status">
+          {error || busy}
+        </p>
+      ) : null}
     </div>
   );
 };

@@ -81,7 +81,7 @@ describe('UserPageAnalysisCard', () => {
     // No picture; the site's mark is asked for but jsdom loads no images, so the card is drawn without it.
     expect(mockDraw).toHaveBeenCalledWith(card, null, null);
     expect(screen.getByRole('img').getAttribute('aria-label')).toBe(
-      'Picture card, page 1 of 2: Wants AI doing paperwork, not governing. Closest historical match: Elinor Ostrom (1933–2012).',
+      'Picture card, page 1 of 2: Wants AI doing paperwork, not governing. Historical match: Elinor Ostrom (1933–2012).',
     );
     expect((screen.getByLabelText('Show page 1 of the card') as HTMLButtonElement).disabled).toBe(true);
 
@@ -106,7 +106,9 @@ describe('UserPageAnalysisCard', () => {
       fireEvent.click(screen.getByText('GIF, moving between the pages'));
     });
     expect(mockDownload).toHaveBeenCalledWith(pages, 'gif');
-    await waitFor(() => expect(screen.getByRole('status').textContent).toBe(''));
+    await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
+    // Download is a plain button of the card's own, so no theme rule for Bootstrap buttons restyles it.
+    expect(screen.getByText('Download').className).not.toMatch(/\bbtn\b/);
   });
 
   it('leaves video out where the browser cannot record one, and says when a file fails', async () => {
@@ -136,8 +138,10 @@ describe('UserPageAnalysisCard', () => {
         picture={{ status: 'ready', dataUrl: 'data:image/jpeg;base64,AAAA', accentHex: '#aa3311' }}
       />,
     );
-    // Until the pages are redrawn with the picture, a click saves nothing.
-    expect((screen.getByText('Download') as HTMLButtonElement).disabled).toBe(true);
+    // Until the pages are redrawn with the picture the card is not shown, so nothing can be saved from it.
+    expect(screen.queryByText('Download')).toBeNull();
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(screen.getByRole('status').textContent).toBe('Drawing the card…');
     await waitFor(() => expect((screen.getByText('Download') as HTMLButtonElement).disabled).toBe(false));
     expect(mockDraw).toHaveBeenLastCalledWith(card, { image: expect.anything(), accentHex: '#aa3311' }, null);
   });
@@ -151,11 +155,11 @@ describe('UserPageAnalysisCard', () => {
     await waitFor(() =>
       expect(screen.getByRole('status').textContent).toBe('The card could not be drawn in this browser.'),
     );
-    expect((screen.getByText('Download') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByText('Download')).toBeNull();
 
     rerender(<UserPageAnalysisCard card={{ ...card }} picture={null} />);
     await waitFor(() => expect((screen.getByText('Download') as HTMLButtonElement).disabled).toBe(false));
-    expect(screen.getByRole('status').textContent).toBe('');
+    expect(screen.queryByRole('status')).toBeNull();
   });
 
   it('says so where the browser gives no canvas to draw on', async () => {
@@ -167,15 +171,38 @@ describe('UserPageAnalysisCard', () => {
     );
   });
 
-  it('holds the download until the picture has arrived', async () => {
+  it('shows a plain waiting box, not a half-made card, until the picture has arrived or is known to be absent', async () => {
     const { rerender } = render(<UserPageAnalysisCard card={card} picture={{ status: 'loading' }} />);
     await waitFor(() => expect(mockDraw).toHaveBeenCalled());
 
-    expect((screen.getByText('Download') as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByRole('status').textContent).toMatch(/^Drawing the picture/);
+    expect(screen.getByRole('status').textContent).toBe('Drawing the card…');
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(screen.queryByText('Download')).toBeNull();
+    expect(screen.queryByLabelText('Show page 2 of the card')).toBeNull();
 
+    // No picture after all: the card drawn without one is shown, though nothing is drawn again.
     rerender(<UserPageAnalysisCard card={card} picture={{ status: 'none' }} />);
     await waitFor(() => expect((screen.getByText('Download') as HTMLButtonElement).disabled).toBe(false));
-    expect(screen.getByRole('status').textContent).toBe('');
+    expect(screen.getByRole('img')).toBeTruthy();
+    expect(drawImage).toHaveBeenCalledWith(pages.page1, 0, 0, 540, 960);
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it("offers no Download on someone else's card, only the page turns", async () => {
+    render(<UserPageAnalysisCard card={{ ...card, own: false }} picture={{ status: 'none' }} />);
+    await waitFor(() => expect(screen.getByRole('img')).toBeTruthy());
+    expect(screen.queryByText('Download')).toBeNull();
+    expect(screen.queryByRole('menuitem')).toBeNull();
+    fireEvent.click(screen.getByLabelText('Show page 2 of the card'));
+    await waitFor(() => expect(screen.getByRole('img').getAttribute('aria-label')).toContain('page 2 of 2'));
+  });
+
+  it('puts the page turns beside Download, under the card', async () => {
+    render(<UserPageAnalysisCard card={card} picture={{ status: 'none' }} />);
+    await waitFor(() => expect(screen.getByText('Download')).toBeTruthy());
+    const row = screen.getByLabelText('Show page 1 of the card').parentElement;
+    expect(row?.contains(screen.getByText('Download'))).toBe(true);
+    expect(row?.contains(screen.getByLabelText('Show page 2 of the card'))).toBe(true);
+    expect(row?.contains(screen.getByRole('img'))).toBe(false);
   });
 });

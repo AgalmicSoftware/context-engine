@@ -36,6 +36,28 @@ import {
   withWorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
 import { WORKER_GROUP_COUNT_WAIT_MS } from './communityWorkerGroupStats';
+
+// The Stats tiles count a Worker-hosted session from its listings. Tests name what each session's listings hold;
+// a session not named here lists nothing.
+const mockListingCounts = {};
+jest.mock('./communityWorkerListingCounts', () => ({
+  // People are counted here as on a session whose answers every reader may list; the module's own tests cover
+  // sessions where each person is listed only their own.
+  listsEveryAnswer: () => true,
+  settingsHiddenQuestionIds: jest.requireActual('./communityWorkerListingCounts').settingsHiddenQuestionIds,
+  loadWorkerListingCounts: jest.fn(async ({ sessionSlug }) => {
+    const counts = mockListingCounts[sessionSlug];
+    if (counts instanceof Error) throw counts;
+    return counts || { questions: 0, surveys: 0, responders: [] };
+  }),
+}));
+// Lets the listing reads started by a refresh settle, then runs the refresh they ask for.
+const settleListingCounts = async (instance) => {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+  await instance._runStatsRefreshCycle({ force: true });
+};
 import BeeswarmPlot from '../Shared/BeeswarmPlot/BeeswarmPlot';
 import SBTsList from '../SBTs/SBTsList';
 import SBTFilter from '../SBTs/SBTFilter';
@@ -62,6 +84,16 @@ const writeWorkerStatsCaches = async ({
   numericSurveys = { staleNumericSurvey: { title: 'Stale numeric survey' } },
   workerSurveys = { workerSurvey: { title: 'Worker survey', creator: '0xabc', questionIDs: ['workerQuestion'] } },
 } = {}) => {
+  // What the fixture session's own listings hold: one question, one survey, answers from three people.
+  mockListingCounts['demo-sh'] = {
+    questions: 1,
+    surveys: 1,
+    responders: [
+      '0x00000000000000000000000000000000000000a1',
+      '0x00000000000000000000000000000000000000a2',
+      '0x00000000000000000000000000000000000000a3',
+    ],
+  };
   const identity = resolveWorkerCanonicalCacheIdentity({
     sessionConfig: WORKER_SESSION_CONFIG,
     sessionSlug: 'demo-sh',
@@ -149,6 +181,7 @@ describe('CommunityTab helpers', () => {
       window.history.replaceState({}, '', '/');
     } catch (_) {}
     localStorage.clear();
+    Object.keys(mockListingCounts).forEach((slug) => delete mockListingCounts[slug]);
     globalThis.CE_SESSION_SCAN_SCOPE = 'active';
     globalThis.CE_SESSION_SCAN_SLUGS = [];
     // Stats count the groups of every bundled Worker session; tests stub those reads instead of calling live Workers.
@@ -798,7 +831,8 @@ describe('CommunityTab helpers', () => {
       expect(instance.state.stats.find((stat) => stat.label === 'Questions').count).toBe(1);
       expect(instance.state.loadingSurveyData).toBe(false);
       expect(instance._statsRefreshInFlight).toBe(false);
-      expect(queueRefresh).not.toHaveBeenCalled();
+      // Only the light refresh a finished listing read asks for; nothing forces a recount.
+      expect(queueRefresh).not.toHaveBeenCalledWith({ force: true });
 
       answerSignIn();
       await jest.advanceTimersByTimeAsync(0);
@@ -972,6 +1006,150 @@ describe('CommunityTab helpers', () => {
     expect(collectNodeText(tile('questions'))).toBe('0Questions');
   });
 
+  it('counts a Worker session from its own listings, whichever session the app has loaded', async () => {
+    const A = '0x00000000000000000000000000000000000000aa';
+    const B = '0x00000000000000000000000000000000000000bb';
+    // The dropdown names a session that is not the app's current one, so the caches hold nothing for it.
+    const selection = { primarySessionSlug: 'other', selectedSessionScope: 'active', selectedSessionSlugs: [] };
+    const instance = attachMutableSetState(new CommunityTab({ globalSessionSelection: selection }));
+    const tile = (label) =>
+      collectTreeNodes(instance.render(), (node) => node.props?.['data-testid'] === `ce-community-stat-${label}`)[0];
+    const entry = {
+      slug: 'other',
+      isWorkerCanonical: true,
+      // Its Settings hide one question: the count leaves it out, as the session page does.
+      sessionConfig: {
+        slug: 'other',
+        corsWorkerUrl: 'https://other.example.workers.dev',
+        BLOCKED_QUESTION_IDS: ['Q-Hidden'],
+      },
+      workerGroupsStatus: 'ready',
+      questionsCache: {},
+      surveysCache: {},
+    };
+    let release;
+    mockListingCounts.other = undefined;
+    const { loadWorkerListingCounts } = jest.requireMock('./communityWorkerListingCounts');
+    loadWorkerListingCounts.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    jest.spyOn(instance, '_iterScopeCaches').mockReturnValue([entry]);
+    jest.spyOn(instance, '_hydrateWorkerGroupCounts').mockResolvedValue(undefined);
+    jest.spyOn(instance, '_computeStatsSnapshot').mockImplementation(() => ({
+      uniqueUsers: [],
+      surveysCreatedCount: 0,
+      surveyResponsesCount: 0,
+      uniqueQuestionsCount: 0,
+      surveysList: [],
+      sbtsCreatedCount: 0,
+    }));
+    jest.spyOn(instance, '_buildCommunityBeeswarmPoints').mockReturnValue([]);
+    jest.spyOn(instance, 'checkIfInitialLoadDone').mockResolvedValue(true);
+
+    // While its listings are being read the three tiles say loading: never a zero that was not read.
+    await instance._runStatsRefreshCycle({ force: true });
+    expect(loadWorkerListingCounts).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionSlug: 'other', hiddenQuestionIds: ['q-hidden'] }),
+    );
+    // A changed list is a new read, not the held count.
+    expect(instance._workerListingKey(entry)).not.toBe(
+      instance._workerListingKey({ ...entry, sessionConfig: { ...entry.sessionConfig, BLOCKED_QUESTION_IDS: [] } }),
+    );
+    expect(tile('questions').props['aria-busy']).toBe(true);
+    expect(collectNodeText(tile('questions'))).toBe('Questions');
+    expect(tile('users').props['aria-busy']).toBe(true);
+    expect(tile('surveys')).toBeUndefined();
+
+    // The listings arrive: forty questions, two people, no surveys.
+    release({ questions: 40, surveys: 0, responders: [A, B] });
+    await settleListingCounts(instance);
+    expect(collectNodeText(tile('questions'))).toBe('40Questions');
+    expect(collectNodeText(tile('users'))).toBe('2Users');
+    expect(tile('questions').props['aria-busy']).toBe(false);
+    // None were listed, so this session has no Surveys tile; the ALL view keeps it.
+    expect(tile('surveys')).toBeUndefined();
+    jest.spyOn(instance, '_isUniverseEnabled').mockReturnValue(true);
+    expect(tile('surveys')).toBeDefined();
+  });
+
+  it('shows no number for a Worker session whose listings could not be read', async () => {
+    const selection = { primarySessionSlug: 'closed', selectedSessionScope: 'active', selectedSessionSlugs: [] };
+    const instance = attachMutableSetState(new CommunityTab({ globalSessionSelection: selection }));
+    const tile = (label) =>
+      collectTreeNodes(instance.render(), (node) => node.props?.['data-testid'] === `ce-community-stat-${label}`)[0];
+    mockListingCounts.closed = new Error('Storage list failed (401).');
+    jest.spyOn(instance, '_iterScopeCaches').mockReturnValue([
+      {
+        slug: 'closed',
+        isWorkerCanonical: true,
+        sessionConfig: { slug: 'closed', corsWorkerUrl: 'https://closed.example.workers.dev' },
+        workerGroupsStatus: 'ready',
+        questionsCache: {},
+        surveysCache: {},
+      },
+    ]);
+    jest.spyOn(instance, '_hydrateWorkerGroupCounts').mockResolvedValue(undefined);
+    jest.spyOn(instance, '_computeStatsSnapshot').mockImplementation(() => ({
+      uniqueUsers: ['0x1'],
+      surveysCreatedCount: 3,
+      surveyResponsesCount: 0,
+      uniqueQuestionsCount: 5,
+      surveysList: [],
+      sbtsCreatedCount: 0,
+    }));
+    jest.spyOn(instance, '_buildCommunityBeeswarmPoints').mockReturnValue([]);
+    jest.spyOn(instance, 'checkIfInitialLoadDone').mockResolvedValue(true);
+    await instance._runStatsRefreshCycle({ force: true });
+    await settleListingCounts(instance);
+    // Whatever the caches hold for it is not shown as its count.
+    expect(collectNodeText(tile('questions'))).toBe('–Questions');
+    expect(collectNodeText(tile('users'))).toBe('–Users');
+    expect(tile('questions').props['aria-busy']).toBe(false);
+  });
+
+  it('keeps each tile to what was read: no people count where answers are private, and a plus for a partial sum', async () => {
+    const selection = { primarySessionSlug: 'one', selectedSessionScope: 'active', selectedSessionSlugs: [] };
+    const instance = attachMutableSetState(new CommunityTab({ globalSessionSelection: selection }));
+    const tile = (label) =>
+      collectTreeNodes(instance.render(), (node) => node.props?.['data-testid'] === `ce-community-stat-${label}`)[0];
+    const entry = (slug) => ({
+      slug,
+      isWorkerCanonical: true,
+      sessionConfig: { slug, corsWorkerUrl: `https://${slug}.example.workers.dev` },
+      workerGroupsStatus: 'ready',
+      questionsCache: {},
+      surveysCache: {},
+    });
+    // Its questions were listed; its answers were not (each person is listed only their own there).
+    mockListingCounts.one = { questions: 5, surveys: 0, responders: null };
+    mockListingCounts.two = new Error('Storage list failed (403).');
+    const scope = jest.spyOn(instance, '_iterScopeCaches').mockReturnValue([entry('one')]);
+    jest.spyOn(instance, '_hydrateWorkerGroupCounts').mockResolvedValue(undefined);
+    jest.spyOn(instance, '_computeStatsSnapshot').mockImplementation(() => ({
+      uniqueUsers: [],
+      surveysCreatedCount: 0,
+      surveyResponsesCount: 0,
+      uniqueQuestionsCount: 0,
+      surveysList: [],
+      sbtsCreatedCount: 0,
+    }));
+    jest.spyOn(instance, '_buildCommunityBeeswarmPoints').mockReturnValue([]);
+    jest.spyOn(instance, 'checkIfInitialLoadDone').mockResolvedValue(true);
+    await instance._runStatsRefreshCycle({ force: true });
+    await settleListingCounts(instance);
+    expect(collectNodeText(tile('questions'))).toBe('5Questions');
+    expect(collectNodeText(tile('users'))).toBe('–Users');
+
+    // With a second session whose listings were refused, the sum says it leaves something out.
+    scope.mockReturnValue([entry('one'), entry('two')]);
+    await instance._runStatsRefreshCycle({ force: true });
+    await settleListingCounts(instance);
+    expect(collectNodeText(tile('questions'))).toBe('5+Questions');
+  });
+
   it('does not mistake an empty identity-bound Worker cache for completed metadata hydration', async () => {
     writeGlobalSessionSelection({ selectedSessionScope: 'active', primarySessionSlug: 'demo-sh' });
     await writeWorkerStatsCaches({ workerQuestions: {}, workerQuestionResponses: {}, workerSurveys: {} });
@@ -1056,7 +1234,8 @@ describe('CommunityTab helpers', () => {
     );
     expect(workerGroupPorts.loadPublicWorkerGroups).not.toHaveBeenCalled();
     expect(instance.state.stats.find((stat) => stat.label === 'Groups').count).toBe(2);
-    expect(instance.state.stats.find((stat) => stat.label === 'Users').count).toBe(4);
+    // The Users tile counts the people the session's listing shows answers from, not group members.
+    expect(instance.state.stats.find((stat) => stat.label === 'Users').count).toBe(3);
     expect(instance.state.uniqueUsers).toEqual(
       expect.arrayContaining([
         '0x00000000000000000000000000000000000000aa',
@@ -2230,7 +2409,9 @@ describe('CommunityTab helpers', () => {
     await instance._runStatsRefreshCycle({ force: false, markLoading: false });
     await instance._runStatsRefreshCycle({ force: false, markLoading: false });
 
-    expect(computeSpy).toHaveBeenCalledTimes(1);
+    // One count for the tables and one for the chain sessions' share of the tiles (Worker sessions in view are
+    // counted from their listings); the second cycle, with nothing changed, counts nothing again.
+    expect(computeSpy).toHaveBeenCalledTimes(2);
     expect(deepSigSpy).toHaveBeenCalledTimes(1);
     expect(instance._statsUnchangedStreak).toBeGreaterThan(0);
   });
@@ -2279,7 +2460,8 @@ describe('CommunityTab helpers', () => {
     await instance._runStatsRefreshCycle({ force: false, markLoading: false });
 
     expect(deepSigSpy).toHaveBeenCalledTimes(2);
-    expect(computeSpy).toHaveBeenCalledTimes(2);
+    // Two counts per change: the tables, and the chain sessions' share of the tiles.
+    expect(computeSpy).toHaveBeenCalledTimes(4);
   });
 
   it('recomputes stats when question metadata mutates in place with stable counts', async () => {
@@ -2318,7 +2500,8 @@ describe('CommunityTab helpers', () => {
     await instance._runStatsRefreshCycle({ force: false, markLoading: false });
 
     expect(deepSigSpy).toHaveBeenCalledTimes(2);
-    expect(computeSpy).toHaveBeenCalledTimes(2);
+    // Two counts per change: the tables, and the chain sessions' share of the tiles.
+    expect(computeSpy).toHaveBeenCalledTimes(4);
     expect(instance.state.uniqueUsers).toContain('0xbbb');
     expect(instance.state.uniqueUsers).not.toContain('0xaaa');
   });
@@ -2367,7 +2550,8 @@ describe('CommunityTab helpers', () => {
     await instance._runStatsRefreshCycle({ force: false, markLoading: false });
 
     expect(deepSigSpy).toHaveBeenCalledTimes(2);
-    expect(computeSpy).toHaveBeenCalledTimes(2);
+    // Two counts per change: the tables, and the chain sessions' share of the tiles.
+    expect(computeSpy).toHaveBeenCalledTimes(4);
     expect(instance.state.uniqueUsers).toContain('0xbbb');
     expect(instance.state.uniqueUsers).not.toContain('0xaaa');
   });
@@ -2416,7 +2600,8 @@ describe('CommunityTab helpers', () => {
     await instance._runStatsRefreshCycle({ force: false, markLoading: false });
 
     expect(deepSigSpy).toHaveBeenCalledTimes(2);
-    expect(computeSpy).toHaveBeenCalledTimes(2);
+    // Two counts per change: the tables, and the chain sessions' share of the tiles.
+    expect(computeSpy).toHaveBeenCalledTimes(4);
     expect(instance.state.uniqueUsers).toContain('0xbbb');
     expect(instance.state.uniqueUsers).not.toContain('0xaaa');
   });
@@ -2468,6 +2653,7 @@ describe('CommunityTab helpers', () => {
     await instance._runStatsRefreshCycle({ force: false, markLoading: false });
 
     expect(deepSigSpy).toHaveBeenCalledTimes(2);
+    // No Worker session is in view in this one, so there is a single count per change.
     expect(computeSpy).toHaveBeenCalledTimes(2);
     expect(instance.state.sbtsCreatedCount).toBe(0);
   });
@@ -2808,6 +2994,7 @@ describe('CommunityTab helpers', () => {
           config,
         }).status,
       ).toBe('cached');
+      mockListingCounts[config.slug] = { questions: 1, surveys: 0, responders: [] };
       const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig: config, sessionSlug: config.slug });
       await writeCache('questionsCache', config.slug, {
         11155420: { questions: { stale: { type: 'binary', prompt: 'Wrong numeric question', creator: '0xstale' } } },
@@ -2852,7 +3039,9 @@ describe('CommunityTab helpers', () => {
     });
     await instance._runStatsRefreshCycle({ force: true });
     expect(instance.state.uniqueUsers).toEqual(['0x1']);
-    expect(instance.state.stats.find(({ label }) => label === 'Questions').count).toBe(2);
+    // The mismatched cache is still kept out of the tables; the tile counts each Worker session from its own
+    // listing, which does not depend on what this browser cached.
+    expect(instance.state.stats.find(({ label }) => label === 'Questions').count).toBe(3);
   });
 
   it.each(['missing', 'wrong-slug', 'wrong-origin', 'wrong-session-id', 'ambiguous'])(

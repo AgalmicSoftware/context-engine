@@ -3,8 +3,11 @@ import { aiRewritePrompt } from './aiRewritePrompt.js';
 import buildClusterAnalysisPrompt from './clusterAnalysisPrompt.js';
 import buildCompareToolkitPrompt from './compareToolkitPrompt.js';
 import buildTagInterpretationPrompt from './tagInterpretationPrompt.js';
-import buildUserAnalysisCardPrompt, { USER_ANALYSIS_CARD_RESPONSE_FORMAT } from './userAnalysisCardPrompt.js';
-import buildUserAnalysisPrompt from './userAnalysisPrompt.js';
+import {
+  buildUserAnalysisCardPrompt,
+  buildUserAnalysisPrompt,
+  USER_ANALYSIS_CARD_RESPONSE_FORMAT,
+} from '../../../shared/userAnalysisPrompts.mjs';
 import buildUserFirstReadPrompt, { USER_FIRST_READ_RESPONSE_FORMAT } from './userFirstReadPrompt';
 
 describe('prompt builders', () => {

@@ -306,8 +306,17 @@ const pick = (value, shape) => {
   );
 };
 
+// A header picture kept with the session as a data: URL stays with it, so a template or link stays short.
+const withoutKeptPicture = (template) =>
+  typeof template.sessionHeader === 'string' && template.sessionHeader.startsWith('data:')
+    ? { ...template, sessionHeader: '' }
+    : template;
+
 export const sessionTemplateFromDraft = (draft) =>
-  validateSessionTemplate({ ...pick(isRecord(draft) ? draft : {}, SHAPE), format: SESSION_TEMPLATE_FORMAT });
+  validateSessionTemplate({
+    ...withoutKeptPicture(pick(isRecord(draft) ? draft : {}, SHAPE)),
+    format: SESSION_TEMPLATE_FORMAT,
+  });
 
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const MAX_DEPTH = 32;

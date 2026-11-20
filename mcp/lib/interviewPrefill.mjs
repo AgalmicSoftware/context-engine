@@ -1,9 +1,11 @@
+import { deflateRawSync } from 'node:zlib';
 import { readLimitedText, text } from './workerClient.mjs';
 import { quadraticCreditsSpent, getVoiceCredits, validateQuadraticAllocation } from '../../shared/questions/quadraticAllocation.mjs';
 
 // Suggested answers for a person to review: the session's question list from its
 // Worker's interview catalog, and a link to the session page that holds the
-// drafts after #prefill=. Nothing here signs in or joins. A public session's
+// drafts after #prefillz= (deflated) where the site reads that, and after
+// #prefill= where it may not. Nothing here signs in or joins. A public session's
 // catalog is read with no credentials. A private session's opens to its group's
 // invite link: the password in the link signs a read proof, sent as a header;
 // neither the password nor the proof is ever put in a link or a result. The
@@ -14,8 +16,17 @@ const CATALOG_TYPE = 'context-engine.interview-question-catalog';
 const PROMPT_VERSIONS = new Set(['ce-interview-brief-v4', 'ce-interview-brief-v5', 'ce-interview-brief-v6']);
 const TIMEOUT_MS = 45_000;
 const MAX_CATALOG_BYTES = 2 * 1024 * 1024;
-// The site reads a #prefill= value of at most this length.
+// The site reads a #prefill= or #prefillz= value of at most this length, a
+// #prefillz= one unpacking to at most MAX_PACKET_BYTES (sessionInterview.ts).
 const MAX_PACKET_CHARS = 100_000;
+const MAX_PACKET_BYTES = 400_000;
+// A site lists the review links it reads in its manifest (client/public/manifest.json).
+// One that doesn't, or can't be read in time, gets #prefill=, which every site reads.
+const SITE_MANIFEST_FIELD = 'context_engine_review_links';
+const SITE_MANIFEST_TIMEOUT_MS = 3_000;
+// A site that gave no clear answer (no reply in time, an error) is asked again after this.
+const SITE_RECHECK_MS = 5 * 60_000;
+const MAX_SITE_MANIFEST_BYTES = 64 * 1024;
 // Kept from the session link, as the site's prompt keeps them; nothing else,
 // so no invite code, password or ticket reaches the link the person gets.
 const KEPT_LINK_PARAMS = ['src', 'joinGroup'];
@@ -56,7 +67,44 @@ const checkedReviewUrl = (value, { page, workerOrigin, sent }) => {
 
 // `readInvite(info)` gives the read-invite header for a link that carries a group invite, or '' when the session
 // needs none; it throws, in words for the agent, when the link's invite can't read (a one-use code, a stale password).
-export const createInterviewPrefill = ({ fetchImpl = globalThis.fetch, resolveLink, profile = async () => ({}), readInvite = async () => '' }) => {
+export const createInterviewPrefill = ({ fetchImpl = globalThis.fetch, resolveLink, profile = async () => ({}), readInvite = async () => '', now = Date.now }) => {
+  // Any failure counts as no. A clear answer (the manifest, or none: 404) holds
+  // while the MCP runs; anything else holds for SITE_RECHECK_MS.
+  const packedSites = new Map();
+  const askSite = async (origin) => {
+    try {
+      const response = await fetchImpl(`${origin}/manifest.json`, {
+        redirect: 'manual',
+        credentials: 'omit',
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(SITE_MANIFEST_TIMEOUT_MS),
+      });
+      if (response.status !== 200) return { reads: false, clear: response.status === 404 || response.status === 410 };
+      // A body cut off by the time limit is no clear answer; one that isn't JSON is.
+      const body = await readLimitedText(response, MAX_SITE_MANIFEST_BYTES);
+      let manifest = null;
+      try {
+        manifest = JSON.parse(body);
+      } catch {
+        return { reads: false, clear: true };
+      }
+      const listed = isRecord(manifest) ? manifest[SITE_MANIFEST_FIELD] : null;
+      return { reads: Array.isArray(listed) && listed.includes('prefillz'), clear: true };
+    } catch {
+      return { reads: false, clear: false };
+    }
+  };
+  const readsPacked = (origin) => {
+    const known = packedSites.get(origin);
+    if (known && known.until > now()) return known.reads;
+    const asked = askSite(origin);
+    const entry = { until: Infinity, reads: asked.then((answer) => answer.reads) };
+    packedSites.set(origin, entry);
+    void asked.then((answer) => {
+      if (!answer.clear) entry.until = now() + SITE_RECHECK_MS;
+    });
+    return entry.reads;
+  };
   const readCatalog = async (link) => {
     if (!text(link)) throw new Error('Pass the session link.');
     const info = await resolveLink(link);
@@ -212,14 +260,18 @@ export const createInterviewPrefill = ({ fetchImpl = globalThis.fetch, resolveLi
         responses: kept,
         ...(groupPicks.length ? { groups: groupPicks } : {}),
       };
-      const encoded = Buffer.from(JSON.stringify(packet), 'utf8').toString('base64url');
-      if (encoded.length > MAX_PACKET_CHARS) throw new Error('These drafts are too long for one link. Shorten the evidence, comments and context, then try again.');
+      // Deflated, the link is well under half as long, so there is less to copy exactly.
+      const json = Buffer.from(JSON.stringify(packet), 'utf8');
+      const packed = kept.length > 0 && (await readsPacked(new URL(reviewUrl).origin));
+      const encoded = (packed ? deflateRawSync(json) : json).toString('base64url');
+      if (encoded.length > MAX_PACKET_CHARS || (packed && json.length > MAX_PACKET_BYTES)) throw new Error('These drafts are too long for one link. Shorten the evidence, comments and context, then try again.');
       return {
         session: info.slug,
-        reviewLink: kept.length ? `${reviewUrl}#prefill=${encoded}` : reviewUrl,
+        reviewLink: kept.length ? `${reviewUrl}#${packed ? 'prefillz' : 'prefill'}=${encoded}` : reviewUrl,
         drafts: kept.length,
         ...(leftOut.length ? { leftOut } : {}),
-        next: 'Give the person reviewLink as a Markdown link labelled "Review your drafted answers". Nothing is submitted: they review the drafts on the page and submit the ones they keep, as themselves.' +
+        next: 'Give the person reviewLink as a Markdown link labelled "Review your drafted answers", copied exactly: if one character changes or goes missing, the page can’t read the drafts. ' +
+          'If it is too long to send whole, call make_review_link again with shorter evidence and comments, or fewer drafts. Nothing is submitted: they review the drafts on the page and submit the ones they keep, as themselves.' +
           (privateSession ? ' This session is private, and the review link carries no invite: they open the session from their own invite link first, or sign in as a member, then open the review link.' : ''),
       };
     },

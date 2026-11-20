@@ -54,7 +54,8 @@ type CommunityWorkerGroupRuntime = {
 };
 
 const WORKER_GROUP_COUNT_TTL_MS = 30000;
-export const WORKER_GROUP_COUNT_WAIT_MS = 2500;
+// Short: the other tiles show their own numbers without the groups, whose tile keeps its spinner until they settle.
+export const WORKER_GROUP_COUNT_WAIT_MS = 250;
 
 /**
  * Live group counts are optional: a load can wait on a Worker sign-in that is

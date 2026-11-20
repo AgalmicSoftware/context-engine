@@ -138,6 +138,28 @@ describe('describeInterviewStatus', () => {
     });
   });
 
+  it('says the questions are loading, failed or need sign-in before saying there are none', () => {
+    const empty = { hasQuestions: false, readiness: 'checking' as const, openingLoading: true };
+    expect(statusOf({ ...empty, questionLoad: 'loading' })).toMatchObject({
+      statusLabel: 'Loading questions…',
+      statusTone: 'busy',
+    });
+    expect(statusOf({ ...empty, questionLoad: 'failed' })).toMatchObject({
+      statusLabel: "Questions didn't load",
+      statusTone: 'error',
+    });
+    expect(statusOf({ ...empty, questionLoad: 'signIn' })).toMatchObject({
+      statusLabel: 'Sign in for questions',
+      statusTone: 'pending',
+    });
+    expect(statusOf(empty)).toMatchObject({ statusLabel: 'No questions', statusTone: 'error' });
+    // Loaded questions and a running interview outrank a stale load flag.
+    expect(statusOf({ questionLoad: 'loading' })).toMatchObject({ statusLabel: 'Ready', statusTone: 'ready' });
+    expect(statusOf({ hasQuestions: false, questionLoad: 'loading', mapping: true })).toMatchObject({
+      statusLabel: 'Preparing responses…',
+    });
+  });
+
   it('guides a paused interview ahead of its drafts', () => {
     expect(statusOf({ recordingState: 'paused', hasDrafts: true }).guidance).toMatch(/^Microphone and interviewer/);
     expect(statusOf({ hasDrafts: true }).guidance).toMatch(/^Review and edit your answers/);

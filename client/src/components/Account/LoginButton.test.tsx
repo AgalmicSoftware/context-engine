@@ -46,9 +46,6 @@ describe('LoginButton', () => {
     expect(compiledAccountStylesheet).toMatch(
       /#accountModalPanel \.accountModalProfileShell\s*\{[^}]*--ce-status-error:\s*var\(--ce-status-danger-text\);/,
     );
-    expect(compiledAccountStylesheet).toMatch(
-      /#accountModalPanel \.disconnectButton\s*\{[^}]*color:\s*var\(--ce-action-primary-text\);/,
-    );
   });
 
   it('keeps the Settings strip on one row on desktop and stacks the session first up to 768px', () => {

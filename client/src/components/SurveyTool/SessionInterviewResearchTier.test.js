@@ -77,7 +77,41 @@ it('labels voice drafts that did not come from a prefill packet', async () => {
     draftOrigin: 'voice_interview',
     // The in-app drafting prompt asks for the chance of keeping the answer.
     confidenceMeaning: 'keep',
+    // Which voice model and drafting prompt made it, so a change between interviews shows in the records.
+    voiceModel: 'gpt-live-1.1',
+    voiceBriefRevision: 'ce-voice-brief-3',
+    mappingPromptVersion: 'ce-interview-mapping-v3',
   });
+});
+
+it('records the voice model the session names, and neither on a prefill draft', async () => {
+  const engine = fakeEngine({ slug: 'demo', interviewMode: { realtimeModel: 'gpt-live-1' } });
+  const voiceDrafts = [
+    { questionId: 'q1', answer: 'Agree', revisions: [{ revision: 1, modelId: 'gpt-realtime', answer: 'Agree' }] },
+  ];
+  await recordInterviewProvenance(engine, voiceDrafts, null, null, true, true, '', []);
+  expect(engine.state.surveysResponseState[0].interviewProvenance.q1.voiceModel).toBe('gpt-live-1');
+  const prefill = fakeEngine({ slug: 'demo' });
+  await recordInterviewProvenance(prefill, drafts, SOURCE, PACKET, true, true, '', review);
+  const record = prefill.state.surveysResponseState[0].interviewProvenance.q1;
+  expect(record.draftOrigin).toBe('external_prefill');
+  expect(record).not.toHaveProperty('voiceModel');
+  expect(record).not.toHaveProperty('voiceBriefRevision');
+  expect(record).not.toHaveProperty('mappingPromptVersion');
+  // The copied prompt's wording is research data, kept even without AI attribution; a voice draft has none.
+  const revised = fakeEngine({ slug: 'demo' });
+  await recordInterviewProvenance(
+    revised,
+    drafts,
+    SOURCE,
+    { ...PACKET, promptRevision: 'ce-prefill-prompt-2' },
+    false,
+    true,
+    '',
+    review,
+  );
+  expect(revised.state.surveysResponseState[0].interviewProvenance.q1.promptRevision).toBe('ce-prefill-prompt-2');
+  expect(engine.state.surveysResponseState[0].interviewProvenance.q1).not.toHaveProperty('promptRevision');
 });
 
 it('records minimal detail when that is what the participant was shown, even if the session now asks for full', async () => {

@@ -169,16 +169,11 @@ const renderModal = async (getEngine, prefillPacket) => {
 
 const consentControls = () => {
   fireEvent.click(screen.getByText('AI submission info'));
-  const name = screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME);
   const ai = screen.queryByLabelText(/Include platform\/model provenance/i);
   return {
-    nameShown: !!name,
-    nameChecked: name ? name.checked : null,
-    nameAria: name ? name.getAttribute('aria-checked') : null,
-    nameLabel: name ? name.closest('label')?.textContent : null,
+    nameShown: screen.queryByText(/as the responder name/) !== null,
     aiShown: !!ai,
     aiChecked: ai ? ai.checked : null,
-    aiAria: ai ? ai.getAttribute('aria-checked') : null,
   };
 };
 // The person changes the q1 draft before its saved answer loads, so the draft stays in review.
@@ -202,61 +197,29 @@ const submitAndCapture = async (submitResponses) => {
   return submitResponses.mock.calls[0][2][0];
 };
 
-it('shows the saved name when own answers load', async () => {
-  mockCaches();
-  mockOwnAnswerListing(true);
-  const submitResponses = mockSubmit();
-  const getEngine = await mountPileEngine();
-  await renderModal(getEngine, packet({}));
-  await editDraftBeforeSavedAnswerLoads(getEngine, 'Disagree');
-  // The edited draft stays chosen and says which saved answer it changes.
-  expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
-  const controls = consentControls();
-  const uploaded = await submitAndCapture(submitResponses);
-  expect(controls.nameShown && controls.nameChecked).toBe(true);
-  expect(uploaded.answer.value).toBe('Disagree');
-  expect(uploaded.responderName).toBe('Participant A');
-  expect(uploaded.interviewProvenance).toMatchObject({
-    source: { modelId: 'new-model' },
-    promptVersion: 'ce-interview-brief-v5',
-    questionSetHash: 'a'.repeat(64),
-  });
-}, 40000);
-
-it('shows saved consent from the pile baseline when own-answer loading is unavailable', async () => {
-  mockCaches();
-  mockOwnAnswerListing(false);
-  const submitResponses = mockSubmit();
-  const getEngine = await mountPileEngine();
-  await renderModal(getEngine, packet({}));
-  await editDraftBeforeSavedAnswerLoads(getEngine, 'Disagree');
-  const controls = consentControls();
-  const uploaded = await submitAndCapture(submitResponses);
-  // A name may only be submitted when the modal shows a ticked (or mixed) name control.
-  expect(controls.nameShown && controls.nameChecked).toBe(true);
-  expect(uploaded.responderName).toBe('Participant A');
-  expect(uploaded.interviewProvenance).toMatchObject({
-    source: { modelId: 'new-model' },
-    promptVersion: 'ce-interview-brief-v5',
-    questionSetHash: 'a'.repeat(64),
-  });
-}, 40000);
-
-it.each([false, true])(
-  'labels the saved name when the packet names someone else (own listing: %s)',
-  async (available) => {
+// An interview writes no name into answers, so one an earlier answer carried is withdrawn when it is replaced,
+// whatever name the imported context gives.
+it.each([
+  [true, {}],
+  [false, {}],
+  [true, { name: 'Fixture Responder' }],
+  [false, { name: 'Fixture Responder' }],
+])(
+  'withdraws the saved answer name (own listing: %s, context: %j)',
+  async (available, context) => {
     mockCaches();
     mockOwnAnswerListing(available);
     const submitResponses = mockSubmit();
     const getEngine = await mountPileEngine();
-    await renderModal(getEngine, packet({ name: 'Fixture Responder' }));
+    await renderModal(getEngine, packet(context));
     await editDraftBeforeSavedAnswerLoads(getEngine, 'Disagree');
+    // The edited draft stays chosen and says which saved answer it changes.
+    expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
     const controls = consentControls();
     const uploaded = await submitAndCapture(submitResponses);
-    expect(controls.nameChecked).toBe(true);
-    expect(controls.nameLabel).toContain('“Participant A”');
-    expect(controls.nameLabel).not.toContain('Fixture Responder');
-    expect(uploaded.responderName).toBe('Participant A');
+    expect(controls.nameShown).toBe(false);
+    expect(uploaded.answer.value).toBe('Disagree');
+    expect(uploaded).not.toHaveProperty('responderName');
     expect(uploaded.interviewProvenance).toMatchObject({
       source: { modelId: 'new-model' },
       promptVersion: 'ce-interview-brief-v5',
@@ -299,12 +262,12 @@ it.each([
     const submitResponses = mockSubmit();
     let getEngine = await mountPileEngine();
     await openReplacementDraft(getEngine, 'Disagree');
-    const checkbox =
-      choice === 'name'
-        ? screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME)
-        : screen.getByLabelText(/Include platform\/model provenance/i);
-    expect(checkbox).toBeChecked();
-    fireEvent.click(checkbox);
+    // The name goes without a choice; AI attribution only when it is unticked.
+    if (choice === 'AI attribution') {
+      const checkbox = screen.getByLabelText(/Include platform\/model provenance/i);
+      expect(checkbox).toBeChecked();
+      fireEvent.click(checkbox);
+    }
     submitResponses.mockRejectedValueOnce(new Error('User rejected the request.'));
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
     await waitFor(() => expect(submitResponses).toHaveBeenCalledTimes(1));
@@ -329,12 +292,11 @@ it.each([
       // The undone draft takes its own attribution with it; the saved answer keeps the saved one.
       const row = submitResponses.mock.calls[1][2][0];
       expect(row.answer.value).toBe('Agree');
+      expect(row).not.toHaveProperty('responderName');
       if (choice === 'name') {
-        expect(row).not.toHaveProperty('responderName');
         expect(row.interviewProvenance).toMatchObject({ source: { modelId: 'saved-model' } });
       } else {
         expect(row).not.toHaveProperty('interviewProvenance');
-        expect(row.responderName).toBe('Participant A');
       }
       return;
     }
@@ -343,9 +305,7 @@ it.each([
     getEngine.view.unmount();
     getEngine = await mountPileEngine();
     await openReplacementDraft(getEngine, 'Unsure');
-    if (choice === 'name') {
-      expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME)).not.toBeInTheDocument();
-    } else {
+    if (choice !== 'name') {
       expect(screen.getByLabelText(/Include platform\/model provenance/i)).not.toBeChecked();
     }
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
@@ -353,8 +313,8 @@ it.each([
     await settle();
     const uploaded = submitResponses.mock.calls[1][2][0];
     expect(uploaded.answer.value).toBe('Unsure');
+    expect(uploaded).not.toHaveProperty('responderName');
     if (choice === 'name') {
-      expect(uploaded).not.toHaveProperty('responderName');
       expect(uploaded.interviewProvenance).toMatchObject({
         source: { modelId: 'new-model' },
         promptVersion: 'ce-interview-brief-v5',
@@ -362,7 +322,6 @@ it.each([
       });
     } else {
       expect(uploaded).not.toHaveProperty('interviewProvenance');
-      expect(uploaded.responderName).toBe('Participant A');
     }
   },
   40000,
@@ -376,11 +335,7 @@ it.each(['name', 'AI attribution'])(
     const submitResponses = mockSubmit();
     const getEngine = await mountPileEngine();
     await openReplacementDraft(getEngine, 'Disagree');
-    fireEvent.click(
-      choice === 'name'
-        ? screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME)
-        : screen.getByLabelText(/Include platform\/model provenance/i),
-    );
+    if (choice === 'AI attribution') fireEvent.click(screen.getByLabelText(/Include platform\/model provenance/i));
     submitResponses.mockRejectedValueOnce(new Error('User rejected the request.'));
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
     await waitFor(() => expect(submitResponses).toHaveBeenCalledTimes(1));
@@ -390,12 +345,11 @@ it.each(['name', 'AI attribution'])(
     await settle();
     const uploaded = submitResponses.mock.calls[1][2][0];
     expect(uploaded.answer.value).toBe('Disagree');
+    expect(uploaded).not.toHaveProperty('responderName');
     if (choice === 'name') {
-      expect(uploaded).not.toHaveProperty('responderName');
       expect(uploaded.interviewProvenance).toMatchObject({ source: { modelId: 'new-model' } });
     } else {
       expect(uploaded).not.toHaveProperty('interviewProvenance');
-      expect(uploaded.responderName).toBe('Participant A');
     }
   },
   40000,
@@ -424,34 +378,10 @@ it.each([false, true])(
     });
     await act(async () => recorded);
     await openReplacementDraft(getEngine, 'Disagree');
-    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME)).not.toBeInTheDocument();
     expect(screen.getByLabelText(/Include platform\/model provenance/i)).not.toBeChecked();
     const uploaded = await submitAndCapture(submitResponses);
     expect(uploaded).not.toHaveProperty('responderName');
     expect(uploaded).not.toHaveProperty('interviewProvenance');
-  },
-  40000,
-);
-
-it.each([false, true])(
-  'labels and submits the imported name after an explicit change (own listing: %s)',
-  async (available) => {
-    mockCaches();
-    mockOwnAnswerListing(available);
-    const submitResponses = mockSubmit();
-    const getEngine = await mountPileEngine();
-    await renderModal(getEngine, packet({ name: 'Fixture Responder' }));
-    await editDraftBeforeSavedAnswerLoads(getEngine, 'Disagree');
-    consentControls();
-    const checkbox = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME);
-    fireEvent.click(checkbox);
-    expect(checkbox).not.toBeChecked();
-    expect(checkbox.closest('label')).toHaveTextContent('“Fixture Responder”');
-    fireEvent.click(checkbox);
-    expect(checkbox).toBeChecked();
-    expect(checkbox.closest('label')).toHaveTextContent('“Fixture Responder”');
-    const uploaded = await submitAndCapture(submitResponses);
-    expect(uploaded.responderName).toBe('Fixture Responder');
   },
   40000,
 );

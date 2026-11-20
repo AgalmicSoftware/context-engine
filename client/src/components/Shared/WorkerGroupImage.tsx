@@ -124,7 +124,16 @@ const WorkerGroupImage = ({
   ]);
 
   if (!resolvedSrc) return null;
-  return <img src={resolvedSrc} alt={alt} className={className} {...(testId ? { 'data-testid': testId } : {})} />;
+  // One that won't load leaves its place to whatever shows when there is no picture.
+  return (
+    <img
+      src={resolvedSrc}
+      alt={alt}
+      className={className}
+      onError={() => setResolvedSrc('')}
+      {...(testId ? { 'data-testid': testId } : {})}
+    />
+  );
 };
 
 export default WorkerGroupImage;

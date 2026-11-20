@@ -68,6 +68,9 @@ checkbox in the same section is the `interviewModeEnabled` switch.
 
 The Interview header shows a colored status pill, such as Ready, Connecting,
 Listening, Paused, Ending, Preparing responses…, Review drafts or Error.
+While the session's questions are still loading, including a read held after
+a rate limit, it reads Loading questions…; a failed load reads Questions didn't
+load, and No questions appears only once the load has finished with none.
 Green readiness requires a reachable Worker that confirms an OpenAI key, voice
 provider, and session access, plus browser microphone support and no known
 permission denial. This setup check does not call OpenAI or request microphone
@@ -176,12 +179,12 @@ Suggested questions follow the response drafts in an expandable **Suggested new 
 
 Every AI in interviews places someone no more precisely than their country. The voice interviewer doesn't ask for or repeat a smaller place, and skips session questions that ask for one. Drafts, comments and evidence made from a voice interview leave such a question without a draft. The copied prefill prompt tells the person's own AI the same for its whole packet, and group match reasons name at most a country.
 
-When a session turns on `interviewMode.joinMatchingGroups` (off by default), Interview review shows a collapsible **Groups** section right below the drafts, both after a voice interview and after an AI prefill. Each group in it has a tick box, and its image beside its name when it has one. An image stored on a private session shows only once the person has a saved Worker sign-in, never by asking them to sign in:
+When a session turns on `interviewMode.joinMatchingGroups` (off by default), Interview review shows a collapsible **Suggested groups** section right below the drafts, both after a voice interview and after an AI prefill. Each group in it has a tick box, and its image beside its name when it has one. An image stored on a private session shows only once the person has a saved Worker sign-in, never by asking them to sign in:
 
-- A join link's group (`?joinGroup=`) still waiting for sign-in comes first, ticked, marked “From your link.” Unticking it cancels that link's join in this browser, as the link notice's **Cancel** does, and ticking it again restores the join; an untick made while sign-in is still reading the groups stops that join too. While the dialog is open and the join is waiting, the link's own notice stands aside; once someone signs in, joining and its outcome show in the notice as before, and a group they join leaves the section.
-- Then the groups that fit the person's answers, each unticked until the person ticks it. A group named exactly like the option the person chose, or their AI drafted, on a single-choice question comes first, with the reason “You chose “d/acc”.”; case and extra spacing don't matter. Only drafts the person keeps selected count, so a removed draft, a still-hidden one, or an unchosen one for an answer they already saved, is left out. Groups the person's own AI suggested in its prefill packet come next. Then come the groups the session's AI picked in the same reply that drafted the answers, after a voice interview or a prefill that brings context but no drafts: the groups the person could join go with the drafting request, and the session's AI follows the rule the person's own AI does, judging fit only on what the person's own words show about the kinds of detail **The AI may use** allows, never on the details no AI may use. It doesn't see the groups the person's own AI picked. There is no second AI call or quote check, so the matches show together once the drafts are ready; if the groups can't be read within five seconds, the session's AI picks none and drafting goes ahead. Every match that fits is listed; there is no cap. With nothing ticked under **The AI may use**, neither AI suggests groups, and only groups named like a chosen answer are listed.
+- A join link's group (`?joinGroup=`) is never listed here, even when an AI suggests it. It stays in the link's own notice at the top of the interview, as on the page: that notice joins it at sign-in, and its **Cancel** cancels the join in this browser, so nothing joins it later.
+- The groups that fit the person's answers, each unticked until the person ticks it. A group named exactly like the option the person chose, or their AI drafted, on a single-choice question comes first, with the reason “You chose “d/acc”.”; case and extra spacing don't matter. Only drafts the person keeps selected count, so a removed draft, a still-hidden one, or an unchosen one for an answer they already saved, is left out. Groups the person's own AI suggested in its prefill packet come next. Then come the groups the session's AI picked in the same reply that drafted the answers, after a voice interview or a prefill that brings context but no drafts: the groups the person could join go with the drafting request, and the session's AI follows the rule the person's own AI does, judging fit only on what the person's own words show about the kinds of detail **The AI may use** allows, never on the details no AI may use. It doesn't see the groups the person's own AI picked. There is no second AI call or quote check, so the matches show together once the drafts are ready; if the groups can't be read within five seconds, the session's AI picks none and drafting goes ahead. Every match that fits is listed; there is no cap. With nothing ticked under **The AI may use**, neither AI suggests groups, and only groups named like a chosen answer are listed.
 
-Each match's reason starts with how well it fits, **Strong fit**, **Moderate fit** or **Weak fit**, from its confidence in the drafts' bands: 70% and up, 40–69%, and under 40%. A group named like a chosen answer is a strong fit; a link's group, and an AI pick without a confidence, show none. Each match shows its reason, which names a place no smaller than a country. Only a link's group starts ticked. While anything is ticked, the submit button reads **Submit and join**. A link's group joins at sign-in, as links always have; the ticked matches join only after the answers save. For those, the app reuses the submit's Worker sign-in, checks each ticked group against the signed-in catalog, counts groups the person already belongs to as joined, and joins the rest through the Worker's `/groups/join` route. It then says which groups it joined, and for each one it couldn't, why: full, closed, no longer open, or a sign-in problem. A failed group stays ticked, with **Join ticked groups** to try again; groups ticked after submitting join the same way. While any group is still joining or left ticked after a submit, **Back** asks first, as it does for unsaved work, and reopening Voice mode returns to this review. When another account signs in, as on a shared phone, the previous account's ticks are cleared; only the link's group keeps its tick, since cancelling a link's join belongs to the browser. A failed submit joins none of the matches, and the Worker still enforces every join.
+Each match's reason starts with how well it fits, **Strong fit**, **Moderate fit** or **Weak fit**, from its confidence in the drafts' bands: 70% and up, 40–69%, and under 40%. A group named like a chosen answer is a strong fit; an AI pick without a confidence shows none. Each match shows its reason, which names a place no smaller than a country. Nothing starts ticked. While anything is ticked, the submit button reads **Submit and join**. A link's group joins at sign-in, as links always have; the ticked matches join only after the answers save. For those, the app reuses the submit's Worker sign-in, checks each ticked group against the signed-in catalog, counts groups the person already belongs to as joined, and joins the rest through the Worker's `/groups/join` route. It then says which groups it joined, and for each one it couldn't, why: full, closed, no longer open, or a sign-in problem. A failed group stays ticked, with **Join ticked groups** to try again; groups ticked after submitting join the same way. While any group is still joining or left ticked after a submit, **Back** asks first, as it does for unsaved work, and reopening Voice mode returns to this review. When another account signs in, as on a shared phone, the previous account's ticks are cleared. A failed submit joins none of the matches, and the Worker still enforces every join.
 
 The section lists only open, unexpired, session-visible groups the person hasn't joined. Signed in, suggestions use the person's saved Worker sign-in, never asking for a new one. Without one, they use the unsigned group list, which a public session shows to anyone and a private session shows only to someone holding a join link to a group they could join on their own, and then only what that group's members see. A signed-out visitor on a private session without such a link sees no suggestions. Suggestion failures do not block submitting answers or editing and uploading suggested questions. The section stays through another interview round, out of sight, keeping its ticks. If a reviewer edits or removes a response after suggestions appear, the listed groups and their ticks stay until the reviewer chooses **Refresh group suggestions** in the section, which replaces them. With the setting off, no groups are matched and the section doesn't appear: participants join groups from the session's **Groups** section, and a join link joins at sign-in.
 
@@ -196,7 +199,9 @@ New speech is mapped even if the interview started with imported predictions. Wh
 expand a read-only transcript disclosure while the session's configured thinking model,
 with at most 8,000 output tokens and reasoning effort capped by the owner's setting,
 maps the transcript and any responder context imported by an AI prefill link
-to response drafts. Imported context remains editable in a collapsed
+to response drafts, written in English; a translated answer or comment ends with
+"(translated from <language>)", with the person's own words shown beside it in
+review and kept in the page’s memory only. Imported context remains editable in a collapsed
 **Imported responder context** disclosure; during a normal voice-only interview
 that context editor is absent, keeping the microphone as the primary action.
 Drafts may include comments,
@@ -264,7 +269,8 @@ prompt/question-set revision and self-reported source platform/model. A separate
 imported or voice-generated AI drafts or prediction revisions are being
 reviewed, and it is on unless the session's `shareDraftChangesByDefault` turns
 it off. The platform checkbox is labeled **Include platform/model
-provenance**. An **AI prefill metadata** disclosure explains the included
+provenance**. Inside **AI submission info**, the **AI prefill metadata** shown
+with them explains the included
 platform, revision, question-set hash, coverage
 counts, prediction fields, selected/unselected draft counts, and excluded
 metadata according to the visible consent controls.
@@ -281,11 +287,10 @@ basis from that metadata. See [Session interview research metadata](session-inte
 for the submitted JSON shape and the differences from the Edge2026 agent-village
 agent-only experiment.
 An external AI may also include a preferred responder name that it already
-knows from the permitted context. The review modal shows a separate
-**Include “name” as the responder name** checkbox only when a name was supplied,
-and that checkbox is off by default. The name is attached to submitted answers
-only after this explicit opt-in; declining it does not affect the drafts or the
-platform/model provenance choice.
+knows from the permitted context. It is never attached to answers. Where the
+session keeps names, the review offers it in an optional **Username (optional)**
+box under the drafts, unsaved until the person presses **Save**; that sets their
+name in the session, with the same rules and messages as **Set username**.
 
 ## Ordinary ChatGPT or Claude, without MCP
 
@@ -328,9 +333,16 @@ The copied prompt tells the AI:
 
 Without a sign-in, the catalog includes only questions the Worker can read
 through the session's existing public access checks. For someone signed in, the
-page first gets a catalog ticket from the Worker and adds it to the copied link
-as `&ticket=…`, so their AI reads the questions that person may see, those shown
-only to their groups included, and the groups they could join and haven't. A
+page reads the catalog without a ticket first. Only when that read is refused,
+as on a private session, or leaves out questions the page shows them, such as
+their group's, does it get a catalog ticket from the Worker, and it keeps the
+ticket only where it opens the catalog or adds some of those questions. Then
+it adds it to the copied link as `&ticket=…`, so their AI reads the questions
+that person may see and the groups they could join and haven't. Elsewhere the
+address stays short enough for a chat AI's fetch tool, and nobody is asked to
+sign in for it; their AI then sees the groups a visitor could join, which may
+include their own. The suggestions prompt in the **Your AI agent** box has no
+question list to compare, so on a public session it never carries a ticket. A
 ticket lasts an hour at most and never past their sign-in, and signing out of
 the page doesn't end one already copied. The page renews it quietly ten
 minutes before it ends, or as it ends when their sign-in ends sooner, and
@@ -344,8 +356,12 @@ top of the page, and the **Interview & share** panel, whose prompt is for
 sharing and never carries a ticket, says each person copies their own prompt
 once signed in. The Worker accepts a return URL only when its
 origin is approved by that session and its `/session/<slug>` path matches. The
-external AI must first display a readable table and the exact single-line JSON
-that will be encoded. Provenance is deliberately coarse: a source
+prompt says a plain HTTP GET of the catalog address is all it needs, with no
+MCP, sign-in or tool to install; a line about the MCP, in the **Your AI agent**
+box's prompt, comes last and speaks only to an agent that already runs
+commands. The external AI replies with one research-coverage line, the review
+link, and the exact single-line JSON that was encoded, in a code block, with
+no table. Provenance is deliberately coarse: a source
 category and relevance note, never quotes, conversation or document names,
 URLs, timestamps, or account identifiers. If no relevant evidence exists, the
 AI returns the clean interview URL with no prefill packet.
@@ -364,18 +380,28 @@ searched count is `null` when the platform does not expose it; zero means the AI
 reports that it used none. The review modal shows these counts before drafts are
 applied, and retained model provenance keeps them beside the eventual prediction
 comparison. Low-confidence responses are allowed when the AI
-has a defensible indirect signal and explains its basis; questions with no
-relevant signal are omitted. When an older v4 catalog cannot represent a
+has a defensible indirect signal and explains its basis in one short clause.
+It drafts only where it has a real basis, at most 15 drafts, and skips the
+rest. When an older v4 catalog cannot represent a
 multiple-selection answer, the prompt also requires omitting that draft and
 disclosing the limitation instead of losing some selections. Model identity is collected to measure prediction
 fidelity across models and may be `unknown` when the interface does not expose
 one. The copied prompt does not ask for a responder name; if a packet includes
-one, the client submits it only when the responder ticks the default-off name
-control. The packet contains no
-credential and is carried in `#prefill=...`, so it
+one, the client only offers it in the optional username box and never submits
+it with answers. The packet contains no
+credential and is carried in `#prefill=...` (or, deflated first for a shorter
+link, `#prefillz=...`, which the page unpacks after it loads; the site's
+`manifest.json` lists both under `context_engine_review_links`, and the MCP
+writes the shorter form only for a site that lists it), so it
 is not sent to the web host as an HTTP request target. The fragment is still
 intentionally readable by scripts on the destination page, which is why source
-identifiers are forbidden and the exact JSON is shown first. The current catalog prompt version is
+identifiers are forbidden and the exact JSON is also given in a code block.
+An AI that can't encode the link exactly links the review page with
+`#prefill=paste`, which opens the review on the paste box, without an error;
+a link that fails to open shows the same box. The packet also names the
+prompt's wording, `promptRevision` (now `ce-prefill-prompt-2`), which the
+page keeps with the AI provenance; the catalog version below is the Worker's
+and does not change with the wording. The current catalog prompt version is
 `ce-interview-brief-v6`. The copied request accepts a catalog with type
 `context-engine.interview-question-catalog`, schema `version: 1`, the expected
 session slug, and prompt version v4, v5 or v6, and states confidence by that
@@ -427,16 +453,16 @@ required field, such as `questionSetHash`, names it. Drafts are never dropped
 silently: a notice counts those left out because they were incomplete or
 repeated, and those that fit none of the session's questions or their options.
 A prefill link opens the interview on its drafts with one status line, such as
-“Your AI drafted 6 answers · Claude, self-reported”, and the microphone reads
-**Talk through your drafts**.
+“Your AI drafted 6 answers”, and the microphone reads
+**Add more by voice**.
 When the participant starts or continues the live voice interview after a valid
 prefill is loaded, the realtime interviewer receives a bounded JSON background
 block with the imported summary/facts, question-matched predictions, and any
 fields the participant already edited in review. That block is labeled as
-untrusted, unconfirmed AI prediction data: the interviewer can ask useful
-confirmation, correction, and gap-filling follow-ups, but it must not treat
-predicted answers as spoken beliefs, skip all predicted questions, or override
-later spoken clarifications. If the prefill hash is stale or belongs to a
+untrusted, unconfirmed AI prediction data: the interviewer uses it for related,
+deeper and gap-filling questions, never asks the questions the AI drafted, and
+must not treat predicted answers as spoken beliefs or override later spoken
+clarifications. If the prefill hash is stale or belongs to a
 different question set, the live interviewer is not started with the imported
 context.
 The account used at final normal submission owns the response. If an older
@@ -451,9 +477,7 @@ Binary drafts reuse the normal pile-view
 Agree/Unsure/Disagree controls. The bullhorn opens both Conviction and Importance
 choices. Both values remain editable through review and are carried into submission. Applied source/model provenance is persisted in
 the anonymous draft together with its answer, so logging in after review does
-not remove the attribution before final submission. An explicitly opted-in
-responder name follows the same draft migration and becomes the report display
-name for that response address. The accuracy-research choice and original
+not remove the attribution before final submission. The accuracy-research choice and original
 prediction use the same draft migration; final comparison values are captured
 immediately before encryption and normal submission.
 
@@ -713,6 +737,8 @@ same order. Live protocol fragments continue to use their timestamps. See the
 After an interview submission leaves page answers unsaved, a notice beside the ordinary Submit button shows their count. Ordinary editing does not show this notice. Submitting the remaining page answers clears it.
 
 Hidden-draft help includes a screen-reader description on its question-mark button; its explanation stays open when the pointer moves into the tooltip.
+
+A voice interview after an AI prefill leaves the questions that prefill drafted, hidden drafts included, to the person's review: the interviewer is told not to ask them, and drafting from the conversation neither replaces nor adds to their drafts, so each keeps its `external_prefill` record and a hidden one stays held out. Voice drafts fill only the other questions. Instead of the session's opening, the interviewer opens with a question that builds on the visible drafts, about a related question or a gap they leave. When every question already has a draft or an answer, it asks only whether there is anything else to add.
 
 Voice interview context omits imported facts whose related questions in the interview all have concealed AI drafts, wherever their words appear in the editable background, including inside the summary. A fact with a visible related question stays whole, even when it contains a concealed fact's words.
 

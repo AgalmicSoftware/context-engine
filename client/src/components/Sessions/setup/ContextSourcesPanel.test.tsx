@@ -2,6 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import ContextSourcesPanel, { describeContextSource } from './ContextSourcesPanel';
+import { AGENT_MARK_LABEL } from '../../Shared/AgentMark';
 import {
   addContextLink,
   readContextPdf,
@@ -114,7 +115,14 @@ describe('context sources panel', () => {
     });
     renderPanel(list({ sources: [agentLink] }));
     const [row] = await screen.findAllByTestId('ce-context-source');
-    expect(row).toHaveTextContent('Everyone in the session · Added by Test Kami · Agent · Read');
+    // The robot follows the adder's name, which the agent chose; the line's text carries no word for it.
+    expect(row).toHaveTextContent('Everyone in the session · Added by Test Kami · Read');
+    expect(within(row).getByRole('button', { name: AGENT_MARK_LABEL }).previousSibling?.textContent).toBe(
+      'Added by Test Kami',
+    );
+    expect(describeContextSource(agentLink, { adder: 'Test Kami' })).toMatch(
+      /^Everyone in the session · Added by Test Kami · Read /,
+    );
   });
 
   it('adds a link with its privacy, refreshes one, reads a PDF and removes after asking', async () => {

@@ -25,6 +25,8 @@ type SessionInterviewMemoryKickoffCardProps = {
   copyButton?: {
     className: string;
     testId: string;
+    /** Its name for screen readers where more than one copy button shares a list. */
+    ariaLabel?: string;
     /** Beside the button, in a row of `rowClassName`, such as the caret of a split button. */
     addon?: ReactNode;
     rowClassName?: string;
@@ -199,6 +201,7 @@ export default function SessionInterviewMemoryKickoffCard({
             className={copyButton.className}
             onClick={copyPrompt}
             aria-disabled={!compatible}
+            aria-label={copyButton.ariaLabel}
             data-testid={copyButton.testId}
           >
             <FontAwesomeIcon icon={promptCopied ? faCheck : faCopy} />

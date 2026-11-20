@@ -195,7 +195,8 @@ answers per `answer` call.
 Most calls return in a few seconds, and the first `list_questions` in a
 session within about 2. The slow ones are `answer`, about a second per answer
 (up to 25 in one call), `get_results`, which stops itself at about 40
-seconds, and `claim_sbt`, which can take several minutes while it waits for
+seconds, `make_analysis_card`, which waits on the session's AI and can take
+several minutes, and `claim_sbt`, which can take several minutes while it waits for
 test ETH and its transactions. The server gives any call up to 15 minutes. A
 host that stops sooner may cut the call short while the claim still lands;
 calling `claim_sbt` again is safe, since it reports a token already held. An agent shown only a generic error such as "An error occurred while
@@ -242,6 +243,31 @@ losing remembered sessions. If a process stops during a write and a later call
 reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
+
+## Upgrading to 0.8.1
+
+- A group's refusal names the group as the site shows it, quoted, with its
+  id: `Group "Edge City" (9f63…) isn’t open to joining`.
+- `make_review_link` deflates the drafts into a shorter link, after
+  `#prefillz=`, where the session's site lists that form in its
+  `/manifest.json` (`context_engine_review_links`). A clear answer holds for
+  the run, and a failed check is retried after 5 minutes; a site that doesn't
+  list it, or doesn't answer within 3 seconds, gets `#prefill=`, which every
+  site reads.
+- `make_review_link`'s `next` says to copy the link exactly, and, when it is
+  too long to send whole, to call again with shorter evidence and comments or
+  fewer drafts.
+- **Make the analysis card.** `make_analysis_card` makes the card of the
+  agent's own account as the session page makes it, and `show_analysis_card`
+  puts it on the account's profile, or takes it down, once the person has
+  said yes. They need a Session Worker with the card (`analysis_card_v1`) and
+  a session with the card on; no Worker update is needed.
+- `answer` adds `analysisCard` where the session makes cards, so the agent
+  offers one after answering, and the server's instructions say to.
+- Making a card takes two requests to the session's AI, one after the other,
+  and, for a figure not drawn in the session before, a picture: with a model
+  that thinks it can take several minutes, so allow that call five, as under
+  Tool-call timeouts above.
 
 ## Upgrading to 0.8.0
 
@@ -505,6 +531,8 @@ directory when upgrading; identities and saved session access do not change.
 | `join_session` | Joins from a session link: signs in, claims SBTs the link marks for automatic claiming (`auto=1`), names a group in the link without joining it (a private session's is joined first), and returns the session context, its instructions for agents, its groups and any invitation to add context. It also returns `youMay`: what the agent may do next if it wants to (set a display name, join an open group, add context). Where the session keeps names, a display name already set is saved there, under the rule given for `set_profile`, and `name` says whether it was. |
 | `make_sign_in_link` | Makes a link that opens a joined session with the agent's person signed in as the agent's account: once, for 30 minutes, on the session's own site. Give it only to that person. Needs a Session Worker with sign-in links, and a session whose admin has turned them on; says so otherwise. |
 | `get_analysis_card` | Reads a person's saved analysis card where the session lets the agent read that person's answers: its words, and where the Worker keeps them the matched figure's picture and the drawn pages as images. Asks no model. |
+| `make_analysis_card` | Makes the analysis card of the agent's own account, as the session page makes it when its person presses Analyze: the same two prompts to the session's AI through the Worker's `/ai` route (two of the account's AI calls for the day, paid by the session under its limits, with a key the agent never sees), then the matched figure's picture from the Worker. Returns the card, the analysis and the picture as an image, to give the person in the conversation. Saves nothing. Says so, and makes nothing, where the card is off, the session has ended or doesn't let the agent use its AI, or the account has no answers stored in the clear. Covers only the agent's own account: a person's account used through a delegated key (Agent HTTP) is not. |
+| `show_analysis_card` | `shown: true` shows the card the agent made last on its profile in the session, after the person has said yes; `shown: false` takes it down. Refuses to show one where the session keeps each person's answers to them and its admins. The made card is kept until the MCP restarts. |
 | `get_interview_catalog` | For suggesting answers the person reviews and submits themselves: reads a session's questions from its link, with no sign-in and without joining; a private session needs its group's invite link, the one with the password. A private session, or one with interview mode off, refuses, and the error says to use the prompt the person copies under **Let your AI draft your answers**. |
 | `make_review_link` | Turns suggested answers into a link that opens the session with them filled in, for the person to review and submit as themselves. Submits and joins nothing. Checks each draft against the session's questions (a quadratic draft against that question's own credit budget) and says in `leftOut` why any was left out. The link keeps only the session page, its Worker, `mode=interview` and the link's `src` and `joinGroup`: never an invite, password or ticket. |
 | `get_session` | Shows the description, context, instructions for agents, groups, any invitation to add context, whether the session has a Session Agent and records chats with it, end time and the agent's progress. |

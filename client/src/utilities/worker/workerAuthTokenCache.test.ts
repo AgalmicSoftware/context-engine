@@ -4,6 +4,7 @@ import {
   clearAllTokenCaches,
   clearTokenCache,
   heldSessionToken,
+  listReplacedTokens,
   readScopedTokenCache,
   readTokenCache,
   resetTokenCaches,
@@ -159,6 +160,40 @@ describe('workerAuthTokenCache', () => {
       page.adoptTokenCaches(ADDRESS);
       expect(page.readTokenCache(CACHE_KEY)).toBeNull();
     });
+  });
+
+  it('remembers a sign-in it replaced while that still stands, across a reload, until a sign-out', () => {
+    adoptTokenCaches(ADDRESS);
+    const scope = { workerUrl: 'https://worker.example', sessionSlug: 'edge', address: ADDRESS };
+    const soon = Math.floor(Date.now() / 1000) + 3600;
+    const signIn = (token: string, exp = soon) =>
+      writeTokenCache(CACHE_KEY, buildTokenCacheEnvelope({ ...scope, token, exp }));
+    signIn('first');
+    // The same sign-in written again replaces nothing.
+    signIn('first');
+    expect(listReplacedTokens()).toEqual([]);
+    signIn('second');
+    clearTokenCache(CACHE_KEY);
+    // One that had already run out is not worth ending.
+    signIn('ran-out', Math.floor(Date.now() / 1000) - 60);
+    signIn('third');
+    const replaced = [
+      { workerUrl: 'https://worker.example', sessionSlug: 'edge', token: 'first' },
+      { workerUrl: 'https://worker.example', sessionSlug: 'edge', token: 'second' },
+    ];
+    expect(listReplacedTokens()).toEqual(replaced);
+    // The held one is not among them, and they are not offered as the tab's sign-in.
+    expect(heldSessionToken('https://worker.example', 'edge')).toBe('third');
+    const page = reload();
+    page.adoptTokenCaches(ADDRESS);
+    expect(page.listReplacedTokens()).toEqual(replaced);
+    expect(page.listReplacedTokens(soon + 1)).toEqual([]);
+    // Ended at the Worker: forgotten, whichever list it was in.
+    page.forgetHeldToken('first');
+    expect(page.listReplacedTokens()).toEqual([replaced[1]]);
+    page.resetTokenCaches('');
+    expect(page.listReplacedTokens()).toEqual([]);
+    expect(reload().listReplacedTokens()).toEqual([]);
   });
 
   it('drops a saved sign-in once it has expired', () => {

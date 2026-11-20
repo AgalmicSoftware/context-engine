@@ -1,6 +1,14 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import LoginModalDisplayBody from './LoginModalDisplayBody';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import LoginModalDisplayBody, { SlowFallback } from './LoginModalDisplayBody';
+
+// The profile, as the dialog's lazy chunk: it puts the dialog's rows in its own list.
+jest.mock('components/UserPage/UserPage', () => ({
+  __esModule: true,
+  default: ({ accountMenuRows }: { accountMenuRows?: React.ReactNode }) => (
+    <ul data-testid="profile-menu">{accountMenuRows}</ul>
+  ),
+}));
 
 type Props = React.ComponentProps<typeof LoginModalDisplayBody>;
 
@@ -39,4 +47,113 @@ it('offers Your AI agent only once someone is signed in', () => {
 it('shows Your AI agent to a signed-in person', () => {
   expect(renderBody({ loginComplete: true })).toHaveBeenCalled();
   expect(screen.getByTestId('agent-box')).toBeInTheDocument();
+});
+
+it('lists Bookmarks, Your AI agent and a red Disconnect, in that order, with no account to show', () => {
+  const handleLogout = jest.fn();
+  const openBookmarks = jest.fn();
+  renderBody({ loginComplete: true, handleLogout, openBookmarks });
+  const menu = screen.getByTestId('ce-account-menu');
+  expect(Array.from(menu.children).map((row) => row.textContent)).toEqual(['Bookmarks', '', 'Disconnect']);
+  expect(menu.children[1]).toContainElement(screen.getByTestId('agent-box'));
+  fireEvent.click(screen.getByRole('button', { name: 'Bookmarks' }));
+  expect(openBookmarks).toHaveBeenCalledTimes(1);
+  const disconnect = screen.getByTestId('ce-account-disconnect');
+  expect(disconnect.className).toMatch(/accountMenuRowDanger/);
+  fireEvent.click(disconnect);
+  expect(handleLogout).toHaveBeenCalledTimes(1);
+});
+
+it('shows one Disconnect, in the profile list, when the profile loads quickly, and mounts Your AI agent once', async () => {
+  renderBody({ loginComplete: true, account: '0x00000000000000000000000000000000000000aa' });
+  // Not swapped from under a click: the rows on their own wait for a slow load.
+  expect(screen.queryByTestId('ce-account-disconnect')).not.toBeInTheDocument();
+  expect(screen.queryByTestId('agent-box')).not.toBeInTheDocument();
+  const profile = await screen.findByTestId('profile-menu');
+  expect(profile).toContainElement(screen.getByTestId('agent-box'));
+  expect(profile).toContainElement(screen.getByTestId('ce-account-disconnect'));
+  expect(screen.getAllByTestId('agent-box')).toHaveLength(1);
+});
+
+it('shows the rows on their own only once the profile is slow', () => {
+  jest.useFakeTimers();
+  try {
+    render(
+      <SlowFallback>
+        <span>Disconnect</span>
+      </SlowFallback>,
+    );
+    expect(screen.queryByText('Disconnect')).not.toBeInTheDocument();
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+    expect(screen.getByText('Disconnect')).toBeInTheDocument();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+describe('Disconnect with unsent answers', () => {
+  const me = '0x00000000000000000000000000000000000000aa';
+  const draftKey = `dg:surveyDraft:meadow-forum:84532:${me}:all`;
+  let confirm: jest.SpyInstance<boolean, [message?: string]>;
+  beforeEach(() => {
+    confirm = jest.spyOn(window, 'confirm');
+  });
+  afterEach(() => {
+    confirm.mockRestore();
+    sessionStorage.clear();
+  });
+  const pressDisconnect = async () => {
+    const handleLogout = jest.fn();
+    renderBody({ loginComplete: true, account: me, handleLogout });
+    await screen.findByTestId('profile-menu');
+    fireEvent.click(screen.getByTestId('ce-account-disconnect'));
+    return handleLogout;
+  };
+
+  it('asks once, and stays signed in when the person declines', async () => {
+    sessionStorage.setItem(draftKey, JSON.stringify({ answers: { q1: { value: 'Yes' }, q2: { value: 'No' } } }));
+    confirm.mockReturnValue(false);
+    const handleLogout = await pressDisconnect();
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(confirm).toHaveBeenCalledWith('You have 2 unsent answers. Disconnect and discard them?');
+    expect(handleLogout).not.toHaveBeenCalled();
+  });
+
+  it('disconnects once the person agrees', async () => {
+    sessionStorage.setItem(draftKey, JSON.stringify({ answers: { q1: { value: 'Yes' } } }));
+    confirm.mockReturnValue(true);
+    const handleLogout = await pressDisconnect();
+    expect(confirm).toHaveBeenCalledWith('You have 1 unsent answer. Disconnect and discard it?');
+    expect(handleLogout).toHaveBeenCalledTimes(1);
+  });
+
+  it('still disconnects where the browser denies storage', async () => {
+    const held = Object.getOwnPropertyDescriptor(window, 'sessionStorage');
+    Object.defineProperty(window, 'sessionStorage', {
+      configurable: true,
+      get() {
+        throw new DOMException('The operation is insecure.', 'SecurityError');
+      },
+    });
+    try {
+      const handleLogout = await pressDisconnect();
+      expect(confirm).not.toHaveBeenCalled();
+      expect(handleLogout).toHaveBeenCalledTimes(1);
+    } finally {
+      if (held) Object.defineProperty(window, 'sessionStorage', held);
+      else Reflect.deleteProperty(window, 'sessionStorage');
+    }
+  });
+
+  it('disconnects at once with none unsent, or only another account’s', async () => {
+    sessionStorage.setItem(
+      'dg:surveyDraft:meadow-forum:84532:0x00000000000000000000000000000000000000bb:all',
+      JSON.stringify({ answers: { q1: { value: 'Yes' } } }),
+    );
+    const handleLogout = await pressDisconnect();
+    expect(confirm).not.toHaveBeenCalled();
+    expect(handleLogout).toHaveBeenCalledTimes(1);
+  });
 });

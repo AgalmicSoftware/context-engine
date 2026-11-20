@@ -1,7 +1,5 @@
 import { QuestionFilter as QuestionFilterComponent } from './QuestionFilter';
 import {
-  QUESTION_FILTER_ACTIONS_STYLE,
-  QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
   QUESTION_FILTER_DISABLED_TEXT_SPACING_STYLE,
   QUESTION_FILTER_ENCRYPTED_COUNT_LOCK_STYLE,
   QUESTION_FILTER_MODAL_HEADER_ROW_STYLE,
@@ -13,9 +11,6 @@ import {
   buildQuestionFilterTagBubbleClassName,
   buildQuestionFilterTypeButtonClassName,
   buildQuestionFilterTypePillClassName,
-  resolveQuestionFilterBookmarkIconStyle,
-  resolveQuestionFilterClearIconStyle,
-  resolveQuestionFilterCopyIconStyle,
   resolveQuestionFilterEncryptedCountBadgeStyle,
   resolveQuestionFilterInlineVisibilityStyle,
   resolveQuestionFilterSectionBodyStyle,

@@ -32,8 +32,6 @@ export type CompareProfileScanFailure = {
 const isUnknownRecord = (value: unknown): value is UnknownRecord =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
-export const COMPARE_GRAPHIC_FILENAME = 'contextEngine_comparisonGraphic.png';
-
 export const resolveCompareRunLabel = (sessionCachesReady?: boolean): string =>
   sessionCachesReady === false ? 'Loading session data…' : 'Comparing';
 

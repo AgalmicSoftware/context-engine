@@ -250,7 +250,7 @@ export only, and there only what they wrote and added: the export's group
 member lists still include their address, and it still shows wherever the
 session shows their answers. The Worker stores
 who turned it off, and backs that up, the same way, from 0.9.11. Only someone
-signed in with an address has it. The interview dialog carries the first
+signed in with an address has it. The Context section carries the first
 switch only.
 
 Both switches stay open after the session has ended or its AI is turned off,
@@ -265,11 +265,13 @@ organisers and signed-in members, or its organisers alone. The robot's notice
 ends with the session's own note on where its data goes, when its admins wrote
 one (`interviewMode.dataNote`), as plain text.
 
-While it is on, the interview dialog, where AI-drafted answers are reviewed and
-submitted, carries the same switch at its foot, **Session Agent may use my
-answers and files**, with the same "?". A change made there is saved at once
-when signed in; made before signing in, it is saved once the person has, ahead
-of their answers, and if it can't be saved nothing is submitted.
+While it is on, the Context section carries the same switch beside the Session
+Agent button, **Session Agent may use my answers and files**, with the same
+"?", for someone signed in. It shows what the Worker holds, and a change made
+there is saved at once; if it can't be saved, the box goes back to what is
+stored and says so. The interview dialog has no switch of its own: submitting
+an interview changes nothing the Worker holds, so someone who turned it off
+stays out.
 
 ## Export
 

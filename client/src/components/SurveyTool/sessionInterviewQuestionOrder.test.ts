@@ -50,7 +50,7 @@ it('leads the voice brief and personal AI prompt with newest unanswered question
   expect(kickoff).toContain('Unanswered question IDs, newest first: ["room-newest","room-first"]');
   expect(kickoff).toContain('Already answered IDs, only for changes I request: ["opening"]');
   expect(kickoff).not.toContain('Private prior answer');
-  expect(kickoff.split('Fetch this URL:\n')[1].split('\n')[0]).toBe(
+  expect(kickoff.split('to install:\n')[1].split('\n')[0]).toBe(
     'https://worker.example/agent/interview-catalog?slug=workshop&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fworkshop',
   );
   expect(await hashInterviewQuestions(sorted)).toBe(await hashInterviewQuestions(normalizeInterviewQuestions(pool)));

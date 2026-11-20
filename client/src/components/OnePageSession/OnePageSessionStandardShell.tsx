@@ -30,6 +30,7 @@ import styles from './OnePageSession.module.scss';
 import WorkerGroupsLoading from './WorkerGroupsLoading';
 import OnePageSessionAutoMintAlerts, { type OnePageSessionAutoMintAlertsProps } from './OnePageSessionAutoMintAlerts';
 import SessionContextSources from './SessionContextSources';
+import SessionAgentUseOption from './SessionAgentUseOption';
 import SessionAgentNotice from './SessionAgentNotice';
 import { normalizeInterviewSettings } from '@ce-shared/interviewSettings.mjs';
 import { useSessionContextSources } from '../../utilities/docLibrary/useSessionContextSources';
@@ -102,6 +103,7 @@ type OnePageSessionStandardShellProps = {
   embeddedAtlasNodeId: unknown;
   embeddedAtlasReturnState: unknown;
   requestedAtlasNodeId?: string | null;
+  onRequestedAtlasNodeOpen?: (nodeId: string) => void;
   onRequestedAtlasNodeClose?: () => void;
   embeddedGroupsSessionConfig: unknown;
   embeddedGroupsSessionSlug: string;
@@ -270,6 +272,7 @@ export default function OnePageSessionStandardShell({
   embeddedAtlasNodeId,
   embeddedAtlasReturnState,
   requestedAtlasNodeId = null,
+  onRequestedAtlasNodeOpen,
   onRequestedAtlasNodeClose,
   embeddedGroupsSessionConfig,
   embeddedGroupsSessionSlug,
@@ -789,6 +792,14 @@ export default function OnePageSessionStandardShell({
               <div className={`${styles.miniSectionContent} ${styles.documentsSectionContent}`.trim()}>
                 {showSessionAgent ? (
                   <div className={styles.sessionAgentBar}>
+                    {/* The dialog has the same switch: closing it shows the box again, read afresh. */}
+                    {sessionAgentOpen ? null : (
+                      <SessionAgentUseOption
+                        sessionSlug={effectiveSlug}
+                        sessionConfig={resolvedSessionConfig}
+                        account={viewerAccount}
+                      />
+                    )}
                     <button
                       type="button"
                       className={styles.sessionAgentButton}
@@ -1081,6 +1092,8 @@ export default function OnePageSessionStandardShell({
                       build={riskMatrix.build}
                       builds={riskMatrix.builds}
                       onSelectBuild={riskMatrix.selectBuild}
+                      atlas={atlas.build}
+                      onOpenAtlasTopic={onRequestedAtlasNodeOpen}
                     />
                   </Suspense>
                 )}

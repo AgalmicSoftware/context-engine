@@ -8,14 +8,15 @@ export const MCP_ADD_COMMAND =
 
 // The MCP, in the prompt rather than a box of its own, so the person copies one thing. Its tools act as the
 // agent itself, so neither task needs it.
-export const MCP_PROMPT_LINE = `If you run commands and want the Context Engine MCP for later, add it with: ${MCP_ADD_COMMAND} This task does not need it.`;
+// Addressed only to an agent that already runs commands, so a chat AI without tools just does the task.
+export const MCP_PROMPT_LINE = `Only if you are an agent that already runs commands: you can add the Context Engine MCP for later with: ${MCP_ADD_COMMAND} This task does not need it.`;
 
 // The agent box is remounted per session and per account, so a key made for one
 // account never stays on screen, or in the prompt, for the next.
 export const agentHandoffPanelKey = (sessionSlug: string, account: unknown) =>
   `${sessionSlug}\n${toStr(account).toLowerCase()}`;
 
-// "Full submit" asks the person in the chat before submitting unless they untick "Ask me if I approve".
+// "Answer for me" asks the person in the chat before submitting unless they untick "Ask me before submitting".
 export const ASK_BEFORE_SUBMIT_DEFAULT = true;
 
 export type AgentDelegateKey = {
@@ -37,10 +38,32 @@ export class AgentDelegateKeyError extends Error {
   }
 }
 
+/**
+ * Why a key was not made, when it is none of the reasons the page has its own words for: what the session
+ * answered (its status and short reason), or what failed before it could answer. Said so the person can pass it
+ * on; it never carries a key or a sign-in.
+ */
+export const agentKeyFailureMessage = (error: unknown): string => {
+  if (error instanceof AgentDelegateKeyError) {
+    const reason = /^[a-z0-9_]{1,64}$/.test(error.reason) ? `, ${error.reason}` : '';
+    return `Couldn't make a key: the session answered ${error.status || 'without one'}${reason}. Try again.`;
+  }
+  const text = (error instanceof Error ? error.message : '')
+    .replace(/(?:ceagt_|eyJ)[\w.-]+/g, '[hidden]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120);
+  // A request the browser never completed: "Load failed" in Safari, "Failed to fetch" in Chrome.
+  if (/load failed|failed to fetch|networkerror/i.test(text)) {
+    return `Couldn't make a key: the session could not be reached (${text}). Try again.`;
+  }
+  return `Couldn't make a key${text ? ` (${text})` : ''}. Try again.`;
+};
+
 // A key is `ceagt_` and base64url characters, so a reply with any other text in its place is refused.
 const AGENT_KEY_RE = /^ceagt_[A-Za-z0-9_-]{16,}$/;
 
-// The one prompt for "Full submit". With `askFirst`, the agent shows its answers in the chat and submits once
+// The one prompt for "Answer for me". With `askFirst`, the agent shows its answers in the chat and submits once
 // the person says yes there; without it, the copied prompt is their approval, given in advance, so it
 // submits without coming back to ask. Either way the person needn't return to the session's page. It carries the key, which lives only as long as
 // the person's sign-in and works only in this session, and tells the agent never to repeat it. `shownToken`

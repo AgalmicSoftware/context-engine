@@ -588,7 +588,7 @@ The core session metadata:
 - session ID, which the page generates
 - chain-backed profiles only: the network, from **Registry network**. Contract
   defaults and `blockLimits.start` (the current chain head) are filled in for you.
-- optional session header image URL; Arweave-backed sessions can also upload the image file with their metadata
+- optional session header image: a URL, a pasted picture or an uploaded file. Arweave-backed sessions upload the file with their metadata; a Session Worker session keeps it in its config, shrunk in the browser to at most 1,200 px and 100 KB, and the page says so if a picture can't be made that small
 
 AI configuration also lives in the session metadata draft:
 
@@ -1294,9 +1294,9 @@ refused, and the notice names each field. The page removes `#template=` and
 copied address doesn't carry the draft again; the notice keeps it until you
 answer.
 
-### Set up with your AI
+### Set up with AI
 
-**Set up with your AI**, at the top of `/new`, gives you a prompt for ChatGPT,
+**Set up with AI**, a button at the top of `/new`, shows a prompt for ChatGPT,
 Claude or another AI. **Copy prompt** copies it. **Open in ChatGPT** and **Open
 in Claude** open a new chat with it, and copy it too in case the site doesn't
 fill it in; **Show prompt** shows it to copy by hand. Like the participants'

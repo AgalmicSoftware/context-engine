@@ -480,6 +480,8 @@ export const SetupAccessSection = ({
       identityConflicts.some((conflict) => conflict.code !== 'sbt_authorization_requires_condition') ? (
         <MatchRunsOn editProfile={editProfile} registryChainId={registryChainId} />
       ) : null}
+      {/* Groups first: the settings below decide what they and others may read. */}
+      {gates}
       <SetupField
         id="ce-setup-encryption"
         label="Encryption"
@@ -535,7 +537,6 @@ export const SetupAccessSection = ({
         </>
       ) : null}
       <SetupConflicts conflicts={conflictsAt(sectionConflicts, ['encryption'])} />
-      {gates}
     </SetupSection>
   );
 };

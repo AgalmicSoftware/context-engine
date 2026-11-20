@@ -107155,15 +107155,17 @@ var dispatchAgentHttpRequest = async ({ request, env, deps, baseHeaders = {} }) 
   let headers2 = {};
   try {
     let body = {};
-    if (request.body) {
+    if (method !== "OPTIONS" && request.body) {
       const bytes3 = await readBodyBytes(request, 512 * 1024);
       request = new Request(request, { body: bytes3 });
-      try {
-        body = await request.clone().json();
-      } catch {
-        throw authorityError("invalid_json", 400);
+      if (bytes3.byteLength) {
+        try {
+          body = await request.clone().json();
+        } catch {
+          throw authorityError("invalid_json", 400);
+        }
+        if (!body || typeof body !== "object" || Array.isArray(body)) throw authorityError("invalid_json", 400);
       }
-      if (!body || typeof body !== "object" || Array.isArray(body)) throw authorityError("invalid_json", 400);
     }
     const slugs = [
       body.sessionSlug,
@@ -108145,7 +108147,7 @@ var FEATURES = Object.freeze([
   "worker_groups"
 ]);
 var WORKERS_AI_FEATURE = "workers_ai_v1";
-var workerRelease = () => "0.9.22" ? "0.9.22" : null;
+var workerRelease = () => "0.9.23" ? "0.9.23" : null;
 var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 = {} }) => {
   const deployed = FEATURES.filter((feature) => feature !== WORKER_GROUP_READ_CODE_FEATURE || workerGroupCodeReadsOn(env));
   const body = {

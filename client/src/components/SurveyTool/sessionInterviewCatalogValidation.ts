@@ -6,6 +6,10 @@ import {
   type InterviewPrefillPacket,
   type InterviewQuestion,
 } from './sessionInterview';
+import {
+  PRIVATE_SESSION_INVITE_INVALID,
+  PRIVATE_SESSION_INVITE_REQUIRED,
+} from '../../../../shared/workerGroupJoin.mjs';
 
 const stale = () =>
   new Error('This prefill link was created for an older or different question set. Ask the AI for a fresh link.');
@@ -170,20 +174,36 @@ export const scopeInterviewPrefillToQuestions = (
   };
 };
 
-/** Checks the catalog a kickoff's AI will fetch, as the ticket's person when there is one, and resolves to the
- *  ticket that worked, or '' without one. */
+// The refusals a ticket can open: a session that lists nothing to a signed-out visitor, and a private one.
+const TICKET_REFUSALS = new Set(['sign_in_required', PRIVATE_SESSION_INVITE_REQUIRED, PRIVATE_SESSION_INVITE_INVALID]);
+
+const listedQuestionIds = async (response: Response): Promise<Set<unknown>> => {
+  try {
+    const { questions } = await response.clone().json();
+    return new Set((Array.isArray(questions) ? questions : []).map((question) => question?.id));
+  } catch {
+    return new Set();
+  }
+};
+
+/** Checks the catalog a kickoff's AI will fetch and resolves to the ticket its address needs, or '' for none.
+ *  A ticket is asked for only when the read without one leaves the person short, so a public session's
+ *  address stays short and nobody is asked to sign in for it. */
 export const verifyInterviewKickoffCatalog = async ({
   workerUrl,
   sessionSlug,
   sessionUrl,
   fetchImpl = globalThis.fetch,
   ticket,
+  questionIds = [],
 }: {
   workerUrl: string;
   sessionSlug: string;
   sessionUrl: string;
   fetchImpl?: typeof fetch;
   ticket?: InterviewCatalogTicketSource;
+  /** The interview questions this page shows the person, which their AI should read too. */
+  questionIds?: string[];
 }): Promise<string> => {
   const url = new URL(`${workerUrl.replace(/\/+$/, '')}/agent/interview-catalog`);
   url.searchParams.set('slug', sessionSlug);
@@ -210,7 +230,27 @@ export const verifyInterviewKickoffCatalog = async ({
   let usedTicket = '';
   let signInNeeded = false;
   try {
-    const read = await fetchInterviewCatalog(url, { fetchImpl, signal: controller.signal, ticket: timedTicket });
+    const open = await fetchInterviewCatalog(url, { fetchImpl, signal: controller.signal });
+    let read = open;
+    // A ticket is for a read without one that was refused, or that leaves out questions this page shows.
+    const refused = !open.response.ok && TICKET_REFUSALS.has(await readRefusalReason(open.response));
+    const listed = open.response.ok ? await listedQuestionIds(open.response) : new Set();
+    const missing = open.response.ok ? questionIds.filter((id) => !listed.has(id)) : [];
+    const held = timedTicket && (refused || missing.length) ? await timedTicket({ fresh: false }) : '';
+    if (timedTicket && held) {
+      const ticketed = await fetchInterviewCatalog(url, {
+        fetchImpl,
+        signal: controller.signal,
+        ticket: async ({ fresh }) => (fresh ? timedTicket({ fresh }) : held),
+      });
+      // Kept only where it opens the session or adds some of those questions, as the Worker serves some
+      // questions to no one (past its cap, hidden): otherwise the shorter address does as well.
+      if (refused) read = ticketed;
+      else if (ticketed.response.ok) {
+        const added = await listedQuestionIds(ticketed.response);
+        if (missing.some((id) => added.has(id))) read = ticketed;
+      }
+    }
     if (!read.response.ok) {
       signInNeeded = !read.ticket && (await readRefusalReason(read.response)) === 'sign_in_required';
       throw new Error('Catalog unavailable');

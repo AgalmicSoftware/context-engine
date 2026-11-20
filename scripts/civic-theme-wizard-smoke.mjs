@@ -32,9 +32,9 @@ export async function inspectCivicWizard(page) {
     await openSetupSections(page);
     await assertReadable(setup);
     if (mode === 'worker_canonical') {
-      await page.getByTestId('ce-new-worker-group-name').fill('Civic preview group');
       await page.getByTestId('ce-new-worker-group-add').click();
       await page.getByTestId('ce-new-worker-group-draft-form').waitFor({ state: 'visible' });
+      await page.getByTestId('ce-new-worker-group-draft-label').fill('Civic preview group');
       await assertReadable(setup);
       await page.getByRole('button', { name: 'Remove Civic preview group', exact: true }).click();
       const workerName = page.getByTestId('ce-wizard-worker-name');

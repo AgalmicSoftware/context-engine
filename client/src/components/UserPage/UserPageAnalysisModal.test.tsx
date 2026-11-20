@@ -70,7 +70,58 @@ const createProps = (overrides: Partial<React.ComponentProps<typeof UserPageAnal
 });
 
 describe('UserPageAnalysisModal', () => {
-  it('shows the picture card under the analysis only when the analysis has one', () => {
+  it('is titled Analyze user and opens on the Breakdown, with the text one press away', () => {
+    const analysisBreakdown = {
+      holds: 'Local councils should decide.',
+      openTo: 'National standards, if reviewed yearly.',
+      unsure: 'How fast a rollout should go.',
+      ownWords: 'People must see how a decision was made.',
+    };
+    render(<UserPageAnalysisModal {...createProps({ analysisBreakdown })} />);
+    expect(screen.getByText('Analyze user')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Breakdown' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.queryByRole('button', { name: 'Card' })).toBeNull();
+    // The generated name heads the view, over the summary and details as the analysis wrote them.
+    expect(screen.getByRole('heading', { name: 'Custom Analysis' })).toBeTruthy();
+    expect(screen.getByText('Profile synthesis')).toBeTruthy();
+    expect(screen.getByText('Detailed analysis text')).toBeTruthy();
+    const labels = ['Holds most strongly', 'Open to', 'Least sure about', 'Own words', 'Historical Alignment'];
+    expect(screen.getAllByText(new RegExp(`^(${labels.join('|')})$`)).map((node) => node.textContent)).toEqual(labels);
+    expect(screen.getByText('Local councils should decide.')).toBeTruthy();
+    expect(screen.getByText('“People must see how a decision was made.”')).toBeTruthy();
+    expect(screen.getByText('A historical figure')).toBeTruthy();
+    expect(screen.getByText('Reasoning text')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Text' }));
+    expect(screen.getByRole('button', { name: 'Text' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.queryByText('Holds most strongly')).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Custom Analysis' })).toBeTruthy();
+    expect(screen.getByText('Profile synthesis')).toBeTruthy();
+    expect(screen.getByText('Detailed analysis text')).toBeTruthy();
+    expect(screen.getByText('Historical Alignment')).toBeTruthy();
+    expect(screen.getByText('Reasoning text')).toBeTruthy();
+  });
+
+  it('draws only the Breakdown lines the analysis gave, and none for an analysis kept from before', () => {
+    const { rerender } = render(<UserPageAnalysisModal {...createProps()} />);
+    expect(screen.getAllByRole('heading', { name: 'Custom Analysis' })).toHaveLength(1);
+    expect(screen.queryByText('Holds most strongly')).toBeNull();
+    expect(screen.queryByText('Own words')).toBeNull();
+    expect(screen.getByText('Historical Alignment')).toBeTruthy();
+
+    const analysisBreakdown = { holds: '', openTo: 'A trial first.', unsure: '', ownWords: '' };
+    rerender(<UserPageAnalysisModal {...createProps({ analysisBreakdown })} />);
+    expect(screen.getByText('Open to')).toBeTruthy();
+    expect(screen.queryByText('Holds most strongly')).toBeNull();
+    expect(screen.queryByText('Least sure about')).toBeNull();
+    expect(screen.queryByText('Own words')).toBeNull();
+
+    // No empty heading where the analysis has no name.
+    rerender(<UserPageAnalysisModal {...createProps({ analysisName: '' })} />);
+    expect(screen.getAllByRole('heading').map((node) => node.textContent)).toEqual(['Historical Alignment']);
+  });
+
+  it('offers the picture card as a third view, with one way to it: the Card button', () => {
     const card = {
       own: true,
       link: 'contextengine.sh',
@@ -83,20 +134,38 @@ describe('UserPageAnalysisModal', () => {
       tastes: { book: null, game: null, film: null, song: null },
       answers: { yesNo: null, ownWords: null, vote: null },
     };
+    const pressed = (name: string) => screen.getByRole('button', { name }).getAttribute('aria-pressed');
     const { rerender } = render(<UserPageAnalysisModal {...createProps()} />);
-    expect(screen.queryByText('Picture card')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Card' })).toBeNull();
 
-    // The analysis is readable while the card is still being written.
+    // The analysis is readable while the card is still being written; the Card view says it is on its way.
     rerender(<UserPageAnalysisModal {...createProps({ analysisCardPending: true })} />);
     expect(screen.getByText('Profile synthesis')).toBeTruthy();
+    expect(screen.queryByRole('status')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Card' }));
     expect(screen.getByRole('status').textContent).toContain('Making the card…');
-    expect(screen.queryByTestId('analysis-card')).toBeNull();
+    expect(screen.queryByText('Profile synthesis')).toBeNull();
 
+    // One card, seen in the Card view only, and no second button for it anywhere.
     rerender(
-      <UserPageAnalysisModal {...createProps({ analysisCard: card, analysisCardPicture: { status: 'loading' } })} />,
+      <UserPageAnalysisModal {...createProps({ analysisCard: card, analysisCardPicture: { status: 'ready' } })} />,
     );
-    expect(screen.getByText('Picture card')).toBeTruthy();
-    expect(screen.getByTestId('analysis-card').textContent).toBe('Wants AI doing paperwork / loading');
+    expect(pressed('Card')).toBe('true');
+    expect(screen.getAllByTestId('analysis-card')).toHaveLength(1);
+    expect(screen.getByTestId('analysis-card')).toBeVisible();
+    expect(screen.getByTestId('analysis-card').textContent).toBe('Wants AI doing paperwork / ready');
+    expect(screen.queryByRole('button', { name: 'View User Card' })).toBeNull();
+    // In the other views the card stays drawn out of sight, so a saved card gets its picture either way.
+    fireEvent.click(screen.getByRole('button', { name: 'Text' }));
+    expect(screen.getAllByTestId('analysis-card')).toHaveLength(1);
+    expect(screen.getByTestId('analysis-card')).not.toBeVisible();
+    expect(screen.getAllByRole('button', { name: /card/i })).toHaveLength(1);
+
+    // A card that is taken away leaves the Breakdown, not an empty view.
+    fireEvent.click(screen.getByRole('button', { name: 'Card' }));
+    rerender(<UserPageAnalysisModal {...createProps()} />);
+    expect(pressed('Breakdown')).toBe('true');
+    expect(screen.getByText('Profile synthesis')).toBeTruthy();
 
     // While an analysis is running or has failed there is no card to show.
     rerender(
@@ -108,6 +177,7 @@ describe('UserPageAnalysisModal', () => {
       />,
     );
     expect(screen.queryByTestId('analysis-card')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Card' })).toBeNull();
   });
 
   it('on my own page puts a "Show this card on my page" box under the card; on another page, their date', () => {
@@ -133,6 +203,12 @@ describe('UserPageAnalysisModal', () => {
         })}
       />,
     );
+    // The box belongs to the card: it is in the Card view and in neither of the others.
+    expect(screen.getByRole('button', { name: 'Breakdown' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Text' }));
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Card' }));
     const box = screen.getByRole('checkbox', { name: 'Show this card on my page' }) as HTMLInputElement;
     expect(box.checked).toBe(true);
     expect(screen.getByRole('tooltip').textContent).toMatch(
@@ -155,6 +231,7 @@ describe('UserPageAnalysisModal', () => {
     expect(saving.disabled).toBe(true);
     expect(screen.getByRole('status').textContent).toBe('The card could not be saved to your page.');
 
+    // Another person's saved card: no box in any view, and its date under the card in the Card view.
     rerender(<UserPageAnalysisModal {...createProps({ analysisCard: card, analysisCardSavedAt: 7 })} />);
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.getByText('Their saved card, from day 7')).toBeTruthy();
@@ -242,7 +319,7 @@ describe('UserPageAnalysisModal', () => {
       />,
     );
 
-    expect(screen.getByText('User Analysis')).toBeInTheDocument();
+    expect(screen.getByText('Analyze user')).toBeInTheDocument();
     expect(screen.getByText('Generating insights… 2 of about 19 seconds')).toBeInTheDocument();
     expect(screen.getByText('Analysis failed.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh analysis' })).toBeDisabled();

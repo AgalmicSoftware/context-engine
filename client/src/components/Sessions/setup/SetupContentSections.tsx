@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Input } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faPlus } from '@fortawesome/free-solid-svg-icons';
 
 import InterviewSettingsFields, {
   DRAFT_TEXT_NEEDS_NEWER_WORKER,
@@ -19,11 +19,11 @@ import {
   DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY,
   normalizeGroupCreationPolicy,
 } from '../../../utilities/session/groupCreationPolicy';
-import { SetupCheck, SetupField, SetupSection, setupHelpId } from './SetupPrimitives';
+import { SetupCheck, SetupField, SetupHelp, SetupSection, setupHelpId } from './SetupPrimitives';
 import SetupContextHtmlField from './SetupContextHtmlField';
 import SetupAgentInstructionsField from './SetupAgentInstructionsField';
+import SetupQuestionTypes from './SetupQuestionTypes';
 import {
-  SETUP_QUESTION_TYPES,
   asList,
   asRecord,
   setupQuestionTypeLabel,
@@ -85,18 +85,38 @@ export const SetupBasicsSection = ({
           onChange={(event) => onChange(['sessionInfo'], event.target.value)}
         />
       </SetupField>
-      {headerImage || (
-        <SetupField id="ce-setup-header-image" label="Header image" help="An https:// image link.">
-          <Input
+      {headerImage ||
+        (text(draft.sessionHeader).startsWith('data:image/') ? (
+          // A picture uploaded on /new is kept with the session, too long to show or edit as a link.
+          <SetupField
             id="ce-setup-header-image"
-            type="url"
-            value={text(draft.sessionHeader)}
-            aria-describedby={setupHelpId('ce-setup-header-image')}
-            data-testid={E2E_TESTIDS.WIZARD_SESSION_HEADER_URL}
-            onChange={(event) => onChange(['sessionHeader'], event.target.value)}
-          />
-        </SetupField>
-      )}
+            label="Header image"
+            help="A picture kept with the session. Remove it to give an image link instead."
+          >
+            <div className={styles.headerPicture}>
+              <img className={styles.headerPicturePreview} src={text(draft.sessionHeader)} alt="Header image" />
+              <button
+                type="button"
+                className={styles.button}
+                aria-describedby={setupHelpId('ce-setup-header-image')}
+                onClick={() => onChange(['sessionHeader'], '')}
+              >
+                Remove picture
+              </button>
+            </div>
+          </SetupField>
+        ) : (
+          <SetupField id="ce-setup-header-image" label="Header image" help="An https:// image link.">
+            <Input
+              id="ce-setup-header-image"
+              type="url"
+              value={text(draft.sessionHeader)}
+              aria-describedby={setupHelpId('ce-setup-header-image')}
+              data-testid={E2E_TESTIDS.WIZARD_SESSION_HEADER_URL}
+              onChange={(event) => onChange(['sessionHeader'], event.target.value)}
+            />
+          </SetupField>
+        ))}
       <div>
         <button
           type="button"
@@ -174,9 +194,18 @@ type ContextProps = SetupSectionProps & {
   sources?: React.ReactNode;
   /** After creation: what adds the chosen files and reads the links. */
   publisher?: React.ReactNode;
+  /** /new: the id of the file input in `sources`, which "Add file" opens. */
+  fileInputId?: string;
 };
 
+const ADD_TEXT_HELP =
+  'Add text: a paragraph on the session page. Add URL: a link there, with the words it shows. Each is its own entry, with Remove.';
+const ADD_FILE_HELP =
+  'Add file: a PDF, a text or data file, or with AI analyze on an image, added after Create for the people you choose in its Visible to.';
 const CONTEXT_HELP =
+  'Text and links show on the session page to everyone who can open it, and the session’s AI reads them. Files are added after Create.';
+// The edit page lists its files and admins-only links below, under their own heading.
+const SETTINGS_CONTEXT_HELP =
   'Paragraphs and links show on the session page to everyone who can open it, and the session’s AI reads them. Files and admins-only links go below.';
 const FORMAT_HELP =
   'Text shows the paragraphs and links below. An HTML file replaces them, under the same title. Switching discards the other one, after asking.';
@@ -197,6 +226,7 @@ export const SetupContextSection = ({
   onToggle,
   sources = null,
   publisher = null,
+  fileInputId = '',
 }: ContextProps) => {
   const context = readContext(draft);
   const hasText =
@@ -225,7 +255,7 @@ export const SetupContextSection = ({
       onToggle={onToggle}
       quick={publisher}
     >
-      <SetupField id="ce-setup-context-heading" label="Title" help={CONTEXT_HELP}>
+      <SetupField id="ce-setup-context-heading" label="Title" help={fileInputId ? CONTEXT_HELP : SETTINGS_CONTEXT_HELP}>
         <Input
           id="ce-setup-context-heading"
           value={context.title}
@@ -261,50 +291,87 @@ export const SetupContextSection = ({
           colorSchemeId={normalizeSessionColorSchemeId(asRecord(draft.appearance).colorSchemeId)}
         />
       ) : null}
-      {format === 'text' &&
-        context.paragraphs.map((paragraph, index) => (
-          <SetupField
-            key={`paragraph-${index}`}
-            id={`ce-setup-context-paragraph-${index}`}
-            label={`Paragraph ${index + 1}`}
-            help={PARAGRAPH_HELP}
-          >
-            <Input
-              id={`ce-setup-context-paragraph-${index}`}
-              type="textarea"
-              className={styles.textarea}
-              value={paragraph}
-              aria-describedby={setupHelpId(`ce-setup-context-paragraph-${index}`)}
-              maxLength={SESSION_CONTEXT_LIMITS.paragraphChars}
-              onChange={(event) =>
-                save({ paragraphs: context.paragraphs.map((entry, at) => (at === index ? event.target.value : entry)) })
-              }
-            />
-            <div className={styles.buttonRow}>
+      {/* Only the buttons this page and format offer, and help about those. */}
+      {format === 'text' || fileInputId ? (
+        <div className={styles.addRow} role="group" aria-label="Add to the context">
+          {format === 'text' ? (
+            <>
               <button
                 type="button"
                 className={styles.button}
-                onClick={() => save({ paragraphs: context.paragraphs.filter((_entry, at) => at !== index) })}
+                data-testid="ce-setup-context-add-paragraph"
+                aria-describedby={setupHelpId('ce-setup-context-add')}
+                disabled={context.paragraphs.length >= SESSION_CONTEXT_LIMITS.paragraphs}
+                onClick={() => save({ paragraphs: [...context.paragraphs, ''] })}
               >
-                Remove paragraph
+                <FontAwesomeIcon icon={faPlus} aria-hidden="true" /> Add text
               </button>
+              <button
+                type="button"
+                className={styles.button}
+                data-testid="ce-setup-context-add-link"
+                aria-describedby={setupHelpId('ce-setup-context-add')}
+                disabled={context.links.length >= SESSION_CONTEXT_LIMITS.links}
+                onClick={() => save({ links: [...context.links, { label: '', url: '' }] })}
+              >
+                <FontAwesomeIcon icon={faPlus} aria-hidden="true" /> Add URL
+              </button>
+            </>
+          ) : null}
+          {fileInputId ? (
+            // The file input sits with the files in `sources`; this opens its picker.
+            <button
+              type="button"
+              className={styles.button}
+              data-testid="ce-setup-context-add-file"
+              aria-describedby={setupHelpId('ce-setup-context-add')}
+              onClick={() => document.getElementById(fileInputId)?.click()}
+            >
+              <FontAwesomeIcon icon={faPlus} aria-hidden="true" /> Add file
+            </button>
+          ) : null}
+          <SetupHelp
+            id="ce-setup-context-add"
+            label="adding to the context"
+            help={[format === 'text' ? ADD_TEXT_HELP : '', fileInputId ? ADD_FILE_HELP : ''].filter(Boolean).join(' ')}
+          />
+        </div>
+      ) : null}
+      {format === 'text' &&
+        context.paragraphs.map((paragraph, index) => (
+          <div key={`paragraph-${index}`} className={styles.listRow} data-testid="ce-setup-context-entry">
+            <div className={styles.listRowBody}>
+              <SetupField id={`ce-setup-context-paragraph-${index}`} label={`Text ${index + 1}`} help={PARAGRAPH_HELP}>
+                <Input
+                  id={`ce-setup-context-paragraph-${index}`}
+                  type="textarea"
+                  className={styles.textarea}
+                  value={paragraph}
+                  aria-describedby={setupHelpId(`ce-setup-context-paragraph-${index}`)}
+                  maxLength={SESSION_CONTEXT_LIMITS.paragraphChars}
+                  onChange={(event) =>
+                    save({
+                      paragraphs: context.paragraphs.map((entry, at) => (at === index ? event.target.value : entry)),
+                    })
+                  }
+                />
+              </SetupField>
             </div>
-          </SetupField>
+            <button
+              type="button"
+              className={styles.button}
+              aria-label={`Remove text ${index + 1}`}
+              onClick={() => save({ paragraphs: context.paragraphs.filter((_entry, at) => at !== index) })}
+            >
+              Remove
+            </button>
+          </div>
         ))}
       {format === 'text' &&
         context.links.map((link, index) => (
-          <div key={`link-${index}`} className={styles.listRow}>
+          <div key={`link-${index}`} className={styles.listRow} data-testid="ce-setup-context-entry">
             <div className={styles.listRowBody}>
-              <SetupField id={`ce-setup-context-link-label-${index}`} label="Link label" help={LINK_LABEL_HELP}>
-                <Input
-                  id={`ce-setup-context-link-label-${index}`}
-                  value={link.label}
-                  aria-describedby={setupHelpId(`ce-setup-context-link-label-${index}`)}
-                  maxLength={SESSION_CONTEXT_LIMITS.labelChars}
-                  onChange={(event) => setLink(index, { label: event.target.value })}
-                />
-              </SetupField>
-              <SetupField id={`ce-setup-context-link-url-${index}`} label="Link" help={LINK_URL_HELP}>
+              <SetupField id={`ce-setup-context-link-url-${index}`} label={`URL ${index + 1}`} help={LINK_URL_HELP}>
                 <Input
                   id={`ce-setup-context-link-url-${index}`}
                   type="url"
@@ -318,6 +385,15 @@ export const SetupContextSection = ({
               {link.url && !isHttpsUrl(link.url.trim()) ? (
                 <p className={styles.errorText}>Use an https:// link.</p>
               ) : null}
+              <SetupField id={`ce-setup-context-link-label-${index}`} label="Link label" help={LINK_LABEL_HELP}>
+                <Input
+                  id={`ce-setup-context-link-label-${index}`}
+                  value={link.label}
+                  aria-describedby={setupHelpId(`ce-setup-context-link-label-${index}`)}
+                  maxLength={SESSION_CONTEXT_LIMITS.labelChars}
+                  onChange={(event) => setLink(index, { label: event.target.value })}
+                />
+              </SetupField>
             </div>
             <button
               type="button"
@@ -329,28 +405,6 @@ export const SetupContextSection = ({
             </button>
           </div>
         ))}
-      {format === 'text' ? (
-        <div className={styles.buttonRow}>
-          <button
-            type="button"
-            className={styles.button}
-            data-testid="ce-setup-context-add-paragraph"
-            disabled={context.paragraphs.length >= SESSION_CONTEXT_LIMITS.paragraphs}
-            onClick={() => save({ paragraphs: [...context.paragraphs, ''] })}
-          >
-            Add paragraph
-          </button>
-          <button
-            type="button"
-            className={styles.button}
-            data-testid="ce-setup-context-add-link"
-            disabled={context.links.length >= SESSION_CONTEXT_LIMITS.links}
-            onClick={() => save({ links: [...context.links, { label: '', url: '' }] })}
-          >
-            Add link
-          </button>
-        </div>
-      ) : null}
       {problems.length ? (
         <ul className={styles.errorText} role="alert" data-testid="ce-setup-context-problems">
           {problems.map((problem) => (
@@ -358,7 +412,9 @@ export const SetupContextSection = ({
           ))}
         </ul>
       ) : null}
-      {sources ? (
+      {sources && fileInputId ? (
+        sources
+      ) : sources ? (
         <>
           <h3 className={styles.subheading}>Files and links for the AI</h3>
           {sources}
@@ -454,6 +510,47 @@ export const SetupQuestionsSection = ({
       onToggle={onToggle}
       quick={publisher}
     >
+      <div className={styles.field}>
+        <div className={styles.fieldLabelRow}>
+          <span className={styles.fieldLabel}>New question type</span>
+          <SetupHelp id="ce-setup-question-type" label="New question type" help={QUESTION_TYPE_HELP} />
+        </div>
+        <SetupQuestionTypes value={newType} onChange={setNewType} describedBy={setupHelpId('ce-setup-question-type')} />
+      </div>
+      <SetupField id="ce-setup-question-prompt" label="New question" help={QUESTION_PROMPT_HELP}>
+        <Input
+          id="ce-setup-question-prompt"
+          type="textarea"
+          value={newPrompt}
+          aria-describedby={setupHelpId('ce-setup-question-prompt')}
+          placeholder="Write your question"
+          data-testid="ce-setup-question-prompt"
+          onChange={(event) => setNewPrompt(event.target.value)}
+        />
+      </SetupField>
+      {setupQuestionUsesOptions(newType) ? (
+        <SetupField id="ce-setup-question-options" label="Options, one per line" help={QUESTION_OPTIONS_HELP}>
+          <Input
+            id="ce-setup-question-options"
+            type="textarea"
+            value={newOptions}
+            aria-describedby={setupHelpId('ce-setup-question-options')}
+            onChange={(event) => setNewOptions(event.target.value)}
+          />
+        </SetupField>
+      ) : null}
+      <div className={styles.buttonRow}>
+        <button
+          type="button"
+          className={`${styles.button} ${styles.primaryButton}`}
+          disabled={!canAdd}
+          data-testid="ce-setup-question-add"
+          onClick={add}
+        >
+          Add question
+        </button>
+      </div>
+      {suggest}
       {questions.map((question, index) => (
         <div key={`question-${index}`} className={styles.listRow} data-testid="ce-setup-question">
           <div className={styles.listRowBody}>
@@ -490,54 +587,6 @@ export const SetupQuestionsSection = ({
           </button>
         </div>
       ))}
-      <SetupField id="ce-setup-question-type" label="New question type" help={QUESTION_TYPE_HELP}>
-        <Input
-          id="ce-setup-question-type"
-          type="select"
-          value={newType}
-          aria-describedby={setupHelpId('ce-setup-question-type')}
-          onChange={(event) => setNewType(event.target.value)}
-        >
-          {SETUP_QUESTION_TYPES.map((entry) => (
-            <option key={entry.value} value={entry.value}>
-              {entry.label}
-            </option>
-          ))}
-        </Input>
-      </SetupField>
-      <SetupField id="ce-setup-question-prompt" label="New question" help={QUESTION_PROMPT_HELP}>
-        <Input
-          id="ce-setup-question-prompt"
-          type="textarea"
-          value={newPrompt}
-          aria-describedby={setupHelpId('ce-setup-question-prompt')}
-          data-testid="ce-setup-question-prompt"
-          onChange={(event) => setNewPrompt(event.target.value)}
-        />
-      </SetupField>
-      {setupQuestionUsesOptions(newType) ? (
-        <SetupField id="ce-setup-question-options" label="Options, one per line" help={QUESTION_OPTIONS_HELP}>
-          <Input
-            id="ce-setup-question-options"
-            type="textarea"
-            value={newOptions}
-            aria-describedby={setupHelpId('ce-setup-question-options')}
-            onChange={(event) => setNewOptions(event.target.value)}
-          />
-        </SetupField>
-      ) : null}
-      <div className={styles.buttonRow}>
-        <button
-          type="button"
-          className={styles.button}
-          disabled={!canAdd}
-          data-testid="ce-setup-question-add"
-          onClick={add}
-        >
-          Add question
-        </button>
-      </div>
-      {suggest}
     </SetupSection>
   );
 };

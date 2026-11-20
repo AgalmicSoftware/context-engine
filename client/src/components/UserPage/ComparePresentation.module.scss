@@ -28,110 +28,13 @@
     outline-offset: 3px;
   }
 }
-.overview {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 1rem;
-  padding: 1rem 0;
-}
-.narrative,
-.graphSection {
-  min-width: 0;
-  padding: clamp(0.75rem, 2vw, 1.25rem);
-  background: var(--ce-card-bg);
-  border: var(--ce-border-control-width) solid var(--ce-card-border);
-  border-radius: var(--ce-radius-12);
-  box-shadow: var(--ce-card-shadow);
-}
-.narrative section + section {
-  margin-top: 1.75rem;
-}
 .provenance,
 .exploreHint {
   color: var(--ce-panel-text-muted);
   font-size: 0.875rem;
 }
-.graphHeading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.5rem;
-}
-.axisBadge {
-  font-size: 0.75rem;
-  border: 1px solid var(--ce-panel-text-muted);
-  border-radius: var(--ce-radius-pill);
-  padding: 0.1rem 0.5rem;
-}
-.map {
-  width: 100%;
-  min-width: 0;
-}
-.mapTop,
-.mapBottom {
-  text-align: center;
-  font-size: 0.875rem;
-  padding-left: 1.5rem;
-}
-.mapMiddle {
-  display: grid;
-  grid-template-columns: 1.5rem minmax(0, 1fr);
-  align-items: center;
-  svg {
-    width: 100%;
-    height: auto;
-    display: block;
-    overflow: visible;
-  }
-}
-.yAxis {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  text-align: center;
-  font-size: 0.875rem;
-}
-.xAxis {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
-  gap: 0.4rem;
-  align-items: start;
-  font-size: 0.875rem;
-  margin: 0.65rem 0 1rem 1.5rem;
-  text-align: center;
-  span:first-child {
-    text-align: left;
-  }
-  span:last-child {
-    text-align: right;
-  }
-}
-.gridLine {
-  stroke: var(--ce-panel-text);
-  stroke-opacity: 0.18;
-  stroke-width: 1;
-}
-.axisLine {
-  stroke: var(--ce-panel-text);
-  stroke-opacity: 0.7;
-  stroke-width: 1.5;
-}
-.pointLabel {
-  fill: var(--ce-panel-text);
-  font-size: 16px;
-  font-weight: 700;
-}
-.axisDetails {
-  font-size: 0.875rem;
-  margin-bottom: 1rem;
-  summary {
-    text-align: right;
-    min-height: 44px;
-    color: var(--ce-panel-text);
-    text-decoration: underline;
-  }
-}
-.marker {
-  font-size: 1.25rem;
+.presentation .foot {
+  margin: 1.5rem 0 1rem;
 }
 :global(:root) .presentation .explore {
   width: 100%;
@@ -276,16 +179,6 @@
   overflow: hidden;
   clip-path: inset(50%);
 }
-@media (max-width: 800px) {
-  .overview {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 1.5rem;
-  }
-  .graphSection {
-    min-width: 0;
-  }
-}
-
 .ratingEndpoints {
   display: flex;
   justify-content: space-between;

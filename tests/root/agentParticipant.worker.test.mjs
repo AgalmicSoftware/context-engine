@@ -4,6 +4,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { inflateRawSync } from 'node:zlib';
 import { ethers } from 'ethers';
 import sessionCorsWorker from '../../workers/sessionCorsWorker/worker.js';
 import { installSessionCoordinatorBinding } from '../helpers/sessionCorsWorkerTestUtils.mjs';
@@ -1629,7 +1630,7 @@ test('an agent sees the session’s instructions and groups, joins the group the
   // A wrong group, joined anyway, is left again.
   await kami.participant.joinGroup({ groupId: salon.groupId });
   assert.deepEqual(await kami.participant.leaveGroup({ groupId: salon.groupId }), { session: SLUG, leftGroup: salon.groupId });
-  await assert.rejects(kami.participant.leaveGroup({ groupId: salon.groupId }), new RegExp(`^Error: You aren’t a member of group "${salon.groupId}"\\.$`));
+  await assert.rejects(kami.participant.leaveGroup({ groupId: salon.groupId }), new RegExp(`^Error: You aren’t a member of group "${salon.label}" \\(${salon.groupId}\\)\\.$`));
   // An unknown group gets the one refusal every refused join gets, so no answer
   // shows whether an unlisted group exists. With no invite sent, the agent is
   // told how to bring one, and to check the id.
@@ -1761,8 +1762,8 @@ test('groups say how joining works and who can end a membership, and a leave the
   assert.equal(groups.find((group) => group.name === 'Full').memberLimit, 1);
   const kept = made['Kept by admins'].groupId;
   await kami.participant.joinGroup({ groupId: kept });
-  await assert.rejects(kami.participant.leaveGroup({ groupId: kept }), new RegExp(`^Error: Group "${kept}" doesn’t let members leave\\.$`));
-  await assert.rejects(kami.participant.joinGroup({ groupId: made.Full.groupId }), new RegExp(`^Error: Group "${made.Full.groupId}" has no room for more members\\.$`));
+  await assert.rejects(kami.participant.leaveGroup({ groupId: kept }), new RegExp(`^Error: Group "Kept by admins" \\(${kept}\\) doesn’t let members leave\\.$`));
+  await assert.rejects(kami.participant.joinGroup({ groupId: made.Full.groupId }), new RegExp(`^Error: Group "Full" \\(${made.Full.groupId}\\) has no room for more members\\.$`));
 });
 
 test('groups a Worker can’t list yet are reported as such, and none are shown where it keeps none', async (t) => {
@@ -2107,12 +2108,17 @@ test('an agent that never joins drafts suggested answers into a review link from
   assert.equal(`${review.origin}${review.pathname}`, `https://contextengine.sh/session/${SLUG}`);
   assert.deepEqual(Object.fromEntries(review.searchParams), { src: 'flyer', worker: WORKER_ORIGIN, mode: 'interview' });
   assert.doesNotMatch(made.reviewLink, /never-shown/);
-  const packet = JSON.parse(Buffer.from(review.hash.slice('#prefill='.length), 'base64url').toString('utf8'));
+  // Plain where the site's manifest can't be read, as here; deflated where it lists #prefillz=.
+  const fragment = new URLSearchParams(review.hash.slice(1));
+  const bytes = Buffer.from(fragment.get('prefillz') ?? fragment.get('prefill'), 'base64url');
+  const packet = JSON.parse((fragment.has('prefillz') ? inflateRawSync(bytes) : bytes).toString('utf8'));
   assert.equal(packet.sessionSlug, SLUG);
   assert.match(packet.questionSetHash, /^[0-9a-f]{64}$/);
   assert.equal(packet.source.modelId, 'test-model');
-  // No sign-in, no join, nothing stored: only the public catalog was read.
-  assert.ok(seen.length >= 2 && seen.every((call) => call.method === 'GET' && call.url.startsWith(`${WORKER_ORIGIN}/agent/interview-catalog?`)));
+  // No sign-in, no join, nothing stored: only the public catalog was read, and the site's manifest once.
+  const catalogReads = seen.filter((call) => call.url.startsWith(`${WORKER_ORIGIN}/agent/interview-catalog?`));
+  assert.ok(catalogReads.length >= 2 && seen.every((call) => call.method === 'GET'));
+  assert.deepEqual(seen.filter((call) => !catalogReads.includes(call)).map((call) => call.url), ['https://contextengine.sh/manifest.json']);
   assert.equal((await carol.participant.whoami()).sessions.length, 0);
 });
 

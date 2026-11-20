@@ -152,7 +152,8 @@ const jaccard = (a, b) => {
 };
 const squaredLength = (votes) => votes.reduce((sum, vote) => sum + vote * vote, 0);
 // Direction of the vote vector: same priorities 1, unrelated 0.5, opposite 0.
-// How strongly people vote is measured separately (see synthesis checks).
+// Strength and votes per option are measured separately, beside it:
+// quadraticIntensitySimilarity, quadraticVoteAgreement and the synthesis checks.
 const quadraticSimilarity = (a, b) => {
   const [squaredA, squaredB] = [squaredLength(a), squaredLength(b)];
   if (!squaredA && !squaredB) return 1;
@@ -160,6 +161,97 @@ const quadraticSimilarity = (a, b) => {
   const dot = a.reduce((sum, vote, index) => sum + vote * b[index], 0);
   return (1 + Math.max(-1, Math.min(1, dot / Math.sqrt(squaredA * squaredB)))) / 2;
 };
+
+// How strongly someone votes on a quadratic question, whatever on: the length
+// of the vote vector in votes, the square root of the credits spent. The whole
+// budget spent is the most there can be, √credits.
+const voteStrength = (votes) => Math.sqrt(squaredLength(votes));
+const strengthSimilarity = (question, a, b) =>
+  question.voiceCredits > 0 ? Math.max(0, 1 - Math.abs(a - b) / Math.sqrt(question.voiceCredits)) : null;
+
+/**
+ * Agreement from 0 to 1 on how strongly two quadratic answers vote, whatever
+ * they vote for: 1 for the same strength, 0 for no votes against the whole
+ * budget spent (a budget that can't be spent exactly, such as 99 on two
+ * options, never quite reaches 0). With answerSimilarity's direction it describes the
+ * whole allocation. It is reported beside the Mirror Score, never inside it, so
+ * scores already collected stay comparable. Null for other question types.
+ */
+export const quadraticIntensitySimilarity = (question, a, b) =>
+  question?.type === 'quadratic' && Array.isArray(a) && Array.isArray(b)
+    ? strengthSimilarity(question, voteStrength(a), voteStrength(b))
+    : null;
+// Mean intensity agreement over a person's quadratic predictions, or null.
+const meanIntensity = (pairs) => mean(pairs.map((pair) => pair.intensity).filter(finite));
+
+// The most votes, counted without sign, that `credits` buy over `options`:
+// spread as evenly as whole votes allow, since moving one vote from an option
+// to one with at least two fewer keeps the count and frees credits. Without
+// whole votes it would be √(options × credits); whole votes fall a step or so
+// short of that.
+const maxTotalVotes = (options, credits) => {
+  const cost = (total) => {
+    const [each, extra] = [Math.floor(total / options), total % options];
+    return extra * (each + 1) ** 2 + (options - extra) * each ** 2;
+  };
+  let total = Math.floor(Math.sqrt(options * credits));
+  while (cost(total) > credits) total -= 1;
+  return total;
+};
+
+/**
+ * How closely two quadratic answers agree option by option, sizes included:
+ * `difference` is the mean absolute difference in votes per option, and
+ * `match` is 1 − the summed difference ÷ the most two answers within the
+ * budget can differ (twice maxTotalVotes: one answer against its reverse),
+ * from 0 to 1. Like strength, it is reported beside the Mirror Score, never
+ * inside it. Null for other question types.
+ */
+export const quadraticVoteAgreement = (question, a, b) => {
+  if (question?.type !== 'quadratic' || !Array.isArray(a) || !Array.isArray(b) || !(question.voiceCredits > 0)) return null;
+  const apart = a.reduce((sum, vote, index) => sum + Math.abs(vote - b[index]), 0);
+  const most = 2 * maxTotalVotes(a.length, question.voiceCredits);
+  // Answers within the budget, and their means, never differ by more.
+  return { difference: apart / a.length, match: most ? Math.max(0, 1 - apart / most) : null };
+};
+const meanVotes = (pairs, key) => mean(pairs.map((pair) => pair.votes?.[key]).filter(finite));
+
+// Per quadratic question, the drafts' total votes per option against the
+// final answers' totals, the quantity Results charts, over the people with a
+// draft (the session keeps one each). Final, not the answer a hidden draft is
+// scored against: that one isn't in Results, and the difference would show
+// a person's change. Session Wrapped's predictions aren't in the
+// Results chart, so they're left out. A question is withheld below the
+// minimum, and where 1 to minimum − 1 people answered without a draft, since
+// the Results totals minus these would show their votes. Those are counted
+// over every answer given, including people the report leaves out.
+const quadraticTotals = (people, questionMap, answers, minimum) =>
+  [...questionMap.values()]
+    .filter((question) => question.type === 'quadratic')
+    .map((question) => {
+      const drafts = people
+        .map((person) => person.pairs.find((pair) => pair.questionId === question.id && pair.votes && pair.origin !== 'wrapped_agent'))
+        .filter(Boolean);
+      if (!drafts.length) return null;
+      const drafted = new Set(drafts.map((pair) => pair.participantId));
+      const given = answers.filter((answer) => answer.questionId === question.id);
+      const undrafted = new Set(given.map((answer) => answer.participantId).filter((id) => !drafted.has(id))).size;
+      const final = new Map(given.map((answer) => [answer.participantId, answer.value]));
+      if (drafts.length < minimum || (undrafted > 0 && undrafted < minimum)) {
+        return { questionId: question.id, participants: drafts.length, suppressed: true };
+      }
+      const sum = (votesOf, index) => drafts.reduce((total, pair) => total + votesOf(pair)[index], 0);
+      return {
+        questionId: question.id,
+        participants: drafts.length,
+        options: question.options.map((option, index) => {
+          const draftedVotes = sum((pair) => pair.prediction, index);
+          const actualVotes = sum((pair) => final.get(pair.participantId) ?? pair.actual, index);
+          return { option, drafted: draftedVotes, actual: actualVotes, difference: draftedVotes - actualVotes };
+        }),
+      };
+    })
+    .filter(Boolean);
 
 /**
  * Graded agreement from 0 to 1 between two normalized answers to the same
@@ -716,6 +808,8 @@ const scorePairs = (pairs, questionMap) =>
         ...pair,
         question,
         similarity: answerSimilarity(question, pair.prediction, pair.actual),
+        intensity: quadraticIntensitySimilarity(question, pair.prediction, pair.actual),
+        votes: quadraticVoteAgreement(question, pair.prediction, pair.actual),
         match: answersMatch(pair.prediction, pair.actual),
         predictionKey: answerKey(pair.prediction),
         actualKey: answerKey(pair.actual),
@@ -1021,8 +1115,15 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
     const peers = ownGroup ? others(pair, ownGroup) : [];
     const populationGuess = consensusAnswer(pair.question, others(pair));
     const groupGuess = peers.length >= settings.minGroupSize ? consensusAnswer(pair.question, peers) : null;
+    // For strength, the median strength among everyone else, the best single
+    // guess under this distance, as the median is for ratings. The mean votes'
+    // own strength would shrink wherever people vote in different directions.
+    const strengths = finite(pair.intensity) ? others(pair).map(voteStrength) : [];
     return {
       ...pair,
+      intensityBaseline: strengths.length ? strengthSimilarity(pair.question, median(strengths), voteStrength(pair.actual)) : null,
+      // For votes per option, everyone else's mean votes, the group's centre.
+      votesBaseline: finite(pair.votes?.match) ? (quadraticVoteAgreement(pair.question, populationGuess, pair.actual)?.match ?? null) : null,
       populationGuess,
       populationSimilarity: answerSimilarity(pair.question, populationGuess, pair.actual),
       groupSimilarity: answerSimilarity(pair.question, groupGuess, pair.actual),
@@ -1051,6 +1152,21 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
   const lift = (personPairs, key) => {
     const comparable = comparableTo(personPairs, key);
     return comparable.length ? meanSimilarity(comparable) - mean(comparable.map((pair) => pair[key])) : null;
+  };
+  // The same for a quadratic measure beside the Mirror Score and its baseline.
+  const besideBaseline = (valueOf, key) => {
+    const on = (personPairs) => {
+      const comparable = comparableTo(personPairs, key);
+      return comparable.length ? [mean(comparable.map(valueOf)), mean(comparable.map((pair) => pair[key]))] : [null, null];
+    };
+    return {
+      agent: perPerson((personPairs) => on(personPairs)[0]),
+      baseline: perPerson((personPairs) => on(personPairs)[1]),
+      lift: perPerson((personPairs) => {
+        const [agent, baseline] = on(personPairs);
+        return finite(agent) ? agent - baseline : null;
+      }),
+    };
   };
   const points = people
     .map((person) => ({
@@ -1122,6 +1238,13 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
       groupsWithheld: groupSizes.size - reportedGroups.length,
     },
     correctionRate: core.correctionRate,
+    // Over the people with quadratic predictions only.
+    quadraticIntensity: perPerson(meanIntensity),
+    quadraticVotes: {
+      difference: perPerson((personPairs) => meanVotes(personPairs, 'difference')),
+      match: perPerson((personPairs) => meanVotes(personPairs, 'match')),
+    },
+    quadraticTotals: quadraticTotals(people, questionMap, answers, settings.minParticipants),
     calibration: core.calibration,
     agreement: {
       choiceKappa: kappaEstimate(people, settings),
@@ -1142,6 +1265,10 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
         baseline: perPerson((personPairs) => mean(personPairs.map((pair) => pair.groupSimilarity).filter(finite))),
         lift: perPerson((personPairs) => lift(personPairs, 'groupSimilarity')),
       },
+      // Quadratic vote strength against everyone else's median strength, and
+      // votes per option against everyone else's mean votes.
+      quadraticIntensity: besideBaseline((pair) => pair.intensity, 'intensityBaseline'),
+      quadraticVotes: besideBaseline((pair) => pair.votes.match, 'votesBaseline'),
     },
     unusualViews:
       points.length >= settings.minParticipants
@@ -1177,6 +1304,9 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
           id: pseudonyms?.get(person.participantId) ?? `p${String(index + 1).padStart(3, '0')}`,
           predictions: person.pairs.length,
           mirrorScore: meanSimilarity(person.pairs),
+          quadraticIntensity: meanIntensity(person.pairs),
+          quadraticVoteDifference: meanVotes(person.pairs, 'difference'),
+          quadraticVoteMatch: meanVotes(person.pairs, 'match'),
           exactMatchRate: matchRate(person.pairs),
           typicality: typicality.get(person.participantId) ?? null,
           groups: groupsOf(person.participantId).filter((group) => reportedGroups.includes(group)),

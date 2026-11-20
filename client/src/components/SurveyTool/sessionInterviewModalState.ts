@@ -1,5 +1,10 @@
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
-import type { InterviewPrefillPacket, InterviewQuestion, InterviewResearchCoverage } from './sessionInterview';
+import {
+  INTERVIEW_PREFILL_PASTE_NOTE,
+  type InterviewPrefillPacket,
+  type InterviewQuestion,
+  type InterviewResearchCoverage,
+} from './sessionInterview';
 
 export type SessionInterviewModalRecord = Record<string, unknown>;
 
@@ -135,6 +140,9 @@ export const describeResearchCoverage = (coverage: InterviewResearchCoverage | u
   ].filter(Boolean);
 };
 
+// Why an empty question pool is still empty; absent once the session's questions have loaded.
+export type InterviewQuestionLoad = 'loading' | 'failed' | 'signIn';
+
 type InterviewStatusInput = {
   recordingState: 'idle' | 'starting' | 'recording' | 'paused' | 'stopping';
   mapping: boolean;
@@ -143,10 +151,18 @@ type InterviewStatusInput = {
   // The interview's own last status, shown when nothing more pressing applies.
   status: string;
   hasQuestions: boolean;
+  questionLoad?: InterviewQuestionLoad;
   hasDrafts: boolean;
   readiness: 'checking' | 'ready' | 'unavailable' | 'unknown';
   openingLoading: boolean;
 };
+
+const EMPTY_POOL_LABELS = {
+  loading: 'Loading questions…',
+  failed: "Questions didn't load",
+  signIn: 'Sign in for questions',
+  none: 'No questions',
+} as const;
 
 /** The interview header's status and its tone, and the guidance behind its help button. */
 export const describeInterviewStatus = ({
@@ -156,6 +172,7 @@ export const describeInterviewStatus = ({
   error,
   status,
   hasQuestions,
+  questionLoad,
   hasDrafts,
   readiness,
   openingLoading,
@@ -174,14 +191,18 @@ export const describeInterviewStatus = ({
           ? 'Review and edit your answers and privacy settings, then select Submit responses. You will be asked to sign in if needed.'
           : 'Speak with an AI interviewer. Stopping prepares drafts for your review. You choose when to submit responses.';
   const idle = recordingState === 'idle' && !mapping && !applying;
+  // A review opened to paste an AI's packet is waiting on the person, not failing.
+  const failed = Boolean(error) && error !== INTERVIEW_PREFILL_PASTE_NOTE;
   const statusLabel = error
-    ? 'Error'
+    ? failed
+      ? 'Error'
+      : 'Paste drafts'
     : mapping
       ? 'Preparing responses…'
       : applying
         ? 'Submitting'
         : idle && !hasQuestions
-          ? 'No questions'
+          ? EMPTY_POOL_LABELS[questionLoad || 'none']
           : idle && readiness === 'checking'
             ? 'Checking setup'
             : idle && readiness === 'unavailable'
@@ -193,15 +214,18 @@ export const describeInterviewStatus = ({
                   : status;
   // 'busy' while the interview is working on something, which shows a spinner; 'pending' while it waits.
   const statusTone =
-    error || (idle && (!hasQuestions || readiness === 'unavailable'))
+    failed ||
+    (idle && !hasQuestions && (!questionLoad || questionLoad === 'failed')) ||
+    (idle && hasQuestions && readiness === 'unavailable')
       ? 'error'
       : isStarting ||
           isStopping ||
           mapping ||
           applying ||
-          (idle && (readiness === 'checking' || (readiness === 'ready' && openingLoading)))
+          (idle && !hasQuestions && questionLoad === 'loading') ||
+          (idle && hasQuestions && (readiness === 'checking' || (readiness === 'ready' && openingLoading)))
         ? 'busy'
-        : isPaused || (idle && readiness === 'unknown')
+        : isPaused || (idle && (hasQuestions ? readiness === 'unknown' : questionLoad === 'signIn'))
           ? 'pending'
           : 'ready';
   return { guidance, idle, statusLabel, statusTone };

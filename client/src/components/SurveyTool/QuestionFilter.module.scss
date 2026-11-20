@@ -30,6 +30,9 @@ $text-color: var(--ce-border);
 }
 
 .filterSummaryContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
   background: color-mix(in srgb, var(--ce-document-surface) 97%, var(--ce-text-inverse));
   border: 1px solid $pastel-border;
   padding: 0.75rem;
@@ -37,31 +40,75 @@ $text-color: var(--ce-border);
   margin-bottom: 1rem;
 }
 
-.filterSummaryActions {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 0.5rem;
-}
-
 .filterSummaryLabel {
   font-weight: 600;
   font-size: 1rem;
   color: $heading-color;
-  margin-bottom: 0.5rem; // --- MODIFICATION START ---
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  align-items: center; // --- MODIFICATION END ---
+  align-items: center;
+  gap: 0.5rem;
 }
 
-// --- MODIFICATION START ---
+.bookmarkFeedback {
+  margin-left: 0.5rem;
+  color: var(--ce-status-warning-text);
+  font-size: 0.85em;
+  font-style: italic;
+}
+
+.filterSummaryActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.filterAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 32px;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid $pastel-border;
+  border-radius: var(--ce-radius-4);
+  background: $pastel-highlight;
+  color: $heading-color;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--ce-status-info-soft) 95%, var(--ce-compat-dark));
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}
+
+.clearActionIcon {
+  color: var(--ce-status-error);
+}
+
+.copiedActionIcon {
+  color: var(--ce-status-success-text);
+}
+
+.bookmarkedActionIcon {
+  color: var(--ce-status-warning);
+}
+
 .filterControlsRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  /* margin-top: 1rem; */
-  padding-top: 0; // border-top: 1px solid var(--ce-data-series-8);
-  margin-bottom: 1rem;
 }
 
 .loadFilterContainer {
@@ -666,15 +713,6 @@ $text-color: var(--ce-border);
   }
 }
 
-.clearFilterIcon {
-  color: var(--ce-status-error); // A material red color  margin-left: 8px;
-  cursor: pointer;
-  transition: transform 0.2s ease;
-  &:hover {
-    transform: scale(1.2);
-  }
-}
-
 /* Small inline count row in inline/results mode */
 .inlineCountRow {
   display: flex;
@@ -686,12 +724,6 @@ $text-color: var(--ce-border);
 .inlineCountText {
   font-size: 0.95rem;
   color: $heading-color;
-}
-
-.addIcon {
-  margin-left: 8px;
-  cursor: pointer;
-  opacity: 0.5;
 }
 // --- MODIFICATION END ---
 
@@ -708,6 +740,10 @@ $text-color: var(--ce-border);
 
   .modalHeader {
     padding: 1rem 1.25rem;
+  }
+
+  .filterAction {
+    min-height: 44px;
   }
 
   // Reduce padding inside collapsible sections

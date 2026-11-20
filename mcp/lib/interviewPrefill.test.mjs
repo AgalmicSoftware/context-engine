@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createInterviewPrefill } from './interviewPrefill.mjs';
 import { parseSessionLink } from './sessionLinks.mjs';
+import { randomBytes } from 'node:crypto';
+import { decodeLinkBytes, decodeLinkUtf8, inflateLinkBytes } from '../../shared/linkPayload.mjs';
 
 const WORKER = 'https://w.example.workers.dev';
 const PAGE = 'https://contextengine.sh/session/forum-a';
@@ -32,17 +34,33 @@ const catalog = (overrides = {}) => ({
   ...overrides,
 });
 
-const harness = ({ status = 200, body = catalog(), profile = {}, readInvite } = {}) => {
+// `site(init)` answers the session page's /manifest.json: by default, a site that reads #prefillz=.
+const harness = ({ status = 200, body = catalog(), profile = {}, readInvite, site = () => Response.json(SITE_MANIFEST), now } = {}) => {
   const calls = [];
   const fetchImpl = async (url, init) => {
+    if (new URL(url).pathname === '/manifest.json') {
+      calls.push({ url: new URL(url), init, site: true });
+      return site(init);
+    }
     calls.push({ url: new URL(url), init });
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   };
   const resolveLink = async (link) => parseSessionLink(link);
-  return { calls, prefill: createInterviewPrefill({ fetchImpl, resolveLink, profile: async () => profile, ...(readInvite ? { readInvite } : {}) }) };
+  return { calls, prefill: createInterviewPrefill({ fetchImpl, resolveLink, profile: async () => profile, ...(readInvite ? { readInvite } : {}), ...(now ? { now } : {}) }) };
 };
 
-const decode = (reviewLink) => JSON.parse(Buffer.from(new URL(reviewLink).hash.slice('#prefill='.length), 'base64url').toString('utf8'));
+// Read as the session page reads it (sessionInterview.ts), through the same shared code.
+const decode = async (reviewLink) => {
+  const params = new URLSearchParams(new URL(reviewLink).hash.slice(1));
+  const packed = params.has('prefillz');
+  const decoded = decodeLinkBytes(params.get(packed ? 'prefillz' : 'prefill'), { maxLength: 100_000 });
+  assert.ok(decoded.ok, decoded.error);
+  const text = decodeLinkUtf8(packed ? await inflateLinkBytes(decoded.bytes, 400_000) : decoded.bytes);
+  assert.ok(text.ok, text.error);
+  return JSON.parse(text.text);
+};
+
+const SITE_MANIFEST = { name: 'contextEngine', context_engine_review_links: ['prefill', 'prefillz'] };
 
 test('reads the public catalog with no credentials, keeping only src and joinGroup from the link', async () => {
   const { calls, prefill } = harness();
@@ -86,8 +104,9 @@ test('makes a review link the page reads, leaving out drafts that would not fit 
   assert.equal(result.drafts, 6);
   assert.deepEqual(result.leftOut.map((item) => item.questionId), ['q-bin', 'q-missing', 'q-quad-2', 'q-many']);
   assert.match(result.leftOut[0].reason, /second draft/);
-  assert.ok(result.reviewLink.startsWith(`${catalog().reviewUrl}#prefill=`));
-  const packet = decode(result.reviewLink);
+  assert.ok(result.reviewLink.startsWith(`${catalog().reviewUrl}#prefillz=`));
+  const packet = await decode(result.reviewLink);
+  assert.match(result.next, /copied exactly: if one character changes or goes missing.*too long to send whole, call make_review_link again with shorter evidence and comments, or fewer drafts\. Nothing is submitted/);
   assert.equal(packet.version, 1);
   assert.equal(packet.sessionSlug, 'forum-a');
   assert.equal(packet.questionSetHash, HASH);
@@ -122,7 +141,7 @@ test('options match in any case and come out as listed, as the review page reads
     link: LINK,
     responses: [draft('q-bin', ' agree '), draft('q-one', ['blue']), draft('q-many', 'green'), draft('q-free', '  Shade. ')],
   });
-  assert.deepEqual(decode(made.reviewLink).responses.map((response) => response.answer), ['Agree', 'Blue', ['Green'], 'Shade.']);
+  assert.deepEqual((await decode(made.reviewLink)).responses.map((response) => response.answer), ['Agree', 'Blue', ['Green'], 'Shade.']);
 });
 
 test('a v4 catalog takes one option, and a later one that doesn’t say how many leaves the draft out', async () => {
@@ -180,7 +199,7 @@ test('a private session’s catalog is read with the proof its invite link makes
   assert.doesNotMatch(JSON.stringify(read), /SECRET|PROOF/);
   const made = await prefill.makeReviewLink({ link: LINK, responses: [{ questionId: 'q-bin', answer: 'Agree', confidence: 0.9, evidence: 'They said so.' }] });
   assert.doesNotMatch(JSON.stringify(made), /SECRET|PROOF|groupInvite/);
-  assert.doesNotMatch(Buffer.from(new URL(made.reviewLink).hash.slice('#prefill='.length), 'base64url').toString('utf8'), /SECRET|PROOF/);
+  assert.doesNotMatch(JSON.stringify(await decode(made.reviewLink)), /SECRET|PROOF/);
   assert.match(made.next, /private, and the review link carries no invite/);
 
   // A link without an invite asks for none, and a session that needs none sends none.
@@ -242,12 +261,77 @@ test('a catalog for another session, of another kind, or with a review link off 
   }
 });
 
+test('the link is deflated where the site says it reads #prefillz=, and plain anywhere else', async () => {
+  const draft = { questionId: 'q-free', answer: 'More trees, and shade.', confidence: 0.5, evidence: 'said so' };
+  const sites = [
+    ['lists it', undefined, 'prefillz'],
+    ['an older manifest', () => Response.json({ name: 'contextEngine' }), 'prefill'],
+    ['no manifest', () => new Response('Not found', { status: 404 }), 'prefill'],
+    ['not JSON', () => new Response('<html>', { status: 200 }), 'prefill'],
+    ['a redirect', () => new Response(null, { status: 302, headers: { location: 'https://elsewhere.example/manifest.json' } }), 'prefill'],
+    ['unreachable', () => Promise.reject(new TypeError('fetch failed')), 'prefill'],
+  ];
+  for (const [label, site, key] of sites) {
+    const { prefill, calls } = harness(site ? { site } : {});
+    const first = await prefill.makeReviewLink({ link: LINK, responses: [draft] });
+    const second = await prefill.makeReviewLink({ link: LINK, responses: [draft] });
+    for (const made of [first, second]) {
+      assert.ok(made.reviewLink.startsWith(`${catalog().reviewUrl}#${key}=`), `${label}: ${made.reviewLink}`);
+      assert.equal((await decode(made.reviewLink)).responses[0].answer, draft.answer);
+    }
+    // Asked once, of the session page's own site, with nothing of the person's.
+    const asked = calls.filter((call) => call.site);
+    assert.equal(asked.length, 1, label);
+    assert.equal(asked[0].url.href, 'https://contextengine.sh/manifest.json');
+    assert.equal(asked[0].init.credentials, 'omit');
+    assert.equal(asked[0].init.redirect, 'manual');
+  }
+});
+
+test('a clear answer from the site holds while the MCP runs; a failure is asked again after five minutes', async () => {
+  const draft = { questionId: 'q-free', answer: 'Shade.', confidence: 0.5, evidence: 'said so' };
+  for (const [label, site, again] of [
+    ['a manifest', undefined, false],
+    ['no manifest', () => new Response('Not found', { status: 404 }), false],
+    ['a server error', () => new Response('', { status: 503 }), true],
+    ['unreachable', () => Promise.reject(new TypeError('fetch failed')), true],
+  ]) {
+    let clock = 1_000;
+    const { prefill, calls } = harness({ ...(site ? { site } : {}), now: () => clock });
+    await prefill.makeReviewLink({ link: LINK, responses: [draft] });
+    clock += 4 * 60_000;
+    await prefill.makeReviewLink({ link: LINK, responses: [draft] });
+    assert.equal(calls.filter((call) => call.site).length, 1, label);
+    clock += 2 * 60_000;
+    await prefill.makeReviewLink({ link: LINK, responses: [draft] });
+    assert.equal(calls.filter((call) => call.site).length, again ? 2 : 1, label);
+  }
+});
+
+test('a site that never answers is given the plain link after a short wait', { timeout: 10_000 }, async () => {
+  const site = (init) => new Promise((resolve, reject) => init.signal.addEventListener('abort', () => reject(init.signal.reason)));
+  const started = Date.now();
+  // AbortSignal.timeout's timer doesn't hold the process open; in the MCP its stdio does.
+  const hold = setTimeout(() => {}, 8_000);
+  const made = await harness({ site }).prefill.makeReviewLink({
+    link: LINK,
+    responses: [{ questionId: 'q-free', answer: 'Shade.', confidence: 0.5, evidence: 'said so' }],
+  });
+  assert.ok(made.reviewLink.includes('#prefill='));
+  clearTimeout(hold);
+  assert.ok(Date.now() - started < 6_000);
+});
+
 test('drafts too long for one link are refused rather than cut', async () => {
   const { prefill } = harness();
-  const long = 'x'.repeat(4000);
-  const responses = QUESTIONS.filter((question) => question.type === 'freeform').map((question) => ({ questionId: question.id, answer: long, confidence: 0.5, evidence: long }));
-  await assert.rejects(
-    prefill.makeReviewLink({ link: LINK, responses, responderContext: { summary: 'y'.repeat(80_000) } }),
-    /too long for one link/,
-  );
+  const responses = QUESTIONS.filter((question) => question.type === 'freeform').map((question) => ({ questionId: question.id, answer: 'Shade.', confidence: 0.5, evidence: 'said so' }));
+  // Text that doesn't deflate makes too long a link; text that does still can't unpack past what the page reads.
+  for (const summary of [randomBytes(90_000).toString('base64'), 'y'.repeat(450_000)]) {
+    await assert.rejects(prefill.makeReviewLink({ link: LINK, responses, responderContext: { summary } }), /too long for one link/);
+  }
+  const made = await prefill.makeReviewLink({ link: LINK, responses, responderContext: { summary: 'y'.repeat(300_000) } });
+  assert.ok(made.reviewLink.length < 5_000);
+  // Plain, the same drafts are far too long.
+  const plain = harness({ site: () => Response.json({}) }).prefill;
+  await assert.rejects(plain.makeReviewLink({ link: LINK, responses, responderContext: { summary: 'y'.repeat(80_000) } }), /too long for one link/);
 });

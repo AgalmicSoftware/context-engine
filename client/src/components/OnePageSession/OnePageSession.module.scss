@@ -1,4 +1,5 @@
 /* @file OnePageSession.module.scss */
+@use 'scss/groupImagePlaceholder' as groupImagePlaceholder;
 @use 'scss/loadingState' as loadingState;
 
 .onePageDemoContainer {
@@ -480,7 +481,10 @@
 
 .sessionAgentBar {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
+  gap: 0.5rem 1rem;
   width: min(100%, 980px);
   margin: 0 auto;
 }
@@ -778,9 +782,7 @@
 .workerGroupDetailImagePlaceholder {
   width: 100%;
   aspect-ratio: 1;
-  background:
-    radial-gradient(circle at 50% 44%, color-mix(in srgb, var(--ce-action-accent) 20%, transparent), transparent 32%),
-    color-mix(in srgb, var(--ce-document-text) 76%, transparent);
+  @include groupImagePlaceholder.group-image-placeholder;
 }
 
 .workerGroupDetailStaticHeader {

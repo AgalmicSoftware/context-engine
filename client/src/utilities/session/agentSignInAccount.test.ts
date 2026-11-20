@@ -107,39 +107,39 @@ beforeEach(() => {
 
 describe('who a link’s sign-in would replace', () => {
   it('is nobody in a fresh tab, and the saved passkey where this browser would sign one back in', async () => {
-    expect(await whoALinkWouldReplace()).toBe('');
+    expect(await whoALinkWouldReplace()).toBeNull();
     jest.mocked(passkeyWallet.restorePasskeyWalletSession).mockResolvedValue(PASSKEY.toUpperCase() as never);
-    expect(await whoALinkWouldReplace()).toBe(PASSKEY);
+    expect(await whoALinkWouldReplace()).toEqual({ address: PASSKEY, kind: 'saved' });
     expect(passkeyWallet.restorePasskeyWalletSession).toHaveBeenLastCalledWith({ requireSigner: false });
     jest.mocked(passkeyWallet.restorePasskeyWalletSession).mockRejectedValue(new Error('no storage'));
-    expect(await whoALinkWouldReplace()).toBe('');
+    expect(await whoALinkWouldReplace()).toBeNull();
   });
 
   it('is whoever is signed in at that moment, read from the page’s state and not from an earlier look', async () => {
     const asked = whoALinkWouldReplace();
-    expect(await asked).toBe('');
+    expect(await asked).toBeNull();
     signInAs(OTHER, 'wagmi');
     expect(liveAccount()).toBe(OTHER);
-    expect(await whoALinkWouldReplace()).toBe(OTHER);
+    expect(await whoALinkWouldReplace()).toEqual({ address: OTHER, kind: 'own' });
   });
 
   it('is an agent’s account the tab still holds a sign-in for, though a reload has not opened it yet', async () => {
     hold();
     expect(liveAccount()).toBe('');
-    expect(await whoALinkWouldReplace()).toBe(ACCOUNT);
+    expect(await whoALinkWouldReplace()).toEqual({ address: ACCOUNT, kind: 'agent' });
   });
 
   it('is nobody when the held agent’s account has no sign-in left: its person came back for a new link', async () => {
     hold();
     jest.mocked(heldSessionToken).mockReturnValue('');
-    expect(await whoALinkWouldReplace()).toBe('');
+    expect(await whoALinkWouldReplace()).toBeNull();
     // Also once the page shows that ended account.
     signInAs(ACCOUNT, 'agent_link');
-    expect(await whoALinkWouldReplace()).toBe('');
+    expect(await whoALinkWouldReplace()).toBeNull();
     // The same address under its own key is somebody.
     forgetAgentLinkAccount();
     signInAs(ACCOUNT, 'passkey_eoa');
-    expect(await whoALinkWouldReplace()).toBe(ACCOUNT);
+    expect(await whoALinkWouldReplace()).toEqual({ address: ACCOUNT, kind: 'own' });
   });
 });
 
@@ -166,19 +166,15 @@ describe('what a failed step leaves behind', () => {
     signInAs(ACCOUNT, 'agent_link');
     jest.mocked(passkeyWallet.createPasskeyWallet).mockResolvedValue(PASSKEY as never);
     jest.mocked(attachPasskeyToAgentAccount).mockRejectedValue(new Error('Refused.'));
-    await expect(attachPasskeyHere({ useExisting: false })).rejects.toThrow('Refused.');
+    await expect(attachPasskeyHere()).rejects.toThrow('Refused.');
+    // Always as a passkey made for this account: one the person already uses is not offered.
     expect(jest.mocked(attachPasskeyToAgentAccount).mock.calls[0][0]).toMatchObject({
       passkeyAddress: PASSKEY,
       newPasskey: true,
     });
+    expect(passkeyWallet.unlockPasskeyWallet).not.toHaveBeenCalled();
     expect(passkeyWallet.logoutPasskeyWallet).toHaveBeenCalledTimes(1);
     expect(readAgentLinkAccount()).toMatchObject({ address: ACCOUNT, via: 'agent_link' });
-    // A passkey the person already had is theirs, and is left as it was.
-    jest.mocked(passkeyWallet.unlockPasskeyWallet).mockResolvedValue(PASSKEY as never);
-    await expect(attachPasskeyHere({ useExisting: true })).rejects.toThrow('Refused.');
-    expect(jest.mocked(attachPasskeyToAgentAccount).mock.calls[1][0]).toMatchObject({ newPasskey: false });
-    expect(passkeyWallet.unlockPasskeyWallet).toHaveBeenCalledWith({ selectCredential: true });
-    expect(passkeyWallet.logoutPasskeyWallet).toHaveBeenCalledTimes(1);
   });
 
   it('does not report the agent’s access as changed when the Worker’s answer leaves it as it was', async () => {

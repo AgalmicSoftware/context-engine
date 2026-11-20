@@ -1,0 +1,509 @@
+// The compare result's headline, cards, sliders and strips. Colours are theme tokens, plus the
+// person's own colour, which each dot receives as --compare-person.
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+// The letter sits on a pale wash of the person's colour, not on the colour itself: the palettes run
+// light in one theme and dark in another, and the letter must stay readable in all of them.
+.dot {
+  --dot-size: 1.5rem;
+  box-sizing: border-box;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border: 2px solid var(--compare-person);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--compare-person) 35%, var(--ce-surface-raised));
+  color: var(--ce-panel-text);
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.headline {
+  color: var(--ce-panel-text);
+  font-size: clamp(1.25rem, 2.6vw, 1.75rem);
+  font-weight: 800;
+  line-height: 1.25;
+  margin: 0.25rem 0 1.25rem;
+}
+.counts {
+  font-weight: 700;
+  margin: 0.25rem 0 1rem;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.5rem;
+  align-items: start;
+}
+.cards,
+.sides,
+.strips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cards {
+  display: grid;
+  gap: 0.75rem;
+}
+.card,
+.slider,
+.map {
+  min-width: 0;
+  padding: 0.75rem 1rem;
+  background: var(--ce-card-bg);
+  border: var(--ce-border-control-width) solid var(--ce-card-border);
+  border-radius: var(--ce-radius-10);
+}
+.card .cardTitle,
+.slider .sliderTitle {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+}
+.card .cardText {
+  margin: 0;
+}
+.sides {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+}
+.side {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+.block {
+  margin-top: 1.75rem;
+}
+.blockHeading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.75rem;
+}
+.badge {
+  font-size: 0.75rem;
+  border: 1px solid var(--ce-panel-text-muted);
+  border-radius: var(--ce-radius-pill);
+  padding: 0.1rem 0.5rem;
+}
+
+.slider + .slider {
+  margin-top: 0.75rem;
+}
+.sliderEnds {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.875rem;
+  span:last-child {
+    text-align: right;
+  }
+}
+// Dots too close to share a row drop to the next one (--lane); inset so end names stay in the card.
+.track {
+  --lane-height: 3.15rem;
+  position: relative;
+  height: calc(var(--lanes, 1) * var(--lane-height));
+  margin: 0.4rem 6% 0;
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(0.875rem - 1px);
+    border-top: 2px solid var(--ce-panel-text-muted);
+  }
+}
+.trackDot {
+  position: absolute;
+  top: calc(var(--lane, 0) * var(--lane-height));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 1.75rem;
+  max-width: 12%;
+  transform: translateX(-50%);
+  .dot {
+    --dot-size: 1.75rem;
+    font-size: 0.85rem;
+  }
+}
+.trackName {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  line-height: 1.4rem;
+}
+.why {
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  summary {
+    min-height: 44px;
+    padding: 0.6rem 0;
+    color: var(--ce-panel-text);
+    text-decoration: underline;
+  }
+  ul {
+    padding-left: 1.25rem;
+  }
+}
+
+// Every button gets its border from the theme, which one theme leaves out, so these have fills.
+:global(:root) .viewSwitch button,
+:global(:root) .block .showAll {
+  min-height: 44px;
+  margin: 0;
+  padding: 0.4rem 1rem;
+  background: var(--ce-control-face);
+  color: var(--ce-control-text);
+  font-size: 0.95rem;
+}
+.viewSwitch {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin: 0 0 0.75rem auto;
+  :global(:root) & button[aria-pressed='true'] {
+    background: var(--ce-action-accent);
+    color: var(--ce-action-accent-text);
+    font-weight: 700;
+  }
+}
+
+// Each end name sits at its own end; long ones are cut short, with the full text in their title.
+.mapGrid {
+  display: grid;
+  grid-template-areas:
+    '. top .'
+    'left plot right'
+    '. bottom .';
+  grid-template-columns: minmax(0, 6rem) minmax(0, 1fr) minmax(0, 6rem);
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  max-width: 40rem;
+  margin: 0 auto;
+  font-size: 0.85rem;
+}
+.mapTop,
+.mapBottom,
+.mapLeft,
+.mapRight {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.mapTop {
+  grid-area: top;
+  text-align: center;
+  -webkit-line-clamp: 2;
+}
+.mapBottom {
+  grid-area: bottom;
+  text-align: center;
+  -webkit-line-clamp: 2;
+}
+.mapLeft {
+  grid-area: left;
+  text-align: right;
+}
+.mapRight {
+  grid-area: right;
+}
+.plot {
+  grid-area: plot;
+  position: relative;
+  aspect-ratio: 5 / 4;
+  min-height: 10rem;
+}
+// Both axes cross at the middle with an arrowhead at every end.
+.axisX,
+.axisY {
+  position: absolute;
+  background: var(--ce-panel-text-muted);
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    background: var(--ce-panel-text-muted);
+  }
+}
+.axisX {
+  left: 0;
+  right: 0;
+  top: calc(50% - 1px);
+  height: 2px;
+  &::before,
+  &::after {
+    top: calc(1px - 0.4rem);
+    width: 0.55rem;
+    height: 0.8rem;
+  }
+  &::before {
+    left: 0;
+    clip-path: polygon(0 50%, 100% 0, 100% 100%);
+  }
+  &::after {
+    right: 0;
+    clip-path: polygon(100% 50%, 0 0, 0 100%);
+  }
+}
+.axisY {
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 1px);
+  width: 2px;
+  &::before,
+  &::after {
+    left: calc(1px - 0.4rem);
+    width: 0.8rem;
+    height: 0.55rem;
+  }
+  &::before {
+    top: 0;
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  }
+  &::after {
+    bottom: 0;
+    clip-path: polygon(50% 100%, 0 0, 100% 0);
+  }
+}
+.axisNameX,
+.axisNameY {
+  position: absolute;
+  color: var(--ce-panel-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.axisNameX {
+  top: calc(50% + 0.3rem);
+  right: 0.9rem;
+  max-width: 45%;
+  text-align: right;
+}
+.axisNameY {
+  top: 0.9rem;
+  right: calc(50% + 0.3rem);
+  max-height: 45%;
+  overflow: hidden;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+.mapCaption {
+  display: none;
+  margin: 0.5rem 0 0;
+  color: var(--ce-panel-text-muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+// Dots are placed inside an inset so a dot at an end stays whole.
+.plotArea {
+  position: absolute;
+  inset: 0.9rem;
+}
+.mapDot {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 45%;
+  // Centred on the spot: half a disc, and half of each further disc's step, back from the anchor.
+  --cluster-half: calc(0.875rem + (var(--members, 1) - 1) * 0.35rem);
+  transform: translate(calc(-1 * var(--cluster-half)), -50%);
+  &[data-side='left'] {
+    flex-direction: row-reverse;
+    transform: translate(var(--cluster-half), -50%);
+  }
+  .dot {
+    --dot-size: 1.75rem;
+    font-size: 0.85rem;
+  }
+}
+// People at one spot: their discs overlap, each a step along from the last.
+.mapCluster {
+  display: flex;
+  flex: 0 0 auto;
+  .dot + .dot {
+    margin-left: -1.05rem;
+  }
+}
+.mapName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem 1rem;
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+}
+
+.strips {
+  display: grid;
+  gap: 0.5rem;
+}
+.strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 0.5rem 1rem;
+  align-items: center;
+  padding: 0.6rem 0.9rem;
+  background: var(--ce-response-agree-bg);
+  border: var(--ce-border-control-width) solid var(--ce-response-agree-border);
+  border-radius: var(--ce-radius-10);
+  &[data-split='true'] {
+    background: var(--ce-response-unsure-bg);
+    border-color: var(--ce-response-unsure-border);
+  }
+}
+.stripHead {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.stripPrompt {
+  font-weight: 700;
+}
+.stripTag {
+  border: 1px solid currentColor;
+  border-radius: var(--ce-radius-pill);
+  color: var(--ce-response-agree-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0 0.5rem;
+  .strip[data-split='true'] & {
+    color: var(--ce-response-unsure-text);
+  }
+}
+// Three stops, Disagree to Agree, with the line running through the dots' row.
+.stops {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(1.25rem + 0.75rem - 1px);
+    border-top: 2px solid var(--ce-panel-text-muted);
+  }
+}
+.stop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+.stopName {
+  font-size: 0.8rem;
+  line-height: 1.25rem;
+}
+.stopDots {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.15rem;
+  min-height: 1.5rem;
+}
+.stop:first-child {
+  align-items: flex-start;
+  .stopDots {
+    justify-content: flex-start;
+  }
+}
+.stop:last-child {
+  align-items: flex-end;
+  .stopDots {
+    justify-content: flex-end;
+  }
+}
+:global(:root) .block .showAll {
+  margin-top: 0.75rem;
+}
+
+@media (max-width: 700px) {
+  .columns,
+  .strip {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+// On a phone the names under the slider dots would collide; the pills and letters carry them.
+@media (max-width: 600px) {
+  .track {
+    --lane-height: 2.1rem;
+  }
+  .trackName {
+    display: none;
+  }
+  // The plot takes the whole width: the side ends move to a row under it, the axes' names to a line of
+  // text, and each person's name to the legend, where the letter in their dot finds it.
+  .mapGrid {
+    grid-template-areas:
+      'top top'
+      'plot plot'
+      'bottom bottom'
+      'left right';
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .mapLeft {
+    text-align: left;
+    &::before {
+      content: '← ';
+    }
+  }
+  .mapRight {
+    text-align: right;
+    &::after {
+      content: ' →';
+    }
+  }
+  .axisNameX,
+  .axisNameY,
+  .mapName {
+    display: none;
+  }
+  .mapCaption {
+    display: block;
+  }
+}

@@ -3,22 +3,16 @@ import { validateQuadraticAllocation } from '../../../../shared/questions/quadra
 import { resolveCompareCompassSeriesColor } from './compareAddressStyles';
 import styles from './ComparePresentation.module.scss';
 import { normalizeRatingScale } from '../../utilities/survey/ratingValue.js';
+import {
+  answerText as textValue,
+  binaryAnswerLabel as binaryLabel,
+  groupAnswersByQuestion,
+  isMissingAnswer as missing,
+  normalizeQuestionType as normalizeType,
+  unwrapAnswer as unwrap,
+  type ComparisonUser,
+} from './compareAnswers';
 
-type Question = {
-  id?: string;
-  questionID?: string;
-  questionId?: string;
-  qId?: string;
-  prompt?: string;
-  type?: string;
-  answer?: unknown;
-  options?: unknown;
-  scale?: unknown;
-  ratingScale?: unknown;
-  voiceCredits?: unknown;
-  additionalComment?: string;
-};
-export type ComparisonUser = { address?: string; questions?: Question[] };
 const types = {
   all: 'All',
   binary: 'Binary',
@@ -28,31 +22,6 @@ const types = {
   quadratic: 'Quadratic',
 };
 type Filter = keyof typeof types;
-const normalizeType = (type = '') =>
-  ({
-    text: 'freeform',
-    open: 'freeform',
-    'open-ended': 'freeform',
-    scale: 'rating',
-    likert: 'rating',
-    multi: 'multichoice',
-    multiple: 'multichoice',
-    'multi-choice': 'multichoice',
-    multi_choice: 'multichoice',
-    multi_select: 'multichoice',
-    'multi-select': 'multichoice',
-  })[type.toLowerCase()] || type.toLowerCase();
-const unwrap = (answer: unknown): unknown =>
-  answer && typeof answer === 'object' && !Array.isArray(answer) && 'value' in answer ? answer.value : answer;
-const missing = (answer: unknown) => answer == null || answer === '*' || answer === '';
-const textValue = (answer: unknown) => (['string', 'number', 'boolean'].includes(typeof answer) ? String(answer) : '');
-const binaryLabel = (answer: unknown) => {
-  const value = textValue(answer).toLowerCase();
-  if (['1', 'agree', 'yes', 'true', 'strongly agree'].includes(value)) return 'Agree';
-  if (['-1', 'disagree', 'no', 'false', 'strongly disagree'].includes(value)) return 'Disagree';
-  if (['0', 'neutral', 'unsure'].includes(value)) return 'Unsure';
-  return textValue(answer) || 'No visible answer';
-};
 const letter = (index: number) => String.fromCharCode(65 + index);
 function Identity({ index }: { index: number }) {
   return (
@@ -85,21 +54,7 @@ function SignedBar({ value, max, index }: { value: number; max: number; index: n
 }
 export default function CompareAnswerDetails({ users }: { users: ComparisonUser[] }) {
   const [filter, setFilter] = useState<Filter>('all');
-  const entries = useMemo(() => {
-    const map = new Map<string, { question: Question; answers: Map<number, Question> }>();
-    users.forEach((user, index) =>
-      user.questions?.forEach((question) => {
-        const id = String(
-          question.id || question.questionID || question.questionId || question.qId || '',
-        ).toLowerCase();
-        if (!id) return;
-        const entry = map.get(id) || { question, answers: new Map<number, Question>() };
-        entry.answers.set(index, question);
-        map.set(id, entry);
-      }),
-    );
-    return [...map.entries()];
-  }, [users]);
+  const entries = useMemo(() => groupAnswersByQuestion(users), [users]);
   const filtered = entries.filter(([, entry]) => filter === 'all' || normalizeType(entry.question.type) === filter);
   return (
     <div className={styles.answerDetails}>

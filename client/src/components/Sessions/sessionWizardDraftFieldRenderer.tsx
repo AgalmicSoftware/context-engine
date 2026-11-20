@@ -73,7 +73,6 @@ export type SessionWizardDraftFieldRenderer = (
 ) => ReactNode;
 
 type SessionWizardDraftFieldRendererOptions = {
-  allowSessionHeaderFileUpload: boolean;
   blockLimitDuration: number | string;
   blockLimitUnit: string;
   compactSessionHeaderInputRef: MutableRefObject<HTMLInputElement | null>;
@@ -142,7 +141,6 @@ type SessionWizardDraftFieldRendererOptions = {
 const pathKey = (path: string[]): string => path.join('.');
 
 export const buildSessionWizardDraftFieldRenderer = ({
-  allowSessionHeaderFileUpload,
   blockLimitDuration,
   blockLimitUnit,
   compactSessionHeaderInputRef,
@@ -626,7 +624,6 @@ export const buildSessionWizardDraftFieldRenderer = ({
           labelPrefix={<FontAwesomeIcon icon={faImage} className={styles.compactSessionHeaderIcon} />}
         >
           <SessionHeaderField
-            allowFileUpload={allowSessionHeaderFileUpload}
             value={draft?.sessionHeader}
             sessionHeaderMode={sessionHeaderMode}
             compactSessionHeaderMode={compactSessionHeaderMode}
@@ -645,19 +642,21 @@ export const buildSessionWizardDraftFieldRenderer = ({
               setSessionHeaderStatus('');
             }}
             onPaste={handlePasteSessionHeaderFromClipboard}
+            // Only a chosen file replaces the picture: closing the file chooser leaves a typed link in place.
             onCompactUploadClick={() => {
-              setCompactSessionHeaderMode('idle');
-              setSessionHeaderMode('upload');
               setSessionHeaderStatus('');
               if (compactSessionHeaderInputRef.current) {
                 compactSessionHeaderInputRef.current.click();
               }
             }}
             onCompactFileChange={(event) => {
-              if (!setSessionHeaderFile(event.target.files?.[0] || null)) {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              if (!setSessionHeaderFile(file)) {
                 event.target.value = '';
                 return;
               }
+              setCompactSessionHeaderMode('idle');
               setSessionHeaderMode('upload');
               setSessionHeaderStatus('');
             }}

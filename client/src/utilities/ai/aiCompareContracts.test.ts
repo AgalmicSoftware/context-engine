@@ -1,25 +1,123 @@
-import { normalizeCompareBullets, readCompareToolkitTask, resolveCompareToolkitPayload } from './aiCompareContracts';
+import {
+  compareSummaryFromParagraphs,
+  readCompareSummary,
+  readCompareToolkitTask,
+  resolveCompareToolkitPayload,
+} from './aiCompareContracts';
+
+const letters = ['A', 'B', 'C'];
 
 describe('aiCompareContracts', () => {
-  it('normalizes compare bullets with fallback and max-item semantics', () => {
-    const fallback = {
-      agreements: ['fallback agree'],
-      disagreements: ['fallback disagree'],
-    };
-
+  it('reads the titled reply with its headline and sides', () => {
     expect(
-      normalizeCompareBullets(
+      readCompareSummary(
         {
-          agreements: Array.from({ length: 13 }, (_, index) => `agree ${index}`),
-          disagreements: ['disagree'],
+          headline: 'They want a public say;\n they split on who sets the rules.',
+          agreements: [{ title: 'Public hearings', text: 'Each would hold a hearing first.' }],
+          disagreements: [
+            {
+              title: 'Who decides',
+              text: 'A and C favour councils; B a national body.',
+              sides: [
+                { who: ['c', 'A'], view: 'say local councils' },
+                { who: ['B'], view: 'says a national body' },
+              ],
+            },
+          ],
         },
-        fallback,
+        letters,
       ),
     ).toEqual({
-      agreements: Array.from({ length: 12 }, (_, index) => `agree ${index}`),
-      disagreements: ['disagree'],
+      headline: 'They want a public say; they split on who sets the rules.',
+      agreements: [{ title: 'Public hearings', text: 'Each would hold a hearing first.' }],
+      disagreements: [
+        {
+          title: 'Who decides',
+          text: 'A and C favour councils; B a national body.',
+          sides: [
+            { who: ['A', 'C'], view: 'say local councils' },
+            { who: ['B'], view: 'says a national body' },
+          ],
+        },
+      ],
     });
-    expect(normalizeCompareBullets({ agreements: [] }, fallback)).toEqual(fallback);
+  });
+
+  it('still reads plain paragraphs, with no headline, and keeps at most three per side', () => {
+    expect(
+      readCompareSummary({ agreements: ['One', 'Two', 'Three', 'Four'], disagreements: ['Apart'] }, letters),
+    ).toEqual({
+      agreements: [{ text: 'One' }, { text: 'Two' }, { text: 'Three' }],
+      disagreements: [{ text: 'Apart' }],
+    });
+  });
+
+  it('caps the headline at one line of 220 characters', () => {
+    const summary = readCompareSummary(
+      { headline: `${'word '.repeat(80)}\nend`, agreements: [], disagreements: [] },
+      letters,
+    );
+    expect(summary?.headline).toHaveLength(220);
+    expect(summary?.headline).toMatch(/…$/);
+    expect(summary?.headline).not.toMatch(/\n/);
+    expect(readCompareSummary({ headline: '  ', agreements: [], disagreements: [] }, letters)).not.toHaveProperty(
+      'headline',
+    );
+  });
+
+  it('drops a side naming someone not compared, and the sides when fewer than two remain', () => {
+    const summary = readCompareSummary(
+      {
+        agreements: [],
+        disagreements: [
+          {
+            title: 'Speed',
+            text: 'B would pilot now; A would wait.',
+            sides: [
+              { who: ['B'], view: 'would pilot now' },
+              { who: ['A', 'D'], view: 'would wait' },
+            ],
+          },
+          {
+            text: 'A is placed twice.',
+            sides: [
+              { who: ['A'], view: 'yes' },
+              { who: ['A', 'B'], view: 'no' },
+              { who: ['C'], view: 'unsure' },
+            ],
+          },
+        ],
+      },
+      letters,
+    );
+    expect(summary?.disagreements[0]).toEqual({ title: 'Speed', text: 'B would pilot now; A would wait.' });
+    expect(summary?.disagreements[1].sides).toEqual([
+      { who: ['A'], view: 'yes' },
+      { who: ['C'], view: 'unsure' },
+    ]);
+  });
+
+  it('refuses a reply with an item it cannot read', () => {
+    expect(readCompareSummary({ agreements: [{ title: 'No text' }], disagreements: [] }, letters)).toBeNull();
+    expect(readCompareSummary({ agreements: [3], disagreements: [] }, letters)).toBeNull();
+    expect(readCompareSummary({ agreements: [] }, letters)).toBeNull();
+    expect(readCompareSummary(null, letters)).toBeNull();
+  });
+
+  it('leaves a blank item out instead of failing a reply that was paid for', () => {
+    expect(readCompareSummary({ agreements: ['Shared groups', ' '], disagreements: [''] }, ['A', 'B'])).toEqual({
+      agreements: [{ text: 'Shared groups' }],
+      disagreements: [],
+    });
+    // Anything else that cannot be read still fails it.
+    expect(readCompareSummary({ agreements: ['Shared groups', 7], disagreements: [] }, ['A', 'B'])).toBeNull();
+  });
+
+  it('turns local paragraphs into untitled points', () => {
+    expect(compareSummaryFromParagraphs({ agreements: ['Shared groups'], disagreements: [] })).toEqual({
+      agreements: [{ text: 'Shared groups' }],
+      disagreements: [],
+    });
   });
 
   it('normalizes compare toolkit tasks and bounds payload users', () => {

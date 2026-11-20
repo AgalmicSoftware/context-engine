@@ -4,6 +4,7 @@ import { toStr } from '../../../utilities/shared/primitives.js';
 import { readCompactImageClipboard } from '../../Shared/compactImageClipboard.js';
 import type { SessionHeaderFieldProps } from '../SessionHeaderField';
 import { resolveSessionHeaderImageFormat, UNSUPPORTED_SESSION_HEADER_IMAGE_MESSAGE } from '../sessionWizardUiSupport';
+import { shrinkHeaderImageToDataUrl } from '../sessionHeaderInlineImage';
 
 export type SessionHeaderUploadStatusTone = NonNullable<SessionHeaderFieldProps['sessionHeaderUploadStatusTone']>;
 export type SessionHeaderFileState = File | Blob;
@@ -22,6 +23,9 @@ type ReadSessionHeaderClipboard = (options: { fileNamePrefix: string }) => Promi
 
 export interface UseSessionHeaderPreviewOptions {
   allowFileUpload?: boolean;
+  /** A Centralized session: a chosen picture is shrunk and kept with the config, not uploaded. */
+  inlineUpload?: boolean;
+  shrinkToDataUrl?: (file: SessionHeaderFileState) => Promise<string>;
   draftSessionHeader?: string | null;
   updateDraftSessionHeader: (value: string | undefined) => void;
   readClipboard?: ReadSessionHeaderClipboard;
@@ -29,6 +33,8 @@ export interface UseSessionHeaderPreviewOptions {
 
 const useSessionHeaderPreview = ({
   allowFileUpload = true,
+  inlineUpload = false,
+  shrinkToDataUrl = shrinkHeaderImageToDataUrl,
   draftSessionHeader,
   updateDraftSessionHeader,
   readClipboard = readCompactImageClipboard as ReadSessionHeaderClipboard,
@@ -42,6 +48,11 @@ const useSessionHeaderPreview = ({
   const [sessionHeaderUploadStatus, setSessionHeaderUploadStatus] = useState('');
   const [sessionHeaderUploadStatusTone, setSessionHeaderUploadStatusTone] =
     useState<SessionHeaderUploadStatusTone>('default');
+  // The shrunk picture for the file it was made from, so a later choice never shows or saves an earlier one.
+  const [inline, setInline] = useState<{ file: SessionHeaderFileState | null; dataUrl: string }>({
+    file: null,
+    dataUrl: '',
+  });
 
   const setSessionHeaderStatus = useCallback((text = '', tone: SessionHeaderUploadStatusTone = 'default') => {
     setSessionHeaderUploadStatus(text);
@@ -49,11 +60,10 @@ const useSessionHeaderPreview = ({
   }, []);
 
   // A picker's accept list is only a hint, so every chosen or pasted file is
-  // checked here instead of failing later at publish.
+  // checked here instead of failing later at publish. A refused file leaves the picture as it was.
   const chooseSessionHeaderFile = useCallback(
     (file: SessionHeaderFileState | null): boolean => {
       if (file && !resolveSessionHeaderImageFormat(file)) {
-        setSessionHeaderFile(null);
         setSessionHeaderStatus(UNSUPPORTED_SESSION_HEADER_IMAGE_MESSAGE, 'error');
         return false;
       }
@@ -90,14 +100,46 @@ const useSessionHeaderPreview = ({
     };
   }, [sessionHeaderFile]);
 
+  const shrunkFile = inline.file;
+  useEffect(() => {
+    // A file already shrunk, as after switching away and back, is not decoded again.
+    if (!inlineUpload || !sessionHeaderFile || shrunkFile === sessionHeaderFile) return undefined;
+    let current = true;
+    let settled = false;
+    setSessionHeaderStatus('Making the picture small enough to keep with the session…', 'loading');
+    shrinkToDataUrl(sessionHeaderFile).then(
+      (dataUrl) => {
+        settled = true;
+        if (!current) return;
+        setInline({ file: sessionHeaderFile, dataUrl });
+        setSessionHeaderStatus('');
+      },
+      (error: unknown) => {
+        settled = true;
+        if (!current) return;
+        setSessionHeaderFile(null);
+        setSessionHeaderStatus(error instanceof Error ? error.message : String(error), 'error');
+      },
+    );
+    return () => {
+      current = false;
+      // Left unfinished, as on a switch to Decentralized: its "Making…" message goes with it.
+      if (!settled) setSessionHeaderStatus('');
+    };
+  }, [inlineUpload, sessionHeaderFile, shrunkFile, setSessionHeaderStatus, shrinkToDataUrl]);
+  const inlineDataUrl =
+    inlineUpload && sessionHeaderMode === 'upload' && sessionHeaderFile && inline.file === sessionHeaderFile
+      ? inline.dataUrl
+      : '';
+
   const sessionHeaderPreviewSrc = useMemo(() => {
     if (allowFileUpload && sessionHeaderMode === 'upload') {
-      return toStr(sessionHeaderPreviewUrl).trim();
+      return inlineDataUrl || toStr(sessionHeaderPreviewUrl).trim();
     }
     return normalizeArweaveUrl(draftSessionHeader || '', {
       contextLabel: 'session_wizard_header_preview',
     });
-  }, [allowFileUpload, draftSessionHeader, sessionHeaderMode, sessionHeaderPreviewUrl]);
+  }, [allowFileUpload, draftSessionHeader, inlineDataUrl, sessionHeaderMode, sessionHeaderPreviewUrl]);
 
   const handlePasteSessionHeaderFromClipboard = useCallback(async () => {
     const clipboardResult = await readClipboard({
@@ -149,6 +191,11 @@ const useSessionHeaderPreview = ({
     setSessionHeaderStatus,
     handlePasteSessionHeaderFromClipboard,
     handleClearSessionHeaderPreview,
+    /** The picture a Centralized session keeps with its config, '' when there is none or it isn't ready. */
+    sessionHeaderInline: inlineDataUrl,
+    /** A picture is still being made small enough; Create waits for it. */
+    sessionHeaderInlinePending:
+      inlineUpload && sessionHeaderMode === 'upload' && !!sessionHeaderFile && inline.file !== sessionHeaderFile,
   };
 };
 

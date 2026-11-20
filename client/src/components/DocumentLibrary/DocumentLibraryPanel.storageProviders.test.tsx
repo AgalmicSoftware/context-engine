@@ -18,6 +18,7 @@ import {
   TEST_SESSION_CONFIG,
   setupDocumentLibraryPanelTestLifecycle,
 } from './DocumentLibraryPanel.testUtils';
+import { AGENT_MARK_LABEL } from '../Shared/AgentMark';
 
 describe('DocumentLibraryPanel thumbnails and storage providers', () => {
   setupDocumentLibraryPanelTestLifecycle();
@@ -272,8 +273,9 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
     await waitFor(() => expect(screen.getAllByTestId(E2E_TESTIDS.DOC_ROW)).toHaveLength(2));
     const [byAgent, byMe] = screen.getAllByTestId(E2E_TESTIDS.DOC_ROW);
     expect(byAgent).toHaveTextContent('Added by Wren');
-    expect(within(byAgent).getByText('agent')).toBeInTheDocument();
-    expect(within(byMe).queryByText('agent')).toBeNull();
+    expect(within(byAgent).getByRole('button', { name: AGENT_MARK_LABEL })).toBeInTheDocument();
+    expect(within(byAgent).queryByText('agent')).toBeNull();
+    expect(within(byMe).queryByRole('button', { name: AGENT_MARK_LABEL })).toBeNull();
     expect(byMe).toHaveTextContent('Added by you');
     expect(byAgent).toHaveTextContent(new Date('2026-11-16T00:00:00.000Z').toLocaleString());
     for (const row of [byAgent, byMe]) {

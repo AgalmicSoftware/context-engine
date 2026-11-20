@@ -25,11 +25,16 @@ export const dispatchAgentHttpRequest = async ({ request, env, deps, baseHeaders
   let headers = {};
   try {
     let body = {};
-    if (request.body) {
+    // A preflight is answered from its address and headers; its body is never read. WebKit sends one with
+    // Content-Length: 0, which the runtime hands over as an empty body, not as none.
+    if (method !== 'OPTIONS' && request.body) {
       const bytes = await readBodyBytes(request, 512 * 1024);
       request = new Request(request, { body: bytes });
-      try { body = await request.clone().json(); } catch { throw authorityError('invalid_json', 400); }
-      if (!body || typeof body !== 'object' || Array.isArray(body)) throw authorityError('invalid_json', 400);
+      // An empty body is no body. Anything else must be a JSON object.
+      if (bytes.byteLength) {
+        try { body = await request.clone().json(); } catch { throw authorityError('invalid_json', 400); }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) throw authorityError('invalid_json', 400);
+      }
     }
     const slugs = [body.sessionSlug, body.slug, body.groupSlug, url.searchParams.get('sessionSlug'), url.searchParams.get('slug'),
       request.headers.get('x-session-slug'), request.headers.get('x-group-slug')].filter(value => value != null);

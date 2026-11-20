@@ -839,11 +839,11 @@ describe('SessionWizard rendered validation', () => {
 
     selectNormalModeCard('Session Access');
     const groupDrafts = await screen.findByTestId('ce-new-worker-group-drafts');
-    expect(within(groupDrafts).getByText(/created after this session/i)).toBeInTheDocument();
-    fireEvent.change(within(groupDrafts).getByTestId('ce-new-worker-group-name'), {
+    expect(within(groupDrafts).getByText(/made after this session/i)).toBeInTheDocument();
+    fireEvent.click(within(groupDrafts).getByTestId('ce-new-worker-group-add'));
+    fireEvent.change(within(groupDrafts).getByTestId('ce-new-worker-group-draft-label'), {
       target: { value: 'Research team' },
     });
-    fireEvent.click(within(groupDrafts).getByTestId('ce-new-worker-group-add'));
 
     expect(within(groupDrafts).getByDisplayValue('Research team')).toBeInTheDocument();
     fireEvent.change(within(groupDrafts).getByLabelText(/Description/i), {

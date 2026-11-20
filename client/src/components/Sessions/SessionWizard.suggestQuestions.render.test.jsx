@@ -52,7 +52,7 @@ describe('SessionWizard Suggest questions', () => {
 
     openSetupSection('context');
     fireEvent.click(screen.getByTestId('ce-setup-context-add-paragraph'));
-    fireEvent.change(screen.getByLabelText('Paragraph 1'), { target: { value: 'Members want longer hours.' } });
+    fireEvent.change(screen.getByLabelText('Text 1'), { target: { value: 'Members want longer hours.' } });
     fireEvent.change(screen.getByTestId('ce-setup-question-prompt'), { target: { value: 'Open on Sundays.' } });
     fireEvent.click(screen.getByTestId('ce-setup-question-add'));
     expect(suggest).toBeEnabled();

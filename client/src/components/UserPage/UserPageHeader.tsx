@@ -10,9 +10,12 @@ import {
   faExternalLinkAlt,
   faPen,
   faSpinner,
+  faUser,
 } from '@fortawesome/free-solid-svg-icons';
 
+import { AccountMenu, AccountMenuRow } from '../Account/AccountMenu';
 import CETooltip from '../Shared/CETooltip';
+import { AnalyzeLinkArrival, AnalyzeUserButton } from './UserPageAnalyzeLinkControls';
 import styles from './UserPage.module.scss';
 
 type UserPageAnalyzeButtonDisplayState = {
@@ -27,11 +30,6 @@ type UserPageBookmarkButtonDisplayState = {
   ariaLabel?: string;
   iconStyle?: React.CSSProperties;
   title?: string;
-};
-
-type UserPageBookmarksLinkDisplayState = {
-  className?: string;
-  style?: React.CSSProperties;
 };
 
 type UserPageCompareButtonDisplayState = {
@@ -70,17 +68,22 @@ type UserPageAvatarDisplayState = {
 
 type UserPageHeaderProps = {
   addressDisplay: React.ReactNode;
+  /** The account dialog's own rows (Bookmarks, Your AI agent, Disconnect), after this page's two. */
+  accountMenuRows?: React.ReactNode;
   /** Your private label for someone else's account, shown beside their name: 'your label' when it stands in for it. */
   privateLabelTag?: string;
   /** Where your own username is saved: the session's store, or only this device. */
   usernameSavedTo?: 'session' | 'device';
   analyzeButtonDisplayState: UserPageAnalyzeButtonDisplayState;
+  /** Whether my answers have finished loading, for an Analyze that "Analyze user" starts on arrival. */
+  analyzeLinkReady?: boolean;
   avatarDisplayState: UserPageAvatarDisplayState;
   bookmarkButtonDisplayState: UserPageBookmarkButtonDisplayState;
   bookmarksHref: string;
-  bookmarksLinkDisplayState: UserPageBookmarksLinkDisplayState;
   compareButtonDisplayState: UserPageCompareButtonDisplayState;
   copyIconDisplayState: UserPageCopyIconDisplayState;
+  /** The link the account dialog's "Analyze user" opens; '' where the button is not offered. */
+  analyzeLinkHref?: string;
   explorerUrl?: string | null;
   headerActionVisibility: UserPageHeaderActionVisibility;
   headerBookmarkClassName: string;
@@ -89,7 +92,7 @@ type UserPageHeaderProps = {
   minimized?: boolean;
   nicknameEnteredIndicatorDisplayState: UserPageInlineEnteredIndicatorDisplayState;
   nicknameInput?: string;
-  onAnalyzeUser: React.MouseEventHandler<HTMLButtonElement>;
+  onAnalyzeUser: (event?: React.MouseEvent<HTMLButtonElement>) => void;
   onBookmark: React.MouseEventHandler<HTMLButtonElement>;
   onCollapseToggle: React.MouseEventHandler<HTMLButtonElement>;
   onCopyAddress: React.MouseEventHandler<HTMLButtonElement>;
@@ -113,15 +116,17 @@ const PRIVATE_LABEL_NOTE = "Your private label for this account. Only you see it
 
 const UserPageHeader = ({
   addressDisplay,
+  accountMenuRows = null,
   privateLabelTag = '',
   usernameSavedTo = 'device',
   analyzeButtonDisplayState,
+  analyzeLinkReady = false,
   avatarDisplayState,
   bookmarkButtonDisplayState,
   bookmarksHref,
-  bookmarksLinkDisplayState,
   compareButtonDisplayState,
   copyIconDisplayState,
+  analyzeLinkHref = '',
   explorerUrl,
   headerActionVisibility,
   headerBookmarkClassName,
@@ -159,7 +164,7 @@ const UserPageHeader = ({
             role="img"
           ></div>
         </div>
-        <div className={styles.addressColumn}>
+        <div className={minimized ? styles.addressColumn : `${styles.addressColumn} ${styles.addressRow}`}>
           <h1 id={styles.userPageAddress}>
             {addressDisplay}
             {privateLabelTag && (
@@ -226,29 +231,31 @@ const UserPageHeader = ({
               </button>
             )}
           </h1>
-          {showUsernameButton && (
-            <button
-              type="button"
-              onClick={onUsernameEdit}
-              className={styles.usernameButton}
-              title={
-                usernameSavedTo === 'session' ? 'Your name in this session' : 'Your username, saved on this device only'
-              }
-            >
-              {username.trim() ? 'Change username' : 'Set username'}
-            </button>
+          {/* On the full profile, "Set username" and "Bookmarks" stand right beside the address, one over the other. */}
+          {!minimized && (showUsernameButton || headerActionVisibility.showBookmarksLink) && (
+            <div className={styles.identityActions}>
+              {showUsernameButton && (
+                <button
+                  type="button"
+                  onClick={onUsernameEdit}
+                  className={styles.identityActionButton}
+                  title={
+                    usernameSavedTo === 'session'
+                      ? 'Your name in this session'
+                      : 'Your username, saved on this device only'
+                  }
+                >
+                  {username.trim() ? 'Change username' : 'Set username'}
+                </button>
+              )}
+              {headerActionVisibility.showBookmarksLink && (
+                <a href={bookmarksHref} className={styles.identityActionButton} data-ce-control-appearance="raised">
+                  My Bookmarks
+                </a>
+              )}
+            </div>
           )}
         </div>
-
-        {headerActionVisibility.showBookmarksLink && (
-          <a
-            href={bookmarksHref}
-            className={bookmarksLinkDisplayState.className}
-            style={bookmarksLinkDisplayState.style}
-          >
-            My Bookmarks <FontAwesomeIcon icon={faExternalLinkAlt} />
-          </a>
-        )}
 
         {headerActionVisibility.showNicknameEditor && (
           <div className={styles.usernameInline}>
@@ -318,6 +325,12 @@ const UserPageHeader = ({
       </div>
 
       {!minimized && (
+        <AnalyzeLinkArrival
+          ready={!!isOwner && analyzeLinkReady && !analyzeButtonDisplayState.disabled}
+          onStart={() => onAnalyzeUser()}
+        />
+      )}
+      {!minimized && (
         <div className={styles.headerActionsRight}>
           {usernameErrorDisplayState.shouldRenderUsernameError && (
             <span className={styles.error}>{usernameErrorDisplayState.usernameErrorText}</span>
@@ -358,6 +371,25 @@ const UserPageHeader = ({
             <span className={styles.error}>{usernameErrorDisplayState.usernameErrorText}</span>
           )}
         </div>
+      )}
+
+      {/* The account dialog's list: this page's two actions, then the dialog's own rows. */}
+      {minimized && (
+        <AccountMenu>
+          {analyzeLinkHref ? <AnalyzeUserButton href={analyzeLinkHref} /> : null}
+          {showUsernameButton && (
+            <AccountMenuRow
+              icon={faUser}
+              onClick={onUsernameEdit}
+              title={
+                usernameSavedTo === 'session' ? 'Your name in this session' : 'Your username, saved on this device only'
+              }
+            >
+              {username.trim() ? 'Change username' : 'Set username'}
+            </AccountMenuRow>
+          )}
+          {accountMenuRows}
+        </AccountMenu>
       )}
     </div>
   </div>

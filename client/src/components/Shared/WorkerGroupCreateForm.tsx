@@ -42,6 +42,8 @@ type WorkerGroupCreateFormProps = {
   status?: string;
   submitTestId: string;
   labelTestId: string;
+  /** Makes the field ids unique where several forms share one page; defaults to the test ids. */
+  idPrefix?: string;
   descriptionTestId: string;
   imageTestId: string;
   joinMode?: WorkerGroupJoinMode;
@@ -154,6 +156,7 @@ const WorkerGroupCreateForm = ({
   memberLimitMax,
   label,
   labelTestId,
+  idPrefix = '',
   memberVisibility = 'session',
   memberVisibilityTestId,
   removalAuth = 'both',
@@ -380,6 +383,8 @@ const WorkerGroupCreateForm = ({
   const joinEndsAtTime = joinEndsAt ? new Date(joinEndsAt).getTime() : 0;
   const joinEndsAtInvalid = Boolean(joinEndsAt && (!Number.isFinite(joinEndsAtTime) || joinEndsAtTime <= Date.now()));
   const adminAddressInvalid = Boolean(adminAddress.trim() && !/^0x[0-9a-fA-F]{40}$/.test(adminAddress.trim()));
+  const fieldId = idPrefix || labelTestId;
+  const descriptionId = idPrefix ? `${idPrefix}-description-input` : `${descriptionTestId}-input`;
   const asksPassword = joinMode === 'group_password' && !!onGroupPasswordChange;
   const passwordProblem = asksPassword ? workerGroupPasswordProblem(groupPassword) : '';
   const passwordInvalid = Boolean(passwordProblem);
@@ -442,9 +447,9 @@ const WorkerGroupCreateForm = ({
           <div className={styles.infoGrid}>
             <div className={styles.fieldStack}>
               <div className={styles.field}>
-                <label htmlFor={`${labelTestId}-input`}>Group name</label>
+                <label htmlFor={`${fieldId}-input`}>Group name</label>
                 <input
-                  id={`${labelTestId}-input`}
+                  id={`${fieldId}-input`}
                   type="text"
                   value={label}
                   maxLength={120}
@@ -454,9 +459,9 @@ const WorkerGroupCreateForm = ({
                 />
               </div>
               <div className={styles.field}>
-                <label htmlFor={`${descriptionTestId}-input`}>Description</label>
+                <label htmlFor={descriptionId}>Description</label>
                 <textarea
-                  id={`${descriptionTestId}-input`}
+                  id={descriptionId}
                   value={description}
                   maxLength={500}
                   rows={4}
@@ -519,10 +524,10 @@ const WorkerGroupCreateForm = ({
           </div>
           <div className={styles.metadataGrid}>
             <div className={styles.metadataCard}>
-              <label htmlFor={`${labelTestId}-document-url`}>Reference URLs</label>
+              <label htmlFor={`${fieldId}-document-url`}>Reference URLs</label>
               <div className={styles.inlineInputRow}>
                 <input
-                  id={`${labelTestId}-document-url`}
+                  id={`${fieldId}-document-url`}
                   type="url"
                   value={documentUrlInput}
                   maxLength={2048}
@@ -563,10 +568,10 @@ const WorkerGroupCreateForm = ({
             </div>
 
             <div className={styles.metadataCard}>
-              <label htmlFor={`${labelTestId}-tag`}>Tags</label>
+              <label htmlFor={`${fieldId}-tag`}>Tags</label>
               <div className={styles.inlineInputRow}>
                 <input
-                  id={`${labelTestId}-tag`}
+                  id={`${fieldId}-tag`}
                   type="text"
                   value={tagInput}
                   maxLength={64}

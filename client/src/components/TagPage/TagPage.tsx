@@ -1,3 +1,4 @@
+import { withoutRetiredSessions } from '../../utilities/session/sessionListing';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { connect } from 'react-redux';
 import { createPortal } from 'react-dom';
@@ -917,8 +918,8 @@ export const TagPageView = ({
             scopedSlugs: effectiveScopeSlugs,
             registrySlugs:
               initialSessionSlug === undefined
-                ? sessionRegistrySnapshot.slugs
-                : [...sessionRegistrySnapshot.slugs, initialSessionSlug],
+                ? withoutRetiredSessions(sessionRegistrySnapshot.slugs)
+                : [...withoutRetiredSessions(sessionRegistrySnapshot.slugs), initialSessionSlug],
             sessionConfigsBySlug: sessionRegistrySnapshot.configsBySlug,
           }),
     [

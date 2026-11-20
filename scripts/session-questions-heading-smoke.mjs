@@ -90,7 +90,7 @@ try {
           const modal = page.getByTestId('ce-question-filter-modal');
           await modal.waitFor();
           const clear = modal.getByTestId('ce-question-filter-clear-all');
-          if (await clear.isVisible()) await clear.click();
+          if (await clear.isEnabled()) await clear.click();
           if (type) {
             const button = modal.getByRole('button', { name: new RegExp(`^${type}`) });
             if (!await button.isVisible()) await modal.getByRole('heading', { name: 'Question Types', exact: true }).click();

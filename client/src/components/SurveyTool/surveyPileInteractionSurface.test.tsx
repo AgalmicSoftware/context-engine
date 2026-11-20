@@ -578,6 +578,8 @@ it('sets the Submit count apart, so a narrow row can drop it while the name keep
   render(renderPileInteractionSurface({ ...buildBaseProps(), finalSubmitText: 'Submit (3)' }));
   const submit = screen.getByRole('button', { name: 'Submit (3)' });
   expect(submit.querySelector('.pileSubmitButtonCount')).toHaveTextContent('(3)');
+  // The brackets are their own spans, which a phone row hides.
+  expect(submit.querySelectorAll('.pileSubmitButtonCountBracket')).toHaveLength(2);
 });
 
 it('reads the submit out from a status region that was already there', () => {

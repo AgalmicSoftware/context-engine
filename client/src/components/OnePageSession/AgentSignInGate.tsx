@@ -12,12 +12,15 @@ import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExtern
 
 import { resolveWorkerGroupAutoJoinContext } from '../../domains/worker/workerGroupAutoJoinContext';
 import {
+  dismissAgentNotice,
   dismissAttachedPasskeyNotice,
   holdAgentLinkAccount,
   isAgentLinkProvider,
+  isAgentNoticeDismissed,
   readAttachedPasskeyNotice,
   readAgentLinkAccount,
   readLinkedAgentAccountHintCount,
+  showAgentNoticeAgain,
   subscribeAgentLinkAccount,
   takeLinkedAgentAccountHint,
 } from '../../utilities/session/agentLinkAccount';
@@ -36,12 +39,15 @@ import {
   enterAgentLinkAccount,
   enterThroughAttachedPasskey,
   isAttachedPasskeyKnown,
+  type AccountInUse,
   liveAccount,
   resumeAgentLinkAccount,
   whoALinkWouldReplace,
+  whoIsHereNow,
 } from '../../utilities/session/agentSignInAccount';
 import { heldSessionToken } from '../../utilities/worker/workerAuthTokenCache.js';
 import AgentAccountAccessPanel, { shortAddress } from '../Account/AgentAccountAccessPanel';
+import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import styles from './WorkerGroupAutoJoinNotice.module.scss';
 
 export type AgentSignInGateProps = { sessionConfig: unknown; sessionSlug: string; account: unknown; provider: unknown };
@@ -53,8 +59,6 @@ const lower = (value: unknown): string =>
     .toLowerCase();
 const LINKS_NOT_ON =
   'This session doesn’t have sign-in links from agents switched on. The link has not been used: open it again once an organiser has turned them on, or sign in yourself to take part.';
-const WHO_ELSE =
-  'Whoever runs the agent that set this account up can see and change what you answer here. If the link did not come from your own agent, sign out.';
 
 export default function AgentSignInGate({
   sessionConfig,
@@ -80,15 +84,19 @@ export default function AgentSignInGate({
   const [phase, setPhase] = useState<Phase>('idle');
   const [note, setNote] = useState<{ text: string; isError: boolean } | null>(null);
   const [fromLink, setFromLink] = useState(false);
+  // Counts the person's dismissals, so the notice goes at once; what is dismissed is kept with the account.
+  const [, setDismissals] = useState(0);
   // Whose place the link's sign-in would take, shown when asking.
-  const [replaces, setReplaces] = useState('');
+  const [replaces, setReplaces] = useState<AccountInUse | null>(null);
   // A sign-in already made from the link, held while the person is asked: the code works once.
   const pending = useRef<AgentSignInReply | null>(null);
   const working = useRef(false);
   // The passkey's own account is open, and the passkey is attached to an agent's account here.
   const [offer, setOffer] = useState('');
   // A passkey the Worker says is attached to the account a link signed in to.
-  const [attachedHere, setAttachedHere] = useState('');
+  // Whether the account already has a passkey attached, by the Worker's word: Create passkey is offered only once
+  // it is known to have none. Where the Worker can't be asked it is offered, and the Worker refuses a second one.
+  const [passkeyAttached, setPasskeyAttached] = useState<boolean | null>(null);
   const signedInAs = lower(account);
 
   const fail = useCallback((error: unknown): void => {
@@ -110,6 +118,8 @@ export default function AgentSignInGate({
     (reply: AgentSignInReply): void => {
       if (!target) return;
       pending.current = null;
+      // A new sign-in from a link is told in full, whatever was dismissed before.
+      showAgentNoticeAgain();
       enterAgentLinkAccount(target, reply);
       setFromLink(true);
       setPhase('idle');
@@ -125,8 +135,8 @@ export default function AgentSignInGate({
       setPhase('working');
       try {
         const reply = pending.current || (await exchangeHeldAgentSignInCode(target));
-        const now = liveAccount();
-        if (!agreed && now && now !== reply.address) {
+        const now = whoIsHereNow();
+        if (!agreed && now && now.address !== reply.address) {
           pending.current = reply;
           setReplaces(now);
           setPhase('ask');
@@ -215,64 +225,118 @@ export default function AgentSignInGate({
     const token = heldSessionToken(target.workerUrl, target.sessionSlug);
     if (!token) return undefined;
     let current = true;
-    setAttachedHere('');
+    setPasskeyAttached(null);
     void readAgentSignInState(target, token)
       .then((state) => {
         const account = readAgentLinkAccount();
-        if (!current || !account || account.address !== heldAddress || !state.attachedPasskey) return;
-        // Someone signed in from a link is told when a passkey can already open this account.
-        if (account.via !== 'passkey_link') setAttachedHere(state.attachedPasskey.address);
-        if (account.agentAccess !== state.attachedPasskey.agentAccess) {
+        if (!current || !account || account.address !== heldAddress) return;
+        setPasskeyAttached(!!state.attachedPasskey);
+        if (state.attachedPasskey && account.agentAccess !== state.attachedPasskey.agentAccess) {
           holdAgentLinkAccount({ ...account, agentAccess: state.attachedPasskey.agentAccess });
         }
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (current) setPasskeyAttached(false);
+      });
     return () => {
       current = false;
     };
   }, [target, heldAddress]);
 
   if (!target) return null;
-  const notice = (message: React.ReactNode, actions: React.ReactNode, isError = false): React.ReactElement => (
-    <section className={styles.notice} aria-label="Agent’s account" data-testid="ce-agent-sign-in-notice">
-      <p className={styles.message} role={isError ? 'alert' : 'status'}>
-        {message}
-      </p>
+  // `alert` is something that went wrong with what the person just pressed. It is said by itself, set apart from
+  // the standing words of the notice, so it is not read past.
+  const notice = (
+    message: React.ReactNode,
+    actions: React.ReactNode,
+    isError = false,
+    alert: React.ReactNode = null,
+  ): React.ReactElement => (
+    <section
+      className={`${styles.notice} ${styles.noticeLarge}`}
+      aria-label="Agent’s account"
+      data-testid="ce-agent-sign-in-notice"
+    >
+      <div className={styles.noticeText}>
+        <p className={styles.message} role={isError && !alert ? 'alert' : 'status'}>
+          {message}
+        </p>
+        {alert ? (
+          <p className={styles.noticeAlert} role="alert" data-testid="ce-agent-sign-in-alert">
+            {alert}
+          </p>
+        ) : null}
+      </div>
       {actions ? <div className={styles.actions}>{actions}</div> : null}
     </section>
   );
+  const wentWrong = note?.isError ? note.text : null;
 
+  // A link's sign-in would replace the account this tab uses: asked in a dialog, which is answered one way or
+  // the other before anything changes. Closing it is staying.
   if (phase === 'ask') {
-    return notice(
+    // What the dialog says follows what is really here: an account signed in now, an agent's account the tab
+    // holds, or a saved passkey account the browser has not signed in yet.
+    const current: AccountInUse = replaces || {
+      address: signedInAs,
+      kind: isAgentLinkProvider(provider) ? 'agent' : 'own',
+    };
+    const other = pending.current?.address || '';
+    const here = <strong title={current.address}>{shortAddress(current.address)}</strong>;
+    const stay = (): void => {
+      pending.current = null;
+      dropAgentSignInCode();
+      setPhase('idle');
+      // The agent's account this tab already held, if it was waiting behind the question, is opened again.
+      if (!liveAccount()) resumeAgentLinkAccount(target);
+    };
+    const theLink = other ? (
       <>
-        This link signs you in to <strong>an account an AI agent set up</strong>, in place of the account you use here
-        now ({shortAddress(replaces || signedInAs)}). Only switch if your own agent gave you the link.
-        {pending.current ? ' The link has been used: if you stay, ask your agent for a new one to switch later.' : ''}
-      </>,
-      <>
-        <button
-          type="button"
-          className={styles.secondaryButton}
-          onClick={() => void signIn({ agreed: true })}
-          data-testid="ce-agent-sign-in-switch"
-        >
-          Switch to it
-        </button>
-        <button
-          type="button"
-          className={styles.secondaryButton}
-          onClick={() => {
-            pending.current = null;
-            dropAgentSignInCode();
-            setPhase('idle');
-            // The agent's account this tab already held, if it was waiting behind the question, is opened again.
-            if (!liveAccount()) resumeAgentLinkAccount(target);
-          }}
-          data-testid="ce-agent-sign-in-stay"
-        >
-          Stay as I am
-        </button>
-      </>,
+        , <strong title={other}>{shortAddress(other)}</strong>
+      </>
+    ) : null;
+    return (
+      <CEConfirmDialog
+        isOpen
+        testId="ce-agent-sign-in-ask"
+        title="Switch accounts?"
+        body={
+          <>
+            <p>
+              <strong>Now:</strong>{' '}
+              {current.kind === 'own' ? (
+                <>you are signed in here as {here}.</>
+              ) : current.kind === 'saved' ? (
+                <>this browser has a saved passkey account, {here}, and would sign you in to it.</>
+              ) : (
+                <>this tab is using {here}, an account an AI agent set up.</>
+              )}
+            </p>
+            <p>
+              <strong>The link:</strong>{' '}
+              {current.kind === 'agent' ? (
+                <>
+                  it signs this tab in to an account an AI agent set up{theLink}, which may be a different one. To come
+                  back to {here} afterwards you need a new link from its agent, or its passkey.
+                </>
+              ) : (
+                <>
+                  it signs this tab in to a different account{theLink}, one that an AI agent set up. Your account {here}{' '}
+                  is not changed; sign in to it again later.
+                </>
+              )}
+            </p>
+            <p>Switch only if your own agent gave you this link.</p>
+            {pending.current ? (
+              <p>The link has now been used. If you stay, ask your agent for a new one to switch later.</p>
+            ) : null}
+          </>
+        }
+        confirmLabel="Switch to the agent’s account"
+        cancelLabel={current.kind === 'agent' ? 'Stay in this account' : 'Stay in my account'}
+        onConfirm={() => void signIn({ agreed: true })}
+        onCancel={stay}
+      />
     );
   }
   if (phase === 'working') return notice('Signing you in from your agent’s link…', null);
@@ -300,7 +364,6 @@ export default function AgentSignInGate({
       <>
         A passkey (<span title={attached.passkey}>{shortAddress(attached.passkey)}</span>) is attached to your account
         in this session: whoever holds it can sign in here as you. If you did not attach it, remove it.
-        {note ? <> {note.text}</> : null}
       </>,
       <>
         <button
@@ -334,6 +397,7 @@ export default function AgentSignInGate({
         </button>
       </>,
       true,
+      wentWrong,
     );
   }
 
@@ -344,7 +408,7 @@ export default function AgentSignInGate({
       <>
         This passkey is also attached to <strong>an account your AI agent set up</strong> in this session. You are in
         the passkey’s own account now ({shortAddress(signedInAs)}): what you answer here is kept under it, not under the
-        agent’s account.{note ? <> {note.text}</> : null}
+        agent’s account.
       </>,
       <>
         <button
@@ -367,7 +431,8 @@ export default function AgentSignInGate({
           Open the agent’s account
         </button>
       </>,
-      note?.isError,
+      false,
+      wentWrong,
     );
   }
 
@@ -381,54 +446,77 @@ export default function AgentSignInGate({
   if (!here) return null;
   const who = <strong title={here.address}>{shortAddress(here.address)}</strong>;
   const ended = !heldSessionToken(target.workerUrl, target.sessionSlug);
+  // The two standing notices can be dismissed, by the person, once they have seen them. Create passkey and the
+  // rest stay in the account dialog.
+  const dismissed = isAgentNoticeDismissed(here);
+  const dismiss = (
+    <button
+      type="button"
+      className={styles.secondaryButton}
+      title="Hides this notice. Your account’s options, a passkey among them, stay under Account."
+      data-testid="ce-agent-sign-in-dismiss"
+      onClick={() => {
+        dismissAgentNotice(here);
+        setNote(null);
+        setDismissals((count) => count + 1);
+      }}
+    >
+      Dismiss
+    </button>
+  );
   const panel = (
     <AgentAccountAccessPanel
       provider={provider}
       buttonClassName={styles.secondaryButton}
-      onMessage={(text, isError) => setNote({ text, isError })}
+      primaryButtonClassName={styles.primaryButton}
+      // The notice has the one step a new arrival needs, Create passkey, and only where the account has no
+      // passkey yet; signing out and the rest are in the account dialog.
+      inNotice
+      offerPasskey={passkeyAttached === false}
+      // The notice itself says what is now so (a passkey attached), so only what went wrong is said beside it.
+      onMessage={(text, isError) => setNote(isError ? { text, isError } : null)}
     />
   );
-  const said = note ? <> {note.text}</> : null;
   if (ended && here.via !== 'passkey_link') {
     return notice(
       <>Your sign-in to {who}, the account your AI agent set up, has ended. Ask your agent for a new link.</>,
-      panel,
+      null,
       true,
     );
   }
   if (here.via !== 'passkey_link') {
+    if (dismissed) return null;
     return notice(
       <>
         {fromLink ? 'Signed in from your agent’s link. ' : ''}You are signed in as {who}, the account your AI agent set
-        up. {WHO_ELSE}
-        {attachedHere ? (
-          <>
-            {' '}
-            A passkey (<span title={attachedHere}>{shortAddress(attachedHere)}</span>) is already attached to this
-            account: whoever holds it can sign in here as this account. If it isn’t yours, sign out and tell your agent.
-          </>
-        ) : null}
-        {said}
+        up.
       </>,
-      panel,
-      note?.isError,
+      // With a passkey already attached, or while that is being asked, no passkey button is shown.
+      <>
+        {passkeyAttached === false ? panel : null}
+        {dismiss}
+      </>,
+      false,
+      wentWrong,
     );
   }
   if (here.agentAccess === 'active') {
+    if (dismissed) return null;
     return notice(
       <>
         You are using {who}, the account your AI agent set up, with your passkey. Your agent can still use it, and see
-        and change what you answer here.{said}
+        and change what you answer here.
       </>,
-      panel,
-      note?.isError,
+      dismiss,
+      false,
+      wentWrong,
     );
   }
+  // Reached only for an account whose agent's access was ended before the site stopped offering that.
   return notice(
-    <>
-      You are using {who}, the account your AI agent set up, with your passkey. Your agent’s access is ended.{said}
-    </>,
+    <>Agent access ended. Your agent can no longer sign in to {who} in this session; only your passkey can.</>,
     panel,
-    note?.isError,
+    false,
+    wentWrong,
   );
 }

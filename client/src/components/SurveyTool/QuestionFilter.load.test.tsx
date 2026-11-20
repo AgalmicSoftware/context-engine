@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QuestionFilter } from './QuestionFilter';
 import { serializeFilterState } from '../../utilities/survey/filterStateUtils';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
@@ -47,17 +47,17 @@ describe.each([true, false])('saved-filter loader, inline=%s', (resultsMode) => 
       );
       if (state !== 'empty') await screen.findByRole('button', { name: 'Remove filter: binary' });
       if (state === 'cleared') {
-        fireEvent.click(screen.getByTitle('Clear current filters'));
+        fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
         await waitFor(() =>
           expect(screen.queryByRole('button', { name: 'Remove filter: binary' })).not.toBeInTheDocument(),
         );
       }
-      fireEvent.click(screen.getByTitle('Load a saved filter'));
+      fireEvent.click(screen.getByRole('button', { name: 'Load', expanded: false }));
       const input = screen.getByPlaceholderText('Load filter from URL/string...');
       fireEvent.change(input, {
         target: { value: format === 'token' ? token : `https://example.test/session/filter-fixture?filter=${token}` },
       });
-      fireEvent.click(screen.getByRole('button', { name: 'Load' }));
+      fireEvent.click(within(input.parentElement as HTMLElement).getByRole('button', { name: 'Load' }));
       expect(await screen.findByRole('button', { name: 'Remove filter: Top 1 by # responses' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Remove filter: Responder include: Workshop' })).toBeInTheDocument();
       expect(onFilterStateChange).toHaveBeenLastCalledWith(expect.objectContaining(savedState));

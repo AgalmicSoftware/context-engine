@@ -220,7 +220,6 @@ describe('AboutPage', () => {
     expect(loop.loop).toBe(true);
     expect(loop.autoplay).toBe(true);
     expect(loop).not.toHaveAttribute('controls');
-    expect(screen.getByText('An illustration, not a real deployment.')).toBeInTheDocument();
 
     // The words come first in the page, so a screen reader reads them before the caption.
     const words = screen.getByRole('article').querySelector('[class*="useCaseDetailText"]') as HTMLElement;
@@ -229,15 +228,24 @@ describe('AboutPage', () => {
     fireEvent.error(loop);
     expect(screen.queryByTestId('ce-about-use-case-loop')).toBeNull();
 
-    // Two loops show roadmap work: their buttons carry an asterisk, explained once under the buttons.
-    expect(screen.getByTestId('ce-about-usecase-corporate')).toHaveTextContent('For Companies*');
-    expect(screen.getByTestId('ce-about-usecase-digital-groups')).toHaveTextContent('For Groups*');
-    expect(screen.getByTestId('ce-about-usecase-cities')).not.toHaveTextContent('*');
-    expect(screen.getByText('* Animations marked * show future features.')).toBeInTheDocument();
+    // No button carries an asterisk and no footnote sits under the buttons.
+    expect(screen.getByTestId('ce-about-usecase-corporate')).toHaveTextContent(/^For Companies$/);
+    expect(screen.getByTestId('ce-about-usecase-digital-groups')).toHaveTextContent(/^For Groups$/);
+    expect(screen.queryByText(/Animations marked/)).toBeNull();
+    // A loop that shows built features has no note, and none says "illustration".
+    expect(screen.queryByText('This animation shows future features.')).toBeNull();
+    expect(screen.queryByText(/An illustration, not a real deployment/)).toBeNull();
 
     // Every use case has its own files.
     fireEvent.click(screen.getByTestId('ce-about-usecase-corporate'));
     expect(screen.getByTestId('ce-about-use-case-loop')).toHaveAttribute('src', '/about/use-cases/corporate-720p.mp4');
+    // Companies and Groups say, above the video, that it shows future features.
+    const notice = screen.getByText('This animation shows future features.');
+    expect(
+      notice.compareDocumentPosition(screen.getByTestId('ce-about-use-case-loop')) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    fireEvent.click(screen.getByTestId('ce-about-usecase-digital-groups'));
+    expect(screen.getByText('This animation shows future features.')).toBeInTheDocument();
 
     const matchMedia = window.matchMedia;
     window.matchMedia = ((query: string) => ({

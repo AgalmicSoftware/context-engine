@@ -3,6 +3,7 @@ import { ModalHeader, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import SessionInterviewLanguageMarks from './SessionInterviewLanguageMarks';
 import SessionVoiceModeBackButton, { VoiceModeBackContext } from './SessionVoiceModeBack';
 import styles from './SurveyTool.module.scss';
 
@@ -16,6 +17,9 @@ type SessionInterviewModalHeaderProps = {
   statusTone: string;
   statusRef: React.RefObject<HTMLButtonElement>;
 };
+
+/** Behind the interview's "?": the voice interviewer follows the language someone speaks. */
+export const INTERVIEW_LANGUAGE_HINT = 'You can answer in the language you prefer.';
 
 /** A waiting line in the interview: the app's spinner, then what it is waiting on. */
 export function InterviewBusyLabel({ label }: { label: string }) {
@@ -52,8 +56,9 @@ export default function SessionInterviewModalHeader({
           <FontAwesomeIcon icon={faQuestionCircle} />
         </button>
         <UncontrolledTooltip target="ce-interview-help" placement="bottom" trigger="hover focus" autohide={false}>
-          {guidance}
+          {guidance} {INTERVIEW_LANGUAGE_HINT}
         </UncontrolledTooltip>
+        <SessionInterviewLanguageMarks />
         <span
           role="status"
           aria-live="polite"
@@ -79,6 +84,8 @@ export default function SessionInterviewModalHeader({
           trigger="hover focus"
           autohide={false}
         >
+          {/* The status first, as a phone may show only its start. */}
+          {/[.…]$/.test(statusLabel) ? statusLabel : `${statusLabel}.`}{' '}
           {idle ? `${readinessDetail} Click to check again.` : guidance}
         </UncontrolledTooltip>
       </span>

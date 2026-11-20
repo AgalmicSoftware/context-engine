@@ -76,12 +76,18 @@ const LoginSettingsStrip = ({
   const [appearanceOpen, setAppearanceOpen] = React.useState(false);
   const id = React.useId();
   const themeLabel = useThemeChoiceLabel();
-  // Config and Appearance read as "<cell label> <value>" to assistive tech.
-  const disclosure = (key: string, value: string, expanded: boolean, onToggle: (() => void) | null, more = {}) => (
+  // Appearance reads as "<cell label> <value>" to assistive tech; Config's own word is its whole name.
+  const disclosure = (
+    key: string,
+    value: string,
+    expanded: boolean,
+    onToggle: (() => void) | null,
+    { ownName = false, ...more }: { ownName?: boolean; testId?: string; controls?: string } = {},
+  ) => (
     <LoginSettingsConfigToggleControl
       expanded={expanded}
       onToggle={onToggle}
-      labelledBy={`${id}-${key}-label ${id}-${key}-value`}
+      labelledBy={ownName ? `${id}-${key}-value` : `${id}-${key}-label ${id}-${key}-value`}
       {...more}
     >
       <span id={`${id}-${key}-value`} className={styles.settingsStripValue}>
@@ -93,7 +99,9 @@ const LoginSettingsStrip = ({
     {
       key: 'config',
       label: 'Config',
-      control: disclosure('config', 'Advanced', configOpen, onToggleConfig, { testId: configTestId }),
+      // The control itself says "Config", so the heading over it is kept only as space, to line the cells up.
+      labelHidden: true,
+      control: disclosure('config', 'Config', configOpen, onToggleConfig, { testId: configTestId, ownName: true }),
     },
     { key: 'session', label: 'Session', control: sessionControl },
     { key: 'explainers', label: 'Explainers', control: tooltipsControl },
@@ -117,11 +125,16 @@ const LoginSettingsStrip = ({
   return (
     <>
       <div className={styles.settingsStrip} data-testid={E2E_TESTIDS.SETTINGS_QUICK_CONTROLS}>
-        {cells.map(({ key, label, control }) =>
+        {cells.map(({ key, label, control, labelHidden = false }) =>
           control ? (
             <div className={styles.settingsStripCell} data-cell={key} key={key}>
-              {/* Controls carry their own names; Config and Appearance borrow this label. */}
-              <span id={`${id}-${key}-label`} className={styles.settingsStripLabel} aria-hidden>
+              {/* Controls carry their own names; Appearance borrows this label. */}
+              <span
+                id={`${id}-${key}-label`}
+                className={styles.settingsStripLabel}
+                style={labelHidden ? { visibility: 'hidden' } : undefined}
+                aria-hidden
+              >
                 {label}
               </span>
               {control}

@@ -190,3 +190,48 @@ it('gives the interviewer the session context block within its share of the limi
   expect(oversized.match(/~+/)?.[0].length).toBe(SESSION_CONTEXT_LIMIT);
   expect(buildRealtimeInterviewInstructions({ questions: [question] })).not.toContain('session_context');
 });
+
+describe('after an AI prefill', () => {
+  const asked = { ...question, id: 'q1', prompt: 'Which risk worries you most?' };
+  const drafted = { ...question, id: 'q2', prompt: 'How ready is the town for floods?' };
+  const held = { ...question, id: 'q3', prompt: 'Should the levy rise?' };
+  const brief = (overrides: Partial<Parameters<typeof buildRealtimeInterviewInstructions>[0]> = {}) =>
+    buildRealtimeInterviewInstructions({
+      questions: [asked],
+      draftedQuestions: [drafted, held],
+      openingPrompt: 'Configured opening?',
+      // Only the shown draft reaches the interviewer; the held-out one's guess never does.
+      importedDrafts: [{ questionId: 'q2', answer: 80, evidence: 'Robin said the town drilled twice' }],
+      ...overrides,
+    });
+
+  it('opens from the drafts, not the session opening, and never asks a drafted question', () => {
+    const instructions = brief();
+    expect(instructions).toContain('digs into what the drafts below say');
+    expect(instructions).toContain('I see your drafts, and was wondering');
+    expect(instructions).not.toContain('Configured opening?');
+    expect(instructions).toContain('Never ask them or about their drafts');
+    // The bank holds only the undrafted question; the drafted ones are listed by prompt for reference.
+    expect(instructions).toContain('[q1]');
+    expect(instructions).not.toMatch(/\[q2\]|\[q3\]/);
+    expect(instructions).toMatch(
+      /Already drafted by their AI \(reference only; not to ask\), with the question ids its drafts use:\n- \(q2\) How ready is the town for floods\?\n- \(q3\) Should the levy rise\?$/,
+    );
+    expect(readPrefill(instructions).predictedResponses).toEqual([
+      expect.objectContaining({ questionId: 'q2', predictedAnswer: 80 }),
+    ]);
+  });
+
+  it('keeps the session opening when only hidden drafts exist, and asks nothing when all are covered', () => {
+    expect(brief({ importedDrafts: [] })).toContain('Ask this opening question immediately: "Configured opening?"');
+    const covered = brief({ questions: [drafted, held], openingPrompt: undefined });
+    expect(covered).toContain('Ask none of them; ask only whether there is anything else');
+    expect(covered).not.toContain('I see your drafts');
+  });
+
+  it('continues a prior interview without repeating the opening', () => {
+    const instructions = brief({ previousTranscript: 'Interviewer: Hello?\nResponder: Floods.' });
+    expect(instructions).toContain('Continue the prior interview');
+    expect(instructions).not.toContain('I see your drafts');
+  });
+});

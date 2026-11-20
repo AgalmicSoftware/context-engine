@@ -367,6 +367,8 @@ const pickTemplateFields = (value: unknown, like: unknown): unknown =>
     ? Object.fromEntries(Object.keys(like).map((key) => [key, pickTemplateFields(value[key], like[key])]))
     : value;
 
+const HEADER_PICTURE_PENDING = 'The header picture is still being made smaller. Press Create again in a moment.';
+
 const SessionWizard = ({
   account,
   provider,
@@ -794,8 +796,9 @@ const SessionWizard = ({
     () => resolveSessionWizardModeFieldPolicy(sessionModeRequirements),
     [sessionModeRequirements],
   );
-  const allowSessionHeaderFileUpload =
-    !sessionModeRequirements.selected || sessionModeRequirements.publish.uploadMetadata;
+  // Both paths take a picture: Decentralized sends it to Arweave at Create, and Centralized keeps it, shrunk, in
+  // the Worker's config.
+  const inlineSessionHeaderUpload = sessionModeRequirements.selected && !sessionModeRequirements.publish.uploadMetadata;
   const {
     sessionHeaderMode,
     setSessionHeaderMode,
@@ -809,8 +812,10 @@ const SessionWizard = ({
     setSessionHeaderStatus,
     handlePasteSessionHeaderFromClipboard,
     handleClearSessionHeaderPreview,
+    sessionHeaderInline,
+    sessionHeaderInlinePending,
   } = useSessionHeaderPreview({
-    allowFileUpload: allowSessionHeaderFileUpload,
+    inlineUpload: inlineSessionHeaderUpload,
     draftSessionHeader: draft?.sessionHeader,
     updateDraftSessionHeader: (value) => updateDraftValue(['sessionHeader'], value),
   });
@@ -1898,6 +1903,10 @@ const SessionWizard = ({
       return;
     }
     if (workerCanonicalSettlement.preventDuplicatePublish(setStatus)) return;
+    if (sessionHeaderInlinePending) {
+      setStatus(HEADER_PICTURE_PENDING);
+      return;
+    }
     publishRequestInFlightRef.current = true;
     try {
       const publishStartPreflightDescriptor = resolveSessionWizardPublishStartPreflightDescriptor({
@@ -2260,7 +2269,11 @@ const SessionWizard = ({
     deployComplete,
     deployWorkerUrl,
     workerRequirementProof,
-    draft,
+    // A Centralized session's uploaded picture joins the config only here, so share links and exports stay short.
+    draft:
+      inlineSessionHeaderUpload && sessionHeaderMode === 'upload'
+        ? { ...draft, sessionHeader: sessionHeaderInline }
+        : draft,
     deployForm,
   };
 
@@ -2356,7 +2369,6 @@ const SessionWizard = ({
   );
 
   const renderField = buildSessionWizardDraftFieldRenderer({
-    allowSessionHeaderFileUpload,
     blockLimitDuration,
     blockLimitUnit,
     compactSessionHeaderInputRef,
@@ -2697,6 +2709,11 @@ const SessionWizard = ({
   handlePublishRef.current = handlePublish;
   const handleCreate = () => {
     if (sessionCreated || conflicts.length || missingInputs.length || createRunningRef.current) return;
+    // Before any deploy, whose Worker config and proof would otherwise leave the picture out.
+    if (sessionHeaderInlinePending) {
+      setStatus(HEADER_PICTURE_PENDING);
+      return;
+    }
     setStatus('');
     if (loginComplete !== true) {
       setCreateStage('sign-in');

@@ -79,25 +79,6 @@
   overflow-wrap: anywhere;
 }
 
-.metadata summary {
-  cursor: pointer;
-  font-weight: 850;
-}
-
-.metadata[open] summary {
-  position: sticky;
-  top: 0;
-  background: color-mix(in srgb, var(--ce-surface-sunken) 92%, transparent);
-  z-index: 1;
-}
-
-.metadataBody {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-  padding-top: 8px;
-}
-
 .metadata a {
   color: var(--ce-status-info-text);
   font-weight: 850;

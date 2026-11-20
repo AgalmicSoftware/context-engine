@@ -7,8 +7,6 @@ import {
   QuestionFilterTagsSection,
 } from './QuestionFilterSections';
 import {
-  QUESTION_FILTER_ACTIONS_STYLE,
-  QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
   QUESTION_FILTER_DISABLED_TEXT_SPACING_STYLE,
   QUESTION_FILTER_ENCRYPTED_COUNT_LOCK_STYLE,
   QUESTION_FILTER_MODAL_HEADER_ROW_STYLE,
@@ -20,9 +18,6 @@ import {
   buildQuestionFilterTagBubbleClassName,
   buildQuestionFilterTypeButtonClassName,
   buildQuestionFilterTypePillClassName,
-  resolveQuestionFilterBookmarkIconStyle,
-  resolveQuestionFilterClearIconStyle,
-  resolveQuestionFilterCopyIconStyle,
   resolveQuestionFilterEncryptedCountBadgeStyle,
   resolveQuestionFilterInlineVisibilityStyle,
   resolveQuestionFilterSectionBodyStyle,
@@ -237,22 +232,92 @@ describe('QuestionFilterQuestionTypesSection', () => {
 });
 
 describe('QuestionFilterSummaryControls', () => {
+  const buildSummaryProps = (overrides: Record<string, any> = {}) => ({
+    copiedUrlSuccess: false,
+    filterBookmarkedFeedback: false,
+    filterUrlInput: '',
+    isCurrentFilterBookmarked: false,
+    isDefault: false,
+    onBookmarkCurrentFilter: jest.fn(),
+    onClearFilters: jest.fn(),
+    onCopyFilterUrl: jest.fn(),
+    onFilterUrlInputChange: jest.fn(),
+    onLoadFilter: jest.fn(),
+    onToggleLoadInput: jest.fn(),
+    showLoadInput: false,
+    summaryItems: [],
+    ...overrides,
+  });
+  const getActionButtons = (summary: TreeNode): TreeNode[] => {
+    const actions = findElement(summary, (element) => element?.props?.className === styles.filterSummaryActions);
+    return [actions.props.children].flat().filter((child: TreeNode) => child?.type === 'button');
+  };
+  const findLoadInput = (summary: TreeNode) =>
+    findElement(summary, (element) => element?.props?.placeholder === 'Load filter from URL/string...');
+
+  it('renders Clear, Copy, Bookmark and Load as labelled native buttons in that order', () => {
+    const buttons = getActionButtons(QuestionFilterSummaryControls(buildSummaryProps()));
+
+    expect(buttons.map(getNodeText)).toEqual(['Clear', 'Copy', 'Bookmark', 'Load']);
+    expect(buttons.map((button) => button.props.type)).toEqual(['button', 'button', 'button', 'button']);
+    expect(buttons[0].props['data-testid']).toBe(E2E_TESTIDS.QUESTION_FILTER_CLEAR_ALL);
+  });
+
+  it('disables Clear, Copy and Bookmark on the default filter but keeps Load available', () => {
+    const summary = QuestionFilterSummaryControls(buildSummaryProps({ isDefault: true }));
+    const buttons = getActionButtons(summary);
+
+    expect(buttons.map((button) => !!button.props.disabled)).toEqual([true, true, true, false]);
+    expect(buttons.slice(0, 3).map((button) => button.props.title)).toEqual([
+      'No filters to clear',
+      'No custom filters to copy',
+      'No custom filters to bookmark',
+    ]);
+    expect(findElement(summary, (element) => element?.props?.className === styles.summaryItemsRow)).toBeNull();
+  });
+
+  it('toggles the saved-filter input row from Load', () => {
+    const props = buildSummaryProps();
+    const closed = QuestionFilterSummaryControls(props);
+    const loadButton = getActionButtons(closed)[3];
+
+    expect(loadButton.props['aria-expanded']).toBe(false);
+    expect(findLoadInput(closed)).toBeNull();
+    loadButton.props.onClick();
+    expect(props.onToggleLoadInput).toHaveBeenCalledTimes(1);
+
+    const open = QuestionFilterSummaryControls({ ...props, showLoadInput: true });
+    expect(getActionButtons(open)[3].props['aria-expanded']).toBe(true);
+    expect(findLoadInput(open)).toBeTruthy();
+  });
+
+  it('calls each enabled action handler once', () => {
+    const props = buildSummaryProps();
+    const [clear, copy, bookmark] = getActionButtons(QuestionFilterSummaryControls(props));
+
+    clear.props.onClick();
+    copy.props.onClick();
+    bookmark.props.onClick();
+
+    expect(props.onClearFilters).toHaveBeenCalledTimes(1);
+    expect(props.onCopyFilterUrl).toHaveBeenCalledTimes(1);
+    expect(props.onBookmarkCurrentFilter).toHaveBeenCalledTimes(1);
+    expect(props.onToggleLoadInput).not.toHaveBeenCalled();
+  });
+
+  it('shows the copied state on Copy without copying again', () => {
+    const copy = getActionButtons(QuestionFilterSummaryControls(buildSummaryProps({ copiedUrlSuccess: true })))[1];
+
+    expect(getNodeText(copy)).toBe('Copied');
+    expect(copy.props.title).toBe('URL Copied!');
+    expect(copy.props.onClick).toBeUndefined();
+  });
+
   it('renders removable filter chips as native buttons', () => {
     const onRemove = jest.fn();
-    const summary = QuestionFilterSummaryControls({
-      copiedUrlSuccess: false,
-      filterBookmarkedFeedback: false,
-      filterUrlInput: '',
-      isCurrentFilterBookmarked: false,
-      isDefault: false,
-      onBookmarkCurrentFilter: jest.fn(),
-      onClearFilters: jest.fn(),
-      onCopyFilterUrl: jest.fn(),
-      onFilterUrlInputChange: jest.fn(),
-      onLoadFilter: jest.fn(),
-      showLoadInput: false,
-      summaryItems: [{ label: 'Rating', onRemove, type: 'questionType' }],
-    });
+    const summary = QuestionFilterSummaryControls(
+      buildSummaryProps({ summaryItems: [{ label: 'Rating', onRemove, type: 'questionType' }] }),
+    );
     const removeButton = findElement(
       summary,
       (element) => element?.type === 'button' && element?.props?.['aria-label'] === 'Remove filter: Rating',
@@ -266,18 +331,7 @@ describe('QuestionFilterSummaryControls', () => {
 });
 
 describe('QuestionFilter display helpers', () => {
-  it('builds section and action icon display state', () => {
-    expect(QUESTION_FILTER_ACTIONS_STYLE).toEqual({
-      marginLeft: 'auto',
-      paddingLeft: '15px',
-      display: 'flex',
-      alignItems: 'center',
-    });
-    expect(QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE).toEqual({
-      color: 'var(--ce-status-warning-text)',
-      fontSize: '0.85em',
-      fontStyle: 'italic',
-    });
+  it('builds section display state', () => {
     expect(QUESTION_FILTER_ENCRYPTED_COUNT_LOCK_STYLE).toEqual({
       marginRight: '3px',
       fontSize: '0.85em',
@@ -310,38 +364,6 @@ describe('QuestionFilter display helpers', () => {
     expect(buildQuestionFilterSectionIconClassName(styles, false)).toBe(`${styles.icon} `);
     expect(resolveQuestionFilterSectionBodyStyle(true, false)).toEqual({ display: 'block' });
     expect(resolveQuestionFilterSectionBodyStyle(true, true)).toEqual({ display: 'none' });
-    expect(resolveQuestionFilterClearIconStyle(true)).toEqual({
-      cursor: 'not-allowed',
-      marginRight: '12px',
-    });
-    expect(resolveQuestionFilterClearIconStyle(false)).toEqual({
-      cursor: 'pointer',
-      marginRight: '12px',
-    });
-    expect(resolveQuestionFilterCopyIconStyle(false, true)).toEqual({
-      cursor: 'not-allowed',
-      color: 'var(--ce-status-success-text)',
-      fontSize: '1.1em',
-      marginRight: '15px',
-    });
-    expect(resolveQuestionFilterCopyIconStyle(true, false)).toEqual({
-      cursor: 'not-allowed',
-      color: 'var(--ce-control-disabled-text)',
-      fontSize: '1.1em',
-      marginRight: '15px',
-    });
-    expect(resolveQuestionFilterBookmarkIconStyle(false, true, false)).toEqual({
-      cursor: 'pointer',
-      color: 'var(--ce-status-warning)',
-      fontSize: '1.1em',
-      marginRight: '8px',
-    });
-    expect(resolveQuestionFilterBookmarkIconStyle(true, false, false)).toEqual({
-      cursor: 'not-allowed',
-      color: 'var(--ce-control-disabled-text)',
-      fontSize: '1.1em',
-      marginRight: '8px',
-    });
     expect(resolveQuestionFilterEncryptedCountBadgeStyle('12px')).toEqual({
       marginLeft: '12px',
       opacity: 0.7,

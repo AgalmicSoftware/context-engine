@@ -2,7 +2,9 @@ import { QUADRATIC_ANSWER_RULE } from '../../../../shared/promptRules.mjs';
 import { GROUP_SUGGESTION_NEVER } from '../../../../shared/interviewSettings.mjs';
 import { callAI } from '../../utilities/ai/aiClient.js';
 import { generateQuestionId } from '../../utilities/shared/questionUtils.mjs';
-import { encodeLinkJson } from '../../../../shared/linkPayload.mjs';
+import { deflateLinkBytes, encodeBase64Url, encodeLinkJson } from '../../../../shared/linkPayload.mjs';
+import fs from 'fs';
+import path from 'path';
 
 const decodeInterviewPrefillPacket = (encoded: unknown) => decodeInterviewPrefill(encoded).packet;
 jest.mock('../../utilities/ai/aiClient.js', () => ({ callAI: jest.fn() }));
@@ -15,6 +17,11 @@ import {
   hashInterviewQuestions,
   clearInterviewPrefillHash,
   hasInterviewPrefillHash,
+  INTERVIEW_PREFILL_FRAGMENT_KEY,
+  INTERVIEW_PREFILL_PACKED_FRAGMENT_KEY,
+  isPackedInterviewPrefillHash,
+  readPackedInterviewPrefillFromHash,
+  unpackInterviewPrefill,
   INTERVIEW_PROMPT_VERSION,
   INTERVIEW_REPLY_UNREADABLE,
   isInterviewFeatureEnabled,
@@ -27,6 +34,8 @@ import {
   readInterviewPrefillFromHash,
   resolveRealtimeInterviewSource,
   resolveSessionVoiceMode,
+  PREFILL_PROMPT_REVISION,
+  requestsInterviewPrefillPaste,
   type InterviewPrefillPacket,
   decodeInterviewPrefill,
 } from './sessionInterview';
@@ -211,6 +220,33 @@ describe('session interview protocol', () => {
     ).toBe('ce-interview-brief-v6');
   });
 
+  it('reads a deflated #prefillz= packet as #prefill= reads a plain one, and says when it is damaged', async () => {
+    const packed = encodeBase64Url(await deflateLinkBytes(new TextEncoder().encode(JSON.stringify(packet))));
+    expect(packed.length).toBeLessThan(encodeLinkJson(packet).length);
+    expect((await unpackInterviewPrefill(packed)).packet).toEqual(decodeInterviewPrefillPacket(encodeLinkJson(packet)));
+    expect((await readPackedInterviewPrefillFromHash(`#x=1&prefillz=${packed}`)).packet?.source).toEqual(packet.source);
+    expect(hasInterviewPrefillHash(`#prefillz=${packed}`)).toBe(true);
+    expect(isPackedInterviewPrefillHash(`#prefillz=${packed}`)).toBe(true);
+    // A plain packet beside it wins, and is read at once.
+    expect(isPackedInterviewPrefillHash(`#prefillz=${packed}&prefill=${encodeLinkJson(packet)}`)).toBe(false);
+    expect(
+      clearInterviewPrefillHash({ pathname: '/session/demo', search: '', hash: `#prefillz=${packed}&x=1` } as Location),
+    ).toBe('/session/demo#x=1');
+    // Plain base64url isn't deflate data; a cut-off one stops partway.
+    expect((await unpackInterviewPrefill(encodeLinkJson(packet))).error).toMatch(/damaged or cut off/);
+    expect((await unpackInterviewPrefill(packed.slice(0, Math.floor(packed.length / 2)))).packet).toBeNull();
+    expect((await unpackInterviewPrefill('')).error).toMatch(/carries no data/);
+  });
+
+  it('tells agents, in the site manifest, which review links this page reads', () => {
+    // The MCP writes #prefillz= only for a site whose manifest lists it, and #prefill= for any other.
+    const manifest = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../../public/manifest.json'), 'utf8'));
+    expect(manifest.context_engine_review_links).toEqual([
+      INTERVIEW_PREFILL_FRAGMENT_KEY,
+      INTERVIEW_PREFILL_PACKED_FRAGMENT_KEY,
+    ]);
+  });
+
   it('reads prefill links the way setup links are read: tolerant of wrapping, strict about damage', () => {
     const encoded = encodeLinkJson(packet);
     const expected = decodeInterviewPrefillPacket(encoded);
@@ -260,6 +296,31 @@ describe('session interview protocol', () => {
     expect(read.notice).toBe(
       'Left out 2 drafts from your AI that were incomplete or repeated; each needs a question, an answer and a confidence.',
     );
+  });
+
+  it('keeps the prompt revision a packet names, and only a well-formed one', () => {
+    const read = (promptRevision: unknown) =>
+      decodeInterviewPrefill(encodeLinkJson({ ...packet, promptRevision })).packet?.promptRevision;
+    expect(read(PREFILL_PROMPT_REVISION)).toBe('ce-prefill-prompt-2');
+    expect(read('anything else')).toBeUndefined();
+    expect(decodeInterviewPrefill(encodeLinkJson(packet)).packet).not.toHaveProperty('promptRevision');
+  });
+
+  it('opens the paste box for #prefill=paste, and only for that', () => {
+    expect(requestsInterviewPrefillPaste('#prefill=paste')).toBe(true);
+    expect(requestsInterviewPrefillPaste('#claim=x&prefill=paste')).toBe(true);
+    expect(requestsInterviewPrefillPaste('#prefill=cGFzdGU')).toBe(false);
+    expect(requestsInterviewPrefillPaste('')).toBe(false);
+  });
+
+  it('puts a caller’s line last, after the task', () => {
+    const kickoff = buildExternalInterviewKickoff({
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'demo',
+      sessionUrl: 'https://app.example/session/demo',
+      note: 'A closing line.',
+    });
+    expect(kickoff.endsWith('\n\nA closing line.')).toBe(true);
   });
 
   it('reads a pasted JSON packet when the link breaks', () => {
@@ -312,11 +373,24 @@ describe('session interview protocol', () => {
     expect(kickoff).not.toContain('preferred name');
     expect(kickoff).toContain('"responderContext":{"summary":"relevant background/views/uncertainties"');
     expect(kickoff).toContain('"facts":[{"fact":"stated or inferred context"');
-    expect(kickoff).toContain('the exact single-line JSON packet');
+    // A plain fetch is all it takes, so a chat AI doesn't go looking for tools.
+    expect(kickoff).toContain(
+      'Fetch this URL with a plain HTTP GET; that is all this needs, with no MCP, sign-in or tool to install:\nhttps://worker.example/agent/interview-catalog',
+    );
+    // Drafts only with a basis, and the packet ready to paste; no table to read through.
+    expect(kickoff).toContain('Draft only where you have a real basis; skip the rest, at most 15 drafts.');
+    expect(kickoff).toContain('the exact packet as single-line JSON in a code block. No table.');
+    expect(kickoff).not.toContain('confidence/basis table');
+    expect(kickoff).toContain('"evidence":"one short clause"');
+    expect(kickoff).toContain(
+      "If you can't encode it exactly, link catalog.reviewUrl + #prefill=paste instead and tell me to paste the packet there.",
+    );
+    // The packet names the prompt's wording, for research to tell the wordings apart.
+    expect(kickoff).toContain(`"promptRevision":"${PREFILL_PROMPT_REVISION}"`);
     expect(kickoff).toContain('Nothing is submitted;');
     expect(kickoff).toContain('Markdown link labeled "Review your drafted answers"');
     expect(kickoff).toContain('never visible text or a code block');
-    expect(kickoff.length).toBeLessThan(4200);
+    expect(kickoff.length).toBeLessThan(4500);
 
     const mappingPrompt = buildInterviewResponseMappingPrompt({
       questions: [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }],
@@ -588,6 +662,48 @@ describe('session interview protocol', () => {
         confidence: 1,
       },
     ]);
+  });
+
+  it('drafts in English, marks a translation, and keeps the responder’s own words beside it', () => {
+    const prompt = buildInterviewResponseMappingPrompt({
+      questions: [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }],
+    });
+    expect(prompt).toContain('Write prose answers and additionalComments in English.');
+    expect(prompt).toContain('end each translated text with " (translated from <language>)"');
+    // The basis is uploaded at full research detail, so it holds no words in another language either.
+    expect(prompt).toContain(
+      "Write evidence in English too, and never quote the responder's words in another language",
+    );
+    expect(prompt).toContain('Options, ratings and votes stay the exact option strings and numbers.');
+    const reply = {
+      responses: [
+        {
+          questionId: 'q1',
+          answer: 'Audits people can check (translated from French)',
+          confidence: 0.8,
+          original: { language: 'French', answer: 'Des audits vérifiables' },
+        },
+      ],
+    };
+    expect(
+      parseInterviewDraftResponses(JSON.stringify(reply), [
+        { id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] },
+      ]),
+    ).toEqual([
+      {
+        questionId: 'q1',
+        answer: 'Audits people can check (translated from French)',
+        confidence: 0.8,
+        spokenOriginal: { language: 'French', answer: 'Des audits vérifiables' },
+      },
+    ]);
+    // Without a language, or without words, there is nothing to show.
+    const bare = { responses: [{ ...reply.responses[0], original: { answer: 'Des audits' } }] };
+    expect(
+      parseInterviewDraftResponses(JSON.stringify(bare), [
+        { id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] },
+      ])[0],
+    ).not.toHaveProperty('spokenOriginal');
   });
 
   it('uses agent-authored response drafts directly and requires confidence', () => {

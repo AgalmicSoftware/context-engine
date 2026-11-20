@@ -30,7 +30,7 @@ import { buildSurveyQuestionPoolLoadState } from './surveyQuestionsTypes.js';
 import { buildListeningModeSearch, isListeningModeQueryEnabled } from '../../utilities/audio/rollingTranscription';
 import * as recordingChunkStore from '../../utilities/audio/recordingChunkStore';
 import { resolveSessionVoiceMode } from './sessionInterview';
-import { encodeLinkJson } from '../../../../shared/linkPayload.mjs';
+import { deflateLinkBytes, encodeBase64Url, encodeLinkJson } from '../../../../shared/linkPayload.mjs';
 import { readSessionRecruitmentSource } from './sessionRecruitmentSource';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
@@ -1148,6 +1148,75 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(modal).toHaveAttribute('data-mode', 'interview');
     expect(modal).toHaveAttribute('data-prefill-model', 'claude-test');
     expect(modal).toHaveAttribute('data-prefill-confidence', '0.22');
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    rendered.unmount();
+  });
+
+  it('opens a deflated #prefillz= link once it has unpacked after mount, then clears it', async () => {
+    const json = JSON.stringify({
+      version: 1,
+      sessionSlug: 'demo',
+      questionSetHash: 'a'.repeat(64),
+      promptVersion: 'ce-interview-brief-v3',
+      source: { platform: 'claude', modelId: 'claude-packed', verification: 'self_reported' },
+      responses: [{ questionId: 'q1', answer: 'Draft', confidence: 0.31 }],
+    });
+    const packed = encodeBase64Url(await deflateLinkBytes(new TextEncoder().encode(json)));
+    const route = `/session/demo?mode=interview#prefillz=${packed}`;
+    window.history.replaceState({}, '', route);
+    // Nothing is read synchronously: the packet arrives once it has unpacked.
+    expect(
+      buildPileRuntimeInitialState({ props: {}, buildWarmPileSeedState: () => null }).interviewPrefillPacket,
+    ).toBeNull();
+    const rendered = renderDemoPile({}, { route });
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-model', 'claude-packed'),
+    );
+    expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-confidence', '0.31');
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    rendered.unmount();
+  });
+
+  const packedPrefill = async (modelId) =>
+    encodeBase64Url(
+      await deflateLinkBytes(
+        new TextEncoder().encode(
+          JSON.stringify({
+            version: 1,
+            sessionSlug: 'demo',
+            questionSetHash: 'a'.repeat(64),
+            promptVersion: 'ce-interview-brief-v3',
+            source: { platform: 'claude', modelId, verification: 'self_reported' },
+            responses: [{ questionId: 'q1', answer: 'Draft', confidence: 0.4 }],
+          }),
+        ),
+      ),
+    );
+
+  it('reads the link the address holds once unpacking ends, if it changed meanwhile', async () => {
+    const first = await packedPrefill('claude-first');
+    const second = await packedPrefill('claude-second');
+    const rendered = renderDemoPile({}, { route: `/session/demo?mode=interview#prefillz=${first}` });
+    window.history.replaceState({}, '', `/session/demo?mode=interview#prefillz=${second}`);
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-model', 'claude-second'),
+    );
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    rendered.unmount();
+  });
+
+  it('leaves a #prefillz= link alone when the view unmounts before it has unpacked', async () => {
+    const packed = await packedPrefill('claude-gone');
+    const rendered = renderDemoPile({}, { route: `/session/demo?mode=interview#prefillz=${packed}` });
+    rendered.unmount();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(window.location.hash).toBe(`#prefillz=${packed}`);
+  });
+
+  it('opens a damaged #prefillz= link in the interview with its reason', async () => {
+    const rendered = renderDemoPile({ activeSessionSlug: 'demo' }, { route: '/session/demo#prefillz=bm90LWRlZmxhdGU' });
+    await waitFor(() => expect(mockVoiceModeProps.initialError).toMatch(/damaged or cut off.*paste the JSON packet/));
+    expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'interview');
     await waitFor(() => expect(window.location.hash).toBe(''));
     rendered.unmount();
   });

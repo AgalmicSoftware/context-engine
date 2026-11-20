@@ -143,3 +143,17 @@ test('only the stored responder or a session admin reads the material', () => {
   // A row stored without its responder is nobody's own.
   assert.equal(readsResearchFields({ metadata: {}, requesterAddress: responder, adminAddresses: admins }), false);
 });
+
+test('a shared interview transcript reaches only the readers of research material', () => {
+  const stored = JSON.stringify({
+    responses: [
+      { ...answer('q-1'), interviewProvenance: { ...provenance, interviewId: 'interview-1', transcript: 'Responder: Robin said audits.' } },
+      { ...answer('q-2'), interviewProvenance: { ...provenance, interviewId: 'interview-1' } },
+    ],
+  });
+  const other = answerPayloadForReader(stored, { reads: false });
+  assert.equal(other.withheld, true);
+  assert.doesNotMatch(other.text, /Robin said audits|interview-1/);
+  // The answer's author and the session's admins get the stored bytes.
+  assert.equal(answerPayloadForReader(stored, { reads: true }).text, stored);
+});

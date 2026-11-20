@@ -1,4 +1,4 @@
-import InterviewResponderNameOption from './InterviewResponderNameOption';
+import SessionInterviewUserName from './SessionInterviewUserName';
 import { useSessionNames } from '../../utilities/session/useSessionNames';
 import { summarizeInterviewConsent, type InterviewConsentOverrides } from './sessionInterviewConsent';
 import { useInterviewSavedAnswers } from './useInterviewSavedAnswers';
@@ -47,6 +47,7 @@ import {
   type InterviewPrefillGroupPick,
   type InterviewPrefillPacket,
   type InterviewQuestion,
+  INTERVIEW_PREFILL_PASTE_NOTE,
 } from './sessionInterview';
 import {
   resolveInterviewPrefillQuestions,
@@ -86,7 +87,7 @@ import {
   readAnswersToReconsider,
 } from './sessionInterviewReconsideration';
 import { draftsWithUnseenComments, useStartingInterviewComments } from './sessionInterviewComments';
-import { lockEncryptedFields } from './sessionInterviewResearch';
+import { lockEncryptedFields, transcriptOfferable } from './sessionInterviewResearch';
 import type { TranscriptClaim } from './sessionTranscriptClaim';
 import { useKeptInterviewReview } from './sessionInterviewKeptReview';
 
@@ -130,6 +131,7 @@ export default function SessionInterviewPanel({
   loginModalToggled = false,
   toggleLoginModal,
   isResponsesCacheReady,
+  questionLoad,
   responseReadinessContextToken,
   submitContextToken = '',
   questionCreatorProps,
@@ -233,11 +235,10 @@ export default function SessionInterviewPanel({
     contextToken: string;
     included: boolean;
   } | null>(kept.researchSharingChoice);
-  // A session that keeps names shows them only to the people it admits. A name written into an answer would
-  // reach everyone who can read answers, so there the choice isn't offered and no name is sent, as with the MCP.
-  // Unknown counts as kept.
-  const namesKept = !useSessionNames({ sessionSlug, sessionConfig, account: String(account || '') }).answerNamesShown;
-  const [includeResponderName, setIncludeResponderName] = useState(kept.includeResponderName);
+  // A name belongs to the account, set in the box under the drafts; no answer carries one. Withdrawing is sent on
+  // every submit, so an answer that carried a name from before loses it when it is submitted again.
+  const sessionNames = useSessionNames({ sessionSlug, sessionConfig, account: String(account || '') });
+  const includeResponderName = false;
   // Like research sharing, kept across signing in to submit, which resets consentOverrides.
   const [draftTextKept, setDraftTextKept] = useState(kept.draftText);
   const [consentOverrides, setConsentOverrides] = useState<InterviewConsentOverrides>({});
@@ -251,6 +252,8 @@ export default function SessionInterviewPanel({
   // The questions an imported AI prefill drafted; its status line counts those still in review.
   const [prefillDraftIds, setPrefillDraftIds] = useState<string[]>(kept.prefillDraftIds);
   const prefillDraftCount = drafts.filter((draft) => prefillDraftIds.includes(draft.questionId)).length;
+  // An AI prefill's drafts, hidden ones included, stay its own: a voice round never asks or redrafts them.
+  const heldIds = useMemo(() => new Set(hasAiPrefill ? prefillDraftIds : []), [hasAiPrefill, prefillDraftIds]);
   const [contextExpanded, setContextExpanded] = useState(false);
   const [submitSucceeded, setSubmitSucceeded] = useState(false);
   // After a submit, how well the person's AI predicted them, and the panel height it keeps
@@ -263,6 +266,8 @@ export default function SessionInterviewPanel({
   const { showFidelityScore, joinMatchingGroups, keepDraftTextForAdmins, suggestQuestions, dataNote } =
     normalizeInterviewSettings(sessionConfig?.interviewMode);
   const [draftTextShown, setDraftTextShown] = useState(keepDraftTextForAdmins);
+  // Sharing the voice interview's transcript for research: off until the person ticks it.
+  const [transcriptShared, setTranscriptShared] = useState(false);
   if (draftTextShown && !keepDraftTextForAdmins) setDraftTextShown(false);
   const [showViewResults, setShowViewResults] = useState(false);
   const [hasRefreshableGroups, setHasRefreshableGroups] = useState(false);
@@ -465,18 +470,19 @@ export default function SessionInterviewPanel({
   const consentDrafts = selectedDrafts.length ? selectedDrafts : drafts;
   const draftTextOverride = draftTextKept?.contextToken === baseSubmitContextToken ? draftTextKept.included : undefined;
   const draftTextForwarded = keepDraftTextForAdmins ? (draftTextShown ? draftTextOverride : false) : undefined;
-  const { aiChoice, comparisonChoice, nameChoice, draftTextChoice, hasSavedName, hasSavedAi } =
-    summarizeInterviewConsent({
-      drafts: consentDrafts,
-      saved: savedConsent,
-      overrides: { ...consentOverrides, includeDraftText: draftTextOverride },
-      defaults: {
-        ai: hasAiPrefill && includeProvenance,
-        comparison: includePredictionComparison,
-        name: includeResponderName,
-        draftText: true,
-      },
-    });
+  // Only a person's own voice interview: a group recording's transcript holds other people's words.
+  const transcriptOffered = researchAvailable && !claim && transcriptOfferable(sessionConfig, mappedTranscript);
+  const { aiChoice, comparisonChoice, draftTextChoice, hasSavedAi } = summarizeInterviewConsent({
+    drafts: consentDrafts,
+    saved: savedConsent,
+    overrides: { ...consentOverrides, includeDraftText: draftTextOverride },
+    defaults: {
+      ai: hasAiPrefill && includeProvenance,
+      comparison: includePredictionComparison,
+      name: includeResponderName,
+      draftText: true,
+    },
+  });
 
   const existingResponsesRef = useRef(existingResponseSlice);
   existingResponsesRef.current = existingResponseSlice;
@@ -642,20 +648,21 @@ export default function SessionInterviewPanel({
             account: authenticatedForSubmit ? String(account) : '',
           });
           if (disposedRef.current) return;
-          // The mapper hears no AI prediction for an answered question, so it can't hand one back
-          // as new evidence. Drafts under review keep theirs.
-          const inReview = new Set(latestReviewRef.current.drafts.map((draft) => draft.questionId));
+          // The mapper hears no AI prediction for an answered or AI-drafted question, so it can't hand one back.
           if (usedClaimRef.current) reconsidered = readAnswersToReconsider(questions, existingResponsesRef.current);
+          const asked =
+            !nextTranscript.trim() && prefillPacket ? validatedPrefillQuestionsRef.current || questions : questions;
+          // With every question held it still suggests questions and groups; its drafts are dropped below.
+          const open = asked.filter((question) => !heldIds.has(question.id));
           mapped = await mapInterviewEvidenceToResponses({
-            questions:
-              !nextTranscript.trim() && prefillPacket ? validatedPrefillQuestionsRef.current || questions : questions,
+            questions: open.length ? open : asked,
             transcript: nextTranscript,
             prefillPacket: contextPacket?.responses
               ? {
                   ...contextPacket,
                   responses: contextPacket.responses.filter(
                     ({ questionId }) =>
-                      inReview.has(questionId) ||
+                      !heldIds.has(questionId) &&
                       !hasDraftValue(responseFieldValue(existingResponsesRef.current, 'answers', questionId)),
                   ),
                 }
@@ -665,7 +672,7 @@ export default function SessionInterviewPanel({
             workerUrl: url,
             // A hidden draft isn't part of the review until its guess is shown.
             previousResponses: drafts
-              .filter((draft) => !isDraftConcealed(draft.questionId))
+              .filter((draft) => !isDraftConcealed(draft.questionId) && !heldIds.has(draft.questionId))
               .map(({ revisions: _revisions, ...prediction }) => ({
                 // The mapping prompt rates importance/conviction 0-100.
                 prediction: {
@@ -698,10 +705,11 @@ export default function SessionInterviewPanel({
                 }
               : null,
           });
+          mapped = mapped.filter((draft) => !heldIds.has(draft.questionId));
         }
         if (disposedRef.current) return;
         const combinedQuestions = [...suggestedQuestions];
-        const knownPrompts = new Set(combinedQuestions.map((question) => question.prompt.trim().toLowerCase()));
+        const knownPrompts = new Set([...combinedQuestions, ...questions].map((q) => q.prompt.trim().toLowerCase()));
         for (const question of proposedQuestions) {
           if (!knownPrompts.has(question.prompt.trim().toLowerCase())) {
             combinedQuestions.push(question);
@@ -758,7 +766,10 @@ export default function SessionInterviewPanel({
         setSelected(review.selected);
         setLeftOutIds((current) => [...new Set([...current, ...review.leftOut])]);
         setStillFitIds(readAnswersThatStillFit(review.leftOut, mapped, reconsidered, questions));
-        if (importedDrafts) setPrefillDraftIds(importedDrafts.map((draft) => draft.questionId));
+        if (importedDrafts)
+          setPrefillDraftIds(
+            importedDrafts.map(({ questionId }) => questionId).filter((id) => !review.leftOut.includes(id)),
+          );
         let newlyHidden: string[] = [];
         if (review.drafts.length) {
           // Chosen once per review, and only while research sharing is on.
@@ -820,6 +831,7 @@ export default function SessionInterviewPanel({
       context,
       drafts,
       hasAiPrefill,
+      heldIds,
       includePredictionComparison,
       isDraftConcealed,
       reviewedDraftValues,
@@ -917,9 +929,11 @@ export default function SessionInterviewPanel({
       setStatus('Error');
       return;
     }
+    if (error === INTERVIEW_PREFILL_PASTE_NOTE) setError('');
     setMappingNotice('');
     setLeftOutIds([]);
     setSubmitSucceeded(false);
+    setTranscriptShared(false);
     roundBaseTranscriptRef.current = transcriptRef.current;
     setShowTranscript(false);
     const voiceContext = omitConcealedInterviewFacts(responderContext, prefillPacket, isDraftConcealed, questions);
@@ -941,15 +955,16 @@ export default function SessionInterviewPanel({
           validatedPrefillQuestionsRef.current || questions,
         )?.filter(shown) || null
       : null;
-    // It spends the conversation on unanswered questions while any remain.
-    const openQuestions = questions.filter((question) => !answered(question.id));
+    // It spends the conversation on unanswered questions while any remain, and leaves an AI's drafts to review.
+    const openQuestions = questions.filter((question) => !answered(question.id) && !heldIds.has(question.id));
     try {
       const instructions = buildRealtimeInterviewInstructions({
         questions: openQuestions.length ? openQuestions : questions,
         answeredQuestions: questions.filter((question) => answered(question.id)),
+        draftedQuestions: questions.filter((question) => !answered(question.id) && heldIds.has(question.id)),
         suggestQuestions,
         responderContext: voiceContext,
-        openingPrompt: openQuestions.length === questions.length ? interviewOpening.opening : undefined,
+        openingPrompt: questions.some((question) => answered(question.id)) ? undefined : interviewOpening.opening,
         steeringPrompt: interviewOpening.steeringPrompt,
         sessionContext: sessionContextPrompt.text,
         previousTranscript: transcriptRef.current,
@@ -1015,13 +1030,17 @@ export default function SessionInterviewPanel({
       hasAiPrefill,
       includePredictionComparison,
       includeProvenance,
-      includeResponderName: namesKept ? false : includeResponderName,
+      includeResponderName: false,
       // Forward the shown detail only when it is narrower than the session's current one.
       consentOverrides: {
         ...consentOverrides,
         ...(draftTextForwarded === undefined ? {} : { includeDraftText: draftTextForwarded }),
         ...(shownResearchDetail === sessionResearchDetail ? {} : { researchDetail: shownResearchDetail }),
-        ...(namesKept ? { includeResponderName: false } : {}),
+        // Said outright, so a name an earlier answer carried is withdrawn however its saved record is read.
+        includeResponderName: false,
+        ...(transcriptOffered && transcriptShared && comparisonChoice.checked
+          ? { transcript: mappedTranscript.trim() }
+          : {}),
       },
       isInterviewBusy,
       researchAvailable,
@@ -1071,9 +1090,11 @@ export default function SessionInterviewPanel({
     hasAiPrefill,
     includePredictionComparison,
     includeProvenance,
-    includeResponderName,
-    namesKept,
     consentOverrides,
+    transcriptOffered,
+    transcriptShared,
+    comparisonChoice.checked,
+    mappedTranscript,
     shownResearchDetail,
     sessionResearchDetail,
     isInterviewBusy,
@@ -1129,25 +1150,8 @@ export default function SessionInterviewPanel({
 
   const importedContext = prefillPacket?.responderContext;
   const importedResponderName = String(importedContext?.name || '').trim();
-  const displayedResponderNames =
-    hasSavedName && (consentOverrides.includeResponderName === undefined || !importedResponderName)
-      ? [...new Set(consentDrafts.map((draft) => savedConsent[draft.questionId]?.responderName).filter(Boolean))]
-      : [importedResponderName];
-  // The responder-name choice sits with the other sharing choices.
-  const nameOption =
-    !namesKept && (importedResponderName || hasSavedName) ? (
-      <InterviewResponderNameOption
-        names={displayedResponderNames as string[]}
-        choice={nameChoice}
-        disabled={applying}
-        onChange={(included) => {
-          setIncludeResponderName(included);
-          setConsentOverrides((prev) => ({ ...prev, includeResponderName: included }));
-        }}
-      />
-    ) : null;
-  const researchCoverage = prefillPacket?.source?.researchCoverage;
-  const researchCoverageDetails = describeResearchCoverage(researchCoverage);
+  // Shown only in the AI submission info's metadata.
+  const researchCoverageDetails = describeResearchCoverage(prefillPacket?.source?.researchCoverage);
   const hasImportedResponderContext = Boolean(importedContext?.summary?.trim() || importedContext?.facts?.length);
   const canManuallyRefreshGroupRecommendations =
     hasRefreshableGroups && drafts.length > 0 && !groupRecommendationRequest;
@@ -1159,6 +1163,7 @@ export default function SessionInterviewPanel({
     error,
     status,
     hasQuestions: questions.length > 0,
+    questionLoad,
     hasDrafts: drafts.length > 0,
     readiness: readiness.state,
     openingLoading: interviewOpening.loading,
@@ -1183,7 +1188,7 @@ export default function SessionInterviewPanel({
     if (scoreScreenShown) setSubmissionInfoOpen(false);
   }, [scoreScreenShown]);
   const hasTranscript = !isInterviewBusy && Boolean(transcript.trim());
-  // A prefill link goes straight to its drafts; the interview then talks them through.
+  // A prefill link goes straight to its drafts; the interview then asks about the rest.
   const showPrefillStatus = hasAiPrefill && prefillDraftCount > 0;
   const startLabel = interviewOpening.loading
     ? 'Preparing opening…'
@@ -1192,7 +1197,7 @@ export default function SessionInterviewPanel({
       : transcript.trim()
         ? 'Continue interview'
         : showPrefillStatus
-          ? 'Talk through your drafts'
+          ? 'Add more by voice'
           : 'Start voice interview';
   const leftOutCount = leftOutIds.length;
   const leftOutNotice = describeLeftOutDrafts(leftOutIds, stillFitIds, drafts.length > 0);
@@ -1249,10 +1254,9 @@ export default function SessionInterviewPanel({
             </p>
           ) : null}
           {updates.notice ? <p role="status">{updates.notice}</p> : null}
-          {interviewOpening.notice ? <p>{interviewOpening.notice}</p> : null}
-          {!questions.length ? <p>No accessible questions are available for this interview.</p> : null}
+          {!questions.length && !questionLoad ? <p>No accessible questions are available for this interview.</p> : null}
           <audio ref={audioRef} className={styles.sessionListeningSrOnly} aria-label="Realtime interviewer audio" />
-          {idle && readiness.state === 'unavailable' && !error ? (
+          {idle && readiness.state === 'unavailable' && (!error || error === INTERVIEW_PREFILL_PASTE_NOTE) ? (
             <p role="alert">
               {readiness.detail}{' '}
               <button type="button" onClick={readiness.retry}>
@@ -1260,7 +1264,7 @@ export default function SessionInterviewPanel({
               </button>
             </p>
           ) : null}
-          {error ? (
+          {error && error !== INTERVIEW_PREFILL_PASTE_NOTE ? (
             <div className={styles.sessionListeningError} role="alert">
               {error}
             </div>
@@ -1326,7 +1330,6 @@ export default function SessionInterviewPanel({
           {showPrefillStatus ? (
             <SessionInterviewPrefillStatus
               draftCount={prefillDraftCount}
-              platform={prefillPacket?.source.platform}
               hiddenCount={hiddenDrafts.count}
               dataNote={dataNote}
             />
@@ -1399,6 +1402,16 @@ export default function SessionInterviewPanel({
               })}
             </SessionInterviewReviewSection>
           ) : null}
+          {drafts.length && !mapping ? (
+            <SessionInterviewUserName
+              key={authenticatedForSubmit ? String(account).toLowerCase() : ''}
+              source={sessionNames.source}
+              names={sessionNames.names}
+              account={authenticatedForSubmit ? String(account) : ''}
+              suggestion={importedResponderName}
+              disabled={applying}
+            />
+          ) : null}
           {joinMatchingGroups && drafts.length ? (
             <SessionInterviewRecommendedGroups
               hidden={isInterviewBusy || mapping}
@@ -1423,20 +1436,9 @@ export default function SessionInterviewPanel({
               hidden={isInterviewBusy || mapping || shouldHideSuggestedQuestionSection(suggestedQuestionAuthoringState)}
             />
           ) : null}
-          {researchCoverage ? (
-            <section
-              className={styles.sessionInterviewResearchCoverage}
-              aria-label="Self-reported agent research coverage"
-              data-testid={E2E_TESTIDS.SESSION_INTERVIEW_RESEARCH_COVERAGE}
-            >
-              <strong>Self-reported agent research coverage</strong>
-              <span>{researchCoverageDetails.join(' · ') || 'Coverage counts unavailable'}</span>
-              {researchCoverage.searchScopeNote ? <small>{researchCoverage.searchScopeNote}</small> : null}
-            </section>
-          ) : null}
           {drafts.length && !isInterviewBusy && !mapping ? (
             <div className={styles.sessionInterviewReviewActions} role="group" aria-label="Response submission">
-              {researchAvailable || importedResponderName || hasSavedName || hasSavedAi ? (
+              {researchAvailable || hasSavedAi ? (
                 <div
                   className={`${styles.sessionInterviewConsentGroup} ${submissionInfoOpen ? styles.sessionInterviewConsentGroupOpen : ''}`}
                 >
@@ -1469,11 +1471,11 @@ export default function SessionInterviewPanel({
                           onDraftTextChange={(included) =>
                             setDraftTextKept({ contextToken: baseSubmitContextToken, included })
                           }
-                        >
-                          {nameOption}
-                        </SessionInterviewResearchConsent>
+                          transcript={transcriptOffered ? transcriptShared : null}
+                          transcriptText={mappedTranscript}
+                          onTranscriptChange={setTranscriptShared}
+                        />
                       ) : null}
-                      {researchAvailable || hasSavedAi ? null : nameOption}
                     </div>
                   </details>
                   {researchAvailable || hasSavedAi ? (

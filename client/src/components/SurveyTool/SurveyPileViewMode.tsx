@@ -1,5 +1,6 @@
 import {
   getChangedInterviewConsentQids,
+  capInterviewTranscript,
   isWithheldConsent,
   keepConsentWithdrawals,
   resolveConsentFlags,
@@ -132,12 +133,19 @@ import {
   hasInterviewPrefillHash,
   INTERVIEW_PROMPT_VERSION,
   isInterviewFeatureEnabled,
+  isPackedInterviewPrefillHash,
   opensSessionVoiceChooser,
   parseInterviewPrefillJson,
   readInterviewPrefillFromHash,
+  readPackedInterviewPrefillFromHash,
+  requestsInterviewPrefillPaste,
+  INTERVIEW_PREFILL_PASTE_NOTE,
   resolveRealtimeInterviewSource,
   resolveSessionVoiceMode,
+  INTERVIEW_MAPPING_PROMPT_VERSION,
+  VOICE_BRIEF_REVISION,
   type InterviewDraftResponse,
+  type InterviewPrefillRead,
   type InterviewPrefillPacket,
   type SessionVoiceMode,
 } from './sessionInterview';
@@ -153,6 +161,7 @@ import {
 } from './sessionTranscriptClaim';
 import { resolveInterviewDraftOrigin } from './sessionInterviewResearch';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
+import { resolveRealtimeInterviewModel } from '../../../../shared/realtimeInterviewConfig.mjs';
 import { confidenceMeaningOf } from '../../../../shared/interviewConfidence.mjs';
 import { holdGroupInviteForLink } from '../../domains/worker/workerGroupAutoJoinIntent';
 import { captureSessionRecruitmentSource } from './sessionRecruitmentSource';
@@ -246,14 +255,21 @@ const prefillSessionMismatch = (props: SurveyQuestionsProps, packet: InterviewPr
     : '';
 };
 
-const readInterviewPrefillStateForProps = (props: SurveyQuestionsProps = {}, hash: unknown) => {
-  if (!hasInterviewPrefillHash(hash)) {
+// `unpacked` is what a #prefillz= link held; until it has unpacked, there is nothing to read.
+const readInterviewPrefillStateForProps = (
+  props: SurveyQuestionsProps = {},
+  hash: unknown,
+  unpacked?: InterviewPrefillRead,
+) => {
+  if (!hasInterviewPrefillHash(hash) || (!unpacked && isPackedInterviewPrefillHash(hash))) {
     return { hasPrefill: false, packet: null as InterviewPrefillPacket | null, error: '', notice: '' };
   }
-  const read = readInterviewPrefillFromHash(hash);
+  const read = unpacked || readInterviewPrefillFromHash(hash);
   const error = read.packet
     ? prefillSessionMismatch(props, read.packet)
-    : `${read.error} Ask the AI for a fresh link, or paste the JSON packet it gave you below.`;
+    : requestsInterviewPrefillPaste(hash)
+      ? INTERVIEW_PREFILL_PASTE_NOTE
+      : `${read.error} Ask the AI for a fresh link, or paste the JSON packet it gave you below.`;
   return error
     ? { hasPrefill: true, packet: null as InterviewPrefillPacket | null, error, notice: '' }
     : { hasPrefill: true, packet: read.packet, error: '', notice: read.notice };
@@ -1164,10 +1180,32 @@ export const noteInterviewProgress = (engine: PileViewModeEngine, inProgress: bo
   if (engine.state.interviewProgressContext !== interviewProgressContext) engine.setState({ interviewProgressContext });
 };
 
-const consumeInterviewPrefillHashIfPresent = (engine: PileViewModeEngine) => {
+// A #prefillz= link unpacks asynchronously, then is read as a #prefill= one is.
+// Each link unpacks once, however often this runs. If the address moved on
+// meanwhile, what it holds now is read instead; an unmounted view reads nothing.
+const unpackInterviewPrefillHash = (engine: PileViewModeEngine, hash: string) => {
+  if (engine._lastConsumedInterviewPrefillHash === hash || engine._unpackingInterviewPrefillHash === hash) return;
+  engine._unpackingInterviewPrefillHash = hash;
+  void readPackedInterviewPrefillFromHash(hash)
+    .then((read) => {
+      engine._unpackingInterviewPrefillHash = '';
+      if (!engine._isMounted) return;
+      consumeInterviewPrefillHashIfPresent(engine, (window.location.hash || '') === hash ? read : undefined);
+    })
+    .catch((e) => {
+      engine._unpackingInterviewPrefillHash = '';
+      surveyLog.warn('PileViewMode: could not read a packed interview link', e);
+    });
+};
+
+const consumeInterviewPrefillHashIfPresent = (engine: PileViewModeEngine, unpacked?: InterviewPrefillRead) => {
   if (typeof window === 'undefined' || !isInterviewFeatureEnabled(engine.props?.sessionConfig)) return false;
   const hash = window.location.hash || '';
-  const prefillState = readInterviewPrefillStateForProps(engine.props || {}, hash);
+  if (!unpacked && isPackedInterviewPrefillHash(hash)) {
+    unpackInterviewPrefillHash(engine, hash);
+    return false;
+  }
+  const prefillState = readInterviewPrefillStateForProps(engine.props || {}, hash, unpacked);
   if (!prefillState.hasPrefill) {
     engine._lastConsumedInterviewPrefillHash = '';
     return false;
@@ -1277,6 +1315,10 @@ const runPileComponentDidMount = (engine: PileViewModeEngine) => {
     } catch (e) {
       surveyLog.warn('PileViewMode: could not clear imported interview packet from URL', e);
     }
+  }
+  // A #prefillz= link starts unpacking now; the first update would otherwise wait for something else to change.
+  if (typeof window !== 'undefined' && isPackedInterviewPrefillHash(window.location.hash || '')) {
+    consumeInterviewPrefillHashIfPresent(engine);
   }
   // Only once it's held: a session whose settings load later still reads it, when they arrive.
   if (typeof window !== 'undefined' && engine.state.interviewClaimFrame && hasClaimHash(window.location.hash || ''))
@@ -1869,6 +1911,9 @@ const openSessionResults = (engine: PileViewModeEngine) => {
   window.dispatchEvent(new Event('popstate'));
 };
 
+const withoutSpokenOriginal = ({ spokenOriginal: _words, ...draft }: InterviewDraftResponse): InterviewDraftResponse =>
+  draft;
+
 export const recordInterviewProvenance = (
   engine: PileViewModeEngine,
   drafts: InterviewDraftResponse[],
@@ -1877,9 +1922,14 @@ export const recordInterviewProvenance = (
   included = true,
   includePredictionComparison = false,
   responderName = '',
-  review: Array<InterviewDraftResponse & { selected: boolean; original: InterviewDraftResponse }> = [],
+  reviewEntries: Array<InterviewDraftResponse & { selected: boolean; original: InterviewDraftResponse }> = [],
   consentOverrides?: InterviewConsentOverrides,
 ) => {
+  // The person's own words in another language stay on the page: never in the page draft or the upload.
+  const review = reviewEntries.map(({ spokenOriginal: _entryWords, original, ...entry }) => ({
+    ...entry,
+    original: original && withoutSpokenOriginal(original),
+  }));
   const normalizedSource = source || resolveRealtimeInterviewSource(engine.props?.sessionConfig);
   const { researchDetail: sessionResearchDetail, keepDraftTextForAdmins } = normalizeInterviewSettings(
     (engine.props?.sessionConfig as { interviewMode?: unknown } | undefined)?.interviewMode,
@@ -1887,6 +1937,8 @@ export const recordInterviewProvenance = (
   // Full detail only when the session asks for it and the participant was shown it.
   const researchTier =
     sessionResearchDetail === 'full' && consentOverrides?.researchDetail !== 'minimal' ? 'full' : 'minimal';
+  // The voice model the session's settings name, which its Worker runs for the interview.
+  const voiceModel = resolveRealtimeInterviewModel(engine.props?.sessionConfig || {});
   const pendingQuestionIds = engine.getChangedQidsAndFields?.(0)?.changedQids;
   const researchAnchor = drafts.find((draft) => pendingQuestionIds?.has(draft.questionId)) || drafts[0];
   const normalizedResponderName = String(responderName || '')
@@ -1906,6 +1958,18 @@ export const recordInterviewProvenance = (
             ? { ...currentProvenance }
             : {};
         const reviewedByQuestionId = new Map(review.map((entry) => [entry.questionId, entry]));
+        // A shared transcript is kept once for the interview; its answers name it, and the upload puts it on
+        // one of them that isn't encrypted.
+        const sharedTranscript = capInterviewTranscript(String(consentOverrides?.transcript || ''));
+        const interviewId = sharedTranscript
+          ? `interview-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+          : '';
+        if (interviewId) {
+          slice.interviewTranscripts = {
+            ...(slice.interviewTranscripts as Record<string, string> | undefined),
+            [interviewId]: sharedTranscript,
+          };
+        }
         const savedConsentFor = (questionId: string) => {
           const consent = provenance[questionId] ?? prev.editBaseline?.interviewProvenance?.[questionId];
           // A copy stripped of research material holds no choices: these drafts take the defaults instead.
@@ -1949,6 +2013,7 @@ export const recordInterviewProvenance = (
                 ? ''
                 : normalizedResponderName ||
                   (consentOverrides?.includeResponderName ? String(saved?.responderName || shownSavedName) : '');
+          const draftOrigin = resolveInterviewDraftOrigin(originalDraft, packet, normalizedSource);
           provenance[draft.questionId] = {
             version: 1,
             includeAiProvenance: ai,
@@ -1976,9 +2041,22 @@ export const recordInterviewProvenance = (
                   predictionRevisions: originalDraft.revisions || draft.revisions || [],
                   userEditedFields: reviewed.userEditedFields || [],
                   researchTier,
-                  draftOrigin: resolveInterviewDraftOrigin(originalDraft, packet, normalizedSource),
+                  draftOrigin,
+                  // Any draft of this submit, a talked-through prefill's included.
+                  ...(interviewId ? { interviewId } : {}),
+                  // Drafts the session's AI wrote: the prompt's version, and for a voice interview its voice model.
+                  ...(draftOrigin === 'external_prefill'
+                    ? {}
+                    : { mappingPromptVersion: INTERVIEW_MAPPING_PROMPT_VERSION }),
+                  ...(draftOrigin === 'voice_interview'
+                    ? { voiceModel, voiceBriefRevision: VOICE_BRIEF_REVISION }
+                    : {}),
                   // Read by research without the AI provenance choice, which carries the prompt version.
                   confidenceMeaning: confidenceMeaningOf(packet?.promptVersion || INTERVIEW_PROMPT_VERSION),
+                  // The copied prompt's wording, which the catalog's version doesn't tell.
+                  ...(draftOrigin === 'external_prefill' && packet?.promptRevision
+                    ? { promptRevision: packet.promptRevision }
+                    : {}),
                   predictionCondition: reviewed.predictionCondition === 'blind' ? 'blind' : 'shown',
                   // A hidden draft keeps the answer given before its guess was shown.
                   ...(reviewed.predictionCondition === 'blind' && reviewed.revealedAt !== undefined
@@ -3582,6 +3660,18 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
   } = pileWorkspaceViewState;
   const lockedGateDetails = engine.getMemoizedLockedQuestionGateDetails(hiddenMaskedQuestionIds);
   const isStillLoading = pileWorkspaceViewState.isStillLoading;
+  const requiresStorageLogin = requiresQuestionStorageLogin(
+    engine.getEffectivePileSessionConfig(engine.props),
+    Boolean(engine.props.loginComplete && engine.props.account),
+  );
+  // The interview reads why its pool is empty in the same order as the pile's empty state.
+  const interviewQuestionLoad = requiresStorageLogin
+    ? 'signIn'
+    : hasTerminalScanError || hasError
+      ? 'failed'
+      : isStillLoading
+        ? 'loading'
+        : undefined;
 
   /**
    * PILE MODE — Submit button label (central helper)
@@ -3724,10 +3814,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             hasTerminalScanError,
             scanErrorMessage,
             hasError,
-            requiresStorageLogin: requiresQuestionStorageLogin(
-              engine.getEffectivePileSessionConfig(engine.props),
-              Boolean(engine.props.loginComplete && engine.props.account),
-            ),
+            requiresStorageLogin,
             isStillLoading,
             hydrateDone,
             hydrateDiscovered,
@@ -3820,6 +3907,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                 {...engine.props}
                 {...engine.getAudioInputWorkerProps()}
                 isResponsesCacheReady={Boolean(responseReadinessContextToken)}
+                questionLoad={interviewQuestionLoad}
                 responseReadinessContextToken={responseReadinessContextToken}
                 submitContextToken={submitContextToken}
                 isOpen={!!showVoiceModeModal}

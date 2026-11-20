@@ -89,6 +89,7 @@ import {
 import { isHostedAgentSessionConfig } from '../../utilities/session/sessionBackendKind';
 import { isSessionModeProfileAgentHttpEnabled } from '../../utilities/session/sessionModeProfile';
 import { agentHandoffPanelKey, requestAgentDelegateKey } from '../../utilities/session/agentHandoff';
+import SignAgentsOutControl from './SignAgentsOutControl';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import {
   exchangeAgentClientLogin,
@@ -205,6 +206,8 @@ interface LoginAndSettingsModalState {
   agentTokenLoginOpen: boolean;
   agentTokenInput: string;
   agentTokenStatus: string;
+  // Counts each Sign Agents Out, so the "Your AI agent" box starts afresh without its now dead key.
+  agentsSignedOut: number;
   agentTokenError: string;
   walletBalanceWei: ethers.BigNumber | null;
 }
@@ -373,6 +376,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       agentTokenLoginOpen: false,
       agentTokenInput: '',
       agentTokenStatus: '',
+      agentsSignedOut: 0,
       agentTokenError: '',
       walletBalanceWei: null,
     };
@@ -1536,11 +1540,16 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return requestAgentDelegateKey({ agentWorkerUrl, sessionSlug, workerToken });
   };
 
-  // Hidden while an agent is the one signed in here: a key comes from a person's own sign-in.
+  // Hidden while an agent is the one signed in here: a key comes from a person's own sign-in. Hidden too in an
+  // account an AI agent set up, entered by its link or an attached passkey: the Worker refuses both prompts there.
   renderAgentHandoffPanel = () => {
     const { agentWorkerUrl, sessionConfig, sessionId, sessionSlug, workerCanonical, workerUrl } =
       this.getAgentTokenLoginSessionContext();
-    if (!sessionSlug || readAgentClientLoginEnvelope({ sessionSlug, sessionId, workerUrl, agentWorkerUrl }))
+    if (
+      !sessionSlug ||
+      isAgentLinkProvider(this.props.provider) ||
+      readAgentClientLoginEnvelope({ sessionSlug, sessionId, workerUrl, agentWorkerUrl })
+    )
       return null;
     return (
       <LoginAgentHandoffPanel
@@ -1556,6 +1565,16 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         context={this.getWorkerTokenContext()}
         workerUrl={agentWorkerUrl}
         requestKey={this.requestAgentKey}
+        // The box drops the key it may still show after this: that key is dead now.
+        agentsSignedOut={this.state.agentsSignedOut}
+        signAgentsOut={
+          <SignAgentsOutControl
+            provider={this.props.provider}
+            sessionSlug={sessionSlug}
+            buttonClassName={styles.agentHandoffButton}
+            onDone={() => this.setStateIfMounted({ agentsSignedOut: this.state.agentsSignedOut + 1 })}
+          />
+        }
       />
     );
   };
