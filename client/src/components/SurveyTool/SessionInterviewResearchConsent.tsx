@@ -94,122 +94,121 @@ export default function SessionInterviewResearchConsent({
           {children}
         </div>
       ) : null}
-      {/* An unticked box already says what is left out; with nothing shared there is nothing to describe. */}
+      {/* An unticked box already says what is left out; with nothing shared there is nothing to describe. Shown
+          at once inside "AI submission info", with no second section to open. */}
       {sharesMetadata ? (
-        <details
+        <div
+          role="group"
           className={styles.metadata}
           aria-label={showProvenance ? 'AI prefill metadata' : 'AI research metadata'}
         >
-          <summary>{showProvenance ? 'AI prefill metadata' : 'AI research metadata'}</summary>
-          <div className={styles.metadataBody}>
-            {preserveSavedProvenance ? (
+          {preserveSavedProvenance ? (
+            <p>
+              Saved consent choices are retained. Selected AI drafts use this interview’s source metadata when
+              provenance is included.
+            </p>
+          ) : null}
+          {showProvenance && includeProvenance ? (
+            <dl>
+              <dt>Platform</dt>
+              <dd>{platform}</dd>
+              <dt>Model</dt>
+              <dd>{model}</dd>
+              <dt>Verification</dt>
+              <dd>Self-reported</dd>
+              <dt>Prompt version</dt>
+              <dd>{packet.promptVersion || INTERVIEW_PROMPT_VERSION}</dd>
+              <dt>Question set</dt>
+              <dd>{packet.questionSetHash || 'Not provided'}</dd>
+              {packet.source.researchCoverage ? (
+                <>
+                  <dt>Research coverage</dt>
+                  <dd>
+                    {coverageDetails.join(' · ') || 'Coverage counts unavailable'}
+                    {packet.source.researchCoverage.searchScopeNote ? (
+                      <p>{packet.source.researchCoverage.searchScopeNote}</p>
+                    ) : null}
+                  </dd>
+                </>
+              ) : null}
+            </dl>
+          ) : null}
+          {includeComparison && minimal ? (
+            <>
               <p>
-                Saved consent choices are retained. Selected AI drafts use this interview’s source metadata when
-                provenance is included.
+                {selectedCount} selected {selectedCount === 1 ? 'draft' : 'drafts'}:
               </p>
-            ) : null}
-            {showProvenance && includeProvenance ? (
-              <dl>
-                <dt>Platform</dt>
-                <dd>{platform}</dd>
-                <dt>Model</dt>
-                <dd>{model}</dd>
-                <dt>Verification</dt>
-                <dd>Self-reported</dd>
-                <dt>Prompt version</dt>
-                <dd>{packet.promptVersion || INTERVIEW_PROMPT_VERSION}</dd>
-                <dt>Question set</dt>
-                <dd>{packet.questionSetHash || 'Not provided'}</dd>
-                {packet.source.researchCoverage ? (
-                  <>
-                    <dt>Research coverage</dt>
-                    <dd>
-                      {coverageDetails.join(' · ') || 'Coverage counts unavailable'}
-                      {packet.source.researchCoverage.searchScopeNote ? (
-                        <p>{packet.source.researchCoverage.searchScopeNote}</p>
-                      ) : null}
-                    </dd>
-                  </>
-                ) : null}
-              </dl>
-            ) : null}
-            {includeComparison && minimal ? (
-              <>
-                <p>
-                  {selectedCount} selected {selectedCount === 1 ? 'draft' : 'drafts'}:
-                </p>
-                <ul>
-                  <li>
-                    The AI’s predicted answers, importance, conviction, and confidence.
-                    {keepsText ? '' : ' Drafted text is not kept.'}
-                  </li>
-                  <li>{revisionCount} saved prediction versions with model IDs, without drafted text or basis.</li>
-                  <li>Which fields changed. Unchanged fields are labeled unchanged, not human agreement.</li>
-                </ul>
-                <p>
-                  {keepsText
-                    ? 'The AI’s notes and drafts for questions you skipped are not included.'
-                    : 'The AI’s notes, drafted comments, and drafts for questions you skipped are not included.'}
-                </p>
-                {draftText ? (
-                  <>
-                    <Label check className={styles.provenanceOption}>
-                      <Input
-                        type="checkbox"
-                        checked={draftText.mixed ? false : draftText.checked}
-                        aria-checked={draftText.mixed ? 'mixed' : draftText.checked}
-                        innerRef={(element: HTMLInputElement | null) => {
-                          if (element) element.indeterminate = draftText.mixed;
-                        }}
-                        disabled={disabled}
-                        onChange={(event) => onDraftTextChange?.(event.target.checked)}
-                        data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_DRAFT_TEXT}
-                      />{' '}
-                      <span>Let admins read the AI’s draft text{draftText.mixed ? ' (mixed saved choices)' : ''}</span>
-                    </Label>
-                    <p>{DRAFT_TEXT_NOTE}</p>
-                  </>
-                ) : null}
-              </>
-            ) : includeComparison ? (
-              <>
-                <p>
-                  {selectedCount} selected {selectedCount === 1 ? 'draft' : 'drafts'} and {unselectedCount} unselected{' '}
-                  {unselectedCount === 1 ? 'draft' : 'drafts'}:
-                </p>
-                <ul>
-                  <li>Original answers, comments, confidence, basis, importance, and conviction.</li>
-                  <li>
-                    {revisionCount} saved prediction versions, including model IDs and revised answers, comments,
-                    confidence, and basis.
-                  </li>
-                  <li>
-                    Reviewed final values and which fields changed. Unchanged fields are labeled unchanged, not human
-                    agreement.
-                  </li>
-                  <li>
-                    Unselected drafts, including original and edited values and selection status. Their final value is
-                    empty unless submitted separately.
-                  </li>
-                </ul>
-                <p>
-                  Encrypted answer and comment text is excluded, along with its prediction basis. Edits are not treated
-                  as agreement.
-                </p>
-              </>
-            ) : null}
-            {includeProvenance || includeComparison ? (
+              <ul>
+                <li>
+                  The AI’s predicted answers, importance, conviction, and confidence.
+                  {keepsText ? '' : ' Drafted text is not kept.'}
+                </li>
+                <li>{revisionCount} saved prediction versions with model IDs, without drafted text or basis.</li>
+                <li>Which fields changed. Unchanged fields are labeled unchanged, not human agreement.</li>
+              </ul>
               <p>
-                Also includes the time drafts were applied. The full interview transcript and imported conversation
-                history are not attached. See{' '}
-                <a href={RESEARCH_DOC_URL} target="_blank" rel="noreferrer">
-                  How research data is handled
-                </a>
-                .
+                {keepsText
+                  ? 'The AI’s notes and drafts for questions you skipped are not included.'
+                  : 'The AI’s notes, drafted comments, and drafts for questions you skipped are not included.'}
               </p>
-            ) : null}
-          </div>
-        </details>
+              {draftText ? (
+                <>
+                  <Label check className={styles.provenanceOption}>
+                    <Input
+                      type="checkbox"
+                      checked={draftText.mixed ? false : draftText.checked}
+                      aria-checked={draftText.mixed ? 'mixed' : draftText.checked}
+                      innerRef={(element: HTMLInputElement | null) => {
+                        if (element) element.indeterminate = draftText.mixed;
+                      }}
+                      disabled={disabled}
+                      onChange={(event) => onDraftTextChange?.(event.target.checked)}
+                      data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_DRAFT_TEXT}
+                    />{' '}
+                    <span>Let admins read the AI’s draft text{draftText.mixed ? ' (mixed saved choices)' : ''}</span>
+                  </Label>
+                  <p>{DRAFT_TEXT_NOTE}</p>
+                </>
+              ) : null}
+            </>
+          ) : includeComparison ? (
+            <>
+              <p>
+                {selectedCount} selected {selectedCount === 1 ? 'draft' : 'drafts'} and {unselectedCount} unselected{' '}
+                {unselectedCount === 1 ? 'draft' : 'drafts'}:
+              </p>
+              <ul>
+                <li>Original answers, comments, confidence, basis, importance, and conviction.</li>
+                <li>
+                  {revisionCount} saved prediction versions, including model IDs and revised answers, comments,
+                  confidence, and basis.
+                </li>
+                <li>
+                  Reviewed final values and which fields changed. Unchanged fields are labeled unchanged, not human
+                  agreement.
+                </li>
+                <li>
+                  Unselected drafts, including original and edited values and selection status. Their final value is
+                  empty unless submitted separately.
+                </li>
+              </ul>
+              <p>
+                Encrypted answer and comment text is excluded, along with its prediction basis. Edits are not treated as
+                agreement.
+              </p>
+            </>
+          ) : null}
+          {includeProvenance || includeComparison ? (
+            <p>
+              Also includes the time drafts were applied. The full interview transcript and imported conversation
+              history are not attached. See{' '}
+              <a href={RESEARCH_DOC_URL} target="_blank" rel="noreferrer">
+                How research data is handled
+              </a>
+              .
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </>
   );

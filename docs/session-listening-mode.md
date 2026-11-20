@@ -264,7 +264,8 @@ prompt/question-set revision and self-reported source platform/model. A separate
 imported or voice-generated AI drafts or prediction revisions are being
 reviewed, and it is on unless the session's `shareDraftChangesByDefault` turns
 it off. The platform checkbox is labeled **Include platform/model
-provenance**. An **AI prefill metadata** disclosure explains the included
+provenance**. Inside **AI submission info**, the **AI prefill metadata** shown
+with them explains the included
 platform, revision, question-set hash, coverage
 counts, prediction fields, selected/unselected draft counts, and excluded
 metadata according to the visible consent controls.

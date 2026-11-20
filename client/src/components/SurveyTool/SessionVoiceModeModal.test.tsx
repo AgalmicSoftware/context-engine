@@ -556,11 +556,9 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByRole('button', { name: 'What’s this? About sharing for research' })).toHaveAccessibleDescription(
       /drafts you did not select/,
     );
+    // Inside AI submission info the metadata shows at once, with nothing more to open.
     const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
-    expect(metadata).not.toHaveAttribute('open');
-    expect(metadata.querySelector('summary')).toHaveTextContent('AI prefill metadata');
-    fireEvent.click(metadata.querySelector('summary')!);
-    expect(metadata).toHaveAttribute('open');
+    expect(metadata.querySelector('details, summary')).toBeNull();
     expect(metadata).toHaveTextContent('Claude');
     expect(metadata).toHaveTextContent('example');
     expect(metadata).toHaveTextContent('Self-reported');
@@ -3114,7 +3112,6 @@ describe('SessionVoiceModeModal', () => {
     expect(responderContext.closest('details')).not.toHaveAttribute('open');
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)).not.toBeInTheDocument();
     const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
-    fireEvent.click(metadata.querySelector('summary')!);
     expect(metadata).toHaveTextContent('Memories: 4 used / 20 searched');
     expect(metadata).toHaveTextContent('Chat search did not expose a total scanned count.');
     await expectReadableDraftText('Draft answer for What matters?', 'A cautious prediction');
@@ -3469,7 +3466,6 @@ describe('SessionVoiceModeModal', () => {
     const includeComparison = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
     expect(includeComparison).toBeChecked();
     const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
-    fireEvent.click(metadata.querySelector('summary')!);
     expect(metadata).toHaveTextContent('Platform');
     expect(metadata).toHaveTextContent('Claude');
     expect(metadata).toHaveTextContent('Question set');

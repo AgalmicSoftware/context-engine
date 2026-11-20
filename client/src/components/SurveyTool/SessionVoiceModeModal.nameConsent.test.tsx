@@ -397,7 +397,7 @@ it('keeps provenance and the name inside AI submission info, before its metadata
   expect(submissionInfo).not.toContainElement(
     screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON),
   );
-  const metadata = screen.getByText('AI prefill metadata');
+  const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
   expect(submissionInfo).toContainElement(metadata);
   expect(choices[1].compareDocumentPosition(metadata) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });

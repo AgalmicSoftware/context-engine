@@ -198,9 +198,7 @@ it('says what is kept in AI submission info after a voice interview with nothing
   // Sharing for research shows what it would keep instead.
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON));
   expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_NOTHING_SHARED)).not.toBeInTheDocument();
-  expect(screen.getByRole('group', { name: 'AI research metadata' }).querySelector('summary')).toHaveTextContent(
-    'AI research metadata',
-  );
+  expect(screen.getByRole('group', { name: 'AI research metadata' })).toHaveTextContent(/Which fields changed/);
 });
 
 it('counts every hidden draft, scored on the answer given before the reveal', async () => {
