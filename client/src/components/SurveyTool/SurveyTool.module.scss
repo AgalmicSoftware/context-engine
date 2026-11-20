@@ -3893,12 +3893,18 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   min-width: 0;
 }
 
+// Discard sits small at the left, the transcript at the right.
 .sessionInterviewMicRow {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  align-items: center;
+  align-self: stretch;
   gap: 12px;
   max-width: 100%;
+
+  > section {
+    margin-inline-start: auto;
+  }
 }
 
 // The prompt card under an interview that hasn't started, flush with the interview above it.
@@ -4032,7 +4038,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     padding: 8px 6px;
   }
 
-  // Discard and the transcript share the row under the microphone equally.
+  // The transcript takes the rest of the row beside a small Discard.
   .sessionInterviewMicRow {
     width: 100%;
   }
@@ -4131,20 +4137,24 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 }
 
 // Discard on the left of the row under the microphone, in the danger tone.
+// A small text control: findable by its bin and underline, too small to be the thing a thumb lands on.
 .sessionInterviewPanel .sessionInterviewDiscard {
   display: inline-flex;
+  flex: none;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 8px 18px;
-  // The frameless recipe and theme button rules would square it or take its outline off.
-  border: 1px solid currentColor !important;
-  border-radius: var(--ce-radius-pill) !important;
+  gap: 6px;
+  min-height: 36px;
+  padding: 4px 6px;
+  // The frameless recipe and theme button rules would square or outline it.
+  border: 0 !important;
+  border-radius: var(--ce-radius-6) !important;
   background: transparent !important;
   color: var(--ce-status-danger-text) !important;
   font: inherit;
+  font-size: 0.85rem;
   font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
   cursor: pointer;
 
   &:hover:not(:disabled),
