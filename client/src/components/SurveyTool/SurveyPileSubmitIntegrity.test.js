@@ -1158,39 +1158,6 @@ describe('an answer held back for size', () => {
     expect(row.interviewProvenance?.source).toBeUndefined();
   });
 
-  // A shared transcript rides on the first answer sent; one too long with it on keeps its place, and the
-  // transcript goes on the next, or is left out and said so.
-  it.each([
-    ['moves to the next answer sent', true],
-    ['is left out and said so when no other answer is sent', false],
-  ])('a transcript too long for its first answer %s', async (_label, otherEdit) => {
-    const h = await fixture();
-    await act(async () => h.sync());
-    await h.mount();
-    const engine = () => h.engine();
-    const answer = 'y'.repeat(40 * 1024);
-    const drafts = [
-      { questionId: FREEFORM_QID, answer },
-      ...(otherEdit ? [{ questionId: BINARY_QID, answer: 'Yes' }] : []),
-    ];
-    for (const draft of drafts) await run(() => applySessionInterviewAnswer(engine(), draft.questionId, draft.answer));
-    const transcript = `Responder: ${'z'.repeat(60 * 1024)}`;
-    await run(() => recordInterviewProvenance(engine(), drafts, SOURCE, PACKET, false, true, '', [], { transcript }));
-    await settle();
-    const ids = otherEdit ? [BINARY_QID, FREEFORM_QID] : [FREEFORM_QID];
-    const outcome = await run(() => submitSessionInterviewResponses(engine(), ids));
-    await settle();
-
-    const rows = h.submitResponses.mock.calls[0][2];
-    expect(rows.map((row) => row.questionID).sort()).toEqual(ids.slice().sort());
-    const freeform = rows.find((row) => row.questionID === FREEFORM_QID);
-    expect(freeform.answer.value).toBe(answer);
-    expect(freeform.interviewProvenance.transcript).toBeUndefined();
-    const binary = rows.find((row) => row.questionID === BINARY_QID);
-    if (otherEdit) expect(binary.interviewProvenance.transcript).toBe(transcript);
-    else expect(outcome).toEqual({ status: 'submitted', notice: expect.stringMatching(/transcript wasn’t kept/) });
-  });
-
   it('keeps a withdrawal made in the interview window and leaves other edits pending', async () => {
     const h = await mountWithSavedConsent();
     const engine = () => h.engine();

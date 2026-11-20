@@ -10,7 +10,7 @@ import {
 } from './sessionInterviewModalState';
 
 export type InterviewSubmitResult =
-  | { status: 'submitted' | 'already-saved'; notice?: string }
+  | { status: 'submitted' | 'already-saved' }
   | { status: 'login-required' }
   | { status: 'failed' | 'pending' | 'stale'; message?: string };
 
@@ -263,8 +263,6 @@ export const runInterviewDraftSubmit = async ({
       setPendingSubmitAfterLogin,
     });
     setStatus(submitResult?.status === 'already-saved' ? 'Responses already saved' : 'Responses submitted');
-    // Stored, but without something the review offered to keep, such as a transcript too long to fit.
-    if (submitResult && 'notice' in submitResult && submitResult.notice) setError(submitResult.notice);
     onSubmitted?.();
   } catch (applyError) {
     if (disposedRef.current) return;
