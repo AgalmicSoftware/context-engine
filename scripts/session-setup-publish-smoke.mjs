@@ -391,6 +391,9 @@ try {
     .waitFor();
   const showReportSettings = page.getByRole('button', { name: 'Show report settings', exact: true });
   if (await showReportSettings.isVisible()) await showReportSettings.click();
+  // The projection sits behind the Participants Graph's gear.
+  const graphSettings = page.getByRole('button', { name: 'Graph settings', exact: true });
+  if ((await graphSettings.getAttribute('aria-expanded')) !== 'true') await graphSettings.click();
   await page.getByRole('combobox').filter({ has: page.locator('option[value="POLIS"]') }).selectOption('POLIS');
   const analyze = page.getByTestId('ce-polis-analyze-clusters');
   failSponsoredAnalysis = true;
