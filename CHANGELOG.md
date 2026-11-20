@@ -23,7 +23,7 @@ A website release with MCP 0.7.2, published at merge (0.7.1 was never published;
 
 ### Fixed
 
-- Analyze and the other AI text requests are sent once more when the first request gets no reply within ten seconds, instead of saying the AI service cannot be reached. A lost sign-in request is not sent again.
+- Analyze and the other AI text requests are sent once more when the first request fails with no reply within ten seconds of being sent, instead of saying the AI service cannot be reached. A lost sign-in request is not sent again.
 - Profile links from an unlisted session keep working in a browser that hasn't opened the session link.
 
 ### MCP 0.7.2
