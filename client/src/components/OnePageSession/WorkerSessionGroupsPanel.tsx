@@ -324,13 +324,13 @@ const WorkerSessionGroupsPanel = ({
     if (createOnly) {
       return (
         <WorkerGroupCreateMessage sessionName={activeSessionName} sessionSlug={canonicalSessionSlug}>
-          Group creation is unavailable because this session does not have a valid Groups configuration.
+          Groups can’t be created here because this session’s settings could not be read.
         </WorkerGroupCreateMessage>
       );
     }
     return (
       <div className={styles.workerGroupNotice}>
-        This session does not have an exact, validated Worker Groups profile.
+        Groups can’t be shown because this session’s settings could not be read.
       </div>
     );
   }

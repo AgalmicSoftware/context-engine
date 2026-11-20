@@ -291,6 +291,16 @@ describe('ToolExplorer session propagation', () => {
     expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-session-slug', '');
   });
 
+  it('waits for the session before opening Groups, then opens it', async () => {
+    const props = { activeSessionSlug: 'edge', sessionLoadingView: <div role="status">Loading session</div> };
+    const view = renderToolExplorer(props);
+    fireEvent.click(screen.getByText('Groups'));
+    expect(screen.getByRole('status')).toHaveTextContent('Loading session');
+    expect(screen.queryByTestId('mock-sbts-page')).not.toBeInTheDocument();
+    view.rerender(<ToolExplorer activeSessionSlug="edge" />);
+    expect(await screen.findByTestId('mock-sbts-page')).toBeInTheDocument();
+  });
+
   it('keeps Questions open while resolving its session and forwards an inconclusive cache state', async () => {
     const props = { activeSessionSlug: 'edge', sessionLoadingView: <div role="status">Loading session</div> };
     const view = renderToolExplorer(props);

@@ -356,7 +356,9 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
             )}
 
             <Suspense fallback={<LazyFallback label="Loading..." minHeight="30vh" />}>
-              {(expandedToolName === 'Questions' && props.sessionLoadingView) ||
+              {/* Questions and Groups read the session's own settings, so both wait for them: until the Worker has
+                  answered, a listed session has only a placeholder that Groups cannot open. */}
+              {((showQuestionsHeaderActions || showGroupsHeaderActions) && props.sessionLoadingView) ||
                 React.createElement(expandedComponent.component, {
                   ...expandedChildProps,
                   ...(showGroupsHeaderActions ? { key: activeSessionSlug } : {}),
