@@ -5,11 +5,15 @@ import { SESSION_CONFIG_MIGRATION_REQUIRED_REASON } from './sessionConfigSecrets
 import { getDefaultWorkerSessionSlug, validateInboundWorkerSessionSlug } from './sessionSlugResolution.js';
 import { getStorageIndexBinding, resolvePayloadAccessControl } from './storageRouteExecution.js';
 import { GPT_LIVE_1_1_FEATURE } from '../../shared/realtimeInterviewConfig.mjs';
+import { ANALYSIS_CARD_DRAWING_FEATURE } from '../../shared/analysisCardSaved.mjs';
 
 export const FEATURES = Object.freeze([
   'agent_http_v1',
   // limits.aiPerWalletPerDay is honoured; older Workers store it and ignore it.
   'ai_daily_limit_v1',
+  // A saved card's drawn pages are kept and served under the card's own rule, and /analysis-card/picture takes
+  // cachedOnly: an older Worker would draw a picture, and spend an AI call, for that request.
+  ANALYSIS_CARD_DRAWING_FEATURE,
   // The personal analysis card's picture and saved card; they answer only where analysisCardEnabled is true.
   'analysis_card_v1',
   // Context sources carry cards: /storage/context takes set-card and make-card, and lists show each card.

@@ -94,6 +94,47 @@ export const normalizeSavedAnalysisCard = (value) => {
 export const ANALYSIS_CARD_FEATURE = 'analysis_card_v1';
 
 /**
+ * What a Session Worker advertises when it keeps the drawn picture of a saved card and answers for a figure's
+ * portrait without drawing one. An older Worker would draw (and spend an AI call) for the same request, so
+ * neither is ever asked of a Worker that doesn't list this.
+ */
+export const ANALYSIS_CARD_DRAWING_FEATURE = 'analysis_card_drawing_v1';
+// The drawn card: its two pages as the page draws them, each a JPEG or PNG of at most this many bytes.
+export const ANALYSIS_CARD_DRAWING_PAGES_MAX = 2;
+export const ANALYSIS_CARD_DRAWING_PAGE_MAX_BYTES = 1024 * 1024;
+const DRAWING_BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+const DRAWING_SIGNATURES = Object.freeze({
+  'image/jpeg': [0xff, 0xd8, 0xff],
+  'image/png': [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+});
+
+/**
+ * The pages of a drawn card to keep, as `[{ mime, base64 }]`, or null when they are not that: one or two pages,
+ * each standard base64 of a JPEG or PNG whose first bytes say so, within the size limit. Nothing else is kept.
+ */
+export const normalizeAnalysisCardDrawing = (value) => {
+  if (!Array.isArray(value) || !value.length || value.length > ANALYSIS_CARD_DRAWING_PAGES_MAX) return null;
+  const pages = [];
+  for (const entry of value) {
+    const page = record(entry);
+    const signature = Object.hasOwn(DRAWING_SIGNATURES, page.mime) ? DRAWING_SIGNATURES[page.mime] : null;
+    const base64 = typeof page.base64 === 'string' ? page.base64 : '';
+    // Four characters hold three bytes, so the length bounds the size before anything is decoded.
+    if (!signature || !base64 || base64.length % 4 !== 0 || base64.length > Math.ceil(ANALYSIS_CARD_DRAWING_PAGE_MAX_BYTES / 3) * 4) return null;
+    if (!DRAWING_BASE64.test(base64)) return null;
+    let head;
+    try {
+      head = atob(base64.slice(0, 12));
+    } catch {
+      return null;
+    }
+    if (!signature.every((byte, index) => head.charCodeAt(index) === byte)) return null;
+    pages.push({ mime: page.mime, base64 });
+  }
+  return pages;
+};
+
+/**
  * The analysis card is off unless the session has it on (`analysisCardEnabled: true`). A session made on /new
  * starts with it on, because the box there starts ticked; one that never saved the setting, as every session
  * from before the card, has it off until an admin turns it on in Settings. Off, the Worker refuses the card's

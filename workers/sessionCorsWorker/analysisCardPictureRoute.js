@@ -199,6 +199,8 @@ export const dispatchAnalysisCardPictureRoute = async ({
   const kept = await store?.read(figureKey);
   if (kept?.image?.base64) return send({ ...kept, figure: parsed.figure, cached: true }, 200);
   if (REFUSALS.has(kept?.refused)) return send({ error: kept.refused }, 422);
+  // A reader who wants only a picture already made: nothing is asked of a model, counted or stored.
+  if (body?.cachedOnly === true) return send({ error: 'picture_not_made' }, 404);
   if (await store?.read(SESSION_LIMIT_KEY)) return send({ error: 'picture_session_limit' }, 429);
 
   const openaiKey = String((await deps?.getSessionSecrets?.(env, slug))?.openaiKey || '').trim();

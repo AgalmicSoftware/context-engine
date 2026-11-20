@@ -17,3 +17,8 @@ export const ANALYSIS_CARD_FEATURE: 'analysis_card_v1';
 export function analysisCardOn(config: unknown): boolean;
 /** Whether the session keeps each person's answers to that person and its admins, so no card is saved on a page. */
 export function analysisCardAnswersArePrivate(config: unknown): boolean;
+export const ANALYSIS_CARD_DRAWING_FEATURE: 'analysis_card_drawing_v1';
+export const ANALYSIS_CARD_DRAWING_PAGES_MAX: number;
+export const ANALYSIS_CARD_DRAWING_PAGE_MAX_BYTES: number;
+export type AnalysisCardDrawingPage = { mime: 'image/jpeg' | 'image/png'; base64: string };
+export function normalizeAnalysisCardDrawing(value: unknown): AnalysisCardDrawingPage[] | null;

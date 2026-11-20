@@ -3,8 +3,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import {
+  ANALYSIS_CARD_DRAWING_PATH,
+  ANALYSIS_CARD_DRAWING_SAVE_PATH,
+  ANALYSIS_CARD_DRAWINGS_PER_DAY,
   ANALYSIS_CARD_PUBLISH_PATH,
   ANALYSIS_CARD_PUBLISHED_PATH,
+  ANALYSIS_CARD_SAVED_PATHS,
   ANALYSIS_CARD_SAVES_PER_DAY,
   dispatchAnalysisCardSavedRoute,
 } from './analysisCardSavedRoute.js';
@@ -14,7 +18,10 @@ import { json } from './responseKvHelpers.js';
 import { applySessionConfigMutation } from './sessionConfigMutation.js';
 import { FEATURES } from './workerCapabilities.js';
 import { projectPublicWorkerSessionConfig, selectDeployWorkerSessionConfigFields } from '../shared/workerSessionConfig.mjs';
-import { analysisCardAnswersArePrivate, analysisCardOn } from '../../shared/analysisCardSaved.mjs';
+import {
+  ANALYSIS_CARD_DRAWING_FEATURE, ANALYSIS_CARD_DRAWING_PAGE_MAX_BYTES, analysisCardAnswersArePrivate, analysisCardOn,
+  normalizeAnalysisCardDrawing,
+} from '../../shared/analysisCardSaved.mjs';
 import { classifySessionConfigEdits } from '../../shared/sessionConfigEdits.mjs';
 
 const OWNER = `0x${'a1'.repeat(20)}`;
@@ -401,4 +408,150 @@ test('analysisCardEnabled is true or false, set when made or later, signs no one
   assert.equal(selectDeployWorkerSessionConfigFields({ ...base, analysisCardEnabled: true }).analysisCardEnabled, true);
   // The site offers the switch only where the Worker says it has the card.
   assert.ok(FEATURES.includes('analysis_card_v1'));
+});
+
+// The drawn card: made-up bytes with a real picture's first bytes, as the page's canvas gives them.
+const picture = (mime, size = 64) => {
+  const head = mime === 'image/png' ? [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] : [0xff, 0xd8, 0xff, 0xe0];
+  const bytes = Buffer.alloc(size, 7);
+  Buffer.from(head).copy(bytes);
+  return { mime, base64: bytes.toString('base64') };
+};
+const PAGES = [picture('image/jpeg'), picture('image/png')];
+const DRAWING_KEY = `session:salon:analysis-card-drawing:v1:${OWNER}`;
+const saveDrawing = (kv, extra = {}) => run({ path: ANALYSIS_CARD_DRAWING_SAVE_PATH, body: { pages: PAGES }, kv, ...extra });
+const readDrawing = (kv, extra = {}) =>
+  run({ path: ANALYSIS_CARD_DRAWING_PATH, body: { account: OWNER }, address: VISITOR, kv, ...extra });
+
+test('the drawn pages are kept beside the caller\'s own saved card and read back by whoever reads the card', async () => {
+  const kv = createKv();
+  // With no card saved there is nothing to draw for.
+  const early = await saveDrawing(kv);
+  assert.deepEqual([early.response.status, early.body], [409, { error: 'analysis_card_not_saved' }]);
+  assert.deepEqual([kv.puts.length, early.counted.length], [0, 0]);
+
+  await run({ kv });
+  const stored = await saveDrawing(kv);
+  assert.deepEqual([stored.response.status, stored.body], [200, { saved: true, pages: 2, savedAt: NOW }]);
+  assert.deepEqual(stored.counted, [{ route: 'analysis-card-drawing', address: OWNER, limit: ANALYSIS_CARD_DRAWINGS_PER_DAY }]);
+  assert.equal(stored.response.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(JSON.parse(kv.rows.get(DRAWING_KEY)), { cardSavedAt: NOW, pages: PAGES });
+  assert.equal(kv.puts.at(-1).options.expirationTtl, 365 * 24 * 60 * 60);
+
+  const seen = await readDrawing(kv);
+  assert.deepEqual(seen.body, { drawing: { pages: PAGES, savedAt: NOW } });
+  assert.deepEqual(seen.counted, []);
+  assert.deepEqual((await readDrawing(kv, { address: OWNER })).body, seen.body);
+
+  // Nobody draws onto someone else's card, and a read names one account.
+  const other = await saveDrawing(kv, { address: VISITOR, body: { pages: PAGES, account: OWNER } });
+  assert.deepEqual([other.response.status, other.body], [403, { error: 'analysis_card_own_only' }]);
+  assert.deepEqual((await saveDrawing(kv, { address: VISITOR })).body, { error: 'analysis_card_not_saved' });
+  assert.equal((await readDrawing(kv, { body: {} })).response.status, 400);
+  assert.deepEqual(JSON.parse(kv.rows.get(DRAWING_KEY)).pages, PAGES);
+});
+
+test('only one or two small JPEG or PNG pages are kept, and a refused one is neither stored nor counted', async () => {
+  const kv = createKv();
+  await run({ kv });
+  const tooBig = picture('image/jpeg', ANALYSIS_CARD_DRAWING_PAGE_MAX_BYTES + 3);
+  const atLimit = picture('image/png', ANALYSIS_CARD_DRAWING_PAGE_MAX_BYTES);
+  assert.equal(normalizeAnalysisCardDrawing([atLimit]).length, 1);
+  for (const pages of [
+    undefined, null, 'pages', {}, [], [PAGES[0], PAGES[1], PAGES[0]],
+    [tooBig],
+    [{ mime: 'image/svg+xml', base64: Buffer.from('<svg onload="x()"/>').toString('base64') }],
+    [{ mime: 'text/html', base64: PAGES[0].base64 }],
+    // Bytes that are not the picture the type names.
+    [{ mime: 'image/png', base64: PAGES[0].base64 }],
+    [{ mime: 'image/jpeg', base64: Buffer.from('<script>alert(1)</script>').toString('base64') }],
+    [{ mime: 'image/jpeg', base64: `${PAGES[0].base64.slice(0, -4)}!!!!` }],
+    [{ mime: 'image/jpeg', base64: `data:image/jpeg;base64,${PAGES[0].base64}` }],
+    [{ mime: 'image/jpeg', base64: 42 }],
+    [{ base64: PAGES[0].base64 }],
+    ['page'],
+  ]) {
+    const refused = await saveDrawing(kv, { body: { pages } });
+    assert.deepEqual([refused.response.status, refused.body], [400, { error: 'invalid_drawing' }], JSON.stringify(pages)?.slice(0, 60));
+    assert.deepEqual(refused.counted, []);
+  }
+  assert.equal(kv.rows.has(DRAWING_KEY), false);
+  // Anything beside mime and base64 is dropped.
+  await saveDrawing(kv, { body: { pages: [{ ...PAGES[0], name: '../../x', html: '<b>' }] } });
+  assert.deepEqual(JSON.parse(kv.rows.get(DRAWING_KEY)).pages, [PAGES[0]]);
+  // Past the day's uploads nothing is written.
+  const before = kv.rows.get(DRAWING_KEY);
+  const limited = await saveDrawing(kv, { refuse: ['analysis-card-drawing'] });
+  assert.equal(limited.response.status, 429);
+  assert.equal(kv.rows.get(DRAWING_KEY), before);
+});
+
+test('the drawn pages go where the card goes and nowhere else', async () => {
+  const asMember = { ai: true, storage: true };
+  // A new save, or a withdrawal, leaves the old pages unread and deletes them.
+  for (const body of [{ published: true, card: { ...CARD, title: 'A newer card' } }, { published: false }]) {
+    const kv = createKv();
+    await run({ kv });
+    await saveDrawing(kv);
+    await run({ kv, body });
+    assert.equal(kv.rows.has(DRAWING_KEY), false);
+    assert.deepEqual((await readDrawing(kv)).body, { drawing: null });
+    assert.deepEqual((await readDrawing(kv, { address: OWNER })).body, { drawing: null });
+  }
+  // Pages left behind by a failed delete are still not shown beside another save.
+  const stale = createKv();
+  await run({ kv: stale });
+  stale.rows.set(DRAWING_KEY, JSON.stringify({ cardSavedAt: NOW - 1, pages: PAGES }));
+  assert.deepEqual((await readDrawing(stale)).body, { drawing: null });
+  stale.rows.set(DRAWING_KEY, JSON.stringify({ cardSavedAt: NOW, pages: [{ mime: 'image/jpeg', base64: 'not a picture' }] }));
+  assert.deepEqual((await readDrawing(stale)).body, { drawing: null });
+
+  // Where answers are private nobody is given the pages, owner and admin included, and they are deleted.
+  for (const visibility of ['participant_aggregate', 'private_admin']) {
+    for (const reader of [VISITOR, ADMIN, OWNER]) {
+      const kv = createKv();
+      await run({ kv });
+      await saveDrawing(kv);
+      const hidden = await readDrawing(kv, { address: reader, config: showing(visibility), scopes: asMember });
+      assert.deepEqual(hidden.body, { drawing: null }, visibility);
+      assert.equal(kv.rows.has(DRAWING_KEY), false, visibility);
+      // And none can be stored there.
+      const refused = await saveDrawing(kv, { config: showing(visibility), scopes: asMember });
+      assert.equal(refused.response.status, 409, visibility);
+    }
+  }
+  // Where members see every answer, a member reads the pages; a sign-in that could not read the answers does not.
+  const members = showing('session_member_full');
+  const kv = createKv();
+  await run({ kv, config: members, scopes: asMember });
+  await saveDrawing(kv, { config: members, scopes: asMember });
+  assert.deepEqual((await readDrawing(kv, { config: members, scopes: asMember })).body.drawing.pages, PAGES);
+  assert.deepEqual((await readDrawing(kv, { config: members, scopes: { ai: true } })).body, { drawing: null });
+  // A check that cannot be made counts as no.
+  const broken = await readDrawing(kv, { createRequesterAccessChecks: () => ({ canRead: async () => { throw new Error('gate unavailable'); } }) });
+  assert.deepEqual(broken.body, { drawing: null });
+
+  // Off, ended or without the ai scope, the routes answer as the card's own do: nothing read, stored or counted.
+  for (const path of [ANALYSIS_CARD_DRAWING_PATH, ANALYSIS_CARD_DRAWING_SAVE_PATH]) {
+    const body = path === ANALYSIS_CARD_DRAWING_PATH ? { account: OWNER } : { pages: PAGES };
+    const off = await run({ path, body, kv, config: { ...ON, analysisCardEnabled: false } });
+    assert.deepEqual([off.response.status, off.body], [403, { error: 'analysis_card_off' }], path);
+    assert.equal((await run({ path, body, kv, scopes: { storage: true } })).response.status, 403, path);
+    assert.equal((await run({ path, body, kv, currentScopes: { ai: false } })).response.status, 403, path);
+    assert.equal((await run({ path, body, kv, config: { ...ON, sessionEndsAt: new Date(NOW - 1000).toISOString() } })).response.status, 410, path);
+  }
+});
+
+test('the drawn-card routes are path-owned and advertised', async () => {
+  assert.deepEqual(ANALYSIS_CARD_SAVED_PATHS, ['/analysis-card/publish', '/analysis-card/published', '/analysis-card/drawing/save', '/analysis-card/drawing']);
+  assert.ok(FEATURES.includes(ANALYSIS_CARD_DRAWING_FEATURE));
+  const kv = createKv();
+  await run({ kv });
+  const dispatched = await dispatchAuthenticatedSecretActionRoute({
+    path: ANALYSIS_CARD_DRAWING_SAVE_PATH, action: 'ai', body: { pages: PAGES, action: 'ai' }, config: ON, slug: 'salon', address: OWNER,
+    env: { GROUP_KV: kv }, headers: {}, scopes: { ai: true },
+    deps: { json, now: () => NOW, computeScopesForLogin: async () => ({ ai: true }), evaluateAuthenticatedRoutePreflight, checkRateLimit: async () => true },
+  });
+  assert.equal(dispatched.handled, true);
+  assert.deepEqual(await dispatched.response.json(), { saved: true, pages: 2, savedAt: NOW });
 });
