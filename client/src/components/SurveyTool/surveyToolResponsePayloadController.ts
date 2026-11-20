@@ -277,6 +277,13 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
   // answer or comment is encrypted: the conversation may repeat what was encrypted.
   const interviewTranscripts = asRecord(asRecord(surveyResponseState).interviewTranscripts);
   const transcriptsPlaced = new Set<string>();
+  // Answers the submit found too long to store with a transcript on them.
+  const transcriptSkip = new Set(
+    (Array.isArray(asRecord(surveyResponseState).interviewTranscriptSkip)
+      ? (asRecord(surveyResponseState).interviewTranscriptSkip as unknown[])
+      : []
+    ).map((id) => normalizeQuestionIdKey(id)),
+  );
   const anyFieldEncrypted = answeredQuestions.some((q) => {
     const answer = surveyResponseState.answers?.[q.id] || {};
     const additional = surveyResponseState.additionalComments?.[q.id] || {};
@@ -359,7 +366,10 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
     const sharedTranscript = interviewTranscripts[interviewId] ?? interviewProvenanceRecord.transcript;
     // An upload sends only changed answers, so the transcript rides on one of those, never on one left as saved.
     const uploading =
-      !opts.refuseWithheldConsent || !includedQuestionIds.size || includedQuestionIds.has(normalizeQuestionIdKey(q.id));
+      (!opts.refuseWithheldConsent ||
+        !includedQuestionIds.size ||
+        includedQuestionIds.has(normalizeQuestionIdKey(q.id))) &&
+      !transcriptSkip.has(normalizeQuestionIdKey(q.id));
     const transcript =
       interviewId &&
       typeof sharedTranscript === 'string' &&

@@ -15,6 +15,10 @@ export type InterviewConsentOverrides = {
 /** The most of a shared transcript kept with an answer, in bytes as stored: the Worker refuses an answer over 96 KiB. */
 export const INTERVIEW_TRANSCRIPT_MAX_BYTES = 64 * 1024;
 
+/** Said after a submit that stored the answers but no shared transcript, as each would be too long with it. */
+export const INTERVIEW_TRANSCRIPT_LEFT_OUT =
+  'The interview transcript wasn’t kept: with it, an answer would be too long to store.';
+
 /** A shared transcript's opening part that fits, cut between characters; JSON escapes count as stored. */
 export const capInterviewTranscript = (text: string): string => {
   const fits = (value: string) =>

@@ -1,6 +1,7 @@
 import {
   getChangedInterviewConsentQids,
   capInterviewTranscript,
+  INTERVIEW_TRANSCRIPT_LEFT_OUT,
   isWithheldConsent,
   keepConsentWithdrawals,
   resolveConsentFlags,
@@ -2892,6 +2893,8 @@ export const submitSessionInterviewResponses = async (engine: PileViewModeEngine
   ) {
     engine.setState({ interviewPendingNoticeContext: engine.getSubmitCount() > 0 ? submitContext : '' });
   }
+  if (result && typeof result === 'object' && result.status === 'submitted' && engine._transcriptLeftOut)
+    return { ...result, notice: INTERVIEW_TRANSCRIPT_LEFT_OUT };
   if (result && typeof result === 'object' && 'status' in result) return result;
   if (!engine.props.loginComplete) return { status: 'login-required' as const };
   return { status: 'failed' as const, message: 'Submission did not complete.' };

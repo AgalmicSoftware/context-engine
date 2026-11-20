@@ -1,4 +1,8 @@
-import { buildSavedInterviewConsent, isWithheldConsent } from './sessionInterviewConsent';
+import {
+  buildSavedInterviewConsent,
+  INTERVIEW_TRANSCRIPT_LEFT_OUT,
+  isWithheldConsent,
+} from './sessionInterviewConsent';
 import { loadSessionInterviewSavedAnswers } from './sessionInterviewSavedAnswers';
 import { planDraftTextSync, resendPendingDraftTextDeletes, syncDraftText } from './sessionInterviewDraftText';
 import { getSubmittedWorkerResponseRecency } from '../../utilities/survey/workerResponseRecency';
@@ -534,9 +538,7 @@ export const createSurveyQuestionsSubmitRuntime = (
         const error = validateQuadraticAllocation(value, question);
         if (error) throw new Error(error);
       }
-      // The Worker refuses an answer too large to store. Before locking or upload,
-      // hold back and name each one; the other changes still submit.
-      const oversize = readOversizeAnswers(submitContext, activeSlice, changedQids, submitQuestionPool);
+      const oversize = new Map<string, string>();
       // A still-locked field with a new audience can't be re-encrypted until it is decrypted again.
       Array.from(changedQids as Set<string>).forEach((qid) => {
         if (
@@ -555,15 +557,51 @@ export const createSurveyQuestionsSubmitRuntime = (
             "It is still locked, so its new audience can't be applied yet. Decrypt it, then submit again.",
           );
       });
-      heldBackNotice = Array.from(oversize, ([qid, message]) =>
-        submitContext.singleQuestionMode
-          ? message
-          : `${nameQuestionForNotice(
-              submitQuestionPool.find((entry: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(entry?.id) === qid)
-                ?.prompt,
-              qid,
-            )} wasn't submitted. ${message}`,
-      ).join(' ');
+      // The Worker refuses an answer too large to store. Before locking or upload, hold back and name each one;
+      // the other changes still submit. A shared transcript rides on the first answer sent, so each holdback can
+      // move it: the set is sized again until it holds. An answer too long only with the transcript keeps its
+      // place, and the transcript skips it.
+      const transcriptSkip = new Set<string>();
+      // Each submit decides afresh which answers the transcript skips.
+      const { interviewTranscriptSkip: _earlierSkip, ...withoutSkip } = activeSlice;
+      activeSlice = withoutSkip;
+      const pending = () => new Set(Array.from(changedQids as Set<string>).filter((qid) => !oversize.has(qid)));
+      for (;;) {
+        const tooLong = readOversizeAnswers(submitContext, activeSlice, pending(), submitQuestionPool);
+        if (!tooLong.size) break;
+        const bare = readOversizeAnswers(
+          submitContext,
+          { ...activeSlice, interviewTranscriptSkip: Array.from(pending()) },
+          new Set(tooLong.keys()),
+          submitQuestionPool,
+        );
+        tooLong.forEach((message, qid) =>
+          bare.has(qid) ? oversize.set(qid, bare.get(qid) || message) : transcriptSkip.add(qid),
+        );
+        activeSlice = { ...activeSlice, interviewTranscriptSkip: Array.from(transcriptSkip) };
+      }
+      const transcriptKept = (rows: SurveyQuestionsLegacyValue) =>
+        (Array.isArray(rows?.responses) ? rows.responses : [rows]).some(
+          (row: SurveyQuestionsLegacyValue) => !!row?.interviewProvenance?.transcript,
+        );
+      const transcriptLeftOut =
+        transcriptSkip.size > 0 &&
+        !transcriptKept(prepareJsonAndHash(surveyIndex, undefined, activeSlice, pending(), true));
+      // Read by the interview's submit, which says so beside its success.
+      inst._transcriptLeftOut = transcriptLeftOut;
+      heldBackNotice = [
+        ...Array.from(oversize, ([qid, message]) =>
+          submitContext.singleQuestionMode
+            ? message
+            : `${nameQuestionForNotice(
+                submitQuestionPool.find(
+                  (entry: SurveyQuestionsLegacyValue) => normalizeQuestionIdKey(entry?.id) === qid,
+                )?.prompt,
+                qid,
+              )} wasn't submitted. ${message}`,
+        ),
+        ...(transcriptLeftOut ? [INTERVIEW_TRANSCRIPT_LEFT_OUT] : []),
+      ].join(' ');
       const submitQids = new Set<string>(Array.from(changedQids as Set<string>).filter((qid) => !oversize.has(qid)));
       if (oversize.size && !submitQids.size) throw new Error(heldBackNotice);
 
@@ -692,7 +730,7 @@ export const createSurveyQuestionsSubmitRuntime = (
         handleStaleSubmitContext(submitContext);
         return { status: 'stale', message: 'Submission context changed before upload completed.' };
       }
-      if (oversize.size) {
+      if (oversize.size || transcriptLeftOut) {
         // Listed with any answers the upload itself held back, so callers report them too.
         const heldBackQids = Array.isArray(inst._heldBackSubmitQids) ? inst._heldBackSubmitQids : [];
         inst._heldBackSubmitQids = Array.from(new Set([...heldBackQids, ...oversize.keys()]));
