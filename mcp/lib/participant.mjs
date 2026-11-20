@@ -1844,7 +1844,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         return { session: ctx.info.slug, made: false, note: 'This session has its agent functions switched off, so it makes no sign-in links.' };
       }
       if (!agentSignInLinksOn(sessionConfig)) {
-        return { session: ctx.info.slug, made: false, note: 'This session doesn’t have sign-in links from agents switched on; an admin of the session can turn them on in its settings. Until then the person can watch what you did through you, or take part themselves on the session page.' };
+        return { session: ctx.info.slug, made: false, note: 'This session doesn’t have sign-in links from agents switched on; an admin of the session can turn them on in its settings. If an admin has just done so, try again in half a minute: a session’s settings are read again every 30 seconds. Until then the person can watch what you did through you, or take part themselves on the session page.' };
       }
       checkpoint();
       const made = await ctx.client.createSignInCode();

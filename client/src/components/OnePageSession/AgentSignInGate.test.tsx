@@ -338,11 +338,53 @@ it('says in the Worker’s words why a passkey that already took part here was n
     expect(notice()?.textContent).toMatch(/already taken part in this session under its own account/),
   );
   expect(notice()?.textContent).toMatch(/Create a new passkey for this account instead/);
+  // The refusal is its own message, apart from the notice's standing words.
+  const alert = screen.getByTestId('ce-agent-sign-in-alert');
+  expect(alert.getAttribute('role')).toBe('alert');
+  expect(alert.textContent).toMatch(/^This passkey has already taken part in this session under its own account/);
+  expect(alert.closest('p')?.className).not.toBe(notice()?.querySelector('p')?.className);
+  expect(notice()?.querySelector('p')?.textContent).not.toMatch(/already taken part/);
   // Still signed in from the link, with the main way on offer.
   expect(screen.getByTestId('ce-agent-account-add-passkey').textContent).toBe('Create passkey');
   expect(screen.queryByTestId('ce-agent-account-own-account')).toBeNull();
   act(() => void held({ via: 'passkey_link', passkey: PASSKEY }));
   expect(screen.queryByTestId('ce-agent-account-own-account')).toBeNull();
+});
+
+it('makes Create passkey the main button, and says what is now so once, not twice', async () => {
+  act(() => void held());
+  jest.mocked(attachPasskeyHere).mockResolvedValue(null);
+  gate({ account: ACCOUNT, provider: 'agent_link' });
+  const create = screen.getByTestId('ce-agent-account-add-passkey');
+  const existing = screen.getByTestId('ce-agent-account-use-passkey');
+  const signOut = screen.getByTestId('ce-agent-account-sign-out');
+  expect(create.className).toBe('primaryButton');
+  expect([existing.className, signOut.className]).toEqual(['secondaryButton', 'secondaryButton']);
+  // First in order too.
+  expect(notice()?.querySelector('button')).toBe(create);
+  // A step that worked changes what the notice says; it adds no second sentence saying the same.
+  fireEvent.click(create);
+  await waitFor(() => expect(attachPasskeyHere).toHaveBeenCalled());
+  await act(async () => {});
+  expect(screen.queryByTestId('ce-agent-sign-in-alert')).toBeNull();
+  expect(notice()?.textContent).not.toMatch(/Your passkey is attached to this account/);
+
+  act(() => void held({ via: 'passkey_link', passkey: PASSKEY }));
+  jest.mocked(changeAgentAccess).mockImplementation(async (access) => {
+    act(() => void held({ via: 'passkey_link', passkey: PASSKEY, agentAccess: access }));
+    return null;
+  });
+  fireEvent.click(screen.getByTestId('ce-agent-account-cancel'));
+  await waitFor(() => expect(notice()?.textContent).toMatch(/Your agent’s access is ended/));
+  expect(notice()?.textContent?.match(/access (to this account )?is ended/g)).toHaveLength(1);
+  // What goes wrong is still said, by itself.
+  jest.mocked(changeAgentAccess).mockRejectedValue(new Error('The session did not make that change. Try again.'));
+  fireEvent.click(screen.getByTestId('ce-agent-account-allow'));
+  await waitFor(() =>
+    expect(screen.getByTestId('ce-agent-sign-in-alert').textContent).toBe(
+      'The session did not make that change. Try again.',
+    ),
+  );
 });
 
 it('offers Cancel all agent authorizations only once a passkey is attached, and says while the agent still has access', async () => {

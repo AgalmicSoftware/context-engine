@@ -67,6 +67,55 @@
   }
 }
 
+// The one thing a notice most wants done: filled, where the others are outlined.
+.primaryButton {
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 1px solid var(--ce-session-chrome-contrast);
+  border-radius: var(--ce-radius-4);
+  background: var(--ce-session-chrome-contrast);
+  color: var(--ce-session-chrome);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover {
+    background: color-mix(in srgb, var(--ce-session-chrome-contrast) 86%, var(--ce-session-chrome));
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-session-focus);
+    outline-offset: 3px;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.7;
+  }
+}
+
+// The notice's standing words, with anything that went wrong set apart below them.
+.noticeText {
+  min-width: 0;
+}
+
+// Something the person just pressed did not work: its own block in the notice's reversed colours, so it is not
+// read as part of the standing words.
+.noticeAlert {
+  margin: 4px 0 6px;
+  padding: 6px 10px;
+  border-radius: var(--ce-radius-4);
+  background: var(--ce-session-chrome-contrast);
+  color: var(--ce-session-chrome);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .codeForm {
   display: inline-flex;
   flex-wrap: wrap;

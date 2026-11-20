@@ -259,7 +259,11 @@ const LoginModalDisplayBody = ({
             {renderAgentHandoffPanel()}
             <div className={styles.accountModalControls}>
               <Suspense fallback={null}>
-                <AgentAccountAccessPanel provider={provider} buttonClassName="btn btn-secondary btn-sm" />
+                <AgentAccountAccessPanel
+                  provider={provider}
+                  buttonClassName="btn btn-secondary btn-sm"
+                  primaryButtonClassName="btn btn-primary btn-sm"
+                />
               </Suspense>
             </div>
           </div>

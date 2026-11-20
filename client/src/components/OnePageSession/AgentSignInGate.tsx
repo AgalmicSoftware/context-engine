@@ -233,14 +233,29 @@ export default function AgentSignInGate({
   }, [target, heldAddress]);
 
   if (!target) return null;
-  const notice = (message: React.ReactNode, actions: React.ReactNode, isError = false): React.ReactElement => (
+  // `alert` is something that went wrong with what the person just pressed. It is said by itself, set apart from
+  // the standing words of the notice, so it is not read past.
+  const notice = (
+    message: React.ReactNode,
+    actions: React.ReactNode,
+    isError = false,
+    alert: React.ReactNode = null,
+  ): React.ReactElement => (
     <section className={styles.notice} aria-label="Agent’s account" data-testid="ce-agent-sign-in-notice">
-      <p className={styles.message} role={isError ? 'alert' : 'status'}>
-        {message}
-      </p>
+      <div className={styles.noticeText}>
+        <p className={styles.message} role={isError && !alert ? 'alert' : 'status'}>
+          {message}
+        </p>
+        {alert ? (
+          <p className={styles.noticeAlert} role="alert" data-testid="ce-agent-sign-in-alert">
+            {alert}
+          </p>
+        ) : null}
+      </div>
       {actions ? <div className={styles.actions}>{actions}</div> : null}
     </section>
   );
+  const wentWrong = note?.isError ? note.text : null;
 
   if (phase === 'ask') {
     return notice(
@@ -300,7 +315,6 @@ export default function AgentSignInGate({
       <>
         A passkey (<span title={attached.passkey}>{shortAddress(attached.passkey)}</span>) is attached to your account
         in this session: whoever holds it can sign in here as you. If you did not attach it, remove it.
-        {note ? <> {note.text}</> : null}
       </>,
       <>
         <button
@@ -334,6 +348,7 @@ export default function AgentSignInGate({
         </button>
       </>,
       true,
+      wentWrong,
     );
   }
 
@@ -344,7 +359,7 @@ export default function AgentSignInGate({
       <>
         This passkey is also attached to <strong>an account your AI agent set up</strong> in this session. You are in
         the passkey’s own account now ({shortAddress(signedInAs)}): what you answer here is kept under it, not under the
-        agent’s account.{note ? <> {note.text}</> : null}
+        agent’s account.
       </>,
       <>
         <button
@@ -367,7 +382,8 @@ export default function AgentSignInGate({
           Open the agent’s account
         </button>
       </>,
-      note?.isError,
+      false,
+      wentWrong,
     );
   }
 
@@ -385,10 +401,12 @@ export default function AgentSignInGate({
     <AgentAccountAccessPanel
       provider={provider}
       buttonClassName={styles.secondaryButton}
-      onMessage={(text, isError) => setNote({ text, isError })}
+      primaryButtonClassName={styles.primaryButton}
+      // The notice itself says what is now so (a passkey attached, the agent's access ended), so only what went
+      // wrong is said beside it.
+      onMessage={(text, isError) => setNote(isError ? { text, isError } : null)}
     />
   );
-  const said = note ? <> {note.text}</> : null;
   if (ended && here.via !== 'passkey_link') {
     return notice(
       <>Your sign-in to {who}, the account your AI agent set up, has ended. Ask your agent for a new link.</>,
@@ -408,27 +426,27 @@ export default function AgentSignInGate({
             account: whoever holds it can sign in here as this account. If it isn’t yours, sign out and tell your agent.
           </>
         ) : null}
-        {said}
       </>,
       panel,
-      note?.isError,
+      false,
+      wentWrong,
     );
   }
   if (here.agentAccess === 'active') {
     return notice(
       <>
         You are using {who}, the account your AI agent set up, with your passkey. Your agent can still use it, and see
-        and change what you answer here.{said}
+        and change what you answer here.
       </>,
       panel,
-      note?.isError,
+      false,
+      wentWrong,
     );
   }
   return notice(
-    <>
-      You are using {who}, the account your AI agent set up, with your passkey. Your agent’s access is ended.{said}
-    </>,
+    <>You are using {who}, the account your AI agent set up, with your passkey. Your agent’s access is ended.</>,
     panel,
-    note?.isError,
+    false,
+    wentWrong,
   );
 }

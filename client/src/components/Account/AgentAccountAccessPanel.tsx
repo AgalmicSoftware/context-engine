@@ -33,6 +33,8 @@ const HELP = {
 type Props = {
   provider: unknown;
   buttonClassName?: string;
+  // For the one main action, creating a passkey for the account; the other buttons take `buttonClassName`.
+  primaryButtonClassName?: string;
   // Called with what happened, in words, for the notice that shows this panel.
   onMessage?: (message: string, isError: boolean) => void;
 };
@@ -40,6 +42,7 @@ type Props = {
 export default function AgentAccountAccessPanel({
   provider,
   buttonClassName = '',
+  primaryButtonClassName = '',
   onMessage,
 }: Props): React.ReactElement | null {
   const account = useSyncExternalStore(subscribeAgentLinkAccount, readAgentLinkAccount);
@@ -61,10 +64,16 @@ export default function AgentAccountAccessPanel({
       setBusy('');
     }
   };
-  const button = (name: string, label: React.ReactNode, help: string, onClick: () => void): React.ReactElement => (
+  const button = (
+    name: string,
+    label: React.ReactNode,
+    help: string,
+    onClick: () => void,
+    main = false,
+  ): React.ReactElement => (
     <button
       type="button"
-      className={buttonClassName}
+      className={main ? primaryButtonClassName || buttonClassName : buttonClassName}
       onClick={onClick}
       disabled={!!busy}
       title={help}
@@ -86,6 +95,7 @@ export default function AgentAccountAccessPanel({
               () => attachPasskeyHere({ useExisting: false }),
               'Your passkey is attached to this account.',
             ),
+            true,
           )
         : null}
       {!withPasskey
