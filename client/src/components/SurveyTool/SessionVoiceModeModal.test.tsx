@@ -505,6 +505,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByText(/Speak with an AI interviewer/)).not.toBeInTheDocument();
     fireEvent.focus(help);
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Stopping prepares drafts for your review');
+    expect(screen.getByRole('tooltip')).toHaveTextContent('You can answer in the language you prefer.');
     fireEvent.blur(help);
     await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
     fireEvent.focus(screen.getByRole('button', { name: 'Interview status: Ready' }));

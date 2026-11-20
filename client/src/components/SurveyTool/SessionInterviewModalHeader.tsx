@@ -17,6 +17,9 @@ type SessionInterviewModalHeaderProps = {
   statusRef: React.RefObject<HTMLButtonElement>;
 };
 
+/** Behind the interview's "?": the voice interviewer follows the language someone speaks. */
+export const INTERVIEW_LANGUAGE_HINT = 'You can answer in the language you prefer.';
+
 /** A waiting line in the interview: the app's spinner, then what it is waiting on. */
 export function InterviewBusyLabel({ label }: { label: string }) {
   return (
@@ -52,7 +55,7 @@ export default function SessionInterviewModalHeader({
           <FontAwesomeIcon icon={faQuestionCircle} />
         </button>
         <UncontrolledTooltip target="ce-interview-help" placement="bottom" trigger="hover focus" autohide={false}>
-          {guidance}
+          {guidance} {INTERVIEW_LANGUAGE_HINT}
         </UncontrolledTooltip>
         <span
           role="status"
