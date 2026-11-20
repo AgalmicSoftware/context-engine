@@ -1,5 +1,5 @@
-// What a person signed in to the account their AI agent set up can do about it: create a passkey for it, and in
-// the account dialog take that passkey off again. Shown in the session's standing notice and in the account
+// What a person signed in to the account their AI agent set up can do about it: create a passkey for it, where it
+// has none, and in the account dialog take that passkey off again. Shown in the session's standing notice and in the account
 // dialog; it renders nothing for any other account. Signing out is the account dialog's own Disconnect.
 //
 // The Worker can also end the agent's access to such an account. The site no longer offers that: it only lets
@@ -36,6 +36,9 @@ type Props = {
   onMessage?: (message: string, isError: boolean) => void;
   // The notice keeps to the one step a new arrival needs; the account dialog has the rest.
   inNotice?: boolean;
+  // Create passkey is offered only where the account is known to have no passkey attached: the notice asks the
+  // Worker and says so here. Anywhere else it is not offered.
+  offerPasskey?: boolean;
 };
 
 export default function AgentAccountAccessPanel({
@@ -44,6 +47,7 @@ export default function AgentAccountAccessPanel({
   primaryButtonClassName = '',
   onMessage,
   inNotice = false,
+  offerPasskey = false,
 }: Props): React.ReactElement | null {
   const account = useSyncExternalStore(subscribeAgentLinkAccount, readAgentLinkAccount);
   const [busy, setBusy] = useState('');
@@ -85,7 +89,7 @@ export default function AgentAccountAccessPanel({
   const withPasskey = account.via === 'passkey_link';
   return (
     <>
-      {!withPasskey
+      {!withPasskey && offerPasskey
         ? button(
             'add-passkey',
             'Create passkey',

@@ -89,7 +89,9 @@ export default function AgentSignInGate({
   // The passkey's own account is open, and the passkey is attached to an agent's account here.
   const [offer, setOffer] = useState('');
   // A passkey the Worker says is attached to the account a link signed in to.
-  const [attachedHere, setAttachedHere] = useState('');
+  // Whether the account already has a passkey attached, by the Worker's word: Create passkey is offered only once
+  // it is known to have none. Where the Worker can't be asked it is offered, and the Worker refuses a second one.
+  const [passkeyAttached, setPasskeyAttached] = useState<boolean | null>(null);
   const signedInAs = lower(account);
 
   const fail = useCallback((error: unknown): void => {
@@ -216,18 +218,19 @@ export default function AgentSignInGate({
     const token = heldSessionToken(target.workerUrl, target.sessionSlug);
     if (!token) return undefined;
     let current = true;
-    setAttachedHere('');
+    setPasskeyAttached(null);
     void readAgentSignInState(target, token)
       .then((state) => {
         const account = readAgentLinkAccount();
-        if (!current || !account || account.address !== heldAddress || !state.attachedPasskey) return;
-        // Someone signed in from a link is told when a passkey can already open this account.
-        if (account.via !== 'passkey_link') setAttachedHere(state.attachedPasskey.address);
-        if (account.agentAccess !== state.attachedPasskey.agentAccess) {
+        if (!current || !account || account.address !== heldAddress) return;
+        setPasskeyAttached(!!state.attachedPasskey);
+        if (state.attachedPasskey && account.agentAccess !== state.attachedPasskey.agentAccess) {
           holdAgentLinkAccount({ ...account, agentAccess: state.attachedPasskey.agentAccess });
         }
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (current) setPasskeyAttached(false);
+      });
     return () => {
       current = false;
     };
@@ -441,9 +444,10 @@ export default function AgentSignInGate({
       provider={provider}
       buttonClassName={styles.secondaryButton}
       primaryButtonClassName={styles.primaryButton}
-      // The notice has the one step a new arrival needs, Create passkey; signing out and the rest are in the
-      // account dialog.
+      // The notice has the one step a new arrival needs, Create passkey, and only where the account has no
+      // passkey yet; signing out and the rest are in the account dialog.
       inNotice
+      offerPasskey={passkeyAttached === false}
       // The notice itself says what is now so (a passkey attached), so only what went wrong is said beside it.
       onMessage={(text, isError) => setNote(isError ? { text, isError } : null)}
     />
@@ -460,15 +464,9 @@ export default function AgentSignInGate({
       <>
         {fromLink ? 'Signed in from your agent’s link. ' : ''}You are signed in as {who}, the account your AI agent set
         up.
-        {attachedHere ? (
-          <>
-            {' '}
-            A passkey (<span title={attachedHere}>{shortAddress(attachedHere)}</span>) is already attached to this
-            account: whoever holds it can sign in here as this account. If it isn’t yours, sign out and tell your agent.
-          </>
-        ) : null}
       </>,
-      panel,
+      // With a passkey already attached, or while that is being asked, nothing more is shown.
+      passkeyAttached === false ? panel : null,
       false,
       wentWrong,
     );

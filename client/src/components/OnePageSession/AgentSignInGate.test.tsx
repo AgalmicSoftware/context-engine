@@ -356,6 +356,9 @@ it('keeps a notice on the page while signed in from a link, with one button: Cre
   // No way to close it, and one step: signing out is the account dialog's, and a passkey the person already
   // uses is not offered.
   expect(screen.queryByText('Dismiss')).toBeNull();
+  // Offered once the Worker has said the account has no passkey; not before.
+  expect(notice()?.querySelectorAll('button')).toHaveLength(0);
+  await screen.findByTestId('ce-agent-account-add-passkey');
   const buttons = Array.from(notice()?.querySelectorAll('button') || []);
   expect(buttons.map((button) => button.textContent)).toEqual(['Create passkey']);
   expect(buttons[0].className).toBe('primaryButton');
@@ -372,7 +375,7 @@ it('says what went wrong with the passkey as its own message, apart from the sta
   act(() => void held());
   jest.mocked(attachPasskeyHere).mockRejectedValue(new Error('The session could not be reached. Try again.'));
   gate({ account: ACCOUNT, provider: 'agent_link' });
-  fireEvent.click(screen.getByTestId('ce-agent-account-add-passkey'));
+  fireEvent.click(await screen.findByTestId('ce-agent-account-add-passkey'));
   const alert = await screen.findByTestId('ce-agent-sign-in-alert');
   expect(alert.getAttribute('role')).toBe('alert');
   expect(alert.textContent).toBe('The session could not be reached. Try again.');
@@ -480,7 +483,7 @@ it('opens the agent’s account when the Worker says, after the page settled, th
   expect(enterThroughAttachedPasskey).toHaveBeenCalledTimes(1);
 });
 
-it('tells someone signed in from a link when a passkey can already open the account', async () => {
+it('shows nothing extra to someone signed in from a link whose account already has a passkey', async () => {
   act(() => void held());
   jest.mocked(readAgentSignInState).mockResolvedValue({
     via: 'agent_link',
@@ -489,11 +492,19 @@ it('tells someone signed in from a link when a passkey can already open the acco
     agentParticipation: true,
   });
   gate({ account: ACCOUNT, provider: 'agent_link' });
-  await waitFor(() =>
-    expect(notice()?.textContent).toMatch(
-      /A passkey \(0xb2b2…b2b2\) is already attached to this\s+account: whoever holds it can sign in here as this account/,
-    ),
-  );
+  await waitFor(() => expect(readAgentSignInState).toHaveBeenCalled());
+  await act(async () => {});
+  // Who the account is, and no more: no Create passkey, and no word of the passkey that is there.
+  expect(notice()?.textContent).toMatch(/You are signed in as 0xa1a1…a1a1, the account your AI agent set up\.$/);
+  expect(notice()?.querySelectorAll('button')).toHaveLength(0);
+  expect(notice()?.textContent).not.toMatch(/passkey/i);
+});
+
+it('offers Create passkey where the Worker could not be asked: it refuses a second passkey itself', async () => {
+  act(() => void held());
+  jest.mocked(readAgentSignInState).mockRejectedValue(new Error('offline'));
+  gate({ account: ACCOUNT, provider: 'agent_link' });
+  expect((await screen.findByTestId('ce-agent-account-add-passkey')).textContent).toBe('Create passkey');
 });
 
 it('takes the Worker’s word for whether the agent still has access', async () => {
