@@ -22,8 +22,9 @@ import { rateLimitRefusal } from './rateLimitRefusal.js';
 // is then given, as always, only to its owner and to someone who may read that person's answers.)
 //
 // The card as its owner's page drew it travels with the saved card and under the same rule:
-// - POST /analysis-card/drawing/save { pages: [{ mime, base64 }] } keeps the caller's own drawn pages (one or
-//   two, each a JPEG or PNG of at most 1 MiB) beside the card they have saved. With no saved card it is refused.
+// - POST /analysis-card/drawing/save { savedAt, pages: [{ mime, base64 }] } keeps the caller's own drawn pages
+//   (one or two, each a JPEG of at most 1 MiB) beside the card they saved at `savedAt`. With no saved card, or
+//   for a save that is no longer the current one, it is refused.
 // - POST /analysis-card/drawing { account } answers { drawing: { pages, savedAt } } to whoever /published would
 //   give that card to, and { drawing: null } to everyone else, as when none was kept.
 // The pages are tied to the save they were drawn for: a new save, a withdrawal or tightened rules leave them
@@ -117,6 +118,8 @@ export const dispatchAnalysisCardSavedRoute = async ({
   };
   // Deletes a stored card's words. A withdrawal's marker holds none and keeps the person's "no", so it stays.
   const forget = async (account, stored) => {
+    // Nothing stored, nothing to delete: a read of an account that never saved writes nothing.
+    if (!stored) return;
     await forgetDrawing(account);
     if (stored?.published !== true) return;
     try {
@@ -190,6 +193,8 @@ export const dispatchAnalysisCardSavedRoute = async ({
     const saved = await readSavedFor(owner);
     if (saved.unavailable) return send({ error: 'card_store_unavailable' }, 503);
     if (saved.published !== true) return send({ error: 'analysis_card_not_saved' }, 409);
+    // The pages say which save they were drawn for: ones drawn for an earlier card never sit beside a later one.
+    if (body?.savedAt !== saved.savedAt) return send({ error: 'analysis_card_drawing_stale' }, 409);
     const allowed = await deps?.checkRateLimit?.({
       env, slug, address: owner, route: 'analysis-card-drawing', limit: ANALYSIS_CARD_DRAWINGS_PER_DAY,
     });

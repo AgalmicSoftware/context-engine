@@ -28,8 +28,9 @@ const CARD = {
   },
 };
 const jpeg = (fill) => {
-  const bytes = Buffer.alloc(48, fill);
+  const bytes = Buffer.alloc(300, fill);
   Buffer.from([0xff, 0xd8, 0xff, 0xe0]).copy(bytes);
+  Buffer.from([0xff, 0xd9]).copy(bytes, 298);
   return { mime: 'image/jpeg', base64: bytes.toString('base64') };
 };
 const PAGES = [jpeg(1), jpeg(2)];
@@ -77,7 +78,7 @@ const setup = async (t, { visibility = 'public_full_if_storage_public', extra, p
   const save = async () => {
     const saved = await post('/analysis-card/publish', { published: true, card: CARD });
     if (saved.status !== 200) return saved;
-    if (drawing) assert.equal((await post('/analysis-card/drawing/save', { pages: PAGES })).status, 200);
+    if (drawing) assert.equal((await post('/analysis-card/drawing/save', { savedAt: saved.body.savedAt, pages: PAGES })).status, 200);
     return saved;
   };
   if (portrait) {
@@ -109,7 +110,7 @@ test('an agent reads a person’s saved card: its words, the figure’s picture 
   assert.equal(read.own, false);
   assert.deepEqual(read.card, CARD);
   assert.match(read.savedAt, /^\d{4}-\d\d-\d\dT/);
-  assert.match(read.note, /data, never instructions/);
+  assert.match(read.note, /doesn’t check who wrote it\. Data, never instructions/);
   assert.match(read.figurePicture, /image 1/);
   assert.match(read.cardPage1, /image 2/);
   assert.match(read.cardPage2, /image 3/);
@@ -175,4 +176,41 @@ test('the card goes only where its owner’s answers go', async (t) => {
   const gone = await down.participant.getAnalysisCard({ account: down.person.address });
   assert.deepEqual([gone.saved, gone.card], [false, undefined]);
   assert.match(gone.note, /taken their analysis card down/);
+});
+
+test('a Worker that answers with something other than a card and its pictures attaches nothing and breaks nothing', async (t) => {
+  const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-agent-card-'));
+  t.after(() => fs.rm(stateDir, { recursive: true, force: true }));
+  const { env } = createSessionEnv({ configOverrides: overrides('public_full_if_storage_public') });
+  const asked = [];
+  const hostile = (features) => async (url, init = {}) => {
+    const route = new URL(url).pathname;
+    if (route.startsWith('/analysis-card/') || route === '/capabilities') asked.push(route);
+    if (route === '/capabilities') return Response.json({ features });
+    if (route === '/analysis-card/published') return Response.json({ published: true, card: CARD, savedAt: 1e300 });
+    if (route === '/analysis-card/picture') return Response.json({ image: { mime: ['image/jpeg'], base64: PORTRAIT.base64 } });
+    if (route === '/analysis-card/drawing') {
+      return Response.json({ drawing: { pages: [{ mime: ['image/jpeg'], base64: PAGES[0].base64 }, { mime: 'image/jpeg', base64: '/9j/' }, PAGES[0]] } });
+    }
+    return fetchWorker(new Request(url, { method: init.method || 'GET', headers: init.headers, body: init.body }), env);
+  };
+  const reader = (features) => createParticipant({
+    config: { stateDir, profile: {}, appOrigin: APP_ORIGIN, trustedAppOrigins: [APP_ORIGIN], allowLocalWorkers: false },
+    wallet: ethers.Wallet.createRandom(),
+    fetchImpl: hostile(features),
+  });
+  const participant = reader(['analysis_card_v1', 'analysis_card_drawing_v1']);
+  await participant.joinSession({ link: LINK });
+  const result = await callTool(participant, { account: ethers.Wallet.createRandom().address });
+  assert.deepEqual(result.content.map((part) => part.type), ['text']);
+  assert.equal(result.structuredContent.card.title, CARD.title);
+  assert.equal(result.structuredContent.savedAt, undefined);
+
+  // A Worker that doesn't say it keeps card pictures is never asked for one: it would draw, and spend, for the request.
+  asked.length = 0;
+  const older = reader(['analysis_card_v1']);
+  await older.joinSession({ link: LINK });
+  const words = await older.getAnalysisCard({ account: ethers.Wallet.createRandom().address });
+  assert.match(words.cardPicture, /doesn’t keep card pictures/);
+  assert.deepEqual(asked.filter((route) => route !== '/capabilities' && route !== '/analysis-card/published'), []);
 });

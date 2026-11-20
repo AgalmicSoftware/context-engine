@@ -20,5 +20,6 @@ export function analysisCardAnswersArePrivate(config: unknown): boolean;
 export const ANALYSIS_CARD_DRAWING_FEATURE: 'analysis_card_drawing_v1';
 export const ANALYSIS_CARD_DRAWING_PAGES_MAX: number;
 export const ANALYSIS_CARD_DRAWING_PAGE_MAX_BYTES: number;
-export type AnalysisCardDrawingPage = { mime: 'image/jpeg' | 'image/png'; base64: string };
+export type AnalysisCardDrawingPage = { mime: 'image/jpeg'; base64: string };
+export function isAnalysisCardPicture(mime: unknown, base64: unknown, limits: { maxBytes: number; types?: string[] }): boolean;
 export function normalizeAnalysisCardDrawing(value: unknown): AnalysisCardDrawingPage[] | null;

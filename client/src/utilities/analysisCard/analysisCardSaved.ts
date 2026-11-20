@@ -148,7 +148,7 @@ export const publishSavedAnalysisCard = async (
   known.set(keyOf(opts, account), Promise.resolve(state));
   listeners.forEach((listener) => listener());
   // The saved card's picture, as this page drew it, follows where the Worker keeps one; a withdrawal ends that.
-  if (state.status === 'ready') noteAnalysisCardSaved(account, state.card, opts);
+  if (state.status === 'ready') noteAnalysisCardSaved(account, state.card, opts, state.savedAt);
   else forgetAnalysisCardSaved();
   return state;
 };

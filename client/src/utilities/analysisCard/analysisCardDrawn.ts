@@ -29,7 +29,15 @@ const keyOf = (card: unknown): string => {
 
 // The last card drawn in full on this page, and the card saved in this visit.
 let drawn: { key: string; pages: DrawnPages } | null = null;
-let saved: { key: string; account: string; opts: unknown; sentPages: DrawnPages | null } | null = null;
+let saved: {
+  key: string;
+  account: string;
+  opts: unknown;
+  savedAt: number;
+  sentPages: DrawnPages | null;
+  // What was last kept for this save, so the same picture drawn again is not sent again.
+  sentPicture: string;
+} | null = null;
 // Sends go one at a time, so a later drawing is never overtaken by an earlier one.
 let queue: Promise<void> = Promise.resolve();
 const later = (): void => {
@@ -63,7 +71,8 @@ const pageOf = async (canvas: HTMLCanvasElement): Promise<{ mime: string; base64
   return null;
 };
 
-const send = async (account: string, pages: DrawnPages, opts: unknown): Promise<boolean> => {
+const send = async (want: NonNullable<typeof saved>, pages: DrawnPages): Promise<boolean> => {
+  const { account, opts } = want;
   const { context, sessionConfig, sessionSlug } = resolveAiSessionOptions(opts);
   const allowDemoFallback = defaultStrictAllowDemoFallback();
   const corsWorkerUrl = await getCorsProxyUrlOrThrow({ sessionSlug, sessionConfig, context, allowDemoFallback });
@@ -73,6 +82,9 @@ const send = async (account: string, pages: DrawnPages, opts: unknown): Promise<
   if (!features.includes(ANALYSIS_CARD_DRAWING_FEATURE)) return false;
   const made = [await pageOf(pages.page1), await pageOf(pages.page2)];
   if (made.some((page) => !page)) return false;
+  // The same picture as the one already kept: a redraw of the same card, not a new one.
+  const picture = made.map((page) => `${page?.base64.length}:${page?.base64.slice(-96)}`).join('|');
+  if (picture === want.sentPicture) return true;
   const timeout = new AbortController();
   const timer = setTimeout(() => timeout.abort(), SEND_TIMEOUT_MS);
   try {
@@ -81,7 +93,8 @@ const send = async (account: string, pages: DrawnPages, opts: unknown): Promise<
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pages: made }),
+        // The save these pages were drawn for: the Worker refuses them beside any other.
+        body: JSON.stringify({ savedAt: want.savedAt, pages: made }),
         signal: timeout.signal,
       },
       // The page's own doing, never a sign-in prompt; and only while the saver is still the one signed in.
@@ -95,6 +108,7 @@ const send = async (account: string, pages: DrawnPages, opts: unknown): Promise<
         requireAccount: account,
       },
     );
+    if (response.ok) want.sentPicture = picture;
     return response.ok;
   } finally {
     clearTimeout(timer);
@@ -108,7 +122,7 @@ async function sendWhenBoth(): Promise<void> {
   want.sentPages = have.pages;
   try {
     // A refusal or failure is left: the card's words are saved, and its picture is an extra.
-    if (!(await send(want.account, have.pages, want.opts)) && saved === want && want.sentPages === have.pages) {
+    if (!(await send(want, have.pages)) && saved === want && want.sentPages === have.pages) {
       want.sentPages = null;
     }
   } catch {
@@ -125,9 +139,9 @@ export const noteAnalysisCardDrawn = (card: unknown, pages: DrawnPages): void =>
 };
 
 /** The signed-in person saved this card on their page just now. */
-export const noteAnalysisCardSaved = (account: string, card: unknown, opts: unknown): void => {
+export const noteAnalysisCardSaved = (account: string, card: unknown, opts: unknown, savedAt: number): void => {
   const key = keyOf(card);
-  saved = key ? { key, account, opts, sentPages: null } : null;
+  saved = key ? { key, account, opts, savedAt, sentPages: null, sentPicture: '' } : null;
   later();
 };
 

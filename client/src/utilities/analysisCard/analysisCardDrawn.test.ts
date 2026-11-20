@@ -20,6 +20,7 @@ const mockedCapabilities = jest.mocked(readWorkerCapabilities);
 const PERSON = '0x00000000000000000000000000000000000000aa';
 const CARD = { title: 'Keeps the commons in common hands', figure: 'Elinor Ostrom (1933–2012)' };
 const OPTS = { sessionSlug: 'drawn-card', context: { account: PERSON } };
+const SAVED_AT = 1763460000000;
 
 // A canvas whose JPEG is `size` bytes at the first quality tried, and a fifth smaller at each one after.
 const canvas = (size: number, qualities: number[] = []) =>
@@ -28,6 +29,7 @@ const canvas = (size: number, qualities: number[] = []) =>
       qualities.push(quality);
       const bytes = new Uint8Array(Math.round(size * (quality / 0.9) ** 3));
       bytes.set([0xff, 0xd8, 0xff, 0xe0]);
+      bytes.set([0xff, 0xd9], bytes.length - 2);
       done(new Blob([bytes], { type }));
     },
   }) as unknown as HTMLCanvasElement;
@@ -52,7 +54,7 @@ it('sends the drawn pages once the card saved in this visit has been drawn in fu
   // Drawn, but not saved: nothing is sent.
   expect(mockedFetch).not.toHaveBeenCalled();
 
-  noteAnalysisCardSaved(PERSON, CARD, OPTS);
+  noteAnalysisCardSaved(PERSON, CARD, OPTS, SAVED_AT);
   await __test__analysisCardDrawn.settle();
   await __test__analysisCardDrawn.settle();
   expect(mockedFetch).toHaveBeenCalledTimes(1);
@@ -63,23 +65,29 @@ it('sends the drawn pages once the card saved in this visit has been drawn in fu
   // What is sent is what the Worker keeps: two JPEG pages it would accept.
   expect(normalizeAnalysisCardDrawing(sentBody().pages)).toEqual(sentBody().pages);
   expect(sentBody().pages.map((page: { mime: string }) => page.mime)).toEqual(['image/jpeg', 'image/jpeg']);
+  // With the save they were drawn for.
+  expect(sentBody().savedAt).toBe(SAVED_AT);
 });
 
-it('sends again when the same card is drawn anew, as when its picture arrives, and not for another card', async () => {
-  noteAnalysisCardSaved(PERSON, CARD, OPTS);
+it('sends again when the card is drawn differently, as when its picture arrives; not for the same picture or another card', async () => {
+  noteAnalysisCardSaved(PERSON, CARD, OPTS, SAVED_AT);
   noteAnalysisCardDrawn({ ...CARD, title: 'Another card' }, pages());
   await __test__analysisCardDrawn.settle();
   expect(mockedFetch).not.toHaveBeenCalled();
   noteAnalysisCardDrawn(CARD, pages());
   await __test__analysisCardDrawn.settle();
+  // Drawn again with nothing changed, as each time the card is shown: the same picture is not sent twice.
   noteAnalysisCardDrawn(CARD, pages());
+  await __test__analysisCardDrawn.settle();
+  expect(mockedFetch).toHaveBeenCalledTimes(1);
+  noteAnalysisCardDrawn(CARD, pages(2400));
   await __test__analysisCardDrawn.settle();
   expect(mockedFetch).toHaveBeenCalledTimes(2);
 });
 
 it('never sends the pages to a Worker that does not keep drawn cards, or after a withdrawal', async () => {
   withFeature(false);
-  noteAnalysisCardSaved(PERSON, CARD, OPTS);
+  noteAnalysisCardSaved(PERSON, CARD, OPTS, SAVED_AT);
   noteAnalysisCardDrawn(CARD, pages());
   await __test__analysisCardDrawn.settle();
   expect(mockedFetch).not.toHaveBeenCalled();
@@ -93,7 +101,7 @@ it('never sends the pages to a Worker that does not keep drawn cards, or after a
 
 it('makes a page smaller until it fits, and sends nothing when it never does', async () => {
   const tried: number[] = [];
-  noteAnalysisCardSaved(PERSON, CARD, OPTS);
+  noteAnalysisCardSaved(PERSON, CARD, OPTS, SAVED_AT);
   noteAnalysisCardDrawn(CARD, {
     page1: canvas(ANALYSIS_CARD_DRAWING_PAGE_MAX_BYTES * 1.2, tried),
     page2: canvas(2000),
@@ -112,7 +120,7 @@ it('makes a page smaller until it fits, and sends nothing when it never does', a
 it('a failed send never throws, and the same pages can be sent again', async () => {
   mockedFetch.mockRejectedValueOnce(new Error('offline'));
   const drawnPages = pages();
-  noteAnalysisCardSaved(PERSON, CARD, OPTS);
+  noteAnalysisCardSaved(PERSON, CARD, OPTS, SAVED_AT);
   noteAnalysisCardDrawn(CARD, drawnPages);
   await __test__analysisCardDrawn.settle();
   await __test__analysisCardDrawn.settle();

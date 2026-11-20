@@ -411,15 +411,16 @@ test('analysisCardEnabled is true or false, set when made or later, signs no one
 });
 
 // The drawn card: made-up bytes with a real picture's first bytes, as the page's canvas gives them.
-const picture = (mime, size = 64) => {
+const picture = (mime, size = 300) => {
   const head = mime === 'image/png' ? [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] : [0xff, 0xd8, 0xff, 0xe0];
   const bytes = Buffer.alloc(size, 7);
   Buffer.from(head).copy(bytes);
+  if (mime === 'image/jpeg') Buffer.from([0xff, 0xd9]).copy(bytes, size - 2);
   return { mime, base64: bytes.toString('base64') };
 };
-const PAGES = [picture('image/jpeg'), picture('image/png')];
+const PAGES = [picture('image/jpeg'), picture('image/jpeg', 301)];
 const DRAWING_KEY = `session:salon:analysis-card-drawing:v1:${OWNER}`;
-const saveDrawing = (kv, extra = {}) => run({ path: ANALYSIS_CARD_DRAWING_SAVE_PATH, body: { pages: PAGES }, kv, ...extra });
+const saveDrawing = (kv, extra = {}) => run({ path: ANALYSIS_CARD_DRAWING_SAVE_PATH, body: { savedAt: NOW, pages: PAGES }, kv, ...extra });
 const readDrawing = (kv, extra = {}) =>
   run({ path: ANALYSIS_CARD_DRAWING_PATH, body: { account: OWNER }, address: VISITOR, kv, ...extra });
 
@@ -444,7 +445,7 @@ test('the drawn pages are kept beside the caller\'s own saved card and read back
   assert.deepEqual((await readDrawing(kv, { address: OWNER })).body, seen.body);
 
   // Nobody draws onto someone else's card, and a read names one account.
-  const other = await saveDrawing(kv, { address: VISITOR, body: { pages: PAGES, account: OWNER } });
+  const other = await saveDrawing(kv, { address: VISITOR, body: { savedAt: NOW, pages: PAGES, account: OWNER } });
   assert.deepEqual([other.response.status, other.body], [403, { error: 'analysis_card_own_only' }]);
   assert.deepEqual((await saveDrawing(kv, { address: VISITOR })).body, { error: 'analysis_card_not_saved' });
   assert.equal((await readDrawing(kv, { body: {} })).response.status, 400);
@@ -455,11 +456,19 @@ test('only one or two small JPEG or PNG pages are kept, and a refused one is nei
   const kv = createKv();
   await run({ kv });
   const tooBig = picture('image/jpeg', ANALYSIS_CARD_DRAWING_PAGE_MAX_BYTES + 3);
-  const atLimit = picture('image/png', ANALYSIS_CARD_DRAWING_PAGE_MAX_BYTES);
+  const atLimit = picture('image/jpeg', ANALYSIS_CARD_DRAWING_PAGE_MAX_BYTES);
   assert.equal(normalizeAnalysisCardDrawing([atLimit]).length, 1);
+  // One byte over is over, whatever the padding.
+  for (const over of [1, 2, 3]) assert.equal(normalizeAnalysisCardDrawing([picture('image/jpeg', ANALYSIS_CARD_DRAWING_PAGE_MAX_BYTES + over)]), null);
   for (const pages of [
     undefined, null, 'pages', {}, [], [PAGES[0], PAGES[1], PAGES[0]],
     [tooBig],
+    // A type that only looks like one when turned into text, a PNG, three bytes, and a picture that never ends.
+    [{ mime: ['image/jpeg'], base64: PAGES[0].base64 }],
+    [{ mime: [['image/jpeg']], base64: PAGES[0].base64 }],
+    [picture('image/png')],
+    [{ mime: 'image/jpeg', base64: '/9j/' }],
+    [{ mime: 'image/jpeg', base64: Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from('<html><script>x()</script>'.repeat(8))]).toString('base64') }],
     [{ mime: 'image/svg+xml', base64: Buffer.from('<svg onload="x()"/>').toString('base64') }],
     [{ mime: 'text/html', base64: PAGES[0].base64 }],
     // Bytes that are not the picture the type names.
@@ -471,13 +480,13 @@ test('only one or two small JPEG or PNG pages are kept, and a refused one is nei
     [{ base64: PAGES[0].base64 }],
     ['page'],
   ]) {
-    const refused = await saveDrawing(kv, { body: { pages } });
+    const refused = await saveDrawing(kv, { body: { savedAt: NOW, pages } });
     assert.deepEqual([refused.response.status, refused.body], [400, { error: 'invalid_drawing' }], JSON.stringify(pages)?.slice(0, 60));
     assert.deepEqual(refused.counted, []);
   }
   assert.equal(kv.rows.has(DRAWING_KEY), false);
   // Anything beside mime and base64 is dropped.
-  await saveDrawing(kv, { body: { pages: [{ ...PAGES[0], name: '../../x', html: '<b>' }] } });
+  await saveDrawing(kv, { body: { savedAt: NOW, pages: [{ ...PAGES[0], name: '../../x', html: '<b>' }] } });
   assert.deepEqual(JSON.parse(kv.rows.get(DRAWING_KEY)).pages, [PAGES[0]]);
   // Past the day's uploads nothing is written.
   const before = kv.rows.get(DRAWING_KEY);
@@ -533,7 +542,7 @@ test('the drawn pages go where the card goes and nowhere else', async () => {
 
   // Off, ended or without the ai scope, the routes answer as the card's own do: nothing read, stored or counted.
   for (const path of [ANALYSIS_CARD_DRAWING_PATH, ANALYSIS_CARD_DRAWING_SAVE_PATH]) {
-    const body = path === ANALYSIS_CARD_DRAWING_PATH ? { account: OWNER } : { pages: PAGES };
+    const body = path === ANALYSIS_CARD_DRAWING_PATH ? { account: OWNER } : { savedAt: NOW, pages: PAGES };
     const off = await run({ path, body, kv, config: { ...ON, analysisCardEnabled: false } });
     assert.deepEqual([off.response.status, off.body], [403, { error: 'analysis_card_off' }], path);
     assert.equal((await run({ path, body, kv, scopes: { storage: true } })).response.status, 403, path);
@@ -548,10 +557,48 @@ test('the drawn-card routes are path-owned and advertised', async () => {
   const kv = createKv();
   await run({ kv });
   const dispatched = await dispatchAuthenticatedSecretActionRoute({
-    path: ANALYSIS_CARD_DRAWING_SAVE_PATH, action: 'ai', body: { pages: PAGES, action: 'ai' }, config: ON, slug: 'salon', address: OWNER,
+    path: ANALYSIS_CARD_DRAWING_SAVE_PATH, action: 'ai', body: { savedAt: NOW, pages: PAGES, action: 'ai' }, config: ON, slug: 'salon', address: OWNER,
     env: { GROUP_KV: kv }, headers: {}, scopes: { ai: true },
     deps: { json, now: () => NOW, computeScopesForLogin: async () => ({ ai: true }), evaluateAuthenticatedRoutePreflight, checkRateLimit: async () => true },
   });
   assert.equal(dispatched.handled, true);
   assert.deepEqual(await dispatched.response.json(), { saved: true, pages: 2, savedAt: NOW });
+});
+
+test('pages drawn for an earlier save are refused once a later card is the saved one', async () => {
+  const kv = createKv();
+  await run({ kv });
+  // The page saved again before the first save's pages arrived.
+  const later = NOW + 5000;
+  kv.rows.set(`session:salon:analysis-card-saved:v1:${OWNER}`, JSON.stringify({ published: true, card: { ...CARD, title: 'A later card' }, savedAt: later }));
+  for (const savedAt of [NOW, undefined, String(later), later + 1, null]) {
+    const late = await saveDrawing(kv, { body: { savedAt, pages: PAGES } });
+    assert.deepEqual([late.response.status, late.body], [409, { error: 'analysis_card_drawing_stale' }], String(savedAt));
+    assert.deepEqual(late.counted, []);
+  }
+  assert.equal(kv.rows.has(DRAWING_KEY), false);
+  assert.equal((await saveDrawing(kv, { body: { savedAt: later, pages: PAGES } })).response.status, 200);
+  assert.deepEqual((await readDrawing(kv)).body, { drawing: { pages: PAGES, savedAt: later } });
+});
+
+test('where answers are private, reading an account that never saved a card deletes nothing', async () => {
+  const kv = createKv();
+  const deleted = [];
+  kv.delete = async (key) => { deleted.push(key); kv.rows.delete(key); };
+  const config = showing('participant_aggregate');
+  const scopes = { ai: true, storage: true };
+  for (const path of [ANALYSIS_CARD_PUBLISHED_PATH, ANALYSIS_CARD_DRAWING_PATH]) {
+    for (const account of [OWNER, VISITOR, `0x${'9'.repeat(40)}`]) {
+      await run({ path, body: { account }, address: VISITOR, kv, config, scopes });
+    }
+  }
+  await run({ kv, config, scopes });
+  await saveDrawing(kv, { config, scopes });
+  assert.deepEqual(deleted, []);
+  // A card that is there is still deleted, with its pages.
+  await run({ kv });
+  await saveDrawing(kv);
+  deleted.length = 0;
+  await run({ path: ANALYSIS_CARD_PUBLISHED_PATH, body: { account: OWNER }, address: VISITOR, kv, config, scopes });
+  assert.deepEqual(deleted.sort(), [DRAWING_KEY, `session:salon:analysis-card-saved:v1:${OWNER}`].sort());
 });
