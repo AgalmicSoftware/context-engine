@@ -92,3 +92,50 @@ it('shows the rows on their own only once the profile is slow', () => {
     jest.useRealTimers();
   }
 });
+
+describe('Disconnect with unsent answers', () => {
+  const me = '0x00000000000000000000000000000000000000aa';
+  const draftKey = `dg:surveyDraft:meadow-forum:84532:${me}:all`;
+  let confirm: jest.SpyInstance;
+  beforeEach(() => {
+    confirm = jest.spyOn(window, 'confirm');
+  });
+  afterEach(() => {
+    confirm.mockRestore();
+    sessionStorage.clear();
+  });
+  const pressDisconnect = async () => {
+    const handleLogout = jest.fn();
+    renderBody({ loginComplete: true, account: me, handleLogout });
+    await screen.findByTestId('profile-menu');
+    fireEvent.click(screen.getByTestId('ce-account-disconnect'));
+    return handleLogout;
+  };
+
+  it('asks once, and stays signed in when the person declines', async () => {
+    sessionStorage.setItem(draftKey, JSON.stringify({ answers: { q1: { value: 'Yes' }, q2: { value: 'No' } } }));
+    confirm.mockReturnValue(false);
+    const handleLogout = await pressDisconnect();
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(confirm).toHaveBeenCalledWith('You have 2 unsent answers. Disconnect and discard them?');
+    expect(handleLogout).not.toHaveBeenCalled();
+  });
+
+  it('disconnects once the person agrees', async () => {
+    sessionStorage.setItem(draftKey, JSON.stringify({ answers: { q1: { value: 'Yes' } } }));
+    confirm.mockReturnValue(true);
+    const handleLogout = await pressDisconnect();
+    expect(confirm).toHaveBeenCalledWith('You have 1 unsent answer. Disconnect and discard it?');
+    expect(handleLogout).toHaveBeenCalledTimes(1);
+  });
+
+  it('disconnects at once with none unsent, or only another account’s', async () => {
+    sessionStorage.setItem(
+      'dg:surveyDraft:meadow-forum:84532:0x00000000000000000000000000000000000000bb:all',
+      JSON.stringify({ answers: { q1: { value: 'Yes' } } }),
+    );
+    const handleLogout = await pressDisconnect();
+    expect(confirm).not.toHaveBeenCalled();
+    expect(handleLogout).toHaveBeenCalledTimes(1);
+  });
+});

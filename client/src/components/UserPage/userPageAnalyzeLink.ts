@@ -40,23 +40,47 @@ export const readAnalyzeLinkTarget = ({ pathname, search }: AnalyzeLinkLocation)
   };
 };
 
-/**
- * Whether this tab holds answers typed for `account` and not yet sent. They are kept per tab and only edits are
- * kept, so one stored answer is one unsent edit. Where storage cannot be read the answer is yes: the page is
- * then left alone.
- */
-export const hasUnsentAnswers = (account: string, store: Storage = window.sessionStorage): boolean => {
+// Answers typed for `account` in this tab and not yet sent. They are kept per tab and only edits are kept, so one
+// stored answer is one unsent edit. An entry that cannot be read is skipped and reported; storage that cannot be
+// read throws.
+const readUnsentCount = (account: string, store: Storage, onUnreadable: () => void): number => {
   const owner = account.trim().toLowerCase();
-  try {
-    for (let index = 0; index < store.length; index += 1) {
-      const key = store.key(index) || '';
-      if (!key.startsWith('dg:surveyDraft:') || key.split(':')[4] !== owner) continue;
-      const answers = (JSON.parse(store.getItem(key) || '{}') as { answers?: unknown })?.answers;
-      if (answers && typeof answers === 'object' && Object.keys(answers).length > 0) return true;
+  let count = 0;
+  for (let index = 0; index < store.length; index += 1) {
+    const key = store.key(index) || '';
+    if (!key.startsWith('dg:surveyDraft:') || key.split(':')[4] !== owner) continue;
+    let answers: unknown;
+    try {
+      answers = (JSON.parse(store.getItem(key) || '{}') as { answers?: unknown })?.answers;
+    } catch {
+      onUnreadable();
+      continue;
     }
-    return false;
+    if (answers && typeof answers === 'object') count += Object.keys(answers).length;
+  }
+  return count;
+};
+
+/** Whether this tab holds unsent answers for `account`. Where any cannot be read the answer is yes: the page is
+ * then left alone. */
+export const hasUnsentAnswers = (account: string, store: Storage = window.sessionStorage): boolean => {
+  let unreadable = false;
+  try {
+    return readUnsentCount(account, store, () => (unreadable = true)) > 0 || unreadable;
   } catch {
     return true;
+  }
+};
+
+/** How many unsent answers Disconnect would discard for `account` (see clearSurveyDraftsForAccount). Where storage
+ * cannot be read, none: Disconnect cannot clear it either. */
+export const countUnsentAnswers = (account: string, store: Storage = window.sessionStorage): number => {
+  const owner = account.trim().toLowerCase();
+  if (!owner || owner === 'anon') return 0;
+  try {
+    return readUnsentCount(owner, store, () => undefined);
+  } catch {
+    return 0;
   }
 };
 

@@ -12,6 +12,7 @@ import { MetaMaskLoginButton } from '../../app/runtime/walletUiRuntime.js';
 import { copyText } from '../../utilities/ui/copyText';
 import styles from './Account.module.scss';
 import { AccountMenu, AccountMenuRow } from './AccountMenu';
+import { countUnsentAnswers } from 'components/UserPage/userPageAnalyzeLink';
 const AgentAccountAccessPanel = React.lazy(() => import('./AgentAccountAccessPanel'));
 import { PASSKEYS_UNAVAILABLE_MESSAGE, type PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
 
@@ -244,13 +245,23 @@ const LoginModalDisplayBody = ({
     // The dialog's rows follow the profile's own two ("Analyze user", "Set username") in one list. While the
     // profile is slow to load, Bookmarks and Disconnect show on their own, so "Disconnect" is always there; the agent row
     // waits, so it mounts once and keeps what was chosen or made in it.
+    // Disconnect discards this account's unsent answers, so with any it asks once first.
+    const disconnect = () => {
+      const unsent = countUnsentAnswers(account || '');
+      const question =
+        unsent === 1
+          ? 'You have 1 unsent answer. Disconnect and discard it?'
+          : `You have ${unsent} unsent answers. Disconnect and discard them?`;
+      if (unsent > 0 && !window.confirm(question)) return;
+      handleLogout();
+    };
     const menuRows = (agentRow: React.ReactNode) => (
       <>
         <AccountMenuRow icon={faBookmark} onClick={openBookmarks}>
           Bookmarks
         </AccountMenuRow>
         {agentRow ? <li className={`${styles.accountMenuItem} ${styles.accountMenuAgentRow}`}>{agentRow}</li> : null}
-        <AccountMenuRow icon={faSignOutAlt} onClick={handleLogout} danger testId="ce-account-disconnect">
+        <AccountMenuRow icon={faSignOutAlt} onClick={disconnect} danger testId="ce-account-disconnect">
           Disconnect
         </AccountMenuRow>
       </>

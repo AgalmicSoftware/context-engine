@@ -2,6 +2,7 @@ import {
   ANALYZE_LINK_NOTE_KEY,
   ANALYZE_LINK_NOTE_MS,
   buildAnalyzeLinkHref,
+  countUnsentAnswers,
   hasUnsentAnswers,
   openAnalyzeLink,
   readAnalyzeLinkTarget,
@@ -82,6 +83,24 @@ describe('Analyze user, from the account dialog', () => {
     expect(hasUnsentAnswers(ME, memoryStore({ [key('0xbb')]: draft({ q1: { value: 'x' } }) }))).toBe(false);
     expect(hasUnsentAnswers(ME.toUpperCase(), memoryStore({ [key(ME)]: draft({ q1: { value: 'x' } }) }))).toBe(true);
     expect(hasUnsentAnswers(ME, memoryStore({ [key(ME)]: '{not json' }))).toBe(true);
+  });
+
+  it('counts the unsent answers Disconnect would discard, and none where storage cannot be read', () => {
+    const draft = (answers: unknown) => JSON.stringify({ meta: {}, answers });
+    const key = (owner: string, scope = 'questions') => `dg:surveyDraft:demo-one:worker:${owner}:${scope}`;
+    const both = memoryStore({
+      [key(ME)]: draft({ q1: { value: 'x' }, q2: { value: 'y' } }),
+      [key(ME, 'survey-7')]: draft({ s1: { value: 'z' } }),
+      [key('0xbb')]: draft({ q1: { value: 'x' } }),
+    });
+    expect(countUnsentAnswers(ME.toUpperCase(), both)).toBe(3);
+    expect(countUnsentAnswers(ME, memoryStore())).toBe(0);
+    expect(countUnsentAnswers('', both)).toBe(0);
+    expect(countUnsentAnswers(ME, memoryStore({ [key(ME)]: '{not json' }))).toBe(0);
+    // One entry that cannot be read leaves the rest counted.
+    expect(
+      countUnsentAnswers(ME, memoryStore({ [key(ME)]: '{not json', [key(ME, 'survey-7')]: draft({ s1: 1 }) })),
+    ).toBe(1);
   });
 
   it('opens my page in this tab, and in a new one where answers are unsent', () => {
