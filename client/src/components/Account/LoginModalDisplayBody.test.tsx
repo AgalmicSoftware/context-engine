@@ -1,6 +1,6 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
-import LoginModalDisplayBody from './LoginModalDisplayBody';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import LoginModalDisplayBody, { SlowFallback } from './LoginModalDisplayBody';
 
 // The profile, as the dialog's lazy chunk: it puts the dialog's rows in its own list.
 jest.mock('components/UserPage/UserPage', () => ({
@@ -64,12 +64,31 @@ it('lists Bookmarks, Your AI agent and a red Disconnect, in that order, with no 
   expect(handleLogout).toHaveBeenCalledTimes(1);
 });
 
-it('keeps Disconnect in the menu while the profile loads, and mounts Your AI agent only once it has', async () => {
+it('shows one Disconnect, in the profile list, when the profile loads quickly, and mounts Your AI agent once', async () => {
   renderBody({ loginComplete: true, account: '0x00000000000000000000000000000000000000aa' });
-  expect(screen.getByTestId('ce-account-menu')).toContainElement(screen.getByTestId('ce-account-disconnect'));
+  // Not swapped from under a click: the rows on their own wait for a slow load.
+  expect(screen.queryByTestId('ce-account-disconnect')).not.toBeInTheDocument();
   expect(screen.queryByTestId('agent-box')).not.toBeInTheDocument();
   const profile = await screen.findByTestId('profile-menu');
   expect(profile).toContainElement(screen.getByTestId('agent-box'));
   expect(profile).toContainElement(screen.getByTestId('ce-account-disconnect'));
   expect(screen.getAllByTestId('agent-box')).toHaveLength(1);
+});
+
+it('shows the rows on their own only once the profile is slow', () => {
+  jest.useFakeTimers();
+  try {
+    render(
+      <SlowFallback>
+        <span>Disconnect</span>
+      </SlowFallback>,
+    );
+    expect(screen.queryByText('Disconnect')).not.toBeInTheDocument();
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+    expect(screen.getByText('Disconnect')).toBeInTheDocument();
+  } finally {
+    jest.useRealTimers();
+  }
 });

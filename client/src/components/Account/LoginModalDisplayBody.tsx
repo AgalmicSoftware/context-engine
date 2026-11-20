@@ -1,4 +1,4 @@
-import React, { Suspense, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { Button, CardBody, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -81,6 +81,17 @@ type LoginModalDisplayBodyProps = {
 const AccountUserPage = React.lazy(() => import('components/UserPage/UserPage')) as React.LazyExoticComponent<
   React.ComponentType<AccountUserPageProps>
 >;
+
+// Shown only once the profile is slow to load: a quick load would otherwise swap its rows, Disconnect among
+// them, for the profile's own list just as they are clicked.
+export const SlowFallback = ({ children }: { children: React.ReactNode }) => {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setShown(true), 1000);
+    return () => clearTimeout(timer);
+  }, []);
+  return shown ? <>{children}</> : null;
+};
 
 const LoginModalDisplayBody = ({
   account,
@@ -231,7 +242,7 @@ const LoginModalDisplayBody = ({
 
   if (loginComplete) {
     // The dialog's rows follow the profile's own two ("Analyze user", "Set username") in one list. While the
-    // profile loads, Bookmarks and Disconnect show on their own, so "Disconnect" is always there; the agent row
+    // profile is slow to load, Bookmarks and Disconnect show on their own, so "Disconnect" is always there; the agent row
     // waits, so it mounts once and keeps what was chosen or made in it.
     const menuRows = (agentRow: React.ReactNode) => (
       <>
@@ -250,7 +261,13 @@ const LoginModalDisplayBody = ({
           <div className={styles.accountModalBody}>
             {account ? (
               <div className={styles.accountModalProfileShell}>
-                <Suspense fallback={<AccountMenu>{menuRows(null)}</AccountMenu>}>
+                <Suspense
+                  fallback={
+                    <SlowFallback>
+                      <AccountMenu>{menuRows(null)}</AccountMenu>
+                    </SlowFallback>
+                  }
+                >
                   <AccountUserPage
                     viewAddress={account}
                     account={account}
