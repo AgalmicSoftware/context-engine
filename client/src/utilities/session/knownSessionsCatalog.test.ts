@@ -2,13 +2,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { buildExternalInterviewKickoff } from '../../components/SurveyTool/sessionInterview';
-import { KNOWN_SESSIONS, knownSessionQuestionsAddress } from './knownSessionsFile';
+import { KNOWN_SESSIONS, knownSessionQuestionsAddresses } from './knownSessionsFile';
 
 // An AI that may fetch only an address it was shown reads a listed session's catalog address from the list,
 // whole. It must stay the address the session's own page builds; the prompt a person copies there shows the
 // site's pass-through address for it instead, which some chat AIs open where they refuse a Worker's host.
 it("lists each known session's catalog address as its page builds it, and the prompt shows the site's", () => {
   const redirects = fs.readFileSync(path.resolve(__dirname, '../../../public/_redirects'), 'utf8').split('\n');
+  const llms = fs.readFileSync(path.resolve(__dirname, '../../../public/llms.txt'), 'utf8');
   for (const [slug, { worker, interviewCatalog }] of Object.entries(KNOWN_SESSIONS)) {
     const prompt = buildExternalInterviewKickoff({
       workerUrl: worker,
@@ -18,22 +19,31 @@ it("lists each known session's catalog address as its page builds it, and the pr
     if (interviewCatalog === undefined) continue;
     const lines = prompt.split('\n');
     const site = `https://contextengine.sh/questions/${slug}`;
-    expect(
-      knownSessionQuestionsAddress({
-        workerUrl: worker,
-        sessionSlug: slug,
-        sessionUrl: `https://contextengine.sh/session/${slug}`,
-      }),
-    ).toBe(site);
+    // The two addresses come in the generator's order, as llms.txt shows them for this session.
+    const listedOrder = llms
+      .match(new RegExp(`/session/${slug} \\([^\\n]*\\): (\\S+)\\n\\s+second address: (\\S+)\\n`))!
+      .slice(1, 3);
+    expect([...listedOrder].sort()).toEqual([site, interviewCatalog].sort());
+    const page = `https://contextengine.sh/session/${slug}`;
+    expect(knownSessionQuestionsAddresses({ workerUrl: worker, sessionSlug: slug, sessionUrl: page })).toEqual(
+      listedOrder,
+    );
+    const at = lines.indexOf(listedOrder[0]);
+    expect(lines.slice(at, at + 4)).toEqual([
+      listedOrder[0],
+      'Second address:',
+      listedOrder[1],
+      'If the first address does not open, fetch the second exactly as written; if neither opens, say so, ask me to paste the questions and give your drafts of those as plain text with no review link, and never make questions up.',
+    ]);
     // The join panel pins the Worker on the page link; the Worker drops that, so it is the same catalog.
     const pinned = buildExternalInterviewKickoff({
       workerUrl: worker,
       sessionSlug: slug,
-      sessionUrl: `https://contextengine.sh/session/${slug}?${new URLSearchParams({ worker })}`,
+      sessionUrl: `${page}?${new URLSearchParams({ worker })}`,
     });
-    expect(pinned.split('\n')).toContain(site);
-    expect(lines).toContain(site);
-    expect(lines).not.toContain(interviewCatalog);
+    const pinnedLines = pinned.split('\n');
+    const pinnedAt = pinnedLines.indexOf(listedOrder[0]);
+    expect(pinnedLines.slice(pinnedAt, pinnedAt + 3)).toEqual([listedOrder[0], 'Second address:', listedOrder[1]]);
     // The host passes that address through to the same catalog.
     const rule = redirects.find((line) => line.startsWith(`/questions/${slug} `))?.split(' ');
     expect(rule?.[2]).toBe('200');

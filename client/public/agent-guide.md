@@ -13,21 +13,28 @@ results show where they agree and where they differ.
 ## Sessions listed on this site
 
 Each session link, then the address its questions are read from to draft
-answers for review. Fetch that address exactly as written here; "Suggested
-answers for the person to review" says what to do with it. Without tools,
-your first reply still gives the link back and offers to draft (see
-"Without tools: give the link, offer to draft").
+answers for review, and a second address. Fetch them exactly as written
+here; "Suggested answers for the person to review" says what to do with
+the questions. Without tools, your first reply still gives the link back
+and offers to draft (see "Without tools: give the link, offer to draft").
+
+If the first address does not open, fetch the second exactly as written; if neither opens, say so, ask the person to paste the questions and give your drafts of those as plain text with no review link, and never make questions up.
 
 - https://contextengine.sh/session/eddy26 (EDDY 2026 - Bridging theory and practice):
   https://contextengine.sh/questions/eddy26
+  second address: https://ce-eddy26-d9702b0d3c41.agalmic.workers.dev/agent/interview-catalog?slug=eddy26&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Feddy26
 - https://contextengine.sh/session/rxc-ra-2 (Reverse Alignment Salon):
   https://contextengine.sh/questions/rxc-ra-2
+  second address: https://ce-rxc-ra-2.agalmic.workers.dev/agent/interview-catalog?slug=rxc-ra-2&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Frxc-ra-2
 - https://contextengine.sh/session/rxc-ra-test-5 (RA test):
   https://contextengine.sh/questions/rxc-ra-test-5
+  second address: https://ce-rxc-ra-test-5.agalmic.workers.dev/agent/interview-catalog?slug=rxc-ra-test-5&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Frxc-ra-test-5
 - https://contextengine.sh/session/rxc-ra-agent-test-1 (RA agent test):
   https://contextengine.sh/questions/rxc-ra-agent-test-1
+  second address: https://ce-rxc-ra-agent-test-1.agalmic.workers.dev/agent/interview-catalog?slug=rxc-ra-agent-test-1&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Frxc-ra-agent-test-1
 - https://contextengine.sh/session/demo-sh (Demo Session):
   https://contextengine.sh/questions/demo-sh
+  second address: https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/agent/interview-catalog?slug=demo-sh&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Fdemo-sh
 <!-- /known-session-catalogs -->
 
 ## You were given a session link
@@ -360,7 +367,8 @@ answers for them to review.
 
 For a session in "Sessions listed on this site" at the top of this guide, the
 URL to fetch is the address after its link there: fetch that address exactly
-as it is written there, never one you put together yourself. Many chat apps
+as it is written there, never one you put together yourself, and the second
+address there only if that one does not open. Many chat apps
 open only an address they were shown word for word, refuse one they built, and
 refuse a Worker's own host. This site passes that address through to the
 catalog the request below builds for the plain session link, and stores

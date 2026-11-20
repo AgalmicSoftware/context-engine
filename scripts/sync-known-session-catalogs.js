@@ -40,43 +40,61 @@ const passThroughTarget = (slug, entry) => {
   return `${url.origin}${url.pathname}?slug=${slug}&sessionUrl=${page}`;
 };
 
+// The order chat AIs try a listed session's two addresses in: the site's own first, since some chat
+// AIs refuse a Worker's host and stop after a first failure; the Worker's catalog second. The prompt
+// the site builds (knownSessionQuestionsAddresses in client/src/utilities/session/knownSessionsFile.ts)
+// follows this order, and its test checks it.
+const tryOrder = ({ questions, catalog }) => [questions, catalog];
+const FALLBACK =
+  'If the first address does not open, fetch the second exactly as written; if neither opens, say so, ask the person to paste the questions and give your drafts of those as plain text with no review link, and never make questions up.';
+
 const listed = (knownSessions) =>
   Object.entries(knownSessions)
     .filter(([, entry]) => entry.interviewCatalog)
-    .map(([slug, entry]) => ({
-      slug,
-      page: `${SITE}/session/${slug}`,
-      title: entry.title || entry.name || slug,
-      catalog: entry.interviewCatalog,
-      questions: `${SITE}/questions/${slug}`,
-      target: passThroughTarget(slug, entry),
-    }));
+    .map(([slug, entry]) => {
+      const session = {
+        slug,
+        page: `${SITE}/session/${slug}`,
+        title: entry.title || entry.name || slug,
+        catalog: entry.interviewCatalog,
+        questions: `${SITE}/questions/${slug}`,
+        target: passThroughTarget(slug, entry),
+      };
+      const [first, second] = tryOrder(session);
+      return { ...session, first, second };
+    });
 
 const escapeHtml = (text) => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 // No punctuation follows an address, so one copied whole is the address itself.
 const htmlBlock = (sessions, indent) =>
   [
-    'The listed sessions, each link with the address of its questions after it, one per line:',
-    ...sessions.map(({ page, title, questions }) => `${page} (${escapeHtml(title)}): ${questions}`),
+    'The listed sessions follow, each link with the address of its questions after it and a second address on the next line.',
+    FALLBACK,
+    ...sessions.flatMap(({ page, title, first, second }) => [`${page} (${escapeHtml(title)}): ${first}`, `second address: ${second}`]),
   ]
     .map((line) => `${indent}${line}`)
     .join('\n');
 
 const llmsBlock = (sessions) =>
-  sessions.map(({ page, title, questions }) => `  - ${page} (${title}): ${questions}`).join('\n');
+  [
+    `  - ${FALLBACK}`,
+    ...sessions.map(({ page, title, first, second }) => `  - ${page} (${title}): ${first}\n    second address: ${second}`),
+  ].join('\n');
 
 const mdBlock = (sessions) =>
   [
     '## Sessions listed on this site',
     '',
     'Each session link, then the address its questions are read from to draft',
-    'answers for review. Fetch that address exactly as written here; "Suggested',
-    'answers for the person to review" says what to do with it. Without tools,',
-    'your first reply still gives the link back and offers to draft (see',
-    '"Without tools: give the link, offer to draft").',
+    'answers for review, and a second address. Fetch them exactly as written',
+    'here; "Suggested answers for the person to review" says what to do with',
+    'the questions. Without tools, your first reply still gives the link back',
+    'and offers to draft (see "Without tools: give the link, offer to draft").',
     '',
-    ...sessions.map(({ page, title, questions }) => `- ${page} (${title}):\n  ${questions}`),
+    FALLBACK,
+    '',
+    ...sessions.map(({ page, title, first, second }) => `- ${page} (${title}):\n  ${first}\n  second address: ${second}`),
   ].join('\n');
 
 // Before the catch-all, so the host's first match is the pass-through.
@@ -121,4 +139,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { expectedFiles, listed };
+module.exports = { expectedFiles, listed, FALLBACK };

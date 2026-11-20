@@ -170,6 +170,10 @@ test('index.html tells a fetching agent where the guide is, in body text people 
   assert.ok(skillMd.includes(`- ${salon.page} (${salon.title}):\n  ${salon.questions}\n`));
   assert.ok(llmsTxt.includes(`  - ${salon.page} (${salon.title}): ${salon.questions}\n`));
   assert.ok(skillMd.indexOf(salon.questions) < skillMd.indexOf('## You were given a session link'));
+  // Where the list is, one sentence says to try the second address, and never to make questions up.
+  const { FALLBACK } = require('./sync-known-session-catalogs.js');
+  assert.match(FALLBACK, /^If the first address does not open, fetch the second exactly as written; if neither opens, say so, ask the person to paste the questions and give your drafts of those as plain text with no review link, and never make questions up\.$/);
+  for (const [text, count] of [[indexHtml, 2], [skillMd, 1], [llmsTxt, 1]]) assert.equal(text.split(FALLBACK).length - 1, count);
   const redirects = fs.readFileSync(path.join(repoRoot, 'client', 'public', '_redirects'), 'utf8').split('\n');
   for (const { slug, catalog, questions, target } of listed(knownSessions)) {
     // Nothing follows an address but a line break, so an address copied whole is the address itself.
@@ -178,8 +182,14 @@ test('index.html tells a fetching agent where the guide is, in body text people 
       assert.equal(after.length, count, `${questions} shown ${count} times`);
       for (const rest of after) assert.match(rest, /^\n/);
     }
-    // The Worker's own address is shown to chat AIs no longer.
-    for (const text of [indexHtml, skillMd, llmsTxt]) assert.ok(!text.includes(new URL(catalog).host), `${slug}'s Worker host`);
+    // The Worker's own address is shown only as the second address, whole, right after the site's.
+    for (const [text, count] of [[indexHtml, 2], [skillMd, 1], [llmsTxt, 1]]) {
+      const host = new URL(catalog).host;
+      assert.equal(text.split(host).length - 1, count, `${slug}'s Worker host shown ${count} times`);
+      assert.equal(text.split(`${questions}\n`).length - 1, count);
+      const pair = new RegExp(`${escapeRegExp(questions)}\\n[ \\t]*second address: ${escapeRegExp(catalog)}\\n`, 'g');
+      assert.equal((text.match(pair) || []).length, count, `${slug}: the Worker's address follows the site's`);
+    }
     // The pass-through reads the same catalog, with sessionUrl left plain, before the host's catch-all.
     const at = redirects.indexOf(`/questions/${slug} ${target} 200`);
     assert.ok(at >= 0 && at < redirects.indexOf('/* /index.html 200'), `${slug}'s pass-through rule precedes the catch-all`);
@@ -328,8 +338,12 @@ test('skill.md shows agents how to take part, with nothing session-specific', ()
   ]) {
     assert.match(skillMd, toUrlMatcher(url));
   }
-  // Every session gets the same guide: no Worker addresses, tokens or group tags.
-  assert.doesNotMatch(skillMd, /workers\.dev|ceagt_|ai-agents/);
+  // Every session gets the same guide: no Worker addresses, tokens or group tags, except each listed
+  // session's second address in the generated list (checked above).
+  const withoutList = skillMd.replace(/<!-- known-session-catalogs:[\s\S]*?<!-- \/known-session-catalogs -->/, '');
+  assert.notEqual(withoutList, skillMd);
+  assert.doesNotMatch(withoutList, /workers\.dev|ceagt_|ai-agents/);
+  assert.doesNotMatch(skillMd, /ceagt_|ai-agents/);
 });
 
 // An agent handed only a link has to find its own case first: tools already there, a computer to add them on,
