@@ -1,7 +1,9 @@
 import { buildSiweMessage as buildSharedSiweMessage, normalizeSessionIdHex } from '../../shared/auth/siweMessage.mjs';
 import { describeTestEthOffer } from '../../shared/sessions/testEthOffer.mjs';
 import { COORDINATOR_RETRY_DELAYS_MS, SESSION_COORDINATOR_UNAVAILABLE, isRetryableBusy } from '../../shared/sessionCoordinatorBusy.mjs';
-import { AGENT_CLIENT_HEADER, AGENT_SIGN_IN_LINK_STATEMENT, AGENT_SIGN_IN_PATHS, isAgentSignInCode } from '../../shared/agentSignIn.mjs';
+import {
+  AGENT_CLIENT_HEADER, AGENT_SIGN_IN_CODE_IN_TEXT, AGENT_SIGN_IN_LINK_STATEMENT, AGENT_SIGN_IN_PATHS, isAgentSignInCode,
+} from '../../shared/agentSignIn.mjs';
 
 // Every request says it comes from an agent's client, so a session that has switched agents off can refuse it,
 // and so the Worker makes a sign-in link only for one. An older Worker ignores the header.
@@ -220,6 +222,11 @@ export const createWorkerClient = ({
   const request = async (path, { method = 'GET', headers = {}, body, form, auth = false, retried = false, busyRetries = 0, maxBytes = MAX_RESPONSE_BYTES, signal, raw: asText = false, timeoutMs = REQUEST_TIMEOUT_MS } = {}) => {
     const checkpoint = () => { if (signal?.aborted) throw new Error('Stopped before the Worker request was sent.'); };
     checkpoint();
+    // A sign-in link is for one person, in the conversation. Nothing this agent sends a session may carry one,
+    // whatever asked for it: an answer, a comment, a statement, a name or a note would show it to others.
+    if (AGENT_SIGN_IN_CODE_IN_TEXT.test(`${path}${body === undefined ? '' : JSON.stringify(body)}`)) {
+      throw new WorkerRequestError('This would put a sign-in link where other people could read it, so it was not sent. A sign-in link goes only to the person you work for, in the conversation.');
+    }
     // Signed out, a request that would carry the sign-in names its session instead.
     const signedOutRead = auth && signedOut;
     // Opened to read: anything that would change the session is refused here, before it is sent, whoever calls.
