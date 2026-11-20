@@ -13,6 +13,8 @@ import {
   workerOffersGroupJoinChoices,
   formatWorkerGroupReadInvite,
   parseWorkerGroupReadInvite,
+  workerGroupReadOrigin,
+  workerGroupReadStatementV2,
   workerGroupJoinStatement,
   workerGroupPasswordProblem,
   workerGroupReadStatement,
@@ -126,8 +128,13 @@ test('a read proof names its session and group, no address, and joins no one', a
 
   const header = formatWorkerGroupReadInvite({ groupId, proof });
   assert.equal(header, `${groupId}:${proof}`);
-  assert.deepEqual(parseWorkerGroupReadInvite(` ${header} `), { groupId, proof });
-  assert.deepEqual(parseWorkerGroupReadInvite(`Salon.2-a:${proof}`), { groupId: 'salon.2-a', proof });
+  assert.deepEqual(parseWorkerGroupReadInvite(` ${header} `), { groupId, proof, version: 1 });
+  assert.deepEqual(parseWorkerGroupReadInvite(`Salon.2-a:${proof}`), { groupId: 'salon.2-a', proof, version: 1 });
+  // The form that names its Worker is marked, and a group called "v2" is still a group.
+  assert.deepEqual(parseWorkerGroupReadInvite(`v2:Salon.2-a:${proof}`), { groupId: 'salon.2-a', proof, version: 2 });
+  assert.deepEqual(parseWorkerGroupReadInvite(`v2:${proof}`), { groupId: 'v2', proof, version: 1 });
+  assert.equal(formatWorkerGroupReadInvite({ groupId, proof, version: 2 }), `v2:${groupId}:${proof}`);
+  for (const bad of [`v2:a:b:${proof}`, `v3:${groupId}:${proof}`, `v2::${proof}`]) assert.equal(parseWorkerGroupReadInvite(bad), null, bad);
   for (const bad of ['', proof, `:${proof}`, `${groupId}:${proof.slice(0, -2)}`, `${groupId}:${proof}00`,
     `-x:${proof}`, `a b:${proof}`, `${'a'.repeat(200)}:${proof}`, null, 7]) {
     assert.equal(parseWorkerGroupReadInvite(bad), null, String(bad));
@@ -142,4 +149,26 @@ test('reads the session ceiling and the Worker capability', () => {
   assert.equal(workerOffersGroupJoinChoices({ groupJoinChoices: true }), true);
   assert.equal(workerOffersGroupJoinChoices({ groupJoinChoices: 'yes' }), false);
   assert.equal(workerOffersGroupJoinChoices(null), false);
+});
+
+test('a read proof that names its Worker is no proof for any other Worker, or for the form that names none', async () => {
+  const keys = createWorkerGroupPasswordKeys(ethers);
+  const password = 'river-stone-lamp-oak-tide';
+  const signer = await keys.signerOf({ password, sessionId, groupId });
+  const workerOrigin = 'https://ce-salon.example.workers.dev';
+  assert.equal(
+    workerGroupReadStatementV2({ sessionId, groupId, workerOrigin: `${workerOrigin.toUpperCase()}/path?x=1` }),
+    `ContextEngine.WorkerGroup.Read:2\nsession:${sessionId.toLowerCase()}\ngroup:${groupId}\nworker:${workerOrigin}`,
+  );
+  const proof = await keys.signReadFor({ password, sessionId, groupId, workerOrigin });
+  assert.equal(ethers.utils.verifyMessage(workerGroupReadStatementV2({ sessionId, groupId, workerOrigin }), proof), signer);
+  for (const other of ['https://impostor.example', 'http://ce-salon.example.workers.dev', 'https://ce-salon.example.workers.dev:8443']) {
+    assert.notEqual(ethers.utils.verifyMessage(workerGroupReadStatementV2({ sessionId, groupId, workerOrigin: other }), proof), signer, other);
+  }
+  assert.notEqual(ethers.utils.verifyMessage(workerGroupReadStatement({ sessionId, groupId }), proof), signer);
+  assert.notEqual(keys.recoverJoinSigner({ sessionId, groupId, address, proof }), signer);
+  for (const bad of ['', 'not a url', 'ftp://files.example', undefined]) {
+    await assert.rejects(keys.signReadFor({ password, sessionId, groupId, workerOrigin: bad }), /needs the Session Worker/);
+    assert.equal(workerGroupReadOrigin(bad), '');
+  }
 });

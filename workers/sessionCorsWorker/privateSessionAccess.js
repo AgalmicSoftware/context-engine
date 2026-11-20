@@ -12,8 +12,8 @@ import {
 } from '../../shared/workerGroupJoin.mjs';
 import { WORKER_SUPPORT_FIELDS } from '../../shared/workerSessionPublicConfig.mjs';
 import {
-  STORAGE_GROUP_READ_INVITE,
   createRequesterAccessChecks,
+  groupReadInviteDeps,
   resolvePayloadAccessControl,
 } from './storageRouteExecution.js';
 
@@ -64,7 +64,7 @@ export const evaluatePrivateSessionAccess = async ({
     slug,
     requesterAddress: requester.address || '',
     authScopes: requester.scopes,
-    deps: { ...(deps || {}), [STORAGE_GROUP_READ_INVITE]: header },
+    deps: { ...(deps || {}), ...groupReadInviteDeps(request) },
   });
   // A check that throws refuses: the route's own error handling answers it.
   const result = await checks.admits(rule);

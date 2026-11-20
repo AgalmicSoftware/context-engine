@@ -122,17 +122,44 @@ const READ_PROOF = /^0x[0-9a-f]{130}$/i;
 export const workerGroupReadStatement = ({ sessionId, groupId }) =>
   `${READ_STATEMENT}\nsession:${String(sessionId).toLowerCase()}\ngroup:${String(groupId)}`;
 
-/** The header value for a read proof. */
-export const formatWorkerGroupReadInvite = ({ groupId, proof }) => `${String(groupId)}:${String(proof)}`;
+const READ_STATEMENT_V2 = 'ContextEngine.WorkerGroup.Read:2';
+/** What a Session Worker lists when it takes read proofs that name the Worker they are for. */
+export const WORKER_GROUP_READ_PROOF_V2_FEATURE = 'group_read_proof_v2';
+const READ_HEADER_V2 = /^v2:([^:]+):(0x[0-9a-f]{130})$/i;
 
-/** A header value as `{ groupId, proof }`, or null when it isn't one. */
+/** An origin as a read proof names it, or '' when the value isn't one. */
+export const workerGroupReadOrigin = (value) => {
+  try {
+    const url = new URL(String(value));
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.origin.toLowerCase() : '';
+  } catch {
+    return '';
+  }
+};
+
+/**
+ * The read statement that also names the Session Worker it is for. A proof of the first form reads the session
+ * on any Worker that holds it, so one sent to a Worker that only claims to be the session's could be used at the
+ * real one. This form is refused by every Worker but the one at `workerOrigin`.
+ */
+export const workerGroupReadStatementV2 = ({ sessionId, groupId, workerOrigin }) =>
+  `${READ_STATEMENT_V2}\nsession:${String(sessionId).toLowerCase()}\ngroup:${String(groupId)}\nworker:${workerGroupReadOrigin(workerOrigin)}`;
+
+/** The header value for a read proof; `version: 2` for one that names its Worker. */
+export const formatWorkerGroupReadInvite = ({ groupId, proof, version = 1 }) =>
+  `${version === 2 ? 'v2:' : ''}${String(groupId)}:${String(proof)}`;
+
+/** A header value as `{ groupId, proof, version }`, or null when it isn't one. */
 export const parseWorkerGroupReadInvite = (value) => {
   const text = typeof value === 'string' ? value.trim() : '';
+  if (text.length > 300) return null;
+  // `v2:<group>:<proof>`; a group that happens to be called "v2" has one colon, not two.
+  const second = text.match(READ_HEADER_V2);
   const at = text.lastIndexOf(':');
-  if (at < 1 || text.length > 300) return null;
-  const groupId = text.slice(0, at).toLowerCase();
-  const proof = text.slice(at + 1);
-  return /^[a-z0-9][a-z0-9._-]*$/.test(groupId) && READ_PROOF.test(proof) ? { groupId, proof } : null;
+  if (!second && at < 1) return null;
+  const groupId = (second ? second[1] : text.slice(0, at)).toLowerCase();
+  const proof = second ? second[2] : text.slice(at + 1);
+  return /^[a-z0-9][a-z0-9._-]*$/.test(groupId) && READ_PROOF.test(proof) ? { groupId, proof, version: second ? 2 : 1 } : null;
 };
 
 /**
@@ -185,6 +212,13 @@ export const createWorkerGroupPasswordKeys = (ethers) => {
       (await deriveWallet(input)).signMessage(
         workerGroupReadStatement({ sessionId: input.sessionId, groupId: input.groupId }),
       ),
+    /** The read proof for this session and group at one Session Worker, which no other Worker accepts. */
+    signReadFor: async ({ workerOrigin, ...input }) => {
+      if (!workerGroupReadOrigin(workerOrigin)) throw new Error('A read proof needs the Session Worker it is for.');
+      return (await deriveWallet(input)).signMessage(
+        workerGroupReadStatementV2({ sessionId: input.sessionId, groupId: input.groupId, workerOrigin }),
+      );
+    },
     /** The signer a proof was made with (the Worker compares it with the stored one). */
     recoverJoinSigner: ({ sessionId, groupId, address, proof }) =>
       ethers.utils.verifyMessage(workerGroupJoinStatement({ sessionId, groupId, address }), proof),

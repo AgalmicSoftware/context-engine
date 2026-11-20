@@ -9,7 +9,9 @@ import {
 	isOneUseSecretHash,
 	parseWorkerGroupReadInvite,
 	workerGroupJoinStatement,
+	workerGroupReadOrigin,
 	workerGroupReadStatement,
+	workerGroupReadStatementV2,
 } from '../../shared/workerGroupJoin.mjs';
 
 // The Worker's ethers is v6 (`verifyMessage`); v5 keeps it under `utils`.
@@ -82,14 +84,21 @@ export const resolveWorkerGroupJoinCredential = async ({ credential, sessionId, 
 
 /**
  * A read invite header as `{ groupId, signer }`: the group it names and the key that signed its read statement for
- * this session. Null when there is no header; `{ invalid: true }` when there is one that can't be read.
+ * this session. Null when there is no header; `{ invalid: true }` when there is one that can't be read. A proof
+ * that names its Worker is checked against `workerOrigin`, this Worker's own address as the request reached it:
+ * one made for another Worker recovers another signer, and one checked without an origin is unreadable.
  */
-export const readWorkerGroupReadInvite = ({ header, sessionId }) => {
+export const readWorkerGroupReadInvite = ({ header, sessionId, workerOrigin }) => {
 	if (header == null || String(header).trim() === '') return null;
 	const parsed = parseWorkerGroupReadInvite(header);
 	if (!parsed || !sessionId) return { invalid: true };
+	const origin = parsed.version === 2 ? workerGroupReadOrigin(workerOrigin) : '';
+	if (parsed.version === 2 && !origin) return { invalid: true };
 	try {
-		const signer = verifyMessage(workerGroupReadStatement({ sessionId, groupId: parsed.groupId }), parsed.proof);
+		const statement = parsed.version === 2
+			? workerGroupReadStatementV2({ sessionId, groupId: parsed.groupId, workerOrigin: origin })
+			: workerGroupReadStatement({ sessionId, groupId: parsed.groupId });
+		const signer = verifyMessage(statement, parsed.proof);
 		return { groupId: parsed.groupId, signer: signer.toLowerCase() };
 	} catch {
 		return { invalid: true };

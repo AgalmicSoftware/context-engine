@@ -229,7 +229,7 @@ export const dispatchInterviewBriefRequest = async ({
     fetch: deps?.fetch,
     ...(reader ? { reader } : {}),
     // The invite that opened the door also reads: each question is still checked on its own.
-    ...(access.private ? { readInvite: readGroupReadInviteHeader(request) } : {}),
+    ...(access.private ? { readInvite: readGroupReadInviteHeader(request), workerOrigin: safeServedWorkerOrigin(request.url) } : {}),
   });
   if (!questions.length && refused && !reader) {
     return deps?.json?.({

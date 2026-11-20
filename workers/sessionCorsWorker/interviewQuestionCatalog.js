@@ -71,9 +71,11 @@ const listQuestionRows = async (callStorage) => {
   return { items, incomplete: !complete, refused };
 };
 
-const loadCloudflareQuestions = async ({ env, config, slug, storageRoute, reader, readInvite }) => {
+const loadCloudflareQuestions = async ({ env, config, slug, storageRoute, reader, readInvite, workerOrigin }) => {
   if (typeof storageRoute !== 'function') return catalog();
-  const origin = 'https://session-worker.invalid';
+  // An invite that names its Worker is checked against the origin its request came to, so the reads made for
+  // it are made at that origin; every other catalog read is made at no real address.
+  const origin = trim(readInvite) && trim(workerOrigin) ? trim(workerOrigin) : 'https://session-worker.invalid';
   // A catalog ticket's reader sees what that person sees; otherwise this is a signed-out view. A
   // private session's read invite rides on each read, so the storage route checks it per item as
   // it does for the page: the catalog shows an invite holder what the group's link shows, no more.
@@ -324,8 +326,9 @@ export const loadPublicInterviewQuestions = async ({
   fetch: fetchImpl = globalThis.fetch,
   reader,
   readInvite,
+  workerOrigin,
 } = {}) => {
-  const cloudflareQuestions = await loadCloudflareQuestions({ env, config, slug, storageRoute, reader, readInvite });
+  const cloudflareQuestions = await loadCloudflareQuestions({ env, config, slug, storageRoute, reader, readInvite, workerOrigin });
   if (cloudflareQuestions.questions.length) return cloudflareQuestions;
   const onChain = await loadOnChainQuestions({ config, slug, fetchImpl });
   return catalog(

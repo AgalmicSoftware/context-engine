@@ -6,6 +6,7 @@ import { getDefaultWorkerSessionSlug, validateInboundWorkerSessionSlug } from '.
 import { getStorageIndexBinding, resolvePayloadAccessControl } from './storageRouteExecution.js';
 import { GPT_LIVE_1_1_FEATURE } from '../../shared/realtimeInterviewConfig.mjs';
 import { ANALYSIS_CARD_DRAWING_FEATURE } from '../../shared/analysisCardSaved.mjs';
+import { WORKER_GROUP_READ_PROOF_V2_FEATURE } from '../../shared/workerGroupJoin.mjs';
 
 export const FEATURES = Object.freeze([
   'agent_http_v1',
@@ -23,6 +24,8 @@ export const FEATURES = Object.freeze([
   'context_sources_v1',
   'draft_text_v1',
   'envelope_export_identity_v1',
+  // A read invite may name this Worker, and is then refused by every other one.
+  WORKER_GROUP_READ_PROOF_V2_FEATURE,
   // interviewMode.dataNote, the session's note on where research data goes; older Workers reject the key.
   'interview_data_note_v1',
   // interviewMode.realtimeModel may be gpt-live-1.1; older Workers refuse it on save.

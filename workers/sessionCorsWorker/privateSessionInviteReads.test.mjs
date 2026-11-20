@@ -5,7 +5,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Wallet } from 'ethers';
 
-import { formatWorkerGroupReadInvite, workerGroupJoinStatement, workerGroupReadStatement } from '../../shared/workerGroupJoin.mjs';
+import {
+  WORKER_GROUP_READ_PROOF_V2_FEATURE, formatWorkerGroupReadInvite, parseWorkerGroupReadInvite, workerGroupJoinStatement,
+  workerGroupReadStatement, workerGroupReadStatementV2,
+} from '../../shared/workerGroupJoin.mjs';
 import {
   APP_ORIGIN, SESSION_ID, SLUG, WORKER_ORIGIN, createSessionEnv, fetchWorker, login, readJson, signedAdminRequest, uploadJson,
 } from './sessionWorkerRuntimeFixture.mjs';
@@ -188,4 +191,75 @@ test('answers open to the invite only where members see every answer; an invite 
     });
     assert.equal(write.status, 401, visibility);
   }
+});
+
+// A proof that names the Worker it is for, as an agent sends it.
+const boundInvite = async (key, workerOrigin = WORKER_ORIGIN, groupId = GROUP) => formatWorkerGroupReadInvite({
+  groupId, version: 2, proof: await key.signMessage(workerGroupReadStatementV2({ sessionId: SESSION_ID, groupId, workerOrigin })),
+});
+
+test('a read proof that names its Worker reads there, and is worth nothing at any other Worker', async () => {
+  const { env, key, ids } = await setup();
+  const features = (await readJson(await ask(env, '/capabilities'))).body.features;
+  assert.ok(features.includes(WORKER_GROUP_READ_PROOF_V2_FEATURE));
+
+  const here = await boundInvite(key);
+  assert.deepEqual(parseWorkerGroupReadInvite(here), { groupId: GROUP, proof: here.split(':')[2], version: 2 });
+  const catalog = await readJson(await ask(env, catalogPath, { invite: here }));
+  assert.equal(catalog.status, 200, JSON.stringify(catalog.body));
+  assert.deepEqual(catalog.body.questions.map((entry) => entry.id).sort(), ids);
+  assert.equal((await ask(env, '/storage/list?resource=questions&limit=100', { invite: here })).status, 200);
+  assert.equal((await readJson(await ask(env, `/session-config?slug=${SLUG}`, { invite: here }))).body.config.sessionName, 'Runtime session');
+
+  // The same password, proved to a Worker that only claims to hold this session: refused here, in either form.
+  const elsewhere = await boundInvite(key, 'https://impostor.example');
+  for (const invite of [
+    elsewhere,
+    // Relabelled as the older form, which names no Worker.
+    formatWorkerGroupReadInvite({ groupId: GROUP, proof: elsewhere.split(':')[2] }),
+    // This Worker's proof under another group's name, and another password's proof.
+    formatWorkerGroupReadInvite({ groupId: 'other', version: 2, proof: here.split(':')[2] }),
+    await boundInvite(passwordKey('22')),
+    'v2:salon:0x1234',
+    'v2::',
+  ]) {
+    for (const path of [catalogPath, '/storage/list?resource=questions&limit=100']) {
+      const refused = await readJson(await ask(env, path, { invite }));
+      assert.equal(refused.status, 403, `${path} ${invite.slice(0, 20)}`);
+      assert.equal(JSON.stringify(refused.body).includes('Private statement'), false);
+    }
+    assert.equal((await readJson(await ask(env, `/session-config?slug=${SLUG}`, { invite }))).body.privateSession, 'invite_invalid');
+  }
+  // The older form still reads, for the pages and agents that send it.
+  assert.equal((await ask(env, catalogPath, { invite: await readInvite(key) })).status, 200);
+});
+
+test('the catalog never shows an invite holder a question a member of that group could not read', async () => {
+  const { env, admin, adminToken, key, groupId, ids, invite } = await setup();
+  // A question for another group only, one an admin hid, and one the session blocks.
+  const post = (resource, data, extra = {}) => ask(env, '/storage/upload', {
+    token: adminToken, method: 'POST', body: { data: JSON.stringify(data), contentType: 'application/json', resource, ...extra },
+  }).then(readJson);
+  const otherOnly = `0x${'c3'.repeat(32)}`;
+  const stored = await post('questions', question(otherOnly, 'For another group only'), {
+    accessConditions: { match: 'any', conditions: [{ kind: 'worker_group', groupIds: ['other'] }] },
+  });
+  assert.equal(stored.status, 200, JSON.stringify(stored.body));
+
+  // A member of the invite's group, signed in, is the measure.
+  const member = Wallet.createRandom();
+  const memberToken = await login({ env, wallet: member });
+  const proof = await key.signMessage(workerGroupJoinStatement({ sessionId: SESSION_ID, groupId, address: member.address }));
+  assert.equal((await ask(env, '/groups/join', { token: memberToken, method: 'POST', body: { sessionId: SESSION_ID, groupId, proof } })).status, 200);
+  const memberReads = async (id) => (await ask(env, `/storage/read?id=${encodeURIComponent(id)}`, { token: memberToken })).status;
+  assert.equal(await memberReads(stored.body.storageRef.id), 403);
+
+  for (const held of [invite, await boundInvite(key)]) {
+    const catalog = await readJson(await ask(env, catalogPath, { invite: held }));
+    assert.equal(catalog.status, 200, JSON.stringify(catalog.body));
+    assert.deepEqual(catalog.body.questions.map((entry) => entry.id).sort(), ids);
+    assert.equal(JSON.stringify(catalog.body).includes('For another group only'), false);
+    assert.equal((await ask(env, `/storage/read?id=${encodeURIComponent(stored.body.storageRef.id)}`, { invite: held })).status, 403);
+  }
+  assert.ok(admin.address);
 });

@@ -95,6 +95,21 @@ const STORAGE_GROUP_MEMBERSHIP_CACHE = Symbol('storage-group-membership-cache');
 const STORAGE_SESSION_GATE_YES = Symbol('storage-session-gate-yes');
 // The request's `X-CE-Group-Invite` header, set on a route's deps: a way through a Worker group condition.
 export const STORAGE_GROUP_READ_INVITE = 'groupReadInvite';
+// This Worker's own origin as the request reached it: a read invite that names its Worker is checked against it.
+export const STORAGE_GROUP_READ_INVITE_ORIGIN = 'groupReadInviteOrigin';
+/** The two deps a request's read invite travels in: its header, and the origin the request was sent to. */
+export const groupReadInviteDeps = (request) => {
+  let origin = '';
+  try {
+    origin = new URL(request?.url || '').origin;
+  } catch {
+    // An invite that names its Worker is then unreadable, and refused.
+  }
+  return {
+    [STORAGE_GROUP_READ_INVITE]: request?.headers?.get?.(WORKER_GROUP_READ_INVITE_HEADER) || '',
+    [STORAGE_GROUP_READ_INVITE_ORIGIN]: origin,
+  };
+};
 const STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol('storage-rpc-chain-attestation-cache');
 const trim = (value) => toStr(value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -788,7 +803,7 @@ const checkGroupReadInvite = async ({ env, slug, config, groupId, deps }) => {
   const key = `read-invite:${groupId}`;
   if (cache?.has(key)) return cache.get(key);
   const sessionId = resolveCanonicalWorkerSessionIdHex(config);
-  const invite = readWorkerGroupReadInvite({ header, sessionId });
+  const invite = readWorkerGroupReadInvite({ header, sessionId, workerOrigin: deps?.[STORAGE_GROUP_READ_INVITE_ORIGIN] });
   const refused = { ok: false, outcome: 'denied', status: 403, reason: 'worker_group_read_invite_invalid' };
   const check = typeof deps?.checkWorkerGroupReadInvite === 'function' ? deps.checkWorkerGroupReadInvite : checkWorkerGroupReadInvite;
   const pending = invite?.groupId !== groupId
@@ -3148,7 +3163,7 @@ export const storageRoute = async ({
 } = {}) => {
   // A read invite opens reads only: never an upload, a context addition or a field key.
   if (['/storage/read', '/storage/read-batch', '/storage/list'].includes(path)) {
-    deps = { ...(deps || {}), [STORAGE_GROUP_READ_INVITE]: request?.headers?.get?.(WORKER_GROUP_READ_INVITE_HEADER) || '' };
+    deps = { ...(deps || {}), ...groupReadInviteDeps(request) };
   }
   if (method === 'POST' && ['/storage/response-field-key/wrap', '/storage/response-field-key/unwrap'].includes(path)) {
     // Field keys use the same lazy private-RPC setup and chain attestation as

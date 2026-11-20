@@ -8,7 +8,7 @@ import { dispatchInterviewStarterRequest } from './interviewStarter.js';
 import { dispatchAnonymousFeedbackRequest } from './sessionFeedbackRoute.js';
 import { dispatchSignedOutSessionAgentRequest } from './sessionAgentSignedOut.js';
 import { evaluatePrivateSessionAccess, privateSessionRefusal, readGroupReadInviteHeader } from './privateSessionAccess.js';
-import { STORAGE_GROUP_READ_INVITE, createRequesterAccessChecks } from './storageRouteExecution.js';
+import { createRequesterAccessChecks, groupReadInviteDeps } from './storageRouteExecution.js';
 import { readSessionNames } from './sessionNames.js';
 import { BodyByteLimitError, readBodyBytes } from '../shared/bodyByteLimit.mjs';
 import { resolveMaxUploadBytes } from './uploadSizeLimits.js';
@@ -713,7 +713,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
         if (!resultsAccess.ok) {
           return privateSessionRefusal({ access: resultsAccess, json: deps?.json, headers: corsContext?.headers || routeBaseHeaders });
         }
-        const readInvite = { [STORAGE_GROUP_READ_INVITE]: readGroupReadInviteHeader(withQuerySlugHeader) };
+        const readInvite = groupReadInviteDeps(withQuerySlugHeader);
         if (routeSelection.kind === 'debate-atlas' || routeSelection.kind === 'risk-matrix') {
           const dispatchBuildRead = routeSelection.kind === 'debate-atlas' ? dispatchDebateAtlasReadRequest : dispatchRiskMatrixReadRequest;
           return await dispatchBuildRead({
