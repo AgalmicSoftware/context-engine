@@ -109,7 +109,7 @@ const assertNoSecrets = (seen, results) => {
   assert.equal(proofs.length, 1);
   const sent = JSON.stringify(seen.map(({ url, body }) => ({ url, body })));
   const told = JSON.stringify(results);
-  for (const secret of [PASSWORD, encodeURIComponent(PASSWORD), proofs[0], proofs[0].split(':')[1]]) {
+  for (const secret of [PASSWORD, encodeURIComponent(PASSWORD), proofs[0], proofs[0].split(':').at(-1)]) {
     assert.equal(sent.includes(secret), false, 'a request address or body carried a secret');
     assert.equal(told.includes(secret), false, 'a tool result carried a secret');
   }
@@ -255,4 +255,59 @@ test('a public session’s plain link is read without joining too, and a joined 
   assert.equal(joined.joined, undefined);
   assert.equal(joined.answeredByMe, 0);
   assert.ok(seen.some((call) => call.authorization));
+});
+
+test('a Worker that only claims to hold the session gets a proof the real one refuses', async (t) => {
+  const { env, participant } = await setup(t);
+  const IMPOSTOR = 'https://impostor.example';
+  const harvested = [];
+  // The impostor answers as the real session's shell, to draw out a proof of the password.
+  const impostorFetch = async (url, init = {}) => {
+    const target = new URL(url);
+    harvested.push(new Headers(init.headers).get('x-ce-group-invite') || '');
+    if (target.pathname === '/capabilities') return Response.json({ features: ['worker_groups', 'group_read_proof_v2'] });
+    if (target.pathname === '/session-config') {
+      return Response.json({ ok: true, sessionSlug: SLUG, privateSession: 'invite_required',
+        config: { slug: SLUG, sessionId: SESSION_ID, corsWorkerUrl: IMPOSTOR, allowOrigins: [APP_ORIGIN], sessionModeProfile: { authority: { mode: 'worker_canonical' } } } });
+    }
+    return Response.json({ error: 'no' }, { status: 403 });
+  };
+  const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-agent-reader-'));
+  t.after(() => fs.rm(stateDir, { recursive: true, force: true }));
+  const fooled = createParticipant({
+    config: { stateDir, profile: {}, appOrigin: APP_ORIGIN, trustedAppOrigins: [APP_ORIGIN], allowLocalWorkers: false },
+    wallet: ethers.Wallet.createRandom(),
+    fetchImpl: impostorFetch,
+  });
+  const lure = `${APP_ORIGIN}/session/${SLUG}?worker=${encodeURIComponent(IMPOSTOR)}&joinGroup=${GROUP}#groupInvite=${encodeURIComponent(`gp:${PASSWORD}`)}`;
+  await assert.rejects(fooled.getSession({ session: lure }), /private/);
+  const proofs = harvested.filter(Boolean);
+  assert.ok(proofs.length, 'the impostor was sent a proof');
+  // Replayed at the real Worker, by any route, it opens nothing.
+  for (const proof of new Set(proofs)) {
+    for (const route of [`/session-config?slug=${SLUG}`, '/storage/list?resource=questions&limit=100']) {
+      const response = await fetchWorker(new Request(`${WORKER_ORIGIN}${route}`, { headers: { 'X-Session-Slug': SLUG, 'X-CE-Group-Invite': proof } }), env);
+      const body = await response.json();
+      assert.equal(response.status === 200 && !body.privateSession, false, route);
+      assert.equal(JSON.stringify(body).includes('Secret salon') || JSON.stringify(body).includes('Private statement'), false);
+    }
+    // Not even with its label changed to the form that names no Worker.
+    const relabelled = proof.replace(/^v2:/, '');
+    const response = await fetchWorker(new Request(`${WORKER_ORIGIN}/storage/list?resource=questions&limit=100`, { headers: { 'X-Session-Slug': SLUG, 'X-CE-Group-Invite': relabelled } }), env);
+    assert.equal(response.status, 403);
+  }
+  // The real link still reads at the real Worker.
+  assert.equal((await participant.listQuestions({ session: groupLink(`gp:${PASSWORD}`) })).total, 2);
+});
+
+test('two links to one session read as the group each names, and a session opened to read never writes', async (t) => {
+  const { participant, seen } = await setup(t);
+  await participant.getSession({ session: groupLink(`gp:${PASSWORD}`) });
+  const sent = new Set(seen.map((call) => call.invite).filter(Boolean));
+  // The same password text under another group's name is not read with the first group's proof.
+  const other = `${pageLink}&joinGroup=other#groupInvite=${encodeURIComponent(`gp:${PASSWORD}`)}`;
+  await assert.rejects(participant.getSession({ session: other }), /no longer opens it/);
+  const after = new Set(seen.map((call) => call.invite).filter(Boolean));
+  assert.ok([...after].some((invite) => invite.startsWith('v2:other:')));
+  assert.ok([...sent].every((invite) => invite.startsWith(`v2:${GROUP}:`)));
 });

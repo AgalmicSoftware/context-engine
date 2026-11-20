@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { ethers } from 'ethers';
 import { loadOrCreateWallet } from './agentState.mjs';
 import { createParticipant } from './participant.mjs';
-import { createWorkerGroupPasswordKeys, parseWorkerGroupReadInvite, workerGroupReadStatement } from '../../shared/workerGroupJoin.mjs';
+import { createWorkerGroupPasswordKeys, parseWorkerGroupReadInvite, workerGroupReadStatementV2 } from '../../shared/workerGroupJoin.mjs';
 
 const fixture = JSON.parse(await readFile(new URL('../../tests/fixtures/worker-compat/previous-minor.json', import.meta.url), 'utf8'));
 const { slug, sessionId, corsWorkerUrl } = fixture.config;
@@ -20,7 +20,7 @@ const keys = createWorkerGroupPasswordKeys(ethers);
 const link = (fragment = '') => `https://contextengine.sh/session/${slug}?joinGroup=${GROUP_ID}&worker=${encodeURIComponent(corsWorkerUrl)}${fragment}`;
 const passwordFragment = (password = PASSWORD) => `#groupInvite=${encodeURIComponent(`gp:${password}`)}`;
 
-const setup = async (t, { joinRefused = false } = {}) => {
+const setup = async (t, { joinRefused = false, olderWorker = false } = {}) => {
   const stateDir = await mkdtemp(join(tmpdir(), 'ce-agent-private-'));
   t.after(() => rm(stateDir, { recursive: true, force: true }));
   const { wallet } = await loadOrCreateWallet(stateDir, { privateKey: ethers.Wallet.createRandom().privateKey });
@@ -30,8 +30,9 @@ const setup = async (t, { joinRefused = false } = {}) => {
   const admitted = (headers) => {
     if (member && headers.get('authorization')) return true;
     const invite = parseWorkerGroupReadInvite(headers.get('x-ce-group-invite') || '');
-    return !!invite && invite.groupId === GROUP_ID &&
-      ethers.utils.verifyMessage(workerGroupReadStatement({ sessionId, groupId: GROUP_ID }), invite.proof) === signer;
+    // Only a proof that names this Worker; the older form, which any Worker could reuse, is never sent.
+    return !!invite && invite.groupId === GROUP_ID && invite.version === 2 &&
+      ethers.utils.verifyMessage(workerGroupReadStatementV2({ sessionId, groupId: GROUP_ID, workerOrigin: corsWorkerUrl }), invite.proof) === signer;
   };
   const fetchImpl = async (input, init = {}) => {
     const path = new URL(input).pathname;
@@ -45,6 +46,7 @@ const setup = async (t, { joinRefused = false } = {}) => {
         : { ok: true, sessionSlug: slug, privateSession: headers.get('x-ce-group-invite') ? 'invite_invalid' : 'invite_required',
           config: { slug, sessionId, corsWorkerUrl, allowOrigins: fixture.config.allowOrigins, sessionModeProfile: fixture.config.sessionModeProfile } });
     }
+    if (path === '/capabilities') return Response.json({ features: olderWorker ? ['worker_groups'] : ['worker_groups', 'group_read_proof_v2'] });
     if (path === '/auth/nonce') return Response.json({ nonce: 'fixtureNonce12345' });
     if (path === '/auth/login') return Response.json({ token: 'fixture-token' });
     if (path === '/groups/join') {
@@ -78,8 +80,9 @@ test('join_session opens a private session with its link’s password, then join
   // The shell first, then the session as the invite and the membership show it.
   assert.deepEqual(seen.configs[0], 'shell');
   assert.ok(seen.configs.slice(1).every((shown) => shown === 'whole'));
-  // The read invite went with the requests after the shell, and the password with none.
-  assert.ok(seen.invites.slice(1).every(Boolean));
+  // Once made, the read invite went with every request, and the password with none.
+  const first = seen.invites.findIndex(Boolean);
+  assert.ok(first > 0 && seen.invites.slice(first).every(Boolean));
   assert.equal(JSON.stringify(seen).includes(PASSWORD), false);
   assert.equal(JSON.stringify(joined).includes(PASSWORD), false);
   assert.ok(seen.joins[0].proof);
@@ -129,4 +132,17 @@ test('a one-use code makes no read invite, so the session is read whole once the
   assert.equal(joined.joinedGroup, GROUP_ID);
   assert.equal(joined.title, 'Secret salon');
   assert.equal(JSON.stringify(joined).includes(CODE), false);
+});
+
+test('a Worker from before proofs that name their Worker is sent no read proof; the join still opens the session', async (t) => {
+  const { participant, seen } = await setup(t, { olderWorker: true });
+  const joined = await participant.joinSession({ link: link(passwordFragment()) });
+  assert.ok(seen.invites.every((invite) => invite === ''));
+  assert.equal(joined.joinedGroup, GROUP_ID);
+  assert.equal(joined.title, 'Secret salon');
+  // Reading without joining needs the proof, so there it says why not.
+  const reader = await setup(t, { olderWorker: true });
+  await assert.rejects(reader.participant.getSession({ session: link(passwordFragment()) }), /from before reading by link/);
+  assert.ok(reader.seen.invites.every((invite) => invite === ''));
+  assert.equal(reader.seen.joins.length, 0);
 });

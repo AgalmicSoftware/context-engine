@@ -28,7 +28,9 @@ import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinator
 import {
   ANALYSIS_CARD_DRAWING_FEATURE, ANALYSIS_CARD_FEATURE, normalizeAnalysisCardDrawing, normalizeSavedAnalysisCard,
 } from '../../shared/analysisCardSaved.mjs';
-import { createWorkerGroupPasswordKeys, formatWorkerGroupReadInvite, parseGroupInviteToken } from '../../shared/workerGroupJoin.mjs';
+import {
+  WORKER_GROUP_READ_PROOF_V2_FEATURE, createWorkerGroupPasswordKeys, formatWorkerGroupReadInvite, parseGroupInviteToken,
+} from '../../shared/workerGroupJoin.mjs';
 import { ethers } from 'ethers';
 
 const PUBLIC_RESULTS = 'public_full_if_storage_public';
@@ -117,7 +119,8 @@ const CONTEXT_NO_FETCH = 'This session doesn’t let you have its Worker fetch p
 const CONTEXT_RATE_LIMITED = 'The session’s Worker is rate limiting you, so nothing was added. Retry in a few minutes; if it still refuses, you may have reached the session’s daily limit for your address, which clears within a day.';
 
 // Reading a session from its link without joining it: what the read tools say, and why a private one stays shut.
-const READ_ONLY_NOTE = 'Read from the link without joining: you are not a participant here, and nothing was stored or spent. To take part, call join_session with the link.';
+const READ_ONLY_NOTE = 'Read from the link without joining: you are not a participant here, and nothing was stored or spent. To take part, call join_session with the link. Tools called without a session still act on the session you joined most recently, not this one.';
+const READ_NEEDS_NEWER_WORKER = 'This session is private, and its Session Worker is from before reading by link, so it can’t be read here without joining. If the person wants you to take part, call join_session with the link.';
 const READ_NEEDS_PASSWORD_LINK = 'This session is private, and this link doesn’t open it for reading. Ask the person for the group’s invite link, the one that carries its password, and pass that whole link as session. Never ask them to type the password by itself.';
 const READ_ONE_USE_CODE = 'This session is private, and this link’s invite is a one-use code. A code can’t be used to read: it works once, to join. Reading here needs joining first, which spends the code, so ask the person before calling join_session with the link.';
 const READ_INVITE_STALE = 'This session is private, and this link’s group password no longer opens it: the password may have changed, or the group may no longer be let in. Ask the person for the current invite link.';
@@ -372,16 +375,25 @@ const groupJoinCredential = async ({ token, sessionId, groupId, address }) => {
 };
 
 // What lets a private session's agent read before it joins: a group password
-// signs a read proof for its session and group. A code makes none.
-const groupReadInvite = async ({ token, sessionId, groupId }) => {
+// signs a read proof for its session and group. A code makes none. The proof
+// names the Worker it is sent to, which is whatever Worker a link names: one
+// that only claims to hold the session gets a proof no other Worker accepts.
+// The older form, which names no Worker, is never made here.
+const groupReadInvite = async ({ token, sessionId, groupId, workerOrigin }) => {
   const invite = parseGroupInviteToken(token);
   const id = trim(groupId).toLowerCase();
   if (invite?.kind !== 'password' || !id) return '';
   return formatWorkerGroupReadInvite({
     groupId: id,
-    proof: await groupPasswordKeys.signRead({ password: invite.password, sessionId, groupId: id }),
+    version: 2,
+    proof: await groupPasswordKeys.signReadFor({ password: invite.password, sessionId, groupId: id, workerOrigin }),
   });
 };
+// Whether a Worker takes that proof. One from before it is sent none.
+const takesBoundReadProof = async (ctx) => !!(await ctx.client.readFeatures())?.includes(WORKER_GROUP_READ_PROOF_V2_FEATURE);
+// Sessions held open for reading at one time; the least recently opened goes first.
+const MAX_READER_SESSIONS = 8;
+const tokenMark = (token) => (token ? createHash('sha256').update(token).digest('hex') : '');
 
 // `sentInvite` is false when join_group had no invite to send: the link's is
 // held only until the MCP restarts, so a refusal then is not a bad invite. The
@@ -762,9 +774,11 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     if (parsed.kind === 'registry') throw new Error(READ_ONLY_REGISTRY);
     const key = `reader ${sessionKey(parsed)}`;
     const groupInvite = parsed.groupInvite || '';
+    // The link's invite is remembered only as a hash, with the group it is for.
+    const readerInvite = `${trim(parsed.joinGroupId).toLowerCase()} ${tokenMark(groupInvite)}`;
     let ctx = sessions.get(key);
-    // Another invite for the same session starts over, so an old one is never sent with it.
-    if (!ctx || ctx.readerInvite !== groupInvite) {
+    // Another invite or group for the same session starts over, so an old proof is never sent with it.
+    if (!ctx || ctx.readerInvite !== readerInvite) {
       const info = { ...parsed };
       delete info.groupInvite;
       delete info.listedSessionId;
@@ -772,7 +786,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         info,
         registry: null,
         readOnly: true,
-        readerInvite: groupInvite,
+        readerInvite,
         client: createWorkerClient({
           workerOrigin: info.workerOrigin, slug: info.slug, trustedOrigins: trustedOriginsFor(info.appOrigin), wallet, fetchImpl, now, signedOut: true,
         }),
@@ -785,14 +799,20 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       if (parsed.listedSessionId && ctx.client.sessionId !== parsed.listedSessionId) {
         throw new Error(`The Session Worker listed for "${parsed.slug}" answers for a different session, so it was not read. Ask for the session’s link with worker=, the Worker’s address.`);
       }
-      if (ctx.client.privateSession) {
-        const readInvite = await groupReadInvite({ token: groupInvite, sessionId: ctx.client.sessionId, groupId: parsed.joinGroupId });
+      if (ctx.client.privateSession && parseGroupInviteToken(groupInvite)?.kind === 'password' && parsed.joinGroupId) {
+        if (!(await takesBoundReadProof(ctx))) throw new Error(READ_NEEDS_NEWER_WORKER);
+        const readInvite = await groupReadInvite({
+          token: groupInvite, sessionId: ctx.client.sessionId, groupId: parsed.joinGroupId, workerOrigin: info.workerOrigin,
+        });
         if (readInvite) {
           ctx.client.setGroupReadInvite(readInvite);
           await ctx.client.loadConfig();
         }
       }
+      sessions.delete(key);
       sessions.set(key, ctx);
+      const readers = [...sessions.keys()].filter((name) => name.startsWith('reader '));
+      readers.slice(0, Math.max(0, readers.length - MAX_READER_SESSIONS)).forEach((name) => sessions.delete(name));
     }
     if (ctx.client.privateSession) {
       sessions.delete(key);
@@ -1264,8 +1284,13 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       // A private session shows only its shell until the link's invite, or a
       // membership, admits the agent; the invite is held in memory like the link's.
       const privateSession = !ctx.registry && !!ctx.client.privateSession;
-      if (privateSession) {
-        const readInvite = await groupReadInvite({ token: groupInvite, sessionId: ctx.client.sessionId, groupId: parsed.joinGroupId });
+      // Joined now: nothing is read for this session as a visitor any more.
+      sessions.delete(`reader ${sessionKey(parsed)}`);
+      // A Worker from before proofs that name their Worker is sent none: the join below opens the session.
+      if (privateSession && (await takesBoundReadProof(ctx))) {
+        const readInvite = await groupReadInvite({
+          token: groupInvite, sessionId: ctx.client.sessionId, groupId: parsed.joinGroupId, workerOrigin: ctx.info.workerOrigin,
+        });
         if (readInvite) {
           ctx.client.setGroupReadInvite(readInvite);
           sessionConfig = await ctx.client.loadConfig();
@@ -1698,7 +1723,17 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         listStop = result.scanned === false ? 'scan' : null;
       } else {
         const started = now();
-        const result = await ctx.client.listAll('responses', { maxItems: MAX_RESULT_RECORDS, pageSize: RESULTS_LIST_PAGE_SIZE, deadlineMs: RESULTS_LIST_DEADLINE_MS, signal });
+        let result;
+        try {
+          result = await ctx.client.listAll('responses', { maxItems: MAX_RESULT_RECORDS, pageSize: RESULTS_LIST_PAGE_SIZE, deadlineMs: RESULTS_LIST_DEADLINE_MS, signal });
+        } catch (error) {
+          // Members' results, read by someone who hasn't joined: said plainly, not as the Worker's refusal.
+          if (!ctx.readOnly || !(error instanceof WorkerRequestError) || ![401, 403].includes(error.status)) throw error;
+          return {
+            session: ctx.info.slug, resultsPublic: false, joined: false,
+            note: 'This session shows results to its members, so a link alone reads none. Join with join_session to read them, if the person wants you to take part.',
+          };
+        }
         const listed = result.items
           .filter((item) => text(item.storageRef?.id))
           .sort((left, right) => (text(left.metadata?.createdAt) < text(right.metadata?.createdAt) ? 1 : -1));

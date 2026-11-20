@@ -226,3 +226,31 @@ test('a batch read returns each record as a single read would, and leaves the re
   ]);
   assert.deepEqual(sent, [{ path: '/storage/read-batch', ids }]);
 });
+
+test('a client opened to read sends reads without a sign-in and refuses every change before it is sent', async () => {
+  const calls = [];
+  const client = createWorkerClient({
+    workerOrigin: 'https://w.example.workers.dev', slug: 'forum-a', trustedOrigins: ['https://contextengine.sh'], signedOut: true,
+    wallet: { address: '0x00000000000000000000000000000000000000aa', signMessage: async () => { throw new Error('never signs'); } },
+    fetchImpl: async (url, init = {}) => {
+      calls.push({ path: new URL(url).pathname, method: init.method || 'GET', headers: new Headers(init.headers) });
+      return Response.json({ items: [], listComplete: true });
+    },
+  });
+  await client.listAll('questions');
+  await client.readBatch(['cf:one']);
+  assert.deepEqual(calls.map((call) => [call.method, call.path]), [['GET', '/storage/list'], ['POST', '/storage/read-batch']]);
+  assert.ok(calls.every((call) => !call.headers.get('authorization') && call.headers.get('x-session-slug') === 'forum-a'));
+  for (const change of [
+    () => client.upload({ resource: 'responses', data: '{}' }),
+    () => client.uploadForm(new FormData()),
+    () => client.contextAction({ action: 'add-link' }),
+    () => client.joinGroup('salon', { secret: 'c0'.repeat(16) }),
+    () => client.leaveGroup('salon'),
+    () => client.request('/session-agent/ask', { method: 'POST', auth: true, body: { question: 'x' } }),
+    () => client.login(),
+  ]) {
+    await assert.rejects(change(), /opened to read without joining/);
+  }
+  assert.equal(calls.length, 2);
+});

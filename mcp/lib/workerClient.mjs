@@ -210,6 +210,10 @@ export const createWorkerClient = ({
     checkpoint();
     // Signed out, a request that would carry the sign-in names its session instead.
     const signedOutRead = auth && signedOut;
+    // Opened to read: anything that would change the session is refused here, before it is sent, whoever calls.
+    if (signedOutRead && method !== 'GET' && path !== '/storage/read-batch') {
+      throw new WorkerRequestError('This session was opened to read without joining; join it with join_session to do this.');
+    }
     if (signedOutRead) auth = false;
     if (auth) await ensureToken();
     // Login and token refresh can await. Once sent, retain the response for reconciliation.
