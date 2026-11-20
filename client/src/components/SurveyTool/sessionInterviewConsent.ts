@@ -160,6 +160,8 @@ const PREDICTION_RESEARCH_KEYS = [
   'predictionComparison',
   'researchTier',
   'draftOrigin',
+  'mappingPromptVersion',
+  'voiceModel',
   'predictionCondition',
   'blindAnswer',
   'revealedAt',

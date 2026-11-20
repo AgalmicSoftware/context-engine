@@ -139,6 +139,7 @@ import {
   readPackedInterviewPrefillFromHash,
   resolveRealtimeInterviewSource,
   resolveSessionVoiceMode,
+  INTERVIEW_MAPPING_PROMPT_VERSION,
   type InterviewDraftResponse,
   type InterviewPrefillRead,
   type InterviewPrefillPacket,
@@ -156,6 +157,7 @@ import {
 } from './sessionTranscriptClaim';
 import { resolveInterviewDraftOrigin } from './sessionInterviewResearch';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
+import { resolveRealtimeInterviewModel } from '../../../../shared/realtimeInterviewConfig.mjs';
 import { confidenceMeaningOf } from '../../../../shared/interviewConfidence.mjs';
 import { holdGroupInviteForLink } from '../../domains/worker/workerGroupAutoJoinIntent';
 import { captureSessionRecruitmentSource } from './sessionRecruitmentSource';
@@ -1921,6 +1923,8 @@ export const recordInterviewProvenance = (
   // Full detail only when the session asks for it and the participant was shown it.
   const researchTier =
     sessionResearchDetail === 'full' && consentOverrides?.researchDetail !== 'minimal' ? 'full' : 'minimal';
+  // The voice model the session's settings name, which its Worker runs for the interview.
+  const voiceModel = resolveRealtimeInterviewModel(engine.props?.sessionConfig || {});
   const pendingQuestionIds = engine.getChangedQidsAndFields?.(0)?.changedQids;
   const researchAnchor = drafts.find((draft) => pendingQuestionIds?.has(draft.questionId)) || drafts[0];
   const normalizedResponderName = String(responderName || '')
@@ -1983,6 +1987,7 @@ export const recordInterviewProvenance = (
                 ? ''
                 : normalizedResponderName ||
                   (consentOverrides?.includeResponderName ? String(saved?.responderName || shownSavedName) : '');
+          const draftOrigin = resolveInterviewDraftOrigin(originalDraft, packet, normalizedSource);
           provenance[draft.questionId] = {
             version: 1,
             includeAiProvenance: ai,
@@ -2010,7 +2015,12 @@ export const recordInterviewProvenance = (
                   predictionRevisions: originalDraft.revisions || draft.revisions || [],
                   userEditedFields: reviewed.userEditedFields || [],
                   researchTier,
-                  draftOrigin: resolveInterviewDraftOrigin(originalDraft, packet, normalizedSource),
+                  draftOrigin,
+                  // Drafts the session's AI wrote: the prompt's version, and for a voice interview its voice model.
+                  ...(draftOrigin === 'external_prefill'
+                    ? {}
+                    : { mappingPromptVersion: INTERVIEW_MAPPING_PROMPT_VERSION }),
+                  ...(draftOrigin === 'voice_interview' ? { voiceModel } : {}),
                   // Read by research without the AI provenance choice, which carries the prompt version.
                   confidenceMeaning: confidenceMeaningOf(packet?.promptVersion || INTERVIEW_PROMPT_VERSION),
                   predictionCondition: reviewed.predictionCondition === 'blind' ? 'blind' : 'shown',

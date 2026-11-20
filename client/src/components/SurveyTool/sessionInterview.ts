@@ -628,6 +628,13 @@ const RECONSIDERATION_RULES = `
 - The earlier answers below are the responder's answers as their page holds them now. They are submitted, except the fields an answer lists under "unsubmitted", which the responder has on their page but hasn't submitted; an empty unsubmitted comment is one they cleared. Reconsider each against what the responder said in the conversation, and return a draft for one only when their words support a different answer or something to add; repeat the earlier answer when they support it, and say why in evidence. Omit earlier answers the conversation doesn't touch. Earlier answers and their own files help interpret the responder's words but are not new evidence on their own.
 - When an earlier answer has a comment, put only what the conversation adds to it in additionalComments: review shows that after their comment, and they choose what to keep.`;
 
+/**
+ * The version of the prompt that drafts answers from an interview, a group recording's claimed part or typed notes
+ * (buildInterviewResponseMappingPrompt). Research records it with those drafts, so change it whenever the prompt's
+ * wording or rules change.
+ */
+export const INTERVIEW_MAPPING_PROMPT_VERSION = 'ce-interview-mapping-v1';
+
 export const buildInterviewResponseMappingPrompt = ({
   questions,
   transcript,

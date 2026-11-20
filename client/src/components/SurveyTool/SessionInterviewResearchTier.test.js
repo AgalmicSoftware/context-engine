@@ -2,6 +2,7 @@
 // detail and where the draft came from.
 import { recordInterviewProvenance } from './SurveyPileViewMode';
 import { keepConsentWithdrawals } from './sessionInterviewConsent';
+import { INTERVIEW_MAPPING_PROMPT_VERSION } from './sessionInterview';
 
 jest.mock('./CreateQuestionsAndSurveys', () => ({ __esModule: true, default: () => null }));
 jest.mock('./SessionListeningPanel', () => ({ __esModule: true, default: () => null }));
@@ -77,7 +78,25 @@ it('labels voice drafts that did not come from a prefill packet', async () => {
     draftOrigin: 'voice_interview',
     // The in-app drafting prompt asks for the chance of keeping the answer.
     confidenceMeaning: 'keep',
+    // Which voice model and drafting prompt made it, so a change between interviews shows in the records.
+    voiceModel: 'gpt-live-1.1',
+    mappingPromptVersion: INTERVIEW_MAPPING_PROMPT_VERSION,
   });
+});
+
+it('records the voice model the session names, and neither on a prefill draft', async () => {
+  const engine = fakeEngine({ slug: 'demo', interviewMode: { realtimeModel: 'gpt-live-1' } });
+  const voiceDrafts = [
+    { questionId: 'q1', answer: 'Agree', revisions: [{ revision: 1, modelId: 'gpt-realtime', answer: 'Agree' }] },
+  ];
+  await recordInterviewProvenance(engine, voiceDrafts, null, null, true, true, '', []);
+  expect(engine.state.surveysResponseState[0].interviewProvenance.q1.voiceModel).toBe('gpt-live-1');
+  const prefill = fakeEngine({ slug: 'demo' });
+  await recordInterviewProvenance(prefill, drafts, SOURCE, PACKET, true, true, '', review);
+  const record = prefill.state.surveysResponseState[0].interviewProvenance.q1;
+  expect(record.draftOrigin).toBe('external_prefill');
+  expect(record).not.toHaveProperty('voiceModel');
+  expect(record).not.toHaveProperty('mappingPromptVersion');
 });
 
 it('records minimal detail when that is what the participant was shown, even if the session now asks for full', async () => {

@@ -423,6 +423,12 @@ export const buildResponsePayload = (opts: BuildResponsePayloadOptions): Respons
             version: includePredictionComparison && researchTier ? 2 : 1,
             ...(includePredictionComparison && researchTier ? { researchTier } : {}),
             ...(includePredictionComparison && researchTier && draftOrigin ? { draftOrigin } : {}),
+            ...(includePredictionComparison && researchTier && interviewProvenanceRecord.mappingPromptVersion
+              ? { mappingPromptVersion: String(interviewProvenanceRecord.mappingPromptVersion).slice(0, 128) }
+              : {}),
+            ...(includePredictionComparison && researchTier && interviewProvenanceRecord.voiceModel
+              ? { voiceModel: String(interviewProvenanceRecord.voiceModel).slice(0, 128) }
+              : {}),
             ...(includePredictionComparison && researchTier ? { predictionCondition } : {}),
             ...(includePredictionComparison && researchTier && confidenceMeaning ? { confidenceMeaning } : {}),
             // Only the consent is public; the text itself is kept apart, for config admins only.

@@ -705,7 +705,12 @@ it.each([
 
     const rows = upload.mock.calls[0][2];
     expect(rows.map((row) => [row.questionID, row.answer.value])).toEqual([['q1', 'Disagree']]);
-    expect(rows[0].interviewProvenance).toMatchObject({ predictionCondition: 'shown', draftOrigin: 'voice_interview' });
+    expect(rows[0].interviewProvenance).toMatchObject({
+      predictionCondition: 'shown',
+      draftOrigin: 'voice_interview',
+      voiceModel: 'gpt-live-1.1',
+      mappingPromptVersion: 'ce-interview-mapping-v1',
+    });
     expect(rows[0].interviewProvenance.unselectedPredictions?.map((entry) => entry.questionId)).toEqual(unselected);
   },
   40000,
