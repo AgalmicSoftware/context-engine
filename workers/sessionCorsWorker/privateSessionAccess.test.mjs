@@ -522,6 +522,7 @@ const ROUTE_KINDS = {
   'auth-nonce': 'open: signing in',
   'auth-login': 'open: signing in',
   'auth-logout': 'open: signing out',
+  'agent-sign-in-link': 'open: signing in as an agent’s account; the sign-in it gives is then held to the rule',
   feedback: 'open: a note to the admins that shows nothing back',
   'sponsored-bootstrap-redeem': 'open: a sponsorship code for deploying, no session in it',
   admin: 'admins',

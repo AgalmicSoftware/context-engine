@@ -29,6 +29,7 @@ import {
 } from './storageEnvelopeEncryption.js';
 import { checkWorkerGroupReadInvite, isWorkerGroupMember } from './workerGroups.js';
 import { readWorkerGroupReadInvite } from './workerGroupInvites.js';
+import { agentParticipationOn } from '../../shared/agentSignIn.mjs';
 import {
   PRIVATE_SESSION_INVITE_INVALID,
   PRIVATE_SESSION_INVITE_REQUIRED,
@@ -3200,6 +3201,11 @@ export const storageRoute = async ({
       payloadEncrypted: payload.payloadEncrypted === true,
     });
     if (!checked.ok) return responseJson(deps, { error: checked.error }, checked.status, baseHeaders);
+    // A session with AI agents off stores nothing that says an agent made it, whoever sends it.
+    if (!agentParticipationOn(config) && checked.payload?.participant?.kind === 'agent' &&
+        !resolveRoleAddressSet({ config, role: 'admin' }).has(normalizeAddress(uploaderAddress))) {
+      return responseJson(deps, { error: 'This session has AI agents switched off.', reason: 'agent_participation_off' }, 403, baseHeaders);
+    }
     const backend = resolveConfiguredStorageBackend({
       config,
       requestedBackend: payload.backend,

@@ -43,6 +43,7 @@ import { nextResultsJobAt, readResultsJob, runResultsJobs, startResultsJob } fro
 import { RESULTS_JOB_RUNNERS } from './resultsJobRunners.js';
 import { dispatchSessionAgentOptOutStore } from './sessionAgentOptOuts.js';
 import { dispatchSessionNamesStore } from './sessionNames.js';
+import { dispatchAgentSignInStore } from './agentSignInStore.js';
 import { dispatchSessionAgentHistoryStore } from './sessionAgentHistory.js';
 import { dispatchSessionFeedbackStore } from './sessionFeedback.js';
 import {
@@ -3615,6 +3616,9 @@ export class SessionWriteCoordinator {
     }
     if (url.pathname.startsWith('/session-config/session-names/')) {
       return dispatchSessionNamesStore(this, url.pathname.split('/').pop(), payload || {});
+    }
+    if (url.pathname.startsWith('/session-config/agent-sign-in/')) {
+      return dispatchAgentSignInStore(this, url.pathname.split('/').pop(), payload || {});
     }
     if (url.pathname.startsWith('/session-config/session-agent-history/')) {
       return dispatchSessionAgentHistoryStore(this, url.pathname.split('/').pop(), payload || {});

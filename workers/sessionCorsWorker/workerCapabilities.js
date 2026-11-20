@@ -6,10 +6,13 @@ import { getDefaultWorkerSessionSlug, validateInboundWorkerSessionSlug } from '.
 import { getStorageIndexBinding, resolvePayloadAccessControl } from './storageRouteExecution.js';
 import { GPT_LIVE_1_1_FEATURE } from '../../shared/realtimeInterviewConfig.mjs';
 import { ANALYSIS_CARD_DRAWING_FEATURE } from '../../shared/analysisCardSaved.mjs';
+import { AGENT_SIGN_IN_FEATURE } from '../../shared/agentSignIn.mjs';
 import { WORKER_GROUP_READ_PROOF_V2_FEATURE } from '../../shared/workerGroupJoin.mjs';
 
 export const FEATURES = Object.freeze([
   'agent_http_v1',
+  // /auth/agent-link/* and the agentParticipationEnabled setting; an older Worker refuses the key on save.
+  AGENT_SIGN_IN_FEATURE,
   // limits.aiPerWalletPerDay is honoured; older Workers store it and ignore it.
   'ai_daily_limit_v1',
   // A saved card's drawn pages are kept and served under the card's own rule, and /analysis-card/picture takes

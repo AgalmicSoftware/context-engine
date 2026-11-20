@@ -45,6 +45,8 @@ export async function handleWrappedMemberExchangeRequest({ env }) {
   const payload = ctx.auth.payload;
   const kv = env.AGENT_ACTION_KV;
   if (!kv) return json({ ok: false, reason: 'agent_token_storage_unavailable' }, { status: 503 });
+  // Not from a sign-in an agent's link or an attached passkey made.
+  if (payload.via) return json({ ok: false, reason: 'agent_delegate_person_required' }, { status: 403 });
   const replayKey = `agent:member-exchange:v2:${await sha256Hex(`${ctx.sessionId}:${payload.sub.toLowerCase()}:${payload.jti}`)}`;
   if (await kv.get(replayKey)) return json({ ok: false, reason: 'session_worker_credential_replayed' }, { status: 409 });
   const remaining = payload.exp - Math.floor(ctx.now() / 1000);
@@ -73,7 +75,8 @@ export async function handleDelegateCredentialRequest({ env }) {
   const ctx = env.AGENT_CONTEXT;
   const payload = ctx.auth.payload;
   // A sign-in an agent credential made is not a person's.
-  if (payload.agentSource) return json({ ok: false, reason: 'agent_delegate_person_required' }, { status: 403 });
+  // Nor one made from an agent's sign-in link or an attached passkey: keys come from an account's own sign-in.
+  if (payload.agentSource || payload.via) return json({ ok: false, reason: 'agent_delegate_person_required' }, { status: 403 });
   const ttlSeconds = payload.exp - Math.floor(ctx.now() / 1000);
   if (ttlSeconds <= 0) return json({ ok: false, reason: 'session_worker_credential_expired' }, { status: 401 });
   const principal = { principalId: `session-member:${payload.sub.toLowerCase()}`, kind: 'user', adapter: 'session_worker', label: 'Session member' };

@@ -102,7 +102,7 @@ export const dispatchAdminResultsAnalysisStatusRequest = async ({
   if (!auth?.ok) return auth?.response;
   // These lists are for the session's admins only: an agent key, even one
   // minted for an admin, does not read them.
-  if (list && auth.payload?.agentSource) {
+  if (list && (auth.payload?.agentSource || auth.payload?.via)) {
     return deps?.json?.({ error: list.refused }, 403, withPrivateNoStoreHeaders(baseHeaders));
   }
 

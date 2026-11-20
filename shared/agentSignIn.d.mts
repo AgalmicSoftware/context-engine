@@ -1,0 +1,23 @@
+export const AGENT_SIGN_IN_FEATURE: 'agent_sign_in_link_v1';
+export const AGENT_PARTICIPATION_FIELD: 'agentParticipationEnabled';
+export function agentParticipationOn(config: unknown): boolean;
+export const AGENT_CLIENT_HEADER: 'X-CE-Agent-Client';
+export const AGENT_SIGN_IN_PATHS: Readonly<{
+  create: string;
+  exchange: string;
+  attach: string;
+  passkeySignIn: string;
+  access: string;
+  detach: string;
+  state: string;
+}>;
+export const AGENT_SIGN_IN_CODE_TTL_SECONDS: number;
+export function isAgentSignInCode(value: unknown): value is string;
+export function formatAgentSignInCode(bytes: Uint8Array): string;
+export const AGENT_SIGN_IN_FRAGMENT_KEY: 'agentSignIn';
+export const AGENT_SIGN_IN_VIA: Readonly<{ LINK: 'agent_link'; PASSKEY: 'passkey_link' }>;
+export const AGENT_ACCESS: Readonly<{ ACTIVE: 'active'; CANCELLED: 'cancelled' }>;
+export const AGENT_SIGN_IN_LINK_STATEMENT: string;
+export function agentPasskeyAttachStatement(account: string): string;
+export function readAgentPasskeyAttachStatement(statement: unknown): string;
+export function buildAgentSignInLink(input: { appOrigin: string; slug: string; workerOrigin: string; code: string }): string;

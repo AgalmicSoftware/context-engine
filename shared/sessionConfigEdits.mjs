@@ -24,6 +24,7 @@ export const WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
   'feedbackEnabled',
   'namesEnabled',
   'contextCardsEnabled',
+  'agentParticipationEnabled',
   'defaultFilterState',
   'defaultFeaturedSBTs',
   'autoFeatureSBTsBySessionSlug',
@@ -111,6 +112,8 @@ const CONTENT_FIELDS = new Set([
   'namesEnabled',
   // Checked on each context add, card change and AI prompt, the same way.
   'contextCardsEnabled',
+  // Checked on each sign-in and each signed-in request that says it is an agent's, the same way.
+  'agentParticipationEnabled',
   ...CURATED_ID_LIST_KEYS,
 ]);
 const record = value => !!value && typeof value === 'object' && !Array.isArray(value);

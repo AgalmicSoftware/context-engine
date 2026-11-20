@@ -1,3 +1,5 @@
+import { agentParticipationOn } from '../../shared/agentSignIn.mjs';
+import { saysItIsAnAgent } from './agentSignInLink.js';
 import { SESSION_AGENT_PATHS } from './sessionAgentRoute.js';
 import { evaluatePrivateSessionAccess, privateSessionRefusal } from './privateSessionAccess.js';
 
@@ -48,6 +50,12 @@ export const dispatchAuthenticatedRouteEntry = async ({
     baseHeaders,
   });
   if (!authenticatedContext?.ok) return authenticatedContext?.response;
+  // A session with AI agents off answers no signed-in request that says it is an agent's, whenever it signed in.
+  if (!agentParticipationOn(authenticatedContext.config) && saysItIsAnAgent(request) && authenticatedContext.scopes?.admin !== true) {
+    return deps?.json?.(
+      { error: 'This session has AI agents switched off.', reason: 'agent_participation_off' }, 403, authenticatedContext.headers,
+    );
+  }
   if (!OPEN_TO_NON_MEMBERS.has(path)) {
     const { config, slug, address, scopes, headers } = authenticatedContext;
     const access = await evaluatePrivateSessionAccess({ env, slug, config, request, requesterAddress: address, authScopes: scopes });

@@ -10,6 +10,7 @@ import { dispatchSignedOutSessionAgentRequest } from './sessionAgentSignedOut.js
 import { evaluatePrivateSessionAccess, privateSessionRefusal, readGroupReadInviteHeader } from './privateSessionAccess.js';
 import { createRequesterAccessChecks, groupReadInviteDeps } from './storageRouteExecution.js';
 import { readSessionNames } from './sessionNames.js';
+import { checkAgentSignInAtLogin, dispatchAgentSignInLinkRequest } from './agentSignInLink.js';
 import { BodyByteLimitError, readBodyBytes } from '../shared/bodyByteLimit.mjs';
 import { resolveMaxUploadBytes } from './uploadSizeLimits.js';
 import {
@@ -404,46 +405,81 @@ export const createWorkerRouteShellWithWorkerDeps = ({
         return deps?.json?.({ ok: true }, 200, routeBaseHeaders);
       }
 
+      // What a signed message is checked with, for a sign-in and for the requests that are proved the same way.
+      const loginDeps = () => ({
+        json: deps?.json,
+        normalizeSignedWorkerRequest: deps?.normalizeSignedWorkerRequest,
+        resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
+        isAddress: deps?.isAddress,
+        resolveExistingSessionCors: deps?.resolveExistingSessionCors,
+        verifyMessage: deps?.verifyMessage,
+        validateRecoveredAddressMatchesRequest: deps?.validateRecoveredAddressMatchesRequest,
+        parseSiweMessage: deps?.parseSiweMessage,
+        validateSiwe: deps?.validateSiwe,
+        validateBrowserLoginOrigin: deps?.validateBrowserLoginOrigin,
+        resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
+        validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
+        consumeNonce: (envArg, slugArg, addressArg, nonceArg) => deps?.consumeNonce?.(
+          envArg,
+          slugArg,
+          addressArg,
+          nonceArg,
+          {
+            usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
+            ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),
+          },
+        ),
+        computeScopesForLogin: deps?.computeScopesForLogin,
+        signToken: deps?.signToken,
+        getAddress: deps?.getAddress,
+        buildAuthTokenJti: deps?.buildAuthTokenJti,
+        persistAuthTokenRecord: deps?.persistAuthTokenRecord,
+        ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),
+        now: deps?.now,
+        LOGIN_SIWE_MAX_AGE_MS: constants?.loginSiweMaxAgeMs,
+        LOGIN_SIWE_FUTURE_SKEW_MS: constants?.loginSiweFutureSkewMs,
+        TOKEN_TTL_SECONDS: constants?.tokenTtlSeconds,
+        MISSING_SLUG_ERROR: constants?.missingSlugError,
+        SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError,
+      });
+
       if (routeSelection.kind === 'auth-login') {
         return await dispatchAuthLoginRequest({
           request,
           env,
           baseHeaders: routeBaseHeaders,
           slug: envSlug,
+          deps: { ...loginDeps(), checkAgentSignInAtLogin: deps?.checkAgentSignInAtLogin || checkAgentSignInAtLogin },
+        });
+      }
+
+      if (routeSelection.kind === 'agent-sign-in-link') {
+        return await dispatchAgentSignInLinkRequest({
+          path: routeSelection.path,
+          request,
+          env,
+          baseHeaders: routeBaseHeaders,
+          slug: envSlug,
           deps: {
             json: deps?.json,
-            normalizeSignedWorkerRequest: deps?.normalizeSignedWorkerRequest,
-            resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
-            isAddress: deps?.isAddress,
+            now: deps?.now,
+            loginDeps: loginDeps(),
+            requireAuth: deps?.requireAuth,
+            readCurrentSessionConfig: deps?.readCurrentSessionConfig,
+            getCorsContext: deps?.getCorsContext,
             resolveExistingSessionCors: deps?.resolveExistingSessionCors,
-            verifyMessage: deps?.verifyMessage,
-            validateRecoveredAddressMatchesRequest: deps?.validateRecoveredAddressMatchesRequest,
-            parseSiweMessage: deps?.parseSiweMessage,
-            validateSiwe: deps?.validateSiwe,
-            validateBrowserLoginOrigin: deps?.validateBrowserLoginOrigin,
+            resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
+            validateTrustedLoginRequestOrigin: deps?.validateTrustedLoginRequestOrigin,
             resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins,
-            validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
-            consumeNonce: (envArg, slugArg, addressArg, nonceArg) => deps?.consumeNonce?.(
-              envArg,
-              slugArg,
-              addressArg,
-              nonceArg,
-              {
-                usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
-                ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),
-              },
-            ),
+            resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
+            checkRateLimit: deps?.checkRateLimit,
             computeScopesForLogin: deps?.computeScopesForLogin,
             signToken: deps?.signToken,
             getAddress: deps?.getAddress,
             buildAuthTokenJti: deps?.buildAuthTokenJti,
             persistAuthTokenRecord: deps?.persistAuthTokenRecord,
-            ...(deps?.recordAbuseEvent ? { recordAbuseEvent: deps.recordAbuseEvent } : {}),
-            now: deps?.now,
-            LOGIN_SIWE_MAX_AGE_MS: constants?.loginSiweMaxAgeMs,
-            LOGIN_SIWE_FUTURE_SKEW_MS: constants?.loginSiweFutureSkewMs,
+            toStr: deps?.toStr,
             TOKEN_TTL_SECONDS: constants?.tokenTtlSeconds,
-            MISSING_SLUG_ERROR: constants?.missingSlugError,
             SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError,
           },
         });

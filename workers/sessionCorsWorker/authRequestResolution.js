@@ -1,4 +1,5 @@
 import { validateAgentParticipantSource } from './agent/authority.mjs';
+import { validateAgentSignInToken } from './agentSignInLink.js';
 import {
   validateAuthTokenRecord,
 } from './authTokenClaims.js';
@@ -97,5 +98,9 @@ export const resolveAuthenticatedRequest = async ({
 
   const source = await validateAgentParticipantSource({ request, env, payload, slug, deps });
   if (!source.ok) return { ok: false, response: deps?.json?.({ error: source.error }, source.status || 401, baseHeaders) };
+  // A sign-in made from an agent's link or an attached passkey, or an account's own once a passkey is attached,
+  // stands only while the coordinator's record says so. Every other sign-in is not looked up.
+  const linked = await (deps?.validateAgentSignInToken || validateAgentSignInToken)({ env, payload, slug });
+  if (!linked.ok) return { ok: false, response: deps?.json?.({ error: linked.error }, linked.status || 401, baseHeaders) };
   return { ok: true, payload, slug };
 };

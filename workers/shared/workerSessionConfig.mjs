@@ -25,6 +25,7 @@ const DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
   'feedbackEnabled',
   'namesEnabled',
   'contextCardsEnabled',
+  'agentParticipationEnabled',
   'interviewMode',
   'defaultTags',
   'defaultGroupTags',

@@ -143,7 +143,7 @@ export const forgetSessionConfig = (env, slug) => {
 // keeps them), Session Agent opt-outs and people's names. Every other call drops this copy.
 // (backup/status can finish a restore, so it drops it.)
 const KEEPS_CONFIG = new Set(['current', 'backup/write-revision', 'backup/export', 'diagnostics', 'storage/publish', 'worker-groups/mutate']);
-const KEEPS_CONFIG_PREFIXES = ['agent-submit/', 'debate-atlas/', 'risk-matrix/', 'results-job/', 'session-feedback/', 'session-agent/', 'session-agent-history/', 'session-names/'];
+const KEEPS_CONFIG_PREFIXES = ['agent-submit/', 'debate-atlas/', 'risk-matrix/', 'results-job/', 'session-feedback/', 'session-agent/', 'session-agent-history/', 'session-names/', 'agent-sign-in/'];
 const keepsConfig = (path) => KEEPS_CONFIG.has(path) || KEEPS_CONFIG_PREFIXES.some((prefix) => String(path).startsWith(prefix));
 
 export const callSessionConfigCoordinator = async ({ env, slug, path, cache = false, ...payload }) => {

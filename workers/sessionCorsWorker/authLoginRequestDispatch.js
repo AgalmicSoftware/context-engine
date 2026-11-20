@@ -81,6 +81,16 @@ export const dispatchAuthLoginRequest = async ({
     targetSlug,
   } = authorityResult;
 
+  // An account with a passkey attached, or a passkey attached to one: the sign-in is refused where the account's
+  // person ended agent access, and otherwise says what is attached. A session with agents off refuses one.
+  let agentSignIn = {};
+  if (typeof deps?.checkAgentSignInAtLogin === 'function') {
+    agentSignIn = (await deps.checkAgentSignInAtLogin({ env, request, slug: targetSlug, address, config, scopes })) || {};
+    if (agentSignIn.refusal) {
+      return deps?.json?.(agentSignIn.refusal.body, agentSignIn.refusal.status, headers);
+    }
+  }
+
   const exp = Math.floor((deps?.now?.() ?? Date.now()) / 1000) + deps?.TOKEN_TTL_SECONDS;
   const sub = deps?.getAddress?.(address);
   const authzEpoch = readAuthorizationEpoch(config);
@@ -113,6 +123,7 @@ export const dispatchAuthLoginRequest = async ({
     scopes,
     exp,
     jti,
+    ...(agentSignIn.claims || {}),
   };
 
   let token;
@@ -142,5 +153,6 @@ export const dispatchAuthLoginRequest = async ({
     exp,
     sessionSlug: targetSlug,
     ...(sessionId ? { sessionId } : {}),
+    ...(agentSignIn.reply || {}),
   }, 200, headers);
 };
