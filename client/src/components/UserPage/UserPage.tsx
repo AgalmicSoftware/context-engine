@@ -3696,6 +3696,15 @@ class UserPage extends Component<any, any> {
 
     return (
       <div className={rootClassName}>
+        {/* The session this profile shows, at the top right above the header. */}
+        {!minimized && this.props.showSessionSwitch && (
+          <UserPageSessionSwitch
+            viewAddress={String(propViewAddress || '')}
+            sessionSlug={this.getProfileSessionSlug()}
+            sessionConfig={this.props.sessionConfig}
+          />
+        )}
+
         <UserPageHeader
           addressDisplay={addressDisplay}
           privateLabelTag={
@@ -3750,14 +3759,6 @@ class UserPage extends Component<any, any> {
           usernameEnteredIndicatorDisplayState={usernameEnteredIndicatorDisplayState}
           usernameErrorDisplayState={usernameErrorDisplayState}
         />
-
-        {!minimized && this.props.showSessionSwitch && (
-          <UserPageSessionSwitch
-            viewAddress={String(propViewAddress || '')}
-            sessionSlug={this.getProfileSessionSlug()}
-            sessionConfig={this.props.sessionConfig}
-          />
-        )}
 
         <UserPageComparePanel collapseOpen={collapseOpen} minimized={minimized}>
           <CompareAddressSection
