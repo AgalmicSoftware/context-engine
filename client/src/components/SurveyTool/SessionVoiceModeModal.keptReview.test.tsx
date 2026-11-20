@@ -48,6 +48,7 @@ const prefillPacket = {
 };
 type Who = { account?: string; loginComplete?: boolean; shareByDefault?: boolean };
 const onSubmitResponses = jest.fn();
+const onApplyAnswer = jest.fn();
 const modal = (
   { account = alice, loginComplete = true, shareByDefault = false }: Who = {},
   packet: unknown = null,
@@ -67,7 +68,7 @@ const modal = (
     questionPool={questionPool}
     prefillPacket={packet as typeof prefillPacket | null}
     claim={claim}
-    onApplyAnswer={jest.fn()}
+    onApplyAnswer={onApplyAnswer}
     onApplyAdditional={jest.fn()}
     onApplyImportance={jest.fn()}
     onApplyConviction={jest.fn()}
@@ -97,6 +98,7 @@ const startReview = async (who: Who = {}, owner = `account:${alice}`) => {
 beforeEach(() => {
   window.localStorage.clear();
   onSubmitResponses.mockReset().mockResolvedValue({ status: 'submitted' });
+  onApplyAnswer.mockReset();
 });
 
 it('brings a review back after a reload, with its edits, though the link has dropped its prefill', async () => {
@@ -171,6 +173,35 @@ it('starts afresh when a link brings different evidence', async () => {
   render(modal({}, replacement));
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   expect(answer('b1')).toHaveValue('Agree');
+});
+
+// A #prefillz= link unpacks after the page opens, and a link opened in a tab already open arrives late too.
+it('replaces a restored review whole when a link with other evidence arrives after it shows', async () => {
+  (await startReview()).unmount();
+  const view = render(modal());
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  expect(answer('b1')).toHaveValue('Disagree');
+  const replacement = { ...prefillPacket, responses: [{ questionId: 'b1', answer: 'Agree', confidence: 0.9 }] };
+  view.rerender(modal({}, replacement));
+  await waitFor(() => expect(answer('b1')).toHaveValue('Agree'));
+  expect(screen.queryByDisplayValue('Disagree')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Answer b2')).not.toBeInTheDocument();
+  // The old review is gone from this browser too, so it can't come back on the next visit.
+  expect(kept(`account:${alice}`) || '').not.toContain('Disagree');
+  // Only the new link's drafts are submitted.
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+  await waitFor(() => expect(onSubmitResponses).toHaveBeenCalled());
+  expect(onApplyAnswer.mock.calls).toEqual([['b1', 'Agree']]);
+});
+
+it('keeps a restored review and its edits when the same link arrives after it shows', async () => {
+  (await startReview()).unmount();
+  const view = render(modal());
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  view.rerender(modal({}, structuredClone(prefillPacket)));
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  expect(answer('b1')).toHaveValue('Disagree');
+  expect(answer('b2')).toHaveValue('Agree');
 });
 
 const share = () => screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
