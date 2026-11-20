@@ -23,7 +23,6 @@ import {
   enterAgentLinkAccount,
   enterThroughAttachedPasskey,
   isAttachedPasskeyKnown,
-  leaveAgentLinkAccount,
   liveAccount,
   resumeAgentLinkAccount,
   whoALinkWouldReplace,
@@ -345,90 +344,64 @@ it('says so, and drops the code, where the Worker can’t sign in from a link, o
   expect(enterAgentLinkAccount).not.toHaveBeenCalled();
 });
 
-it('keeps a notice on the page while signed in from a link: whose account, who else can use it, and a way out', async () => {
+it('keeps a notice on the page while signed in from a link, with one button: Create passkey', async () => {
   act(() => void held());
+  jest.mocked(attachPasskeyHere).mockResolvedValue(null);
   gate({ account: ACCOUNT, provider: 'agent_link' });
   const text = notice()?.textContent || '';
   expect(text).toMatch(/You are signed in as 0xa1a1…a1a1, the account your AI agent set up/);
   // Short: who the account is, and nothing more.
   expect(text).not.toMatch(/Whoever runs the agent|did not come from your own agent/);
   expect(notice()?.className).toMatch(/noticeLarge/);
-  // No way to close it; a passkey, or out.
+  // No way to close it, and one step: signing out is the account dialog's, and a passkey the person already
+  // uses is not offered.
   expect(screen.queryByText('Dismiss')).toBeNull();
-  expect(screen.getByTestId('ce-agent-account-add-passkey')).toBeTruthy();
-  expect(screen.getByTestId('ce-agent-account-use-passkey')).toBeTruthy();
-  expect(screen.queryByTestId('ce-agent-account-cancel')).toBeNull();
-  fireEvent.click(screen.getByTestId('ce-agent-account-add-passkey'));
-  await waitFor(() => expect(attachPasskeyHere).toHaveBeenCalledWith({ useExisting: false }));
-  fireEvent.click(screen.getByTestId('ce-agent-account-sign-out'));
-  await waitFor(() => expect(leaveAgentLinkAccount).toHaveBeenCalled());
-});
-
-it('says in the Worker’s words why a passkey that already took part here was not attached, and offers no second account', async () => {
-  act(() => void held());
-  jest
-    .mocked(attachPasskeyHere)
-    .mockRejectedValue(
-      new Error(
-        'That passkey already has its own account in this session, so it can’t be added to this one. Create a new passkey instead.',
-      ),
-    );
-  gate({ account: ACCOUNT, provider: 'agent_link' });
-  expect(screen.getByTestId('ce-agent-account-use-passkey').getAttribute('title')).toMatch(
-    /has an account of its own and can’t be attached: create a new passkey/,
-  );
-  fireEvent.click(screen.getByTestId('ce-agent-account-use-passkey'));
-  await waitFor(() => expect(attachPasskeyHere).toHaveBeenCalledWith({ useExisting: true }));
-  await waitFor(() =>
-    expect(notice()?.textContent).toMatch(/That passkey already has its own account in this session/),
-  );
-  expect(notice()?.textContent).toMatch(/Create a new passkey instead/);
-  // The refusal is its own message, apart from the notice's standing words.
-  const alert = screen.getByTestId('ce-agent-sign-in-alert');
-  expect(alert.getAttribute('role')).toBe('alert');
-  expect(alert.textContent).toBe(
-    'That passkey already has its own account in this session, so it can’t be added to this one. Create a new passkey instead.',
-  );
-  expect(alert.closest('p')?.className).not.toBe(notice()?.querySelector('p')?.className);
-  expect(notice()?.querySelector('p')?.textContent).not.toMatch(/already has its own account/);
-  // Still signed in from the link, with the main way on offer.
-  expect(screen.getByTestId('ce-agent-account-add-passkey').textContent).toBe('Create passkey');
-  expect(screen.queryByTestId('ce-agent-account-own-account')).toBeNull();
-  act(() => void held({ via: 'passkey_link', passkey: PASSKEY }));
-  expect(screen.queryByTestId('ce-agent-account-own-account')).toBeNull();
-});
-
-it('makes Create passkey the main button, and says what is now so once, not twice', async () => {
-  act(() => void held());
-  jest.mocked(attachPasskeyHere).mockResolvedValue(null);
-  gate({ account: ACCOUNT, provider: 'agent_link' });
-  const create = screen.getByTestId('ce-agent-account-add-passkey');
-  const existing = screen.getByTestId('ce-agent-account-use-passkey');
-  const signOut = screen.getByTestId('ce-agent-account-sign-out');
-  expect(create.className).toBe('primaryButton');
-  expect([existing.className, signOut.className]).toEqual(['secondaryButton', 'secondaryButton']);
-  // First in order too.
-  expect(notice()?.querySelector('button')).toBe(create);
+  const buttons = Array.from(notice()?.querySelectorAll('button') || []);
+  expect(buttons.map((button) => button.textContent)).toEqual(['Create passkey']);
+  expect(buttons[0].className).toBe('primaryButton');
+  expect(buttons[0].getAttribute('title')).not.toMatch(/cancel|already/i);
   // A step that worked changes what the notice says; it adds no second sentence saying the same.
-  fireEvent.click(create);
-  await waitFor(() => expect(attachPasskeyHere).toHaveBeenCalled());
+  fireEvent.click(buttons[0]);
+  await waitFor(() => expect(attachPasskeyHere).toHaveBeenCalledTimes(1));
   await act(async () => {});
   expect(screen.queryByTestId('ce-agent-sign-in-alert')).toBeNull();
   expect(notice()?.textContent).not.toMatch(/Your passkey is attached to this account/);
+});
 
+it('says what went wrong with the passkey as its own message, apart from the standing words', async () => {
+  act(() => void held());
+  jest.mocked(attachPasskeyHere).mockRejectedValue(new Error('The session could not be reached. Try again.'));
+  gate({ account: ACCOUNT, provider: 'agent_link' });
+  fireEvent.click(screen.getByTestId('ce-agent-account-add-passkey'));
+  const alert = await screen.findByTestId('ce-agent-sign-in-alert');
+  expect(alert.getAttribute('role')).toBe('alert');
+  expect(alert.textContent).toBe('The session could not be reached. Try again.');
+  expect(alert.closest('p')?.className).not.toBe(notice()?.querySelector('p')?.className);
+  // Still signed in from the link, with the one step on offer.
+  expect(screen.getByTestId('ce-agent-account-add-passkey').textContent).toBe('Create passkey');
+});
+
+it('says, once a passkey is attached, that the agent can still use the account, and offers nothing there', () => {
   act(() => void held({ via: 'passkey_link', passkey: PASSKEY }));
-  jest.mocked(changeAgentAccess).mockImplementation(async (access) => {
-    act(() => void held({ via: 'passkey_link', passkey: PASSKEY, agentAccess: access }));
-    return null;
-  });
-  fireEvent.click(screen.getByTestId('ce-agent-account-cancel'));
-  await waitFor(() =>
-    expect(notice()?.textContent).toMatch(
-      /Agent access ended\. Your agent can no longer sign in to 0xa1a1…a1a1 in this session; only your passkey can/,
-    ),
+  gate({ account: ACCOUNT, provider: 'agent_link' });
+  expect(notice()?.textContent).toMatch(
+    /with your passkey\. Your agent can still use it, and see and\s+change what you answer here/,
   );
-  expect(notice()?.textContent?.match(/Agent access ended/g)).toHaveLength(1);
-  expect(screen.getByTestId('ce-agent-account-allow').textContent).toBe('Restore agent access');
+  // Ending the agent's access is not offered: the Worker could only let the same agent key back in.
+  expect(notice()?.querySelectorAll('button')).toHaveLength(0);
+  expect(changeAgentAccess).not.toHaveBeenCalled();
+});
+
+it('still gives the way back to an account whose agent’s access was ended before', async () => {
+  act(() => void held({ via: 'passkey_link', passkey: PASSKEY, agentAccess: 'cancelled' }));
+  gate({ account: ACCOUNT, provider: 'agent_link' });
+  expect(notice()?.textContent).toMatch(
+    /Agent access ended\. Your agent can no longer sign in to 0xa1a1…a1a1 in this session; only your passkey can/,
+  );
+  const buttons = Array.from(notice()?.querySelectorAll('button') || []);
+  expect(buttons.map((button) => button.textContent)).toEqual(['Restore agent access']);
+  fireEvent.click(buttons[0]);
+  await waitFor(() => expect(changeAgentAccess).toHaveBeenCalledWith('active'));
   // What goes wrong is still said, by itself.
   jest.mocked(changeAgentAccess).mockRejectedValue(new Error('The session did not make that change. Try again.'));
   fireEvent.click(screen.getByTestId('ce-agent-account-allow'));
@@ -439,31 +412,12 @@ it('makes Create passkey the main button, and says what is now so once, not twic
   );
 });
 
-it('offers Cancel all agent authorizations only once a passkey is attached, and says while the agent still has access', async () => {
-  act(() => void held({ via: 'passkey_link', passkey: PASSKEY }));
-  gate({ account: ACCOUNT, provider: 'agent_link' });
-  expect(notice()?.textContent).toMatch(
-    /with your passkey\. Your agent can still use it, and see and\s+change what you answer here/,
-  );
-  expect(screen.queryByTestId('ce-agent-account-add-passkey')).toBeNull();
-  fireEvent.click(screen.getByTestId('ce-agent-account-cancel'));
-  await waitFor(() => expect(changeAgentAccess).toHaveBeenCalledWith('cancelled'));
-
-  act(() => void held({ via: 'passkey_link', passkey: PASSKEY, agentAccess: 'cancelled' }));
-  expect(notice()?.textContent).toMatch(
-    /Agent access ended\. Your agent can no longer sign in to 0xa1a1…a1a1 in this session; only your passkey can/,
-  );
-  expect(screen.queryByTestId('ce-agent-account-cancel')).toBeNull();
-  expect(screen.queryByTestId('ce-agent-account-remove-passkey')).toBeNull();
-  fireEvent.click(screen.getByTestId('ce-agent-account-allow'));
-  await waitFor(() => expect(changeAgentAccess).toHaveBeenCalledWith('active'));
-});
-
 it('says when a sign-in from a link has ended, and shows the notice for no other account', () => {
   act(() => void held());
   jest.mocked(heldSessionToken).mockReturnValue('');
   const { unmount } = gate({ account: ACCOUNT, provider: 'agent_link' });
   expect(notice()?.textContent).toMatch(/has ended\. Ask your agent for a new link/);
+  expect(notice()?.querySelectorAll('button')).toHaveLength(0);
   unmount();
   jest.mocked(heldSessionToken).mockReturnValue('held-sign-in');
   // Signed in as someone else, or with another kind of wallet: nothing of the agent's account is shown.

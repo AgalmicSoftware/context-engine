@@ -245,24 +245,17 @@ setAgentLinkRenewer(async (account, { prompt }) => {
 });
 
 /**
- * Attaches a passkey to the account the tab is signed in to from an agent's link: a new passkey, or one the
- * person already has. The passkey signs that it is being attached to this account, and nothing else.
+ * Makes a new passkey for the account the tab is signed in to from an agent's link, and attaches it. The passkey
+ * signs that it is being attached to this account, and nothing else. A passkey the person already uses is not
+ * offered: the Worker refuses one that has an account of its own here, and the site has no words for that yet.
  */
-export const attachPasskeyHere = async ({
-  useExisting,
-}: {
-  useExisting: boolean;
-}): Promise<AgentLinkAccount | null> => {
+export const attachPasskeyHere = async (): Promise<AgentLinkAccount | null> => {
   const account = readAgentLinkAccount();
   if (!account) throw new AgentSignInError('not_signed_in', 'Open the session from your agent’s link first.');
   const target = targetOf(account);
   const token = heldSessionToken(target.workerUrl, target.sessionSlug);
   if (!token) throw new AgentSignInError('sign_in_ended', 'This sign-in has ended. Ask your agent for a new link.');
-  const passkeyAddress = lower(
-    useExisting
-      ? await passkeyWallet.unlockPasskeyWallet({ selectCredential: true })
-      : await passkeyWallet.createPasskeyWallet(),
-  );
+  const passkeyAddress = lower(await passkeyWallet.createPasskeyWallet());
   const client = passkeyWallet.getPasskeyWalletClient();
   let reply: AgentSignInReply;
   try {
@@ -272,12 +265,12 @@ export const attachPasskeyHere = async ({
       token,
       passkeyAddress,
       sign: (message) => client.signMessage(message, passkeyAddress),
-      newPasskey: !useExisting,
+      newPasskey: true,
     });
   } catch (error) {
     // A passkey made for this and then refused is attached to nothing: it is not left as this browser's saved
     // sign-in, where a reload would open its empty account in place of this one.
-    if (!useExisting) await passkeyWallet.logoutPasskeyWallet().catch(() => undefined);
+    await passkeyWallet.logoutPasskeyWallet().catch(() => undefined);
     throw error;
   }
   return enterAgentLinkAccount(target, reply);

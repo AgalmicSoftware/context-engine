@@ -166,19 +166,15 @@ describe('what a failed step leaves behind', () => {
     signInAs(ACCOUNT, 'agent_link');
     jest.mocked(passkeyWallet.createPasskeyWallet).mockResolvedValue(PASSKEY as never);
     jest.mocked(attachPasskeyToAgentAccount).mockRejectedValue(new Error('Refused.'));
-    await expect(attachPasskeyHere({ useExisting: false })).rejects.toThrow('Refused.');
+    await expect(attachPasskeyHere()).rejects.toThrow('Refused.');
+    // Always as a passkey made for this account: one the person already uses is not offered.
     expect(jest.mocked(attachPasskeyToAgentAccount).mock.calls[0][0]).toMatchObject({
       passkeyAddress: PASSKEY,
       newPasskey: true,
     });
+    expect(passkeyWallet.unlockPasskeyWallet).not.toHaveBeenCalled();
     expect(passkeyWallet.logoutPasskeyWallet).toHaveBeenCalledTimes(1);
     expect(readAgentLinkAccount()).toMatchObject({ address: ACCOUNT, via: 'agent_link' });
-    // A passkey the person already had is theirs, and is left as it was.
-    jest.mocked(passkeyWallet.unlockPasskeyWallet).mockResolvedValue(PASSKEY as never);
-    await expect(attachPasskeyHere({ useExisting: true })).rejects.toThrow('Refused.');
-    expect(jest.mocked(attachPasskeyToAgentAccount).mock.calls[1][0]).toMatchObject({ newPasskey: false });
-    expect(passkeyWallet.unlockPasskeyWallet).toHaveBeenCalledWith({ selectCredential: true });
-    expect(passkeyWallet.logoutPasskeyWallet).toHaveBeenCalledTimes(1);
   });
 
   it('does not report the agent’s access as changed when the Worker’s answer leaves it as it was', async () => {

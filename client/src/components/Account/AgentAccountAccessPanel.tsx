@@ -1,11 +1,11 @@
-// What a person signed in to the account their AI agent set up can do about it: attach a passkey, end or
-// restore the agent's access, take the passkey off, go back to their own account, sign out. Shown in the
-// session's standing notice and under "Your AI agent" in the account dialog; it renders nothing for any other
-// account.
+// What a person signed in to the account their AI agent set up can do about it: create a passkey for it, and in
+// the account dialog take that passkey off again. Shown in the session's standing notice and in the account
+// dialog; it renders nothing for any other account. Signing out is the account dialog's own Disconnect.
+//
+// The Worker can also end the agent's access to such an account. The site no longer offers that: it only lets
+// the same agent key back in, which is not the "sign agents out, then hand one a new prompt" people expect. An
+// account already in that state still gets the way back.
 import React, { useState, useSyncExternalStore } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFingerprint } from '@fortawesome/free-solid-svg-icons';
-
 import {
   isAgentLinkProvider,
   readAgentLinkAccount,
@@ -14,7 +14,6 @@ import {
 import {
   attachPasskeyHere,
   changeAgentAccess,
-  leaveAgentLinkAccount,
   removeAttachedPasskey,
 } from '../../utilities/session/agentSignInAccount';
 
@@ -22,11 +21,7 @@ export const shortAddress = (address: string): string => `${address.slice(0, 6)}
 
 const HELP = {
   passkey:
-    'A passkey of your own lets you sign in to this account again without your agent, in this session. Your agent keeps its access until you cancel it.',
-  existing:
-    'Attaches a passkey you already use, if it has not yet taken part in this session. A passkey that has answered, saved a name or joined a group here has an account of its own and can’t be attached: create a new passkey for this account instead.',
-  cancel:
-    'Ends your AI agent’s access to this account in this session: its sign-in is refused, every sign-in it had stops, and its unused links stop working. You can restore it. From then on your passkey is the only way in: if you lose it, only the session’s admins can restore access.',
+    'A passkey of your own lets you sign in to this account again without your agent, in this session. Your agent keeps its access.',
   restore:
     'Lets the AI agent that set this account up sign in to it again with its own key. Your passkey keeps working.',
   remove: 'Takes your passkey off this account and signs you out of it. The account is then your agent’s alone again.',
@@ -39,6 +34,8 @@ type Props = {
   primaryButtonClassName?: string;
   // Called with what happened, in words, for the notice that shows this panel.
   onMessage?: (message: string, isError: boolean) => void;
+  // The notice keeps to the one step a new arrival needs; the account dialog has the rest.
+  inNotice?: boolean;
 };
 
 export default function AgentAccountAccessPanel({
@@ -46,6 +43,7 @@ export default function AgentAccountAccessPanel({
   buttonClassName = '',
   primaryButtonClassName = '',
   onMessage,
+  inNotice = false,
 }: Props): React.ReactElement | null {
   const account = useSyncExternalStore(subscribeAgentLinkAccount, readAgentLinkAccount);
   const [busy, setBusy] = useState('');
@@ -92,34 +90,8 @@ export default function AgentAccountAccessPanel({
             'add-passkey',
             'Create passkey',
             HELP.passkey,
-            run(
-              'add-passkey',
-              () => attachPasskeyHere({ useExisting: false }),
-              'Your passkey is attached to this account.',
-            ),
+            run('add-passkey', attachPasskeyHere, 'Your passkey is attached to this account.'),
             true,
-          )
-        : null}
-      {!withPasskey
-        ? button(
-            'use-passkey',
-            <>
-              <FontAwesomeIcon icon={faFingerprint} /> I already have one
-            </>,
-            HELP.existing,
-            run(
-              'use-passkey',
-              () => attachPasskeyHere({ useExisting: true }),
-              'Your passkey is attached to this account.',
-            ),
-          )
-        : null}
-      {withPasskey && account.agentAccess === 'active'
-        ? button(
-            'cancel',
-            'Cancel all agent authorizations',
-            HELP.cancel,
-            run('cancel', () => changeAgentAccess('cancelled'), 'Agent access ended.'),
           )
         : null}
       {withPasskey && account.agentAccess === 'cancelled'
@@ -134,7 +106,7 @@ export default function AgentAccountAccessPanel({
             ),
           )
         : null}
-      {withPasskey && account.agentAccess === 'active'
+      {withPasskey && account.agentAccess === 'active' && !inNotice
         ? button(
             'remove-passkey',
             'Remove passkey',
@@ -142,7 +114,6 @@ export default function AgentAccountAccessPanel({
             run('remove-passkey', removeAttachedPasskey, 'Your passkey was taken off this account.'),
           )
         : null}
-      {button('sign-out', 'Sign out', 'Signs this browser out.', run('sign-out', leaveAgentLinkAccount, 'Signed out.'))}
       {said ? (
         <span role={said.isError ? 'alert' : 'status'} data-testid="ce-agent-account-said">
           {said.text}

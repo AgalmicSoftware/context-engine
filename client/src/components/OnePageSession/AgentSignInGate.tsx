@@ -441,15 +441,17 @@ export default function AgentSignInGate({
       provider={provider}
       buttonClassName={styles.secondaryButton}
       primaryButtonClassName={styles.primaryButton}
-      // The notice itself says what is now so (a passkey attached, the agent's access ended), so only what went
-      // wrong is said beside it.
+      // The notice has the one step a new arrival needs, Create passkey; signing out and the rest are in the
+      // account dialog.
+      inNotice
+      // The notice itself says what is now so (a passkey attached), so only what went wrong is said beside it.
       onMessage={(text, isError) => setNote(isError ? { text, isError } : null)}
     />
   );
   if (ended && here.via !== 'passkey_link') {
     return notice(
       <>Your sign-in to {who}, the account your AI agent set up, has ended. Ask your agent for a new link.</>,
-      panel,
+      null,
       true,
     );
   }
@@ -477,11 +479,12 @@ export default function AgentSignInGate({
         You are using {who}, the account your AI agent set up, with your passkey. Your agent can still use it, and see
         and change what you answer here.
       </>,
-      panel,
+      null,
       false,
       wentWrong,
     );
   }
+  // Reached only for an account whose agent's access was ended before the site stopped offering that.
   return notice(
     <>Agent access ended. Your agent can no longer sign in to {who} in this session; only your passkey can.</>,
     panel,

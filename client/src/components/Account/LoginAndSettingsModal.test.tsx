@@ -2061,10 +2061,22 @@ test("offers Your AI agent to a signed-in person, not to an agent's own sign-in"
   const panelWithAgentHttp = (agentHttp: boolean) => {
     const profile = sessionConfig.sessionModeProfile as any;
     profile.surfaces = { ...profile.surfaces, agentHttp };
-    return subject.renderAgentHandoffPanel();
+    // The box, then Sign Agents Out beneath it.
+    const [box, signOut] = subject.renderAgentHandoffPanel()?.props.children as Array<{ key: unknown; props: any }>;
+    expect(signOut.props.children.props.session.sessionSlug).toBe('agent-handoff');
+    return box;
   };
   expect(panelWithAgentHttp(true).props.agentHttpEnabled).toBe(true);
   expect(panelWithAgentHttp(false).props.agentHttpEnabled).toBe(false);
+  // After Sign Agents Out the box is a new one, so a key it showed is gone with the sign-in it came from.
+  const keyBefore = panelWithAgentHttp(true).key;
+  subject.state = { ...subject.state, agentsSignedOut: subject.state.agentsSignedOut + 1 };
+  expect(panelWithAgentHttp(true).key).not.toBe(keyBefore);
+  // Not offered in an account an AI agent set up: the Worker refuses both prompts there.
+  const inAgentsAccount = mountClassSubject(
+    new LoginAndSettingsModalSubject(buildProps({ activeSessionSlug: 'agent-handoff', provider: 'agent_link' })),
+  );
+  expect(inAgentsAccount.renderAgentHandoffPanel()).toBeNull();
 
   const target = subject.getAgentTokenLoginSessionContext();
   const expiresAt = '2035-01-01T00:00:00.000Z';

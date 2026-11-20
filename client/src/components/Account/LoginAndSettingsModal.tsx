@@ -89,6 +89,7 @@ import {
 import { isHostedAgentSessionConfig } from '../../utilities/session/sessionBackendKind';
 import { isSessionModeProfileAgentHttpEnabled } from '../../utilities/session/sessionModeProfile';
 import { agentHandoffPanelKey, requestAgentDelegateKey } from '../../utilities/session/agentHandoff';
+import SignAgentsOutControl from './SignAgentsOutControl';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import {
   exchangeAgentClientLogin,
@@ -205,6 +206,8 @@ interface LoginAndSettingsModalState {
   agentTokenLoginOpen: boolean;
   agentTokenInput: string;
   agentTokenStatus: string;
+  // Counts each Sign Agents Out, so the "Your AI agent" box starts afresh without its now dead key.
+  agentsSignedOut: number;
   agentTokenError: string;
   walletBalanceWei: ethers.BigNumber | null;
 }
@@ -373,6 +376,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       agentTokenLoginOpen: false,
       agentTokenInput: '',
       agentTokenStatus: '',
+      agentsSignedOut: 0,
       agentTokenError: '',
       walletBalanceWei: null,
     };
@@ -1536,27 +1540,43 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return requestAgentDelegateKey({ agentWorkerUrl, sessionSlug, workerToken });
   };
 
-  // Hidden while an agent is the one signed in here: a key comes from a person's own sign-in.
+  // Hidden while an agent is the one signed in here: a key comes from a person's own sign-in. Hidden too in an
+  // account an AI agent set up, entered by its link or an attached passkey: the Worker refuses both prompts there.
   renderAgentHandoffPanel = () => {
     const { agentWorkerUrl, sessionConfig, sessionId, sessionSlug, workerCanonical, workerUrl } =
       this.getAgentTokenLoginSessionContext();
-    if (!sessionSlug || readAgentClientLoginEnvelope({ sessionSlug, sessionId, workerUrl, agentWorkerUrl }))
+    if (
+      !sessionSlug ||
+      isAgentLinkProvider(this.props.provider) ||
+      readAgentClientLoginEnvelope({ sessionSlug, sessionId, workerUrl, agentWorkerUrl })
+    )
       return null;
     return (
-      <LoginAgentHandoffPanel
-        key={agentHandoffPanelKey(sessionSlug, this.props.account)}
-        agentHttpEnabled={!!agentWorkerUrl && isSessionModeProfileAgentHttpEnabled(sessionConfig)}
-        sessionUrl={buildSessionWizardSessionUrl({
-          slug: sessionSlug,
-          workerOrigin: workerCanonical ? agentWorkerUrl : '',
-        })}
-        sessionName={toStr((sessionConfig as { sessionName?: unknown } | null)?.sessionName).trim() || sessionSlug}
-        sessionSlug={sessionSlug}
-        sessionConfig={sessionConfig as Record<string, unknown> | null}
-        context={this.getWorkerTokenContext()}
-        workerUrl={agentWorkerUrl}
-        requestKey={this.requestAgentKey}
-      />
+      <>
+        <LoginAgentHandoffPanel
+          key={`${agentHandoffPanelKey(sessionSlug, this.props.account)}:${this.state.agentsSignedOut}`}
+          agentHttpEnabled={!!agentWorkerUrl && isSessionModeProfileAgentHttpEnabled(sessionConfig)}
+          sessionUrl={buildSessionWizardSessionUrl({
+            slug: sessionSlug,
+            workerOrigin: workerCanonical ? agentWorkerUrl : '',
+          })}
+          sessionName={toStr((sessionConfig as { sessionName?: unknown } | null)?.sessionName).trim() || sessionSlug}
+          sessionSlug={sessionSlug}
+          sessionConfig={sessionConfig as Record<string, unknown> | null}
+          context={this.getWorkerTokenContext()}
+          workerUrl={agentWorkerUrl}
+          requestKey={this.requestAgentKey}
+        />
+        <div className={styles.accountModalControls}>
+          <SignAgentsOutControl
+            provider={this.props.provider}
+            session={{ sessionSlug, sessionConfig, context: this.getWorkerTokenContext() }}
+            buttonClassName={`btn btn-secondary btn-sm ${styles.walletButton}`}
+            // The box starts afresh, without the key it may still show: that key is dead now.
+            onDone={() => this.setStateIfMounted({ agentsSignedOut: this.state.agentsSignedOut + 1 })}
+          />
+        </div>
+      </>
     );
   };
 
