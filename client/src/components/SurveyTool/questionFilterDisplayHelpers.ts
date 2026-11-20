@@ -1,18 +1,5 @@
 import type React from 'react';
 
-export const QUESTION_FILTER_ACTIONS_STYLE: React.CSSProperties = {
-  marginLeft: 'auto',
-  paddingLeft: '15px',
-  display: 'flex',
-  alignItems: 'center',
-};
-
-export const QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE: React.CSSProperties = {
-  color: 'var(--ce-status-warning-text)',
-  fontSize: '0.85em',
-  fontStyle: 'italic',
-};
-
 export const QUESTION_FILTER_ENCRYPTED_COUNT_LOCK_STYLE: React.CSSProperties = {
   marginRight: '3px',
   fontSize: '0.85em',
@@ -54,41 +41,6 @@ export const buildQuestionFilterSectionIconClassName = (styleMap: Record<string,
 
 export const resolveQuestionFilterSectionBodyStyle = (isOpen: unknown, disabled: unknown): React.CSSProperties => ({
   display: isOpen && !disabled ? 'block' : 'none',
-});
-
-export const resolveQuestionFilterClearIconStyle = (isDefault: unknown): React.CSSProperties => ({
-  cursor: isDefault ? 'not-allowed' : 'pointer',
-  marginRight: '12px',
-});
-
-export const resolveQuestionFilterCopyIconStyle = (
-  isDefault: unknown,
-  copiedUrlSuccess: unknown,
-): React.CSSProperties => ({
-  cursor: isDefault || copiedUrlSuccess ? 'not-allowed' : 'pointer',
-  color: copiedUrlSuccess
-    ? 'var(--ce-status-success-text)'
-    : isDefault
-      ? 'var(--ce-control-disabled-text)'
-      : 'var(--ce-text-muted)',
-  fontSize: '1.1em',
-  marginRight: '15px',
-});
-
-export const resolveQuestionFilterBookmarkIconStyle = (
-  isDefault: unknown,
-  isCurrentFilterBookmarked: unknown,
-  filterBookmarkedFeedback: unknown,
-): React.CSSProperties => ({
-  cursor: isDefault ? 'not-allowed' : 'pointer',
-  color:
-    isCurrentFilterBookmarked || filterBookmarkedFeedback
-      ? 'var(--ce-status-warning)'
-      : isDefault
-        ? 'var(--ce-control-disabled-text)'
-        : 'var(--ce-text-muted)',
-  fontSize: '1.1em',
-  marginRight: '8px',
 });
 
 export const resolveQuestionFilterEncryptedCountBadgeStyle = (

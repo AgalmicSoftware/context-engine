@@ -33,16 +33,16 @@ try {
       </script></body></html>` });
     });
     await page.goto(`${base}/filter-probe`);
-    await page.getByRole('img', { name: 'Load a saved filter' }).click();
+    await page.getByRole('button', { name: 'Load', exact: true, expanded: false }).click();
     const token = await page.evaluate(() => window.savedFilter);
     const input = page.getByPlaceholder('Load filter from URL/string...');
     for (const state of ['empty', 'active', 'cleared']) {
       if (state === 'cleared') {
-        await page.getByRole('img', { name: 'Clear current filters' }).click();
-        if (!(await input.isVisible())) await page.getByRole('img', { name: 'Load a saved filter' }).click();
+        await page.getByTestId('ce-question-filter-clear-all').click();
+        if (!(await input.isVisible())) await page.getByRole('button', { name: 'Load', exact: true, expanded: false }).click();
       }
       await input.fill(state === 'empty' ? token : `https://example.test/session/filter-fixture?filter=${token}`);
-      await page.getByRole('button', { name: 'Load', exact: true }).click();
+      await input.locator('xpath=..').getByRole('button', { name: 'Load', exact: true }).click();
       await page.getByRole('button', { name: 'Remove filter: Top 1 by # responses' }).waitFor();
       await page.getByRole('button', { name: 'Remove filter: Responder include: Workshop' }).waitFor();
       const applied = await page.evaluate(() => window.appliedFilter);

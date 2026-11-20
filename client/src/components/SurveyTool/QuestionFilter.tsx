@@ -6,7 +6,7 @@ import { Button, Modal, ModalHeader, ModalBody, ModalFooter } from 'reactstrap';
 import styles from './QuestionFilter.module.scss';
 import GateTooltip from '../Gates/GateTooltip';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faLock, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faSpinner, faLock } from '@fortawesome/free-solid-svg-icons';
 import { serializeFilterState, deserializeFilterStateStrict } from '../../utilities/survey/filterStateUtils.js';
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import { readStoredRating } from '../../utilities/survey/storedRating';
@@ -37,7 +37,6 @@ import {
 } from './questionFilterDisplayHelpers';
 import {
   QuestionFilterAiSection,
-  QuestionFilterLoadFilterControls,
   QuestionFilterQuestionTypesSection,
   QuestionFilterResponseStatusSection,
   QuestionFilterSummaryControls,
@@ -149,8 +148,6 @@ import {
   toLowerId,
 } from './questionFilterSignatureHelpers.js';
 export {
-  QUESTION_FILTER_ACTIONS_STYLE,
-  QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
   QUESTION_FILTER_DISABLED_TEXT_SPACING_STYLE,
   QUESTION_FILTER_ENCRYPTED_COUNT_LOCK_STYLE,
   QUESTION_FILTER_MODAL_HEADER_ROW_STYLE,
@@ -162,9 +159,6 @@ export {
   buildQuestionFilterTagBubbleClassName,
   buildQuestionFilterTypeButtonClassName,
   buildQuestionFilterTypePillClassName,
-  resolveQuestionFilterBookmarkIconStyle,
-  resolveQuestionFilterClearIconStyle,
-  resolveQuestionFilterCopyIconStyle,
   resolveQuestionFilterEncryptedCountBadgeStyle,
   resolveQuestionFilterInlineVisibilityStyle,
   resolveQuestionFilterSectionBodyStyle,
@@ -3028,36 +3022,29 @@ class QuestionFilter extends React.Component<any, any> {
       </div>
     );
 
-    const filterSummaryAndControlsJsx =
-      summaryItems.length > 0 ? (
-        <QuestionFilterSummaryControls
-          copiedUrlSuccess={this.state.copiedUrlSuccess}
-          filterBookmarkedFeedback={this.state.filterBookmarkedFeedback}
-          filterUrlInput={filterUrlInput}
-          isCurrentFilterBookmarked={this.state.isCurrentFilterBookmarked}
-          isDefault={isCurrentFilterDefault}
-          onBookmarkCurrentFilter={this.handleBookmarkCurrentFilter}
-          onClearFilters={this.handleClearFilters}
-          onCopyFilterUrl={this.handleCopyFilterUrl}
-          onFilterUrlInputChange={this.handleFilterUrlInputChange}
-          onLoadFilter={this.handleLoadFilter}
-          showLoadInput={showLoadInput}
-          summaryItems={summaryItems}
-        />
-      ) : showLoadInput ? (
-        <QuestionFilterLoadFilterControls
-          filterUrlInput={filterUrlInput}
-          onFilterUrlInputChange={this.handleFilterUrlInputChange}
-          onLoadFilter={this.handleLoadFilter}
-        />
-      ) : null;
+    const filterSummaryAndControlsJsx = (
+      <QuestionFilterSummaryControls
+        copiedUrlSuccess={this.state.copiedUrlSuccess}
+        filterBookmarkedFeedback={this.state.filterBookmarkedFeedback}
+        filterUrlInput={filterUrlInput}
+        isCurrentFilterBookmarked={this.state.isCurrentFilterBookmarked}
+        isDefault={isCurrentFilterDefault}
+        onBookmarkCurrentFilter={this.handleBookmarkCurrentFilter}
+        onClearFilters={this.handleClearFilters}
+        onCopyFilterUrl={this.handleCopyFilterUrl}
+        onFilterUrlInputChange={this.handleFilterUrlInputChange}
+        onLoadFilter={this.handleLoadFilter}
+        onToggleLoadInput={this.toggleLoadInput}
+        showLoadInput={showLoadInput}
+        summaryItems={summaryItems}
+      />
+    );
 
     if (isInline) {
       // "resultsMode" => render inline, but hide if filterModalOpen is false
       return (
         <div style={resolveQuestionFilterInlineVisibilityStyle(this.props.filterModalOpen)}>
           <div className={styles.questionFilterInline} data-testid={E2E_TESTIDS.QUESTION_FILTER_MODAL}>
-            {/* Count row with + icon to open load input */}
             <div className={styles.inlineCountRow}>
               <div className={styles.inlineCountText}>
                 {awaitingQuestionMetadata ? (
@@ -3069,12 +3056,6 @@ class QuestionFilter extends React.Component<any, any> {
                   </>
                 )}
               </div>
-              <FontAwesomeIcon
-                icon={faPlus}
-                className={styles.addIcon}
-                title="Load a saved filter"
-                onClick={this.toggleLoadInput}
-              />
             </div>
 
             {filterSummaryAndControlsJsx}
@@ -3100,13 +3081,6 @@ class QuestionFilter extends React.Component<any, any> {
                     {awaitingQuestionMetadata ? <FontAwesomeIcon icon={faSpinner} spin /> : filteredQuestionsCount}
                     {renderEncryptedCountBadge('6px')})
                   </span>
-                  {/* Place + icon inline with the title to avoid overlaying the close X */}
-                  <FontAwesomeIcon
-                    icon={faPlus}
-                    className={styles.addIcon}
-                    title="Load a saved filter"
-                    onClick={this.toggleLoadInput}
-                  />
                 </span>
               </div>
             </ModalHeader>
