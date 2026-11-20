@@ -58,3 +58,15 @@ export const withCoordinatorRetry =
       await wait(delayMs, init.signal);
     }
   };
+
+// A sign-in request (a nonce, a login) that got no reply. It is marked so that nothing sends the whole call again
+// on its account: a second try would ask the person to sign a second time.
+const signInRequestFailures = new WeakSet<object>();
+
+export const asSignInRequestFailure = (error: unknown): never => {
+  if (error && typeof error === 'object') signInRequestFailures.add(error);
+  throw error;
+};
+
+export const isSignInRequestFailure = (error: unknown): boolean =>
+  !!error && typeof error === 'object' && signInRequestFailures.has(error);

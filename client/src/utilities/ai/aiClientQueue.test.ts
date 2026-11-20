@@ -1,4 +1,11 @@
-import { createQueuedAiCallRunner, isAiRequestWithoutReply, isTransientAiQueueError } from './aiClientQueue';
+import { asSignInRequestFailure } from '../worker/coordinatorRetry';
+
+import {
+  LOST_REQUEST_RESEND_WINDOW_MS,
+  createQueuedAiCallRunner,
+  isAiRequestWithoutReply,
+  isTransientAiQueueError,
+} from './aiClientQueue';
 
 const flushMicrotasks = (): Promise<void> => Promise.resolve();
 
@@ -67,6 +74,41 @@ describe('aiClientQueue', () => {
       expect(delay).not.toHaveBeenCalled();
     },
   );
+
+  // A clock the test moves: each failure comes `afterMs` after its request was sent.
+  const failingAfter = (afterMs: number, error: unknown) => {
+    let clock = 0;
+    const invoke = jest.fn<Promise<string>, []>().mockImplementationOnce(async () => {
+      clock += afterMs;
+      throw error;
+    });
+    invoke.mockResolvedValue('ok');
+    return { invoke, enqueue: createQueuedAiCallRunner({ delay: async () => {}, now: () => clock }) };
+  };
+
+  it.each([4_000, LOST_REQUEST_RESEND_WINDOW_MS])(
+    'sends again a request that failed soon after it was sent (%i ms): it never arrived',
+    async (afterMs) => {
+      const { invoke, enqueue } = failingAfter(afterMs, new TypeError('Load failed'));
+      await expect(enqueue(invoke)).resolves.toBe('ok');
+      expect(invoke).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it('does not send again one that failed later: the reply may have been written, and paid for', async () => {
+    const lost = new TypeError('Load failed');
+    const { invoke, enqueue } = failingAfter(LOST_REQUEST_RESEND_WINDOW_MS + 1, lost);
+    await expect(enqueue(invoke)).rejects.toBe(lost);
+    expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it('never sends a lost sign-in request again: the person would be asked to sign twice', async () => {
+    const lost = new TypeError('Load failed');
+    const enqueue = createQueuedAiCallRunner({ delay: async () => {} });
+    const invoke = jest.fn<Promise<string>, []>(() => Promise.reject(lost).catch(asSignInRequestFailure));
+    await expect(enqueue(invoke)).rejects.toBe(lost);
+    expect(invoke).toHaveBeenCalledTimes(1);
+  });
 
   it('gives up when the second try gets no reply either', async () => {
     const enqueue = createQueuedAiCallRunner({ delay: async () => {} });

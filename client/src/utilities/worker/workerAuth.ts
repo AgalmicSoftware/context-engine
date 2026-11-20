@@ -1,5 +1,5 @@
 import { getClientAuthGeneration, invalidateClientAuthGeneration } from '../session/clientAuthGeneration';
-import { withCoordinatorRetry } from './coordinatorRetry';
+import { asSignInRequestFailure, withCoordinatorRetry } from './coordinatorRetry';
 import { forgetSignInRoutes, rememberSignInRoute, signInRouteKey, signInRouteRemembered } from './workerSignInRoutes';
 import { buildSiweMessage as buildSharedSiweMessage } from '@ce-shared/auth/siweMessage.mjs';
 /**
@@ -77,7 +77,7 @@ const accountLog = createLogger('account');
 const LOGIN_GATE_UNAVAILABLE_RETRIES = 2;
 const LOGIN_GATE_UNAVAILABLE_RETRY_BASE_MS = 700;
 // Sign-in waits out a busy session coordinator, as joining does.
-const sendAuthRequest = withCoordinatorRetry((input, init) => fetch(input, init));
+const sendAuthRequest = withCoordinatorRetry((input, init) => fetch(input, init).catch(asSignInRequestFailure));
 const ADMIN_ACTION_EXPIRATION_WINDOW_SECONDS = 5 * 60;
 export { normalizeWorkerUrl };
 

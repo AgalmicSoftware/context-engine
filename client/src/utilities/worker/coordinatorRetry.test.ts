@@ -1,5 +1,10 @@
 import { coordinatorBusyBody } from '@ce-shared/sessionCoordinatorBusy.mjs';
-import { SESSION_COORDINATOR_UNAVAILABLE, withCoordinatorRetry } from './coordinatorRetry';
+import {
+  SESSION_COORDINATOR_UNAVAILABLE,
+  asSignInRequestFailure,
+  isSignInRequestFailure,
+  withCoordinatorRetry,
+} from './coordinatorRetry';
 
 const busy = () => new Response(JSON.stringify({ error: SESSION_COORDINATOR_UNAVAILABLE }), { status: 503 });
 const ok = () => new Response('{"ok":true}', { status: 200 });
@@ -64,5 +69,16 @@ describe('withCoordinatorRetry', () => {
     const { response, calls } = await run([busy, busy, busy, busy, busy], `${worker}/storage/list`);
     expect(response.status).toBe(503);
     expect(calls).toBe(4);
+  });
+});
+
+describe('a sign-in request that got no reply', () => {
+  it('is passed on unchanged, and known afterwards as a sign-in request', async () => {
+    const lost = new TypeError('Load failed');
+    await expect(Promise.reject(lost).catch(asSignInRequestFailure)).rejects.toBe(lost);
+    expect(isSignInRequestFailure(lost)).toBe(true);
+    expect(isSignInRequestFailure(new TypeError('Load failed'))).toBe(false);
+    expect(isSignInRequestFailure('Load failed')).toBe(false);
+    expect(() => asSignInRequestFailure('not an object')).toThrow('not an object');
   });
 });
