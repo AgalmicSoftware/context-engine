@@ -79,8 +79,8 @@ export const QUICKSTART_STEPS: readonly QuickstartStep[] = Object.freeze(
     },
     {
       id: 'create-passkey-wallet',
-      title: 'Create your passkey wallet',
-      body: 'Use the browser WebAuthn prompt to create or unlock the embedded wallet. There is no seed phrase to manage, and participants do not need crypto expertise.',
+      title: 'Sign in with a passkey',
+      body: 'Choose Create to make an account with a passkey, or Login to return to one. You control the account: there is no password or seed phrase to manage, and participants do not need crypto expertise. Where a session uses Ethereum wallets, you can connect one you already have instead.',
     },
     {
       id: 'respond',

@@ -227,6 +227,7 @@ describe('DocsPage contract deep links', () => {
       'href',
       `/session/${ABOUT_DEMO_SESSION_SLUG}`,
     );
+    expect(screen.getByRole('heading', { name: 'Sign in with a passkey' })).toBeInTheDocument();
     // The Quickstart sends nobody to a "general" session, or to an address to edit by hand.
     const firstStep = QUICKSTART_STEPS[0];
     expect(`${firstStep.body} ${JSON.stringify(firstStep.links)}`).not.toMatch(/general|<slug>/i);
