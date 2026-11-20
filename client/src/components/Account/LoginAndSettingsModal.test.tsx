@@ -2063,7 +2063,7 @@ test("offers Your AI agent to a signed-in person, not to an agent's own sign-in"
     profile.surfaces = { ...profile.surfaces, agentHttp };
     // The box, then Sign Agents Out beneath it.
     const [box, signOut] = subject.renderAgentHandoffPanel()?.props.children as Array<{ key: unknown; props: any }>;
-    expect(signOut.props.children.props.session.sessionSlug).toBe('agent-handoff');
+    expect(signOut.props.children.props.sessionSlug).toBe('agent-handoff');
     return box;
   };
   expect(panelWithAgentHttp(true).props.agentHttpEnabled).toBe(true);

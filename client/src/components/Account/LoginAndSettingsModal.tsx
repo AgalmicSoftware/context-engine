@@ -1570,7 +1570,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         <div className={styles.accountModalControls}>
           <SignAgentsOutControl
             provider={this.props.provider}
-            session={{ sessionSlug, sessionConfig, context: this.getWorkerTokenContext() }}
+            sessionSlug={sessionSlug}
             buttonClassName={`btn btn-secondary btn-sm ${styles.walletButton}`}
             // The box starts afresh, without the key it may still show: that key is dead now.
             onDone={() => this.setStateIfMounted({ agentsSignedOut: this.state.agentsSignedOut + 1 })}

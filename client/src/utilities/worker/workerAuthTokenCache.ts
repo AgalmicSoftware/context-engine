@@ -268,6 +268,17 @@ export const listHeldTokens = (
   return held;
 };
 
+/** Forgets one sign-in this page holds, as when it was ended at its Worker: the page then signs in afresh. */
+export const forgetHeldToken = (token: unknown): void => {
+  const ended = toStr(token).trim();
+  if (!ended) return;
+  const keys = new Set(tokenMemoryCache.keys());
+  forEachTabTokenKey((key) => keys.add(key));
+  keys.forEach((key) => {
+    if (toStr((readTokenCache(key) as TokenCacheEntry | null)?.token).trim() === ended) clearTokenCache(key);
+  });
+};
+
 /** The page has learned who is signed in, as after a reload: this tab's saved sign-ins for them still count. */
 export const adoptTokenCaches = (address: unknown): void => {
   if (typeof window === 'undefined') return;

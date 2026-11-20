@@ -8,15 +8,12 @@
 // It reaches only what was copied from this tab's sign-in. A prompt copied in another tab or on another device
 // came from that one's sign-in, and lasts until that sign-in is signed out or runs out.
 import { normalizeSessionSlug } from './sessionNaming.js';
-import { clearWorkerSessionToken } from '../worker/workerAuth';
-import { listHeldTokens } from '../worker/workerAuthTokenCache';
+import { forgetHeldToken, listHeldTokens } from '../worker/workerAuthTokenCache';
 
 const NOT_REACHED = 'The session could not be reached, so your agents are still signed in. Try again.';
 
-export type SignAgentsOutSession = NonNullable<Parameters<typeof clearWorkerSessionToken>[0]>;
-
-export const signAgentsOut = async (session: SignAgentsOutSession): Promise<void> => {
-  const slug = normalizeSessionSlug(session.sessionSlug);
+export const signAgentsOut = async (sessionSlug: unknown): Promise<void> => {
+  const slug = normalizeSessionSlug(sessionSlug);
   if (!slug) throw new Error('Open a session first.');
   // With no sign-in held here, nothing copied from this tab is still alive.
   for (const { workerUrl, token } of listHeldTokens().filter((held) => held.sessionSlug === slug)) {
@@ -31,7 +28,7 @@ export const signAgentsOut = async (session: SignAgentsOutSession): Promise<void
     }
     // 401: that sign-in had already ended, and what was copied from it with it.
     if (!response.ok && response.status !== 401) throw new Error(NOT_REACHED);
+    // Forgotten here too, so the page signs in afresh and does not go on using the ended sign-in.
+    forgetHeldToken(token);
   }
-  // Forgotten here too, so the page signs in afresh and does not go on using the ended sign-in.
-  await clearWorkerSessionToken(session);
 };

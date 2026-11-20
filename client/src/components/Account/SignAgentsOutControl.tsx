@@ -4,14 +4,14 @@
 import React, { useState } from 'react';
 
 import { isAgentLinkProvider } from '../../utilities/session/agentLinkAccount';
-import { signAgentsOut, type SignAgentsOutSession } from '../../utilities/session/signAgentsOut';
+import { signAgentsOut } from '../../utilities/session/signAgentsOut';
 
 export const SIGN_AGENTS_OUT_HELP =
   'Ends every prompt and key you copied for an AI agent from this tab’s sign-in to this session. You stay signed in. To let an agent in again, copy a new prompt from Your AI agent. A prompt you copied in another tab or on another device has to be ended there.';
 
 type Props = {
   provider: unknown;
-  session: SignAgentsOutSession;
+  sessionSlug: string;
   buttonClassName?: string;
   // After the agents are signed out: a key the menu still shows is dead, and should go.
   onDone?: () => void;
@@ -19,7 +19,7 @@ type Props = {
 
 export default function SignAgentsOutControl({
   provider,
-  session,
+  sessionSlug,
   buttonClassName = '',
   onDone,
 }: Props): React.ReactElement | null {
@@ -30,7 +30,7 @@ export default function SignAgentsOutControl({
     if (busy) return;
     setBusy(true);
     try {
-      await signAgentsOut(session);
+      await signAgentsOut(sessionSlug);
       setSaid({
         text: 'Agents signed out. To let one in again, copy a new prompt from Your AI agent.',
         isError: false,
