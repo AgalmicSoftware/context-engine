@@ -17,19 +17,27 @@ const repoRoot = path.resolve(__dirname, '..');
 const SITE = 'https://contextengine.sh';
 const HTML_MARKERS = ['<!-- known-session-catalogs: generated from known-sessions.json -->', '<!-- /known-session-catalogs -->'];
 const RULE_MARKERS = ['# known-session-catalogs: generated from known-sessions.json', '# /known-session-catalogs'];
-// Characters a _redirects target may hold as they are: no space, and nothing to percent-encode.
-const PLAIN_VALUE = /^[A-Za-z0-9:/._-]+$/;
+// A slug a _redirects path holds as it is (a ':' would make it a placeholder), and a session page
+// a target holds as it is: no space, and nothing to percent-encode.
+const PLAIN_SLUG = /^[a-z0-9][a-z0-9-]*$/;
 
 // The Worker reads the same catalog whether sessionUrl is percent-encoded or not;
 // the rule's target leaves it plain, so the host has nothing to decode or re-encode.
-const passThroughTarget = (slug, catalog) => {
-  const url = new URL(catalog);
+const passThroughTarget = (slug, entry) => {
+  const url = new URL(entry.interviewCatalog);
+  const page = `${SITE}/session/${slug}`;
   const keys = [...url.searchParams.keys()];
-  const sessionUrl = url.searchParams.get('sessionUrl');
-  if (keys.join() !== 'slug,sessionUrl' || url.searchParams.get('slug') !== slug || !PLAIN_VALUE.test(slug) || !PLAIN_VALUE.test(sessionUrl || '')) {
-    throw new Error(`${slug}: interviewCatalog is not slug and sessionUrl alone, in plain characters`);
+  if (
+    !PLAIN_SLUG.test(slug) ||
+    url.origin !== entry.worker ||
+    url.pathname !== '/agent/interview-catalog' ||
+    keys.join() !== 'slug,sessionUrl' ||
+    url.searchParams.get('slug') !== slug ||
+    url.searchParams.get('sessionUrl') !== page
+  ) {
+    throw new Error(`${slug}: interviewCatalog is not its Worker's catalog for ${page}`);
   }
-  return `${url.origin}${url.pathname}?slug=${slug}&sessionUrl=${sessionUrl}`;
+  return `${url.origin}${url.pathname}?slug=${slug}&sessionUrl=${page}`;
 };
 
 const listed = (knownSessions) =>
@@ -41,7 +49,7 @@ const listed = (knownSessions) =>
       title: entry.title || entry.name || slug,
       catalog: entry.interviewCatalog,
       questions: `${SITE}/questions/${slug}`,
-      target: passThroughTarget(slug, entry.interviewCatalog),
+      target: passThroughTarget(slug, entry),
     }));
 
 const escapeHtml = (text) => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

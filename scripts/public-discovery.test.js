@@ -135,7 +135,7 @@ test('index.html tells a fetching agent where the guide is, in body text people 
     assert.match(where, literalCatalog);
   }
   assert.match(llmsTxt.replace(/\s+/g, ' '), noViewsFirst);
-  assert.match(llmsTxt.replace(/\s+/g, ' '), /To draft: fetch the address after the session's link in this list exactly as it is written, never one you put together yourself/);
+  assert.match(llmsTxt.replace(/\s+/g, ' '), /To draft: fetch the address after the session's link in the list below exactly as it is written, never one you put together yourself/);
   assert.match(guide, /the URL to fetch is the address after its link there: fetch that address exactly as it is written there, never one you put together yourself/);
   assert.match(guide, /This site passes that address through to the catalog the request below builds for the plain session link, and stores nothing\./);
   assert.match(guide, /Don't ask them to state their views first\. Draft only where you have a real basis, and tell them plainly which questions you had no basis for\./);
@@ -195,14 +195,23 @@ test('index.html tells a fetching agent where the guide is, in body text people 
   const moved = {
     'rxc-ra-2': {
       ...knownSessions['rxc-ra-2'],
-      interviewCatalog: 'https://example.invalid/c?slug=rxc-ra-2&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Frxc-ra-2',
+      worker: 'https://ce-moved.example.workers.dev',
+      interviewCatalog: 'https://ce-moved.example.workers.dev/agent/interview-catalog?slug=rxc-ra-2&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Frxc-ra-2',
     },
   };
   const movedFiles = expectedFiles(moved);
   assert.ok(movedFiles.every(({ actual, expected }) => actual !== expected));
-  assert.ok(movedFiles.find(({ file }) => file.endsWith('_redirects')).expected.includes(' https://example.invalid/c?slug=rxc-ra-2&sessionUrl=https://contextengine.sh/session/rxc-ra-2 200\n'));
+  assert.ok(movedFiles.find(({ file }) => file.endsWith('_redirects')).expected.includes('/questions/rxc-ra-2 https://ce-moved.example.workers.dev/agent/interview-catalog?slug=rxc-ra-2&sessionUrl=https://contextengine.sh/session/rxc-ra-2 200\n'));
   // A catalog address with anything more than its slug and session page gets no rule.
-  assert.throws(() => expectedFiles({ x: { ...knownSessions['rxc-ra-2'], interviewCatalog: `${knownSessions['rxc-ra-2'].interviewCatalog}&ticket=t` } }));
+  const salonEntry = knownSessions['rxc-ra-2'];
+  for (const bad of [
+    { 'rxc-ra-2': { ...salonEntry, interviewCatalog: `${salonEntry.interviewCatalog}&ticket=t` } },
+    { 'rxc-ra-2': { ...salonEntry, worker: 'https://ce-other.example.workers.dev' } },
+    { 'rxc-ra-2': { ...salonEntry, interviewCatalog: salonEntry.interviewCatalog.replace('%2Frxc-ra-2', '%2Fother') } },
+    { 'Rxc:2': { ...salonEntry, interviewCatalog: salonEntry.interviewCatalog.replace(/rxc-ra-2/g, 'Rxc:2') } },
+  ]) {
+    assert.throws(() => expectedFiles(bad));
+  }
   assert.match(llmsTxt.replace(/\s+/g, ' '), linkAndOffer);
   assert.match(guide, /### Without tools: give the link, offer to draft In cases 3 and 4, when a person gave you a session link, or a picture showing one, with no instruction, don't ask what they want and don't describe the page\./);
   assert.match(guide, /\*\*Gives them the link\*\*, exactly as you received it, to answer themselves\. They never have to ask for it\./);

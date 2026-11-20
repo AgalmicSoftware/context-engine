@@ -598,7 +598,14 @@ export const buildExternalInterviewKickoff = ({
   const ticketParam = ticket ? `&ticket=${encodeURIComponent(ticket)}` : '';
   const workerCatalogUrl = `${base}/agent/interview-catalog?slug=${slug}${sessionUrlParam}${ticketParam}`;
   // A listed session's catalog is also served on the site, which more chat AIs will open.
-  const catalogUrl = (!ticket && knownSessionQuestionsAddress(workerCatalogUrl)) || workerCatalogUrl;
+  const catalogUrl =
+    (!ticket &&
+      knownSessionQuestionsAddress({
+        workerUrl: base,
+        sessionSlug: toTrimmedString(sessionSlug),
+        sessionUrl: returnUrl,
+      })) ||
+    workerCatalogUrl;
   const privateLink = ticket
     ? 'The link is private to me and expires within an hour; never repeat it or put it in the packet.\n'
     : '';

@@ -18,7 +18,20 @@ it("lists each known session's catalog address as its page builds it, and the pr
     if (interviewCatalog === undefined) continue;
     const lines = prompt.split('\n');
     const site = `https://contextengine.sh/questions/${slug}`;
-    expect(knownSessionQuestionsAddress(interviewCatalog)).toBe(site);
+    expect(
+      knownSessionQuestionsAddress({
+        workerUrl: worker,
+        sessionSlug: slug,
+        sessionUrl: `https://contextengine.sh/session/${slug}`,
+      }),
+    ).toBe(site);
+    // The join panel pins the Worker on the page link; the Worker drops that, so it is the same catalog.
+    const pinned = buildExternalInterviewKickoff({
+      workerUrl: worker,
+      sessionSlug: slug,
+      sessionUrl: `https://contextengine.sh/session/${slug}?${new URLSearchParams({ worker })}`,
+    });
+    expect(pinned.split('\n')).toContain(site);
     expect(lines).toContain(site);
     expect(lines).not.toContain(interviewCatalog);
     // The host passes that address through to the same catalog.
@@ -50,4 +63,12 @@ it("keeps the Worker's address for any other catalog", () => {
   expect(fetchLine({ sessionSlug: 'not-listed', sessionUrl: 'https://contextengine.sh/session/not-listed' })).toMatch(
     /\/agent\/interview-catalog\?slug=not-listed/,
   );
+  for (const fields of [
+    { sessionUrl: `https://contextengine.sh/session/${slug}?joinGroup=g1` },
+    { sessionUrl: `http://localhost:3000/session/${slug}` },
+    { workerUrl: 'https://ce-other.example.workers.dev' },
+    { sessionSlug: 'toString', sessionUrl: 'https://contextengine.sh/session/toString' },
+  ]) {
+    expect(fetchLine(fields)).toMatch(/\/agent\/interview-catalog\?/);
+  }
 });
