@@ -12,6 +12,7 @@ import {
 import { copyText, selectText } from '../../utilities/ui/copyText';
 import SessionInterviewMemoryKickoffCard from '../SurveyTool/SessionInterviewMemoryKickoffCard';
 import { useSessionPrefillKickoff } from '../SurveyTool/useSessionPrefillKickoff';
+import AgentPromptPreview, { PromptCaret, maskPromptTicket } from './AgentPromptPreview';
 import styles from './Account.module.scss';
 
 export type LoginAgentHandoffPanelProps = {
@@ -156,6 +157,7 @@ const SuggestAnswers = ({
   'sessionSlug' | 'sessionUrl' | 'sessionName' | 'sessionConfig' | 'context' | 'workerUrl'
 > & { onCopied: () => void }) => {
   const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const copiedTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(copiedTimer.current), []);
   const { ready, kickoff } = useSessionPrefillKickoff({
@@ -199,7 +201,27 @@ const SuggestAnswers = ({
           showAgentPrompt={false}
           onCopyPrompt={copyPrompt}
           onTogglePrompt={() => undefined}
-          copyButton={{ className: styles.agentHandoffPrimary, testId: 'ce-agent-handoff-suggest-copy' }}
+          copyButton={{
+            className: styles.agentHandoffPrimary,
+            testId: 'ce-agent-handoff-suggest-copy',
+            rowClassName: styles.agentHandoffSplit,
+            addon: (
+              <PromptCaret
+                textId="ce-agent-handoff-suggest-prompt-text"
+                testId="ce-agent-handoff-suggest-prompt-expand"
+                expanded={expanded}
+                onToggle={() => setExpanded(!expanded)}
+              />
+            ),
+            renderPreview: (prompt) => (
+              <AgentPromptPreview
+                prompt={maskPromptTicket(prompt)}
+                textId="ce-agent-handoff-suggest-prompt-text"
+                testId="ce-agent-handoff-suggest-prompt"
+                expanded={expanded}
+              />
+            ),
+          }}
         />
         <Help id="ce-agent-handoff-suggest-about" placement="bottom">
           Paste it into ChatGPT, Claude or another AI. It reads this session&apos;s questions, drafts answers from what
@@ -226,6 +248,7 @@ const LoginAgentHandoffPanel = ({
   // The key lives only here, never in browser storage, and goes when the dialog closes.
   const [key, setKey] = useState<AgentDelegateKey | null>(null);
   const [keyShown, setKeyShown] = useState(false);
+  const [submitExpanded, setSubmitExpanded] = useState(false);
   const [askFirst, setAskFirst] = useState(ASK_BEFORE_SUBMIT_DEFAULT);
   const [making, setMaking] = useState(false);
   const [error, setError] = useState('');
@@ -253,8 +276,11 @@ const LoginAgentHandoffPanel = ({
       copiedTimer.current = setTimeout(() => setCopiedStep(''), 1800);
     } else {
       announce(`Copying isn't allowed here, so the ${what} is selected. Copy it yourself.`);
-      // A hidden key is shown, since the masked one is no use to copy.
-      if (step === 'submit-prompt') setKeyShown(true);
+      // A hidden key is shown, and the whole prompt, since the masked or shortened one is no use to copy.
+      if (step === 'submit-prompt') {
+        setKeyShown(true);
+        setSubmitExpanded(true);
+      }
       setSelectStep(step);
     }
   };
@@ -361,36 +387,45 @@ const LoginAgentHandoffPanel = ({
           {sessionName} doesn&apos;t let agents submit, so your agent shows you drafts.
         </p>
       )}
-      <div className={styles.agentHandoffCommandBox}>
-        <code
-          id="ce-agent-handoff-submit-prompt-text"
-          className={styles.agentHandoffCommand}
-          data-testid="ce-agent-handoff-submit-prompt"
-        >
-          {shownSubmitPrompt}
-        </code>
-      </div>
       <div className={styles.agentHandoffCopyRow}>
-        <button
-          type="button"
-          className={styles.agentHandoffPrimary}
-          onClick={() => copy('submit-prompt', 'prompt', submitPrompt)}
-          data-testid="ce-agent-handoff-submit-copy"
-        >
-          <FontAwesomeIcon icon={copiedStep === 'submit-prompt' ? faCheck : faCopy} />
-          {copiedStep === 'submit-prompt' ? 'Copied' : 'Copy the prompt'}
-        </button>
+        <div className={styles.agentHandoffSplit}>
+          <button
+            type="button"
+            className={styles.agentHandoffPrimary}
+            onClick={() => copy('submit-prompt', 'prompt', submitPrompt)}
+            data-testid="ce-agent-handoff-submit-copy"
+          >
+            <FontAwesomeIcon icon={copiedStep === 'submit-prompt' ? faCheck : faCopy} />
+            {copiedStep === 'submit-prompt' ? 'Copied' : 'Copy prompt'}
+          </button>
+          <PromptCaret
+            textId="ce-agent-handoff-submit-prompt-text"
+            testId="ce-agent-handoff-submit-prompt-expand"
+            expanded={submitExpanded}
+            onToggle={() => setSubmitExpanded(!submitExpanded)}
+          />
+        </div>
         <button
           type="button"
           className={styles.agentHandoffButton}
           aria-pressed={keyShown}
           aria-label="Show the key"
-          onClick={() => setKeyShown(!keyShown)}
+          onClick={() => {
+            // The key sits past the prompt's start, so showing it shows all of the prompt.
+            if (!keyShown) setSubmitExpanded(true);
+            setKeyShown(!keyShown);
+          }}
           data-testid="ce-agent-handoff-key-show"
         >
           {keyShown ? 'Hide' : 'Show'}
         </button>
       </div>
+      <AgentPromptPreview
+        prompt={shownSubmitPrompt}
+        textId="ce-agent-handoff-submit-prompt-text"
+        testId="ce-agent-handoff-submit-prompt"
+        expanded={submitExpanded}
+      />
     </>
   );
 

@@ -2567,15 +2567,33 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   opacity: 0.75;
 }
 
-.agentHandoffCommandBox {
-  position: relative;
-  margin: 6px 0 8px;
+// "Copy prompt" and its caret as one split button: the caret opens the whole prompt to read.
+.agentHandoffSplit {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 0;
+
+  > .agentHandoffPrimary:first-child {
+    flex: 1 1 auto;
+    width: auto;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+}
+
+.agentHandoffPrimary.agentHandoffCaret {
+  flex: none;
+  width: 52px;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
 }
 
 // Bootstrap colours code pink; commands here read as the panel's text.
 .agentHandoffCommand {
   display: block;
-  margin: 0;
+  margin: 8px 0 0;
   padding: 8px 10px;
   border: 1px solid var(--ce-settings-border);
   border-radius: var(--ce-radius-6);
@@ -2584,6 +2602,10 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   font-size: 0.9rem;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+
+  &[hidden] {
+    display: none;
+  }
 }
 
 .agentHandoffHint,

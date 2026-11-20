@@ -67,6 +67,16 @@ const renderPanel = (props: Partial<React.ComponentProps<typeof LoginAgentHandof
 
 const chooseSubmit = () => fireEvent.click(screen.getByRole('radio', { name: 'Full submit' }));
 
+const expandSubmitPrompt = () => {
+  const expand = screen.getByTestId('ce-agent-handoff-submit-prompt-expand');
+  expect(expand).toHaveAttribute('aria-expanded', 'false');
+  // The caret half of the split Copy prompt button.
+  expect(expand).toHaveAccessibleName('Read the whole prompt');
+  expect(expand).toHaveAttribute('aria-controls', 'ce-agent-handoff-submit-prompt-text');
+  fireEvent.click(expand);
+  expect(expand).toHaveAttribute('aria-expanded', 'true');
+};
+
 const copySuggestPrompt = async () => {
   const button = await screen.findByTestId('ce-agent-handoff-suggest-copy');
   await waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'false'));
@@ -136,7 +146,7 @@ it('copies one prompt that suggests answers for this session, with no key and th
   expect(prompt).not.toContain('CE_AGENT_TOKEN');
   // The MCP is in the one prompt, not a box of its own.
   expect(prompt).toContain('add it with: claude mcp add --scope user context-engine -- npx');
-  expect(screen.queryByText(/claude mcp add/)).not.toBeInTheDocument();
+  expect(screen.getByText(/claude mcp add/)).toBe(screen.getByTestId('ce-agent-handoff-suggest-prompt'));
   // Drafts come back to the session's page, not to wherever the dialog was opened.
   expect(prompt).toContain(`sessionUrl=${encodeURIComponent(sessionUrl)}`);
 });
@@ -147,6 +157,11 @@ it("puts a signed-in person's private catalog link in their suggestions prompt",
   const prompt = await copySuggestPrompt();
   expect(prompt).toContain('&ticket=ic1.mine');
   expect(prompt).toContain('The link is private to me');
+  // On screen the ticket is masked, as the key is; only the copy holds it.
+  fireEvent.click(screen.getByRole('button', { name: 'Read the whole prompt' }));
+  const shown = screen.getByTestId('ce-agent-handoff-suggest-prompt');
+  expect(shown).toHaveTextContent('&ticket=••••••••');
+  expect(shown).not.toHaveTextContent('ic1.mine');
 });
 
 it('says so when the session has no Worker to suggest from', async () => {
@@ -162,6 +177,10 @@ it('puts the key into the one prompt, masked on screen, which names the session 
   fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
   const prompt = await screen.findByTestId('ce-agent-handoff-submit-prompt');
   expect(requestKey).toHaveBeenCalledTimes(1);
+  // Nothing of it shows until the caret opens it.
+  expect(prompt).not.toBeVisible();
+  expandSubmitPrompt();
+  expect(prompt).toBeVisible();
   // One thing to copy: no terminal command, no MCP box.
   expect(screen.getAllByRole('button', { name: /^Copy/ })).toHaveLength(1);
   expect(screen.queryByText(/export CE_AGENT_TOKEN/)).not.toBeInTheDocument();
@@ -175,7 +194,7 @@ it('puts the key into the one prompt, masked on screen, which names the session 
   expect(screen.getByTestId('ce-agent-handoff-expiry')).toHaveTextContent(/^Your key works in Salon only, until /);
   expect(screen.queryByTestId('ce-agent-handoff-drafts-only')).not.toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Copy the prompt' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Copy prompt' }));
   expect(await screen.findByText('Copied the prompt.')).toBeInTheDocument();
   const copied = String(writeText.mock.calls.at(-1)?.[0]);
   expect(copied).toContain('Your key is ceagt_secret;');
@@ -198,6 +217,7 @@ it("says when a session doesn't let agents submit, and the prompt asks for draft
   expect(await screen.findByTestId('ce-agent-handoff-drafts-only')).toHaveTextContent(
     "Salon doesn't let agents submit, so your agent shows you drafts.",
   );
+  expandSubmitPrompt();
   expect(screen.getByTestId('ce-agent-handoff-submit-prompt')).toHaveTextContent("doesn't let agents submit");
   expect(screen.getByTestId('ce-agent-handoff-submit-prompt')).not.toHaveTextContent('submit as me');
   // Asking first is moot there, so the tick goes.
@@ -212,17 +232,18 @@ it('changes the copied prompt with the Ask me if I approve tick', async () => {
   expect(ask).toHaveAccessibleDescription(/Ticked, your agent shows you its answers in the chat/);
   fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
   const prompt = await screen.findByTestId('ce-agent-handoff-submit-prompt');
+  expandSubmitPrompt();
   fireEvent.click(screen.getByRole('checkbox', { name: 'Ask me if I approve' }));
   expect(screen.getByRole('checkbox', { name: 'Ask me if I approve' })).not.toBeChecked();
   expect(prompt).toHaveTextContent('submit them as me, without asking me again');
   expect(prompt).not.toHaveTextContent('only after I say yes');
-  fireEvent.click(screen.getByRole('button', { name: 'Copy the prompt' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Copy prompt' }));
   expect(await screen.findByText('Copied the prompt.')).toBeInTheDocument();
   expect(String(writeText.mock.calls.at(-1)?.[0])).toContain('without asking me again');
   expect(screen.getByTestId('ce-agent-handoff-submit-copy')).toHaveTextContent('Copied');
   // A change of tick changes the prompt, so the button no longer says it was copied.
   fireEvent.click(screen.getByRole('checkbox', { name: 'Ask me if I approve' }));
-  expect(screen.getByTestId('ce-agent-handoff-submit-copy')).toHaveTextContent('Copy the prompt');
+  expect(screen.getByTestId('ce-agent-handoff-submit-copy')).toHaveTextContent('Copy prompt');
   fireEvent.click(screen.getByRole('checkbox', { name: 'Ask me if I approve' }));
   // Ticked again, the copy asks first again, with the same key.
   fireEvent.click(screen.getByRole('checkbox', { name: 'Ask me if I approve' }));
@@ -239,6 +260,55 @@ it('offers no key while the session has Agent HTTP off, and still offers suggest
   expect(screen.queryByRole('button', { name: 'Make a key' })).not.toBeInTheDocument();
 });
 
+it('copies from one split Copy prompt button, whose caret opens the whole prompt to read', async () => {
+  renderPanel();
+  chooseSubmit();
+  fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
+  const prompt = await screen.findByTestId('ce-agent-handoff-submit-prompt');
+  expect(prompt).not.toBeVisible();
+  const button = screen.getByRole('button', { name: 'Copy prompt' });
+  expect(button.querySelector('[data-icon="copy"]')).not.toBeNull();
+  fireEvent.click(button);
+  expect(await screen.findByText('Copied the prompt.')).toBeInTheDocument();
+  const copied = String(writeText.mock.calls.at(-1)?.[0]);
+  expect(copied).toContain('Your key is ceagt_secret;');
+  expect(copied).toContain('This task does not need it.');
+  // The icon turns from the clipboard to a tick.
+  expect(button.querySelector('[data-icon="check"]')).not.toBeNull();
+  expect(button).toHaveTextContent('Copied');
+  // Still closed after copying; the caret opens all of it, masked, and closes it again.
+  expect(prompt).not.toBeVisible();
+  expandSubmitPrompt();
+  expect(copied).toBe(prompt.textContent?.replace('ceagt_••••••••', 'ceagt_secret'));
+  fireEvent.click(screen.getByTestId('ce-agent-handoff-submit-prompt-expand'));
+  expect(prompt).not.toBeVisible();
+  // Show (the key) opens it too, since the key is what it shows.
+  fireEvent.click(screen.getByRole('button', { name: 'Show the key' }));
+  expect(prompt).toBeVisible();
+  expect(prompt).toHaveTextContent('Your key is ceagt_secret;');
+});
+
+it('shows nothing of the suggestions prompt until its caret opens it', async () => {
+  renderPanel();
+  const button = await screen.findByTestId('ce-agent-handoff-suggest-copy');
+  await waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'false'));
+  expect(button).toHaveTextContent('Copy prompt');
+  const prompt = screen.getByTestId('ce-agent-handoff-suggest-prompt');
+  expect(prompt).not.toBeVisible();
+  await act(async () => fireEvent.click(button));
+  const copied = String(writeText.mock.calls.at(-1)?.[0]);
+  expect(copied).toContain(`${workerUrl}/agent/interview-catalog?slug=salon`);
+  expect(button).toHaveTextContent('Copied');
+  expect(button.querySelector('[data-icon="check"]')).not.toBeNull();
+  const caret = screen.getByRole('button', { name: 'Read the whole prompt' });
+  expect(caret).toHaveAttribute('aria-expanded', 'false');
+  expect(caret).toHaveAttribute('aria-controls', 'ce-agent-handoff-suggest-prompt-text');
+  fireEvent.click(caret);
+  expect(caret).toHaveAttribute('aria-expanded', 'true');
+  expect(prompt).toBeVisible();
+  expect(prompt.textContent).toBe(copied);
+});
+
 it('turns the copy button to Copied for a moment', async () => {
   jest.useFakeTimers();
   try {
@@ -251,7 +321,7 @@ it('turns the copy button to Copied for a moment', async () => {
     expect(copyPrompt).toHaveTextContent('Copied');
     expect(copyPrompt.querySelector('[data-icon="check"]')).not.toBeNull();
     act(() => jest.advanceTimersByTime(1800));
-    expect(copyPrompt).toHaveTextContent('Copy the prompt');
+    expect(copyPrompt).toHaveTextContent('Copy prompt');
   } finally {
     jest.useRealTimers();
   }
@@ -264,7 +334,7 @@ it('shows and selects the prompt with its key when copying is refused', async ()
   renderPanel();
   chooseSubmit();
   fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
-  fireEvent.click(await screen.findByRole('button', { name: 'Copy the prompt' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Copy prompt' }));
   await screen.findByText("Copying isn't allowed here, so the prompt is selected. Copy it yourself.");
   expect(screen.getByRole('button', { name: 'Show the key' })).toHaveAttribute('aria-pressed', 'true');
   expect(window.getSelection()?.toString()).toContain('Your key is ceagt_secret;');
@@ -282,7 +352,7 @@ it('copies with the older copy command where the clipboard is missing', async ()
     renderPanel();
     chooseSubmit();
     fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Copy the prompt' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy prompt' }));
     expect(await screen.findByText('Copied the prompt.')).toBeInTheDocument();
     expect(copied).toHaveLength(1);
     expect(copied[0]).toContain('Your key is ceagt_secret;');
