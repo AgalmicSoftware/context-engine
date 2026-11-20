@@ -87,13 +87,50 @@ const FLAGS: { language: string; art: React.ReactNode }[] = [
   },
 ];
 
-/** Beside the interview's title: some of the languages someone can answer in, as flags. */
+/** How long the flags stay after the interview opens, or after the globe brings them back. */
+export const LANGUAGE_FLAGS_SHOWN_MS = 10_000;
+
+/**
+ * The globe beside the interview's title, and under the title a row of flags for some of the languages
+ * someone can answer in. The row shows on opening, then goes after ten seconds so the title row keeps
+ * the status and the close button on a phone. The globe brings it back; a pointer over it holds it.
+ */
 export default function SessionInterviewLanguageMarks() {
+  const listId = React.useId();
+  const [shown, setShown] = React.useState(true);
+  const [held, setHeld] = React.useState(false);
+  React.useEffect(() => {
+    if (!shown || held) return undefined;
+    const timer = window.setTimeout(() => setShown(false), LANGUAGE_FLAGS_SHOWN_MS);
+    return () => window.clearTimeout(timer);
+  }, [shown, held]);
   return (
-    <span className={styles.sessionInterviewLanguages}>
-      <FontAwesomeIcon icon={faGlobe} aria-hidden="true" />
+    <>
+      <button
+        type="button"
+        className={styles.sessionInterviewHeaderButton}
+        data-ce-control-appearance="frameless"
+        aria-label="Languages you can answer in"
+        aria-expanded={shown}
+        aria-controls={listId}
+        onClick={() => {
+          // A row hidden under the pointer may never hear it leave.
+          setHeld(false);
+          setShown((current) => !current);
+        }}
+      >
+        <FontAwesomeIcon icon={faGlobe} />
+      </button>
       {/* Spans with list roles: the dialog's title is a heading, which can't hold a real list. */}
-      <span role="list" aria-label="Some languages you can answer in">
+      <span
+        id={listId}
+        role="list"
+        aria-label="Some languages you can answer in"
+        className={styles.sessionInterviewLanguages}
+        hidden={!shown}
+        onPointerEnter={() => setHeld(true)}
+        onPointerLeave={() => setHeld(false)}
+      >
         {FLAGS.map(({ language, art }) => (
           <span role="listitem" key={language}>
             {/* The title names it, on hover too. */}
@@ -104,6 +141,6 @@ export default function SessionInterviewLanguageMarks() {
           </span>
         ))}
       </span>
-    </span>
+    </>
   );
 }

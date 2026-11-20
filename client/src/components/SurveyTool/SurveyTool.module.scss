@@ -3639,6 +3639,15 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     outline-offset: 1px;
   }
 
+  // While the interview's flags take the row under its title, the × stays level with the title row.
+  :global(.modal-header):has(.sessionInterviewLanguages:not([hidden])) {
+    align-items: flex-start;
+
+    :global(.btn-close) {
+      margin-top: 6px;
+    }
+  }
+
   label,
   strong {
     color: var(--ce-panel-text);
@@ -3924,18 +3933,17 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// The globe and round flags beside the title; a faint ring keeps white flags apart from a light header.
+// The round flags on their own row under the title, so the title row never wraps; a faint ring keeps
+// white flags apart from a light header.
 .sessionInterviewLanguages {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-inline: 4px;
-  color: var(--ce-panel-text);
-  font-size: 1rem;
+  display: flex;
+  flex-basis: 100%;
+  order: 1;
+  gap: 4px;
+  padding-block: 2px 4px;
 
-  [role='list'] {
-    display: flex;
-    gap: 4px;
+  &[hidden] {
+    display: none;
   }
 
   svg[role='img'] {
@@ -3975,7 +3983,8 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// On a phone the header's items share one row with the close button: Back, the title, its ?, the status.
+// On a phone the header's items share one row with the close button: Back, the title, its ?, the globe, the
+// status. The flags, while shown, take the row under it.
 @media (max-width: 480px) {
   .sessionVoiceModeModal :global(.modal-header) {
     padding-inline: 10px;
@@ -4636,7 +4645,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     border-radius: var(--ce-radius-6);
     object-fit: cover;
   }
-
   small {
     color: inherit;
     font-size: 0.82rem;
