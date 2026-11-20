@@ -60,11 +60,10 @@ const useSessionHeaderPreview = ({
   }, []);
 
   // A picker's accept list is only a hint, so every chosen or pasted file is
-  // checked here instead of failing later at publish.
+  // checked here instead of failing later at publish. A refused file leaves the picture as it was.
   const chooseSessionHeaderFile = useCallback(
     (file: SessionHeaderFileState | null): boolean => {
       if (file && !resolveSessionHeaderImageFormat(file)) {
-        setSessionHeaderFile(null);
         setSessionHeaderStatus(UNSUPPORTED_SESSION_HEADER_IMAGE_MESSAGE, 'error');
         return false;
       }

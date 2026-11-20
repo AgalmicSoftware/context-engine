@@ -52,6 +52,25 @@ describe('useSessionHeaderPreview', () => {
     expect(result.current.sessionHeaderPreviewSrc).toBe('https://example.test/header.png');
   });
 
+  it('keeps the chosen picture when a later file is refused', () => {
+    const { result } = renderHook(() =>
+      useSessionHeaderPreview({ draftSessionHeader: '', updateDraftSessionHeader: jest.fn() }),
+    );
+    const picture = new File(['header'], 'header.png', { type: 'image/png' });
+
+    act(() => {
+      result.current.setSessionHeaderFile(picture);
+    });
+    let accepted = true;
+    act(() => {
+      accepted = result.current.setSessionHeaderFile(new File(['notes'], 'notes.txt', { type: 'text/plain' }));
+    });
+
+    expect(accepted).toBe(false);
+    expect(result.current.sessionHeaderFile).toBe(picture);
+    expect(result.current.sessionHeaderUploadStatusTone).toBe('error');
+  });
+
   it('creates and revokes upload preview object URLs', () => {
     const { result, unmount } = renderHook(() =>
       useSessionHeaderPreview({

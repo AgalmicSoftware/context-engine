@@ -642,19 +642,21 @@ export const buildSessionWizardDraftFieldRenderer = ({
               setSessionHeaderStatus('');
             }}
             onPaste={handlePasteSessionHeaderFromClipboard}
+            // Only a chosen file replaces the picture: closing the file chooser leaves a typed link in place.
             onCompactUploadClick={() => {
-              setCompactSessionHeaderMode('idle');
-              setSessionHeaderMode('upload');
               setSessionHeaderStatus('');
               if (compactSessionHeaderInputRef.current) {
                 compactSessionHeaderInputRef.current.click();
               }
             }}
             onCompactFileChange={(event) => {
-              if (!setSessionHeaderFile(event.target.files?.[0] || null)) {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              if (!setSessionHeaderFile(file)) {
                 event.target.value = '';
                 return;
               }
+              setCompactSessionHeaderMode('idle');
               setSessionHeaderMode('upload');
               setSessionHeaderStatus('');
             }}
