@@ -33,6 +33,10 @@ export type LoginAgentHandoffPanelProps = {
   context?: unknown;
   workerUrl?: string;
   requestKey: () => Promise<AgentDelegateKey>;
+  /** "Sign Agents Out", under both options. */
+  signAgentsOut?: React.ReactNode;
+  /** Counts each Sign Agents Out: the key shown and the suggestions prompt's ticket are dead after one. */
+  agentsSignedOut?: number;
 };
 
 const MASKED_KEY = 'ceagt_••••••••';
@@ -236,6 +240,8 @@ const LoginAgentHandoffPanel = ({
   context,
   workerUrl,
   requestKey,
+  signAgentsOut = null,
+  agentsSignedOut = 0,
 }: LoginAgentHandoffPanelProps) => {
   // Starts closed so the sign-in dialog stays short; closing only hides it, so a key or tick survives.
   const [open, setOpen] = useState(false);
@@ -255,6 +261,17 @@ const LoginAgentHandoffPanel = ({
   const [selectStep, setSelectStep] = useState('');
   const copiedTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(copiedTimer.current), []);
+  // After Sign Agents Out the key is dead, so it goes; the row stays open, with Sign Agents Out's message.
+  const signedOutSeen = useRef(agentsSignedOut);
+  useEffect(() => {
+    if (signedOutSeen.current === agentsSignedOut) return;
+    signedOutSeen.current = agentsSignedOut;
+    setKey(null);
+    setKeyShown(false);
+    setSubmitExpanded(false);
+    setCopyStatus('');
+    setCopiedStep('');
+  }, [agentsSignedOut]);
 
   const announce = (message: string) => {
     setCopyStatus(message);
@@ -426,6 +443,8 @@ const LoginAgentHandoffPanel = ({
           {/* Mounted only once opened: its check may ask to sign in to the session, which only an open box should. */}
           {open ? (
             <SuggestAnswers
+              // Checked afresh after Sign Agents Out, for a new ticket.
+              key={agentsSignedOut}
               sessionSlug={sessionSlug}
               sessionUrl={sessionUrl}
               sessionName={sessionName}
@@ -477,7 +496,7 @@ const LoginAgentHandoffPanel = ({
           ) : null}
         </AgentOption>
 
-        {/* "Cancel all agent authorizations" goes here, under both options. */}
+        {signAgentsOut ? <div className={styles.agentHandoffSignOut}>{signAgentsOut}</div> : null}
 
         {/* Live regions stay mounted, so screen readers hear their first message too. */}
         <div role="alert">

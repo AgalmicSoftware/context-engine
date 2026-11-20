@@ -1552,31 +1552,30 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     )
       return null;
     return (
-      <>
-        <LoginAgentHandoffPanel
-          key={`${agentHandoffPanelKey(sessionSlug, this.props.account)}:${this.state.agentsSignedOut}`}
-          agentHttpEnabled={!!agentWorkerUrl && isSessionModeProfileAgentHttpEnabled(sessionConfig)}
-          sessionUrl={buildSessionWizardSessionUrl({
-            slug: sessionSlug,
-            workerOrigin: workerCanonical ? agentWorkerUrl : '',
-          })}
-          sessionName={toStr((sessionConfig as { sessionName?: unknown } | null)?.sessionName).trim() || sessionSlug}
-          sessionSlug={sessionSlug}
-          sessionConfig={sessionConfig as Record<string, unknown> | null}
-          context={this.getWorkerTokenContext()}
-          workerUrl={agentWorkerUrl}
-          requestKey={this.requestAgentKey}
-        />
-        <div className={styles.accountModalControls}>
+      <LoginAgentHandoffPanel
+        key={agentHandoffPanelKey(sessionSlug, this.props.account)}
+        agentHttpEnabled={!!agentWorkerUrl && isSessionModeProfileAgentHttpEnabled(sessionConfig)}
+        sessionUrl={buildSessionWizardSessionUrl({
+          slug: sessionSlug,
+          workerOrigin: workerCanonical ? agentWorkerUrl : '',
+        })}
+        sessionName={toStr((sessionConfig as { sessionName?: unknown } | null)?.sessionName).trim() || sessionSlug}
+        sessionSlug={sessionSlug}
+        sessionConfig={sessionConfig as Record<string, unknown> | null}
+        context={this.getWorkerTokenContext()}
+        workerUrl={agentWorkerUrl}
+        requestKey={this.requestAgentKey}
+        // The box drops the key it may still show after this: that key is dead now.
+        agentsSignedOut={this.state.agentsSignedOut}
+        signAgentsOut={
           <SignAgentsOutControl
             provider={this.props.provider}
             sessionSlug={sessionSlug}
-            buttonClassName={`btn btn-secondary btn-sm ${styles.walletButton}`}
-            // The box starts afresh, without the key it may still show: that key is dead now.
+            buttonClassName={styles.agentHandoffButton}
             onDone={() => this.setStateIfMounted({ agentsSignedOut: this.state.agentsSignedOut + 1 })}
           />
-        </div>
-      </>
+        }
+      />
     );
   };
 

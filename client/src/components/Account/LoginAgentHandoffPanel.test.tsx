@@ -486,3 +486,31 @@ it('gives each option its own copy and show names, and the suggestions prompt it
   fireEvent.click(within(suggest).getByRole('button', { name: 'Expand prompt: Suggest answers' }));
   expect(screen.getByTestId('ce-agent-handoff-suggest-prompt-box')).toHaveClass('agentHandoffPromptLarge');
 });
+
+it('holds Sign Agents Out under both options, and drops the dead key after it while staying open', async () => {
+  const props = {
+    agentHttpEnabled: true,
+    sessionUrl,
+    sessionName: 'Salon',
+    sessionSlug: 'salon',
+    workerUrl,
+    requestKey: jest.fn(async () => key),
+    signAgentsOut: <span role="status">Agents signed out.</span>,
+  };
+  const { rerender } = render(<LoginAgentHandoffPanel {...props} agentsSignedOut={0} />);
+  const toggle = screen.getByRole('button', { name: 'Your AI agent' });
+  fireEvent.click(toggle);
+  const signOut = screen.getByText('Agents signed out.');
+  const submit = screen.getByRole('group', { name: 'Answer for me' });
+  expect(submit.compareDocumentPosition(signOut) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(document.getElementById('ce-agent-handoff-body')).toContainElement(signOut);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Make a key' }));
+  await screen.findByTestId('ce-agent-handoff-submit-prompt');
+  rerender(<LoginAgentHandoffPanel {...props} agentsSignedOut={1} />);
+  expect(screen.queryByTestId('ce-agent-handoff-submit-prompt')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Make a key' })).toBeInTheDocument();
+  expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByText('Agents signed out.')).toBeVisible();
+  await screen.findByTestId('ce-agent-handoff-suggest-copy');
+});

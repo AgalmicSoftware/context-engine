@@ -1761,6 +1761,22 @@ h1 {
     width: auto;
     flex-shrink: 0;
   }
+
+  .walletButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 1.25em;
+    font-weight: 600;
+    opacity: 0.8;
+
+    @media (min-width: 769px) {
+      font-size: 1.5em;
+      font-weight: 600;
+      opacity: 0.8;
+    }
+  }
 }
 
 // The account dialog's list of actions: Analyze user, Set username, Bookmarks, Your AI agent, Disconnect.
@@ -1905,6 +1921,12 @@ h1 {
 
   .accountModalControls {
     gap: 0.5rem;
+
+    .walletButton {
+      min-height: 44px;
+      padding: 0.5rem;
+      font-size: 1rem;
+    }
   }
 }
 
@@ -2704,6 +2726,20 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
+// "Sign Agents Out" and its message, under both options.
+.agentHandoffSignOut {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ce-settings-border);
+
+  &:empty {
+    display: none;
+  }
+}
+
 // An option's prompt, to read: a small box under it, or large over the account panel.
 .agentHandoffPromptBox {
   display: flex;
@@ -2916,6 +2952,18 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
     .accountModalProfileShell {
       --ce-text-inverse: var(--ce-panel-text);
       --ce-status-error: var(--ce-status-danger-text);
+    }
+
+    .walletButton {
+      opacity: 1;
+      color: var(--ce-panel-text);
+      background: color-mix(in srgb, var(--ce-color-white) 65%, transparent);
+      border: 1px solid color-mix(in srgb, var(--ce-action-primary) 28%, var(--ce-color-white));
+
+      &:hover,
+      &:focus-visible {
+        background: color-mix(in srgb, var(--ce-color-white) 90%, transparent);
+      }
     }
   }
 
