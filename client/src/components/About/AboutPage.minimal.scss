@@ -5,7 +5,8 @@
     .aboutPageContainer {
       --about-accent: var(--ce-data-series-2);
       --about-edge: color-mix(in srgb, var(--about-accent) 32%, var(--ce-surface));
-      background: color-mix(in srgb, var(--about-accent) 3%, var(--ce-surface));
+      // No tint of its own: a second, slightly different white beside the page's white read as a stray rectangle.
+      background: transparent;
     }
 
     .pageShell {
