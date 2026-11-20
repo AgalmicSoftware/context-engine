@@ -12,30 +12,41 @@ const ticketMock = jest.mocked(getInterviewCatalogTicket);
 // The card remembers whom it asked for as long as the page is open, so each test signs in as someone new.
 let people = 0;
 let ACCOUNT = '';
-const catalog = () =>
+const catalog = (questionIds: string[] = []) =>
   new Response(
     JSON.stringify({
       type: 'context-engine.interview-question-catalog',
       version: 1,
       sessionSlug: 'demo',
       prefillPromptVersion: 'ce-interview-brief-v6',
+      questions: questionIds.map((id) => ({ id, prompt: `${id}?`, type: 'freeform' })),
     }),
   );
 const signInRequired = () =>
   new Response(JSON.stringify({ error: 'Sign in.', reason: 'sign_in_required' }), { status: 401 });
-const spyOnFetch = () => jest.spyOn(globalThis, 'fetch').mockImplementation(async () => catalog());
+// A private session's Worker, which lists its questions only with a ticket.
+const privateWorker = async (input: RequestInfo | URL) =>
+  new URL(String(input)).searchParams.get('ticket')
+    ? catalog()
+    : new Response(JSON.stringify({ error: 'Invite.', reason: 'private_session_invite_required' }), { status: 403 });
+const spyOnFetch = () => jest.spyOn(globalThis, 'fetch').mockImplementation(privateWorker);
 let fetchMock: ReturnType<typeof spyOnFetch>;
 const writeText = jest.fn(async (_text: string) => undefined);
 
-const renderCard = (account = ACCOUNT) =>
+const renderCard = (account = ACCOUNT, questionPool?: unknown[]) =>
   render(
     <SessionVoicePrefillCard
       sessionSlug="demo"
       sessionConfig={{ slug: 'demo' }}
       context={account ? { account } : {}}
       workerUrl="https://worker.example"
+      questionPool={questionPool}
     />,
   );
+const POOL = [
+  { id: 'q1', prompt: 'q1?', type: 'freeform' },
+  { id: 'q2', prompt: 'q2?', type: 'freeform' },
+];
 const copy = async () => {
   const button = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
   await waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'false'));
@@ -53,21 +64,49 @@ beforeEach(() => {
 });
 afterEach(() => fetchMock.mockRestore());
 
-it('gives a signed-in person’s AI a private catalog link, asking them to sign in once', async () => {
+// The address a chat AI's fetch tool takes must stay short, so a ticket goes in only where it is needed.
+it('gives a signed-in person on a public session a short address with no ticket, asking nothing', async () => {
+  fetchMock.mockImplementation(async () => catalog(['q1', 'q2']));
+  renderCard(ACCOUNT, POOL);
+  const prompt = await copy();
+  const address = prompt.match(/^https:\/\/worker\.example\/agent\/interview-catalog\S*$/m)?.[0] || '';
+  expect(address).toBe(
+    `https://worker.example/agent/interview-catalog?slug=demo&sessionUrl=${encodeURIComponent('http://localhost/')}`,
+  );
+  expect(address.length).toBeLessThan(200);
+  expect(prompt).not.toContain('The link is private to me');
+  expect(ticketMock).not.toHaveBeenCalled();
+});
+
+it('gives a signed-in person’s AI a private catalog link on a private session, asking them to sign in once', async () => {
   ticketMock.mockResolvedValue({ ticket: 'ic1.mine', expiresAtMs: Date.now() + 60 * 60 * 1000 });
   renderCard();
   const prompt = await copy();
   expect(prompt).toContain('&ticket=ic1.mine');
   expect(prompt).toContain('The link is private to me');
   expect(ticketMock).toHaveBeenCalledWith(expect.objectContaining({ sessionSlug: 'demo', prompt: true, fresh: false }));
-  // The check read the catalog the AI will read.
-  expect(new URL(String(fetchMock.mock.calls[0][0])).searchParams.get('ticket')).toBe('ic1.mine');
+  // The check read the catalog the AI will read, after the read without a ticket was refused.
+  expect(fetchMock.mock.calls.map(([input]) => new URL(String(input)).searchParams.get('ticket'))).toEqual([
+    null,
+    'ic1.mine',
+  ]);
+});
+
+it('asks for a ticket where the public catalog leaves out questions the person sees, as their group’s', async () => {
+  fetchMock.mockImplementation(async (input) =>
+    catalog(new URL(String(input)).searchParams.get('ticket') ? ['q1', 'q2'] : ['q1']),
+  );
+  ticketMock.mockResolvedValueOnce({ ticket: 'ic1.mine', expiresAtMs: Date.now() + 60 * 60 * 1000 });
+  renderCard(ACCOUNT, POOL);
+  expect(await copy()).toContain('&ticket=ic1.mine');
 });
 
 it('still offers a signed-out visitor’s prompt when the person declines to sign in', async () => {
+  fetchMock.mockImplementation(async () => catalog(['q1']));
   ticketMock.mockRejectedValue(new Error('Declined'));
-  renderCard();
+  renderCard(ACCOUNT, POOL);
   const prompt = await copy();
+  expect(ticketMock).toHaveBeenCalled();
   expect(prompt).not.toContain('ticket=');
   expect(prompt).toContain('/agent/interview-catalog?slug=demo');
 });
@@ -88,12 +127,13 @@ it('on a session that needs a sign-in, asks again only when the person presses R
 });
 
 it('asks only once wherever the card shows, as when Back brings it back', async () => {
+  fetchMock.mockImplementation(async () => catalog(['q1']));
   ticketMock.mockRejectedValue(new Error('Declined'));
-  const first = renderCard();
+  const first = renderCard(ACCOUNT, POOL);
   await copy();
   expect(ticketMock).toHaveBeenLastCalledWith(expect.objectContaining({ prompt: true }));
   first.unmount();
-  renderCard();
+  renderCard(ACCOUNT, POOL);
   await copy();
   expect(ticketMock).toHaveBeenCalledTimes(2);
   expect(ticketMock).toHaveBeenLastCalledWith(expect.objectContaining({ prompt: false }));

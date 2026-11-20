@@ -328,9 +328,16 @@ The copied prompt tells the AI:
 
 Without a sign-in, the catalog includes only questions the Worker can read
 through the session's existing public access checks. For someone signed in, the
-page first gets a catalog ticket from the Worker and adds it to the copied link
-as `&ticket=…`, so their AI reads the questions that person may see, those shown
-only to their groups included, and the groups they could join and haven't. A
+page reads the catalog without a ticket first. Only when that read is refused,
+as on a private session, or leaves out questions the page shows them, such as
+their group's, does it get a catalog ticket from the Worker, and it keeps the
+ticket only where it opens the catalog or adds some of those questions. Then
+it adds it to the copied link as `&ticket=…`, so their AI reads the questions
+that person may see and the groups they could join and haven't. Elsewhere the
+address stays short enough for a chat AI's fetch tool, and nobody is asked to
+sign in for it; their AI then sees the groups a visitor could join, which may
+include their own. The suggestions prompt in the **Your AI agent** box has no
+question list to compare, so on a public session it never carries a ticket. A
 ticket lasts an hour at most and never past their sign-in, and signing out of
 the page doesn't end one already copied. The page renews it quietly ten
 minutes before it ends, or as it ends when their sign-in ends sooner, and

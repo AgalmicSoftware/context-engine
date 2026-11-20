@@ -75,12 +75,8 @@ export const useSessionPrefillKickoff = ({
 
   if (!activeWorkerUrl) return { ready: Boolean(workerUrl) || resolved.key === sessionSlug, kickoff: null };
   const sessionUrl = givenSessionUrl || buildInterviewReturnSessionUrl();
-  const questionPriority = questionPool
-    ? buildInterviewQuestionPriority(
-        normalizeInterviewQuestions(sortInterviewQuestionPoolNewestFirst(questionPool)),
-        existingResponseSlice,
-      )
-    : undefined;
+  const questions = questionPool ? normalizeInterviewQuestions(sortInterviewQuestionPoolNewestFirst(questionPool)) : [];
+  const questionPriority = questionPool ? buildInterviewQuestionPriority(questions, existingResponseSlice) : undefined;
   const buildKickoff = (catalogTicket = '') =>
     buildExternalInterviewKickoff({
       workerUrl: activeWorkerUrl,
@@ -92,8 +88,9 @@ export const useSessionPrefillKickoff = ({
       note,
     });
   const accountKey = String(account || '').toLowerCase();
-  // Someone signed in gets a ticket in their prompt, so their AI reads the questions they may see. They're
-  // asked to sign in to the session once; declining still offers what a signed-out visitor's AI may read.
+  // Someone signed in gets a ticket in their prompt only when the catalog without one leaves out questions they
+  // may see, as on a private session. They're asked to sign in to the session once; declining still offers what
+  // a signed-out visitor's AI may read.
   const validateKickoff = async ({ retry }: { retry: boolean }) => {
     const askKey = [activeWorkerUrl, sessionSlug, accountKey].join('\n');
     const prompt = retry || !askedForTicket.has(askKey);
@@ -128,6 +125,7 @@ export const useSessionPrefillKickoff = ({
         sessionSlug,
         sessionUrl,
         ticket,
+        questionIds: questions.map((question) => question.id),
       });
       return { prompt: buildKickoff(catalogTicket), renewAtMs: catalogTicket ? renewAtMs : 0 };
     } catch (error) {

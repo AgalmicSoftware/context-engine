@@ -221,51 +221,130 @@ describe('verifyInterviewKickoffCatalog', () => {
     sessionSlug: 'demo',
     prefillPromptVersion: 'ce-interview-brief-v6',
   };
-  const verify = (fetchImpl: typeof fetch, ticket?: (request: { fresh: boolean }) => Promise<string>) =>
+  const verify = (
+    fetchImpl: typeof fetch,
+    ticket?: (request: { fresh: boolean }) => Promise<string>,
+    questionIds?: string[],
+  ) =>
     verifyInterviewKickoffCatalog({
       workerUrl: 'https://worker.example.test/',
       sessionSlug: 'demo',
       sessionUrl: 'https://client.example.test/session/demo',
       fetchImpl,
       ticket,
+      questionIds,
     });
   const refusal = (status: number, reason: string) => new Response(JSON.stringify({ error: 'No', reason }), { status });
-  const ticketIn = (fetchImpl: jest.Mock, call: number) =>
+  const ticketIn = (fetchImpl: { mock: { calls: unknown[][] } }, call: number) =>
     new URL(String(fetchImpl.mock.calls[call][0])).searchParams.get('ticket');
+  const listing = (...ids: string[]) =>
+    new Response(JSON.stringify({ ...catalog, questions: ids.map((id) => ({ id, prompt: id, type: 'freeform' })) }));
+  // A private session: refused without a ticket, read with one.
+  const privateWorker = () =>
+    jest.fn(async (input: RequestInfo | URL) =>
+      new URL(String(input)).searchParams.get('ticket')
+        ? new Response(JSON.stringify(catalog))
+        : refusal(403, 'private_session_invite_required'),
+    );
 
-  it('resolves to the ticket the catalog took, or none without one', async () => {
-    const fetchImpl = jest.fn(async () => new Response(JSON.stringify(catalog)));
-    await expect(verify(fetchImpl, async () => 'ic1.mine')).resolves.toBe('ic1.mine');
-    expect(ticketIn(fetchImpl, 0)).toBe('ic1.mine');
-    await expect(verify(fetchImpl)).resolves.toBe('');
-    expect(ticketIn(fetchImpl, 1)).toBeNull();
+  it('gives a signed-in person on a public session a prompt with no ticket, without asking them to sign in', async () => {
+    const fetchImpl = jest.fn(async () => listing('q1', 'q2'));
+    const ticket = jest.fn(async () => 'ic1.mine');
+    await expect(verify(fetchImpl, ticket, ['q1', 'q2'])).resolves.toBe('');
+    await expect(verify(fetchImpl, ticket)).resolves.toBe('');
+    expect(ticket).not.toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect([ticketIn(fetchImpl, 0), ticketIn(fetchImpl, 1)]).toEqual([null, null]);
+  });
+
+  it('uses a ticket where the read without one leaves the person short', async () => {
+    // A private session refuses the read without one.
+    const closed = privateWorker();
+    await expect(verify(closed, async () => 'ic1.mine')).resolves.toBe('ic1.mine');
+    expect([ticketIn(closed, 0), ticketIn(closed, 1)]).toEqual([null, 'ic1.mine']);
+    const signInFirst = jest
+      .fn()
+      .mockResolvedValueOnce(refusal(404, 'sign_in_required'))
+      .mockResolvedValueOnce(new Response(JSON.stringify(catalog)));
+    await expect(verify(signInFirst, async () => 'ic1.mine')).resolves.toBe('ic1.mine');
+    // A public session that lists fewer questions than this page shows them, such as their group's.
+    const partial = jest.fn(async (input: RequestInfo | URL) =>
+      new URL(String(input)).searchParams.get('ticket') ? listing('q1', 'q2') : listing('q1'),
+    );
+    await expect(verify(partial, async () => 'ic1.mine', ['q1', 'q2'])).resolves.toBe('ic1.mine');
     // A person whose ticket couldn't be had is checked as a signed-out visitor.
-    await expect(verify(fetchImpl, async () => '')).resolves.toBe('');
-    expect(ticketIn(fetchImpl, 2)).toBeNull();
+    await expect(verify(partial, async () => '', ['q1', 'q2'])).resolves.toBe('');
+    // A Worker that is down or busy is not a reason to ask anyone to sign in.
+    const ticket = jest.fn(async () => 'ic1.mine');
+    await expect(
+      verify(
+        jest.fn(async () => refusal(503, '')),
+        ticket,
+      ),
+    ).rejects.toThrow('Could not check this session’s Worker');
+    await expect(
+      verify(
+        jest.fn(async () => new Response('{}', { status: 429 })),
+        ticket,
+      ),
+    ).rejects.toThrow('Could not check this session’s Worker');
+    expect(ticket).not.toHaveBeenCalled();
+  });
+
+  it('keeps the short address wherever a ticket would add nothing', async () => {
+    const ticket = jest.fn(async () => 'ic1.mine');
+    // The Worker serves q2 to no one, as past its cap or hidden: the ticket adds nothing.
+    const neverServed = jest.fn(async () => listing('q1'));
+    await expect(verify(neverServed, ticket, ['q1', 'q2'])).resolves.toBe('');
+    expect(neverServed).toHaveBeenCalledTimes(2);
+    // A ticketed read that fails leaves the good read without one.
+    const busy = jest.fn(async (input: RequestInfo | URL) =>
+      new URL(String(input)).searchParams.get('ticket') ? refusal(503, '') : listing('q1'),
+    );
+    await expect(verify(busy, ticket, ['q1', 'q2'])).resolves.toBe('');
+    // A refusal for another reason, such as an origin the session doesn't allow, asks no one to sign in.
+    ticket.mockClear();
+    await expect(
+      verify(
+        jest.fn(async () => new Response('{}', { status: 403 })),
+        ticket,
+      ),
+    ).rejects.toThrow('Could not check this session’s Worker');
+    expect(ticket).not.toHaveBeenCalled();
+    // Without a ticket to be had, the catalog is read only once.
+    const once = jest.fn(async () => listing('q1'));
+    await expect(verify(once, async () => '', ['q1', 'q2'])).resolves.toBe('');
+    expect(once).toHaveBeenCalledTimes(1);
   });
 
   it('swaps a ticket the Worker refused for a fresh one, once', async () => {
     const fetchImpl = jest
       .fn()
+      .mockResolvedValueOnce(refusal(403, 'private_session_invite_required'))
       .mockResolvedValueOnce(refusal(401, 'catalog_ticket_invalid'))
       .mockResolvedValueOnce(new Response(JSON.stringify(catalog)));
     const ticket = jest.fn(async ({ fresh }: { fresh: boolean }) => (fresh ? 'ic1.fresh' : 'ic1.held'));
     await expect(verify(fetchImpl, ticket)).resolves.toBe('ic1.fresh');
     expect(ticket.mock.calls).toEqual([[{ fresh: false }], [{ fresh: true }]]);
-    expect([ticketIn(fetchImpl, 0), ticketIn(fetchImpl, 1)]).toEqual(['ic1.held', 'ic1.fresh']);
+    expect([1, 2].map((call) => ticketIn(fetchImpl, call))).toEqual(['ic1.held', 'ic1.fresh']);
 
-    const refusedTwice = jest.fn(async () => refusal(401, 'catalog_ticket_invalid'));
+    const refusedTwice = jest.fn(async (input: RequestInfo | URL) =>
+      new URL(String(input)).searchParams.get('ticket')
+        ? refusal(401, 'catalog_ticket_invalid')
+        : refusal(403, 'private_session_invite_required'),
+    );
     await expect(verify(refusedTwice, ticket)).rejects.toThrow('Could not check this session’s Worker');
-    expect(refusedTwice).toHaveBeenCalledTimes(2);
+    expect(refusedTwice).toHaveBeenCalledTimes(3);
   });
 
   it('times only the Worker, never someone signing in for a ticket', async () => {
     jest.useFakeTimers();
     try {
       // As a real fetch does, it fails at once on an aborted signal.
-      const fetchImpl = jest.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const closed = privateWorker();
+      const fetchImpl = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         if (init?.signal?.aborted) throw new Error('aborted');
-        return new Response(JSON.stringify(catalog));
+        return closed(input);
       });
       let issue: (ticket: string) => void = () => {};
       const signingIn = verify(fetchImpl, () => new Promise<string>((resolve) => (issue = resolve)));

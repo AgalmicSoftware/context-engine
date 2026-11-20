@@ -156,8 +156,23 @@ it('copies one prompt that suggests answers for this session, with no key and th
   expect(prompt).toContain(`sessionUrl=${encodeURIComponent(sessionUrl)}`);
 });
 
-it("puts a signed-in person's private catalog link in their suggestions prompt", async () => {
+it("leaves the ticket out of a signed-in person's suggestions prompt on a public session", async () => {
   ticketMock.mockResolvedValue({ ticket: 'ic1.mine', expiresAtMs: Date.now() + 60 * 60 * 1000 });
+  renderPanel();
+  const prompt = await copySuggestPrompt();
+  expect(prompt).not.toContain('ticket=');
+  expect(prompt).not.toContain('The link is private to me');
+  expect(ticketMock).not.toHaveBeenCalled();
+});
+
+it("puts a signed-in person's private catalog link in their suggestions prompt on a private session", async () => {
+  ticketMock.mockResolvedValue({ ticket: 'ic1.mine', expiresAtMs: Date.now() + 60 * 60 * 1000 });
+  // A private session lists its questions only with a ticket.
+  fetchMock.mockImplementation(async (input) =>
+    new URL(String(input)).searchParams.get('ticket')
+      ? catalog()
+      : new Response(JSON.stringify({ reason: 'private_session_invite_required' }), { status: 403 }),
+  );
   renderPanel();
   const prompt = await copySuggestPrompt();
   expect(prompt).toContain('&ticket=ic1.mine');
