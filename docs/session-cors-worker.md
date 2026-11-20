@@ -3273,7 +3273,10 @@ Signed login/bootstrap requests:
   signed-in person's own address, and on anyone else's page shows the card
   that person saved, or none. (The Worker cannot tell the card's words from
   any other `/ai` call, and its picture names a historical figure, not a
-  person, so this part is the page's rule; saving is the Worker's.)
+  person, so this part is the page's rule; saving is the Worker's.) An agent's
+  MCP keeps the same rule: `make_analysis_card` makes only the agent's own
+  account's card, with the page's prompts (`shared/userAnalysisPrompts.mjs`)
+  through `/ai`, and `show_analysis_card` saves it through `publish`.
   A card is made from its owner's answers and quotes up to three of them, so
   it goes only where those answers go. Where the session keeps each answer to
   its author and the admins (results shown as totals only, or to admins only),

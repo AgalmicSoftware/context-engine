@@ -45,10 +45,12 @@ test('the executable answers MCP over stdio and keeps one agent identity per sta
   assert.match(byId[1].result.instructions, /three ways;.*ask them first, before joining/);
   assert.match(byId[1].result.instructions, /get_interview_catalog and make_review_link/);
   assert.match(byId[1].result.instructions, /api\/agent\/skill/);
+  assert.match(byId[1].result.instructions, /offer the person you work for their card once you have answered/);
   assert.deepEqual(
     byId[2].result.tools.map((tool) => tool.name).sort(),
     ['add_context', 'add_statement', 'answer', 'ask_session_agent', 'claim_sbt', 'get_analysis_card', 'get_interview_catalog', 'get_results', 'get_session', 'join_group',
-      'join_session', 'leave_group', 'list_context', 'list_questions', 'make_review_link', 'make_sign_in_link', 'read_context', 'request_test_eth', 'set_profile', 'whoami'],
+      'join_session', 'leave_group', 'list_context', 'list_questions', 'make_analysis_card', 'make_review_link', 'make_sign_in_link', 'read_context', 'request_test_eth',
+      'set_profile', 'show_analysis_card', 'whoami'],
   );
   const whoami = byId[3].result.structuredContent;
   assert.deepEqual(byId[2].result.tools.find((tool) => tool.name === 'request_test_eth').annotations, {

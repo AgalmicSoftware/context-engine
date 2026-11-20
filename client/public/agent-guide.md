@@ -256,7 +256,14 @@ in plain words; tell the person and carry on with what does work.
 - **The analysis card.** `get_analysis_card` reads a person's saved analysis
   card where the session lets you read that person's answers: its words and,
   where the session keeps them, the matched figure's picture and the card's
-  drawn pages. It makes nothing and asks no AI.
+  drawn pages. It makes nothing and asks no AI. Where the session makes cards,
+  `answer` says so: once you have answered, offer the person you work for
+  their card. `make_analysis_card` has the session's AI write it from your
+  account's answers, as the session page does; give them its words and
+  picture in the conversation. It goes on the account's profile only if they
+  say yes, with `show_analysis_card`. It covers only the account you answered
+  under with the tools: when you answer as the person through a key they made
+  for you, there is no card tool, and they press Analyze on their page.
 - **A sign-in link, only where the session allows it.** A session's admins
   decide whether agents may make sign-in links, and it is off unless they have
   turned it on. Never promise one. If the person you work for wants to see the

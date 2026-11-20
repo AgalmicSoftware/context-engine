@@ -654,8 +654,8 @@ export async function analyzeClusterOpinions(
  */
 export async function analyzeUserOpinions(userData: unknown, opts: unknown = {}) {
   try {
-    const { default: buildUserAnalysisPrompt, USER_ANALYSIS_RESPONSE_FORMAT } =
-      await import('../../prompts/userAnalysisPrompt.js');
+    const { buildUserAnalysisPrompt, USER_ANALYSIS_RESPONSE_FORMAT } =
+      await import('@ce-shared/userAnalysisPrompts.mjs');
     const prompt = buildUserAnalysisPrompt(userData);
     const aiCallOpts = { ...withAiTaskTypeFallback(opts, 'summarize'), response_format: USER_ANALYSIS_RESPONSE_FORMAT };
     const { text: raw, generation } = await enqueueAiCallWithRetry(() =>
@@ -705,8 +705,8 @@ export async function analyzeUserOpinions(userData: unknown, opts: unknown = {})
  * @param {{name?, summary?, details?, figure?, reasoning?}} analysis - what the analysis said
  */
 export async function analyzeUserCard(userData: unknown, analysis: unknown = {}, opts: unknown = {}) {
-  const { default: buildUserAnalysisCardPrompt, USER_ANALYSIS_CARD_RESPONSE_FORMAT } =
-    await import('../../prompts/userAnalysisCardPrompt.js');
+  const { buildUserAnalysisCardPrompt, USER_ANALYSIS_CARD_RESPONSE_FORMAT } =
+    await import('@ce-shared/userAnalysisPrompts.mjs');
   const prompt = buildUserAnalysisCardPrompt(userData, asRecord(analysis));
   const aiCallOpts = {
     ...withAiTaskTypeFallback(opts, 'summarize'),

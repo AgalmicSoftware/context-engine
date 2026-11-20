@@ -1,7 +1,6 @@
-// The words on a personal analysis card, built from the AI analysis and the answers it was made from. The AI
-// chooses which answers to show by question id; every word shown from an answer is the person's own, taken
-// from the same visible answers the analysis read. A choice that is not a real answer of the right kind falls
-// back to the first answer of that kind.
+// The words on a personal analysis card, built from the AI analysis and the answers it was made from. Which
+// answers it shows is chosen in shared/analysisCardAnswers.mjs, as the MCP chooses them.
+import { chooseAnalysisCardAnswers } from '@ce-shared/analysisCardAnswers.mjs';
 
 export const ANALYSIS_CARD_TASTES = ['book', 'game', 'film', 'song'] as const;
 export type AnalysisCardTaste = (typeof ANALYSIS_CARD_TASTES)[number];
@@ -37,15 +36,10 @@ const record = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
 const flat = (value: unknown): string =>
   typeof value === 'string' || typeof value === 'number' ? String(value).replace(/\s+/g, ' ').trim() : '';
-// Quote marks differ between what a person typed and what a model copies back.
-const plain = (value: unknown): string => flat(value).replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
-const optionText = (option: unknown): string => flat(record(option).text || record(option).label || option);
 // Text the model wrote is held to a length the card can set; the card's own layout cuts it to its lines.
 const capped = (value: unknown, max: number): string => flat(value).slice(0, max).trim();
 
 export const ANALYSIS_CARD_SITE = 'contextengine.sh';
-const QUOTE_MIN = 12;
-const QUOTE_MAX = 160;
 const TITLE_MAX = 90;
 const MATCH_NOTE_MAX = 340;
 const WORK_MAX = 80;
@@ -73,76 +67,6 @@ const cardAccount = (value: unknown): string => {
 const splitFigure = (figure: string): { figureName: string; years: string } => {
   const match = figure.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
   return match ? { figureName: match[1].trim(), years: match[2].trim() } : { figureName: figure, years: '' };
-};
-
-type Pool = {
-  yesNo: Map<string, AnalysisCardYesNo>;
-  ownWords: Map<string, AnalysisCardOwnWords[]>;
-  vote: Map<string, AnalysisCardVote>;
-};
-
-const buildPool = (questions: unknown): Pool => {
-  const pool: Pool = { yesNo: new Map(), ownWords: new Map(), vote: new Map() };
-  (Array.isArray(questions) ? questions : []).forEach((entry) => {
-    const question = record(entry);
-    const id = flat(question.id);
-    const prompt = flat(question.prompt);
-    const { answer, type } = question;
-    if (!id || !prompt) return;
-    const own: AnalysisCardOwnWords[] = [];
-    if (type === 'binary' && flat(answer)) pool.yesNo.set(id, { prompt, text: flat(answer) });
-    if (type === 'freeform' && flat(answer)) own.push({ prompt, text: flat(answer), stance: '', trimmed: false });
-    if (flat(question.additionalComment)) {
-      own.push({
-        prompt,
-        text: flat(question.additionalComment),
-        stance: type === 'binary' ? flat(answer) : '',
-        trimmed: false,
-      });
-    }
-    if (own.length) pool.ownWords.set(id, own);
-    if (type === 'multichoice') {
-      const items = (Array.isArray(answer) ? answer : [answer]).map(optionText).filter(Boolean);
-      if (items.length) pool.vote.set(id, { prompt, kind: 'chose', items });
-    }
-    if (type === 'quadratic' && Array.isArray(answer) && Array.isArray(question.options)) {
-      const votes = answer.map(Number);
-      const top = Math.max(...votes);
-      const options = question.options as unknown[];
-      const items =
-        top > 0 ? votes.map((vote, index) => (vote === top ? optionText(options[index]) : '')).filter(Boolean) : [];
-      if (items.length) pool.vote.set(id, { prompt, kind: 'votes', items });
-    }
-  });
-  return pool;
-};
-
-const first = <Value>(map: Map<string, Value>): Value | null => map.values().next().value ?? null;
-
-// Whether `quote` is a run of whole words of `text`. A quote that starts or ends inside a word could turn
-// "unacceptable" into "acceptable", or "non-binding" into "binding": a hyphen or apostrophe joins a word, and so
-// do the marks some scripts write their vowels with.
-const isWholeWordsOf = (text: string, quote: string): boolean => {
-  const wordChar = /[\p{L}\p{N}\p{M}'’-]/u;
-  const joins = (a: string, b: string): boolean => wordChar.test(a) && wordChar.test(b);
-  for (let at = text.indexOf(quote); at !== -1; at = text.indexOf(quote, at + 1)) {
-    const cutsStart = joins(text[at - 1] || '', quote[0]);
-    const cutsEnd = joins(quote[quote.length - 1], text[at + quote.length] || '');
-    if (!cutsStart && !cutsEnd) return true;
-  }
-  return false;
-};
-
-const chooseOwnWords = (pool: Pool, chosen: UnknownRecord): AnalysisCardOwnWords | null => {
-  const quote = flat(chosen.quote);
-  const rows = pool.ownWords.get(flat(chosen.questionId)) || [];
-  // The shorter passage is shown only when it is word for word the person's own; otherwise their whole answer.
-  const quoted =
-    quote.length >= QUOTE_MIN && quote.length <= QUOTE_MAX
-      ? rows.find((row) => isWholeWordsOf(plain(row.text), plain(quote)))
-      : undefined;
-  if (quoted) return { ...quoted, text: quote, trimmed: true };
-  return rows[0] || first(pool.ownWords)?.[0] || null;
 };
 
 // Reads a card back from the analysis cache, keeping only well-formed parts.
@@ -199,18 +123,12 @@ export const buildAnalysisCard = (
 ): AnalysisCard | null => {
   const reply = record(analysis);
   const raw = record(reply.card);
-  const chosen = record(raw.answers);
-  const pool = buildPool(questions);
   return normalizeAnalysisCard({
     ...place,
     title: raw.title,
     matchNote: raw.matchNote,
     figure: record(reply.historicalAlignment).figure,
     tastes: raw.tastes,
-    answers: {
-      yesNo: pool.yesNo.get(flat(record(chosen.yesNo).questionId)) || first(pool.yesNo),
-      ownWords: chooseOwnWords(pool, record(chosen.ownWords)),
-      vote: pool.vote.get(flat(record(chosen.vote).questionId)) || first(pool.vote),
-    },
+    answers: chooseAnalysisCardAnswers(questions, raw.answers),
   });
 };
