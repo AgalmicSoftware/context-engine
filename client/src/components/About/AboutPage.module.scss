@@ -455,6 +455,61 @@ $modal-cta-text: var(--ce-action-submit-text);
   animation: detail-enter 220ms ease;
 }
 
+// The loop at the left and the words beside it; on a narrow screen the loop sits above the words.
+.useCaseDetail {
+  display: grid;
+  grid-template-columns: minmax(260px, 2fr) 3fr;
+  gap: 22px;
+  align-items: center;
+}
+
+.useCaseLoop {
+  // Shown first, though the words come first in the page.
+  order: -1;
+  margin: 0;
+  min-width: 0;
+}
+
+.useCaseLoopVideo {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border: 1px solid $card-border;
+  border-radius: var(--ce-radius-10);
+  background: transparent;
+}
+
+// Under the use-case buttons: what the asterisk on two of them means.
+.useCaseFootnote {
+  margin: -6px 0 0;
+  font-size: 0.82rem;
+  color: $text-color;
+  opacity: 0.85;
+}
+
+.useCaseLoopCaption {
+  margin-top: 6px;
+  font-size: 0.82rem;
+  color: $text-color;
+  opacity: 0.85;
+}
+
+.useCaseDetailText {
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .useCaseDetail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  // Stacked, the loop stays small enough that the use-case buttons above it stay in reach.
+  .useCaseLoop {
+    width: 100%;
+    max-width: 480px;
+  }
+}
+
 .useCaseDetailRow {
   display: flex;
   gap: 14px;
