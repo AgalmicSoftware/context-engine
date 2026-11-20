@@ -299,8 +299,8 @@ type CacheRefreshOptions = {
 type UnifiedCacheAggregateInput = {
   networkID?: unknown;
   viewAddressLower?: unknown;
-  /** Read this session's stores alone, not every session kept in the browser. */
-  onlySlug?: unknown;
+  /** Read the stores kept under these names alone (one session's own names), not every session in the browser. */
+  onlySlugs?: readonly unknown[];
 };
 
 type CacheNetworkBucket = UnknownRecord & {
@@ -2042,10 +2042,12 @@ class UserPage extends Component<any, any> {
     };
   };
 
-  _collectUnifiedCacheData = ({ networkID, viewAddressLower, onlySlug }: UnifiedCacheAggregateInput): unknown =>
+  _collectUnifiedCacheData = ({ networkID, viewAddressLower, onlySlugs }: UnifiedCacheAggregateInput): unknown =>
     measureSync('ce.userPage.aggregateCacheData', () => {
       const read = (name: string): NamespaceCacheSourceEntry[] =>
-        this._dgReadAll(name).filter(({ slug }) => onlySlug == null || isUserPageCacheSourceOfSession(slug, onlySlug));
+        this._dgReadAll(name).filter(
+          ({ slug }) => !onlySlugs || onlySlugs.some((own) => isUserPageCacheSourceOfSession(slug, own)),
+        );
       const surveysCaches = read('surveysCache');
       const questionsCaches = read('questionsCache');
       const sbtCaches = read('sbtCache');
@@ -2252,16 +2254,22 @@ class UserPage extends Component<any, any> {
     });
 
   /**
-   * What one session alone holds for this page's person: the page's own lists, derived the same way but from that
-   * session's stores only. The page merges every session kept in this browser, and the same question in two
-   * sessions has one id with the newest answer winning, so the merged lists cannot be sorted by session
-   * afterwards. The analysis reads these, so an answer given elsewhere never reaches this session's AI or card.
+   * What the page's own session alone holds for this page's person: the page's own lists, derived the same way
+   * but from that session's stores only. The page merges every session kept in this browser, and the same
+   * question in two sessions has one id with the newest answer winning, so the merged lists cannot be sorted by
+   * session afterwards. The analysis reads these, so an answer given elsewhere never reaches this session's AI
+   * or card. A session's stores sit under its own slug, which a route may reach by another name: both of the
+   * page's names for its session are read, and no other session's.
    */
-  deriveSessionSources = (sessionSlug: unknown): SurveySectionResult & QuestionSectionResult & SbtSectionResult => {
+  deriveSessionSources = (): SurveySectionResult & QuestionSectionResult & SbtSectionResult => {
     const viewAddressLower = String(this.props.viewAddress || '').toLowerCase();
     const networkID = this.props.network?.id != null ? this.props.network.id.toString() : '';
-    const onlySlug = String(sessionSlug || '');
-    const aggregate = this._collectUnifiedCacheData({ networkID, viewAddressLower, onlySlug }) as UnknownRecord;
+    const configured = this.props.sessionConfig?.slug;
+    const onlySlugs = [
+      this.getActiveSessionSlug(),
+      ...(typeof configured === 'string' && configured ? [configured] : []),
+    ];
+    const aggregate = this._collectUnifiedCacheData({ networkID, viewAddressLower, onlySlugs }) as UnknownRecord;
     return {
       ...(this._deriveSurveySection(aggregate, viewAddressLower, createGateAccessContext()) as SurveySectionResult),
       ...(this._deriveQuestionSection(aggregate, viewAddressLower, createGateAccessContext()) as QuestionSectionResult),

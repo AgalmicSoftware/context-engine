@@ -213,7 +213,7 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
   // this browser holds for the person, and none of the others may reach this session's AI, the analysis or the card.
   const readOwn = (): ReturnType<UserPage['deriveSessionSources']> | null => {
     try {
-      return this.deriveSessionSources(this.props.activeSessionSlug || this.props.sessionSlug || '');
+      return this.deriveSessionSources();
     } catch (error) {
       // A store that cannot be read is reported below as nothing to analyze, never by falling back to the page's lists.
       accountLog.error('[UserPage] session sources unreadable:', error);

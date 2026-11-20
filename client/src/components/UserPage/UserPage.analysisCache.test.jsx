@@ -298,6 +298,12 @@ describe('UserPage analysis cache and routing', () => {
 
   describe("only the page's own session", () => {
     const mine = '0x00000000000000000000000000000000000000aa';
+    // Each test starts with no session kept in this browser.
+    beforeEach(async () => {
+      for (const store of ['questionsCache', 'surveysCache', 'sbtCache', 'userCache']) {
+        await cacheScripts.clearCacheNamespace(store);
+      }
+    });
     const publicField = (value) => ({ value, encrypted: false, encryptionAudience: 'self', encryptedPortion: '' });
     const answer = (value, comment = '') => ({ answer: publicField(value), additional: publicField(comment) });
     const question = (id, prompt, sessionSlug) => ({ id, type: 'freeform', prompt, creator: '0xother', sessionSlug });
@@ -321,15 +327,104 @@ describe('UserPage analysis cache and routing', () => {
         'q-there': question('q-there', 'A question only in the private session', elsewhere),
       });
     };
-    const realInstance = (slug) => {
+    const realInstance = (slug, props = {}) => {
       const { instance, networkID } = makeAnalysisCacheInstance({
         viewAddress: mine,
         account: mine,
         activeSessionSlug: slug,
+        ...props,
       });
       instance.deriveSessionSources = instance.readSessionSourcesFromStores;
       return { instance, networkID };
     };
+    // Everything one session can hold for me: an answer with a comment, a survey answer, a question and a survey
+    // I made, and a group I am in.
+    const seedWholeSession = async (slug, networkID, word) => {
+      await cacheScripts.writeCache('questionsCache', slug, {
+        [networkID]: {
+          questions: {
+            'q-shared': question('q-shared', 'A question seeded in both sessions', slug),
+            'q-in-survey': question('q-in-survey', `A survey question, ${word}`, slug),
+            'q-made': { ...question('q-made', `A question I made, ${word}`, slug), creator: mine },
+          },
+          questionResponses: { 'q-shared': { [mine]: answer(`MY ANSWER ${word}`, `my comment ${word}`) } },
+        },
+      });
+      await cacheScripts.writeCache('surveysCache', slug, {
+        [networkID]: {
+          surveys: {
+            's-answered': { id: 's-answered', title: `A survey I answered, ${word}`, questionIDs: ['q-in-survey'] },
+            's-made': { id: 's-made', title: `A survey I made, ${word}`, questionIDs: ['q-in-survey'], creator: mine },
+          },
+          surveyResponses: {
+            's-answered': {
+              [mine]: { responses: [{ questionID: 'q-in-survey', ...answer(`MY SURVEY ANSWER ${word}`) }] },
+            },
+          },
+        },
+      });
+    };
+    // The group store keeps only what its own checks accept, so each session's group list is handed to the
+    // page as that store would return it: one source per session, under the session's name.
+    const withGroups = (instance, networkID, bySlug) => {
+      const readStores = instance._dgReadAll;
+      instance._dgReadAll = (name) =>
+        name !== 'sbtCache'
+          ? readStores(name)
+          : Object.entries(bySlug).map(([slug, word], index) => {
+              const group = `0xc${index}${'0'.repeat(38)}`;
+              const entry = {
+                sbtAddress: group,
+                sbtInfo: { name: `A group I am in, ${word}` },
+                mintedAddresses: [mine],
+              };
+              return { slug, data: { [networkID]: { sbtList: { [group]: entry } } } };
+            });
+    };
+    const sentToTheAi = async (instance) => {
+      await instance.analyzeUser();
+      expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+      return JSON.stringify(analyzeUserOpinions.mock.calls[0][0]);
+    };
+    const ALL_OF_IT = [
+      'MY ANSWER',
+      'my comment',
+      'MY SURVEY ANSWER',
+      'A survey I answered',
+      'A question I made',
+      'A survey I made',
+      'A group I am in',
+    ];
+
+    it.each([
+      ['its plain link', (slug) => ({ slug, props: {} })],
+      [
+        'a link that names its Worker',
+        (slug) => ({ slug, props: { sessionConfig: { slug, corsWorkerUrl: 'https://worker.example' } } }),
+      ],
+      // The route's name is not the session's own: its stores sit under the name in its config.
+      [
+        'an alias route',
+        (slug) => ({
+          slug: `${slug}-alias`,
+          props: { sessionConfig: { slug, corsWorkerUrl: 'https://worker.example' } },
+        }),
+      ],
+    ])(
+      'sends all I have in this session when it is opened by %s, and nothing from the session beside it',
+      async (_name, open) => {
+        const stores = `own-whole-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+        const { slug, props } = open(stores);
+        const { instance, networkID } = realInstance(slug, props);
+        await seedWholeSession(stores, networkID, 'HERE');
+        // The same slate, and so the same ids, in another session kept in this browser, with different answers.
+        await seedWholeSession(`${stores}-private`, networkID, 'ELSEWHERE');
+        withGroups(instance, networkID, { [stores]: 'HERE', [`${stores}-private`]: 'ELSEWHERE' });
+        const text = await sentToTheAi(instance);
+        for (const piece of ALL_OF_IT) expect(text).toContain(`${piece}${piece.startsWith('A ') ? ', HERE' : ' HERE'}`);
+        expect(text).not.toContain('ELSEWHERE');
+      },
+    );
 
     it('never sends an answer given elsewhere, even to a question both sessions share', async () => {
       const page = `own-session-${Date.now()}`;
@@ -350,10 +445,10 @@ describe('UserPage analysis cache and routing', () => {
       // which is why the analysis cannot be sorted out of the page's lists afterwards.
       const merged = instance._collectUnifiedCacheData({ networkID, viewAddressLower: mine });
       expect(JSON.stringify(merged.combinedQuestionResponses['q-shared'])).toContain('SAID IN PRIVATE');
-      const alone = instance._collectUnifiedCacheData({ networkID, viewAddressLower: mine, onlySlug: page });
+      const alone = instance._collectUnifiedCacheData({ networkID, viewAddressLower: mine, onlySlugs: [page] });
       expect(alone.combinedQuestionResponses['q-shared']).toBeUndefined();
 
-      const own = instance.deriveSessionSources(page);
+      const own = instance.deriveSessionSources();
       expect(own.questionResponseInfo.map((entry) => entry.id)).toEqual(['q-here']);
       expect(Object.keys(own.detailedQuestionResponses)).toEqual(['q-here']);
 
@@ -399,7 +494,7 @@ describe('UserPage analysis cache and routing', () => {
       });
       const merged = instance._collectUnifiedCacheData({ networkID, viewAddressLower: mine });
       expect(JSON.stringify(merged.combinedQuestionResponses['q-shared'])).toContain('WHAT I SAID IN PRIVATE');
-      const own = instance.deriveSessionSources(page);
+      const own = instance.deriveSessionSources();
       expect(own.questionResponseInfo.map((entry) => entry.id)).toEqual(['q-shared']);
       await instance.analyzeUser();
       const text = JSON.stringify(analyzeUserOpinions.mock.calls[0][0]);
