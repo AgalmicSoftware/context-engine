@@ -77388,11 +77388,17 @@ var init_sessionNames = __esm({
 });
 
 // workers/sessionCorsWorker/agentSignInStore.js
-var ADDRESS_RE4, HASH_RE, codeKey, liveKey, accountKey, passkeyKey, SWEEP_LIMIT, json6, addressOf3, refused, linkOf, operations, ACCOUNT_PREFIX, PAGE3, listAgentLinks, isAgentLinksBackup, restoreAgentLinks, dispatchAgentSignInStore, callAgentSignInStore;
+var AGENT_LINKED_MARK, agentLinkedMarkKey, ADDRESS_RE4, HASH_RE, codeKey, liveKey, accountKey, passkeyKey, SWEEP_LIMIT, json6, addressOf3, refused, linkOf, operations, ACCOUNT_PREFIX, PAGE3, listAgentLinks, isAgentLinksBackup, restoreAgentLinks, dispatchAgentSignInStore, callAgentSignInStore;
 var init_agentSignInStore = __esm({
   "workers/sessionCorsWorker/agentSignInStore.js"() {
     init_agentSignIn();
     init_sessionConfigAuthority();
+    init_sessionSlugResolution();
+    AGENT_LINKED_MARK = "linked";
+    agentLinkedMarkKey = (slug, account) => {
+      const slugPart = sessionSlugStorageKey(slug);
+      return slugPart && account ? `agentLinkAccount:${slugPart}:${account}` : "";
+    };
     ADDRESS_RE4 = /^0x[0-9a-f]{40}$/;
     HASH_RE = /^[0-9a-f]{64}$/;
     codeKey = (hash2) => `agent-signin-code:v1:${hash2}`;
@@ -78295,9 +78301,24 @@ var init_sessionBackupImport = __esm({
           );
           progress.counts.written += names2.written;
           progress.counts.skipped += names2.skipped;
+          const linkRows = snapshot.agentSignInLinks || [];
+          const markStore = budget.wrap(env.GROUP_KV);
+          for (let at = progress.agentLinkMarks || 0; at < linkRows.length; at += 1) {
+            if (budget.remaining < 8) {
+              progress.agentLinkMarks = at;
+              return pending();
+            }
+            const markKey = agentLinkedMarkKey(slug, linkRows[at].account);
+            if (!markKey) fail11("The backup\u2019s agent sign-in links could not be restored.", 409);
+            if (await markStore.get(markKey) !== AGENT_LINKED_MARK) {
+              await journalBackupImportWrite(storage, page.archiveId, "group", markKey);
+              await markStore.put(markKey, AGENT_LINKED_MARK);
+            }
+          }
+          progress.agentLinkMarks = linkRows.length;
           const links = await restoreAgentLinks(
             storage,
-            snapshot.agentSignInLinks || [],
+            linkRows,
             (key) => journalBackupImportWrite(storage, page.archiveId, "durable", key)
           );
           progress.counts.written += links.written;
@@ -109246,16 +109267,11 @@ init_workerGroups();
 var AGENT_SIGN_IN_ROUTE_PATHS = Object.freeze(Object.values(AGENT_SIGN_IN_PATHS));
 var AGENT_SIGN_IN_LIMITS = Object.freeze({ create: 24, exchange: 300, attach: 6, passkeySignIn: 200, access: 20, detach: 20 });
 var AGENT_LINK_SIGN_IN_TTL_SECONDS = 60 * 60;
-var LINKED_FLAG = "linked";
-var linkedFlagKey = (slug, account) => {
-  const slugPart = sessionSlugStorageKey(slug);
-  return slugPart && account ? `agentLinkAccount:${slugPart}:${account}` : "";
-};
 var setLinkedFlag = async (env, slug, account, linked) => {
-  const key = linkedFlagKey(slug, account);
+  const key = agentLinkedMarkKey(slug, account);
   try {
     if (!key) return;
-    if (linked) await env?.GROUP_KV?.put?.(key, LINKED_FLAG);
+    if (linked) await env?.GROUP_KV?.put?.(key, AGENT_LINKED_MARK);
     else await env?.GROUP_KV?.delete?.(key);
   } catch {
   }
@@ -109713,8 +109729,8 @@ var checkAgentSignInAtLogin = async ({ env, request, slug, address: address3, co
   if (!kept?.ok) {
     let marked = true;
     try {
-      const key = linkedFlagKey(slug, lower13(address3));
-      marked = !key || await env?.GROUP_KV?.get?.(key) === LINKED_FLAG;
+      const key = agentLinkedMarkKey(slug, lower13(address3));
+      marked = !key || await env?.GROUP_KV?.get?.(key) === AGENT_LINKED_MARK;
     } catch {
     }
     return marked ? { refusal: { status: 503, body: UNAVAILABLE3 } } : {};
@@ -109741,10 +109757,10 @@ var validateAgentSignInToken = async ({ env, payload, slug } = {}) => {
 };
 setAuthTokenRecordCheck(async ({ env, payload, slug } = {}) => {
   if (payload?.via || payload?.agentLinked === true) return validateAgentSignInToken({ env, payload, slug });
-  const key = linkedFlagKey(slug, lower13(payload?.sub));
+  const key = agentLinkedMarkKey(slug, lower13(payload?.sub));
   let flagged = false;
   try {
-    flagged = !!key && await env?.GROUP_KV?.get?.(key) === LINKED_FLAG;
+    flagged = !!key && await env?.GROUP_KV?.get?.(key) === AGENT_LINKED_MARK;
   } catch {
   }
   return flagged ? validateAgentSignInToken({ env, payload: { ...payload, agentLinked: true }, slug }) : { ok: true };
