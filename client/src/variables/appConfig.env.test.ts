@@ -199,9 +199,12 @@ describe('appConfig env-backed config', () => {
 
       expect(config.DEFAULT_CHAIN_ID).toBe(11155420);
       expect(config.CE_SESSION_SCAN_SCOPE).toBe('all');
-      expect(config.CE_SESSION_SCAN_SLUGS).toEqual(['demo-sh']);
+      expect(config.CE_SESSION_SCAN_SLUGS).toEqual(['rxc-ra-2']);
       expect(config.CE_DEMO_SESSION_SLUGS).toEqual(['demo-sh', 'demo-1', 'demo-3', 'demo-2', 'demo']);
       expect(config.POLIS_DEMO_DATA_AUTOLOAD_SLUGS).toEqual(['demo-sh', 'demo-1', 'demo-3', 'demo-2', 'demo']);
+      // The default session is a real one: no demo affordances or fixture data for it.
+      expect(config.CE_DEMO_SESSION_SLUGS).not.toContain(config.CE_SESSION_SCAN_SLUGS[0]);
+      expect(config.POLIS_DEMO_DATA_AUTOLOAD_SLUGS).not.toContain(config.CE_SESSION_SCAN_SLUGS[0]);
       expect(config.CE_ARWEAVE_DIRECT_TO_AR_IO).toBe(true);
       expect(config.CE_ARWEAVE_PREFLIGHT_SESSION_METADATA).toBe(false);
       expect(config.CE_ARWEAVE_PREFLIGHT_SBT_METADATA).toBe(false);

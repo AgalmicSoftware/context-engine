@@ -49,6 +49,8 @@ try {
     }
   }
   const page = await browser.newPage();
+  // Stay off the default session's live Worker; this step renders its own fixture.
+  await page.addInitScript(() => localStorage.setItem('ce:primarySessionSlug', 'demo-sh'));
   await page.goto(base);
   await page.evaluate(async () => {
     const React = (await import('/node_modules/.vite/deps/react.js')).default;

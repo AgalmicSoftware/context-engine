@@ -542,11 +542,11 @@ not returned by these configuration or presence reads.
 
 - `REACT_APP_CE_SESSION_SCAN_SCOPE=all`
   - Controls the default session scan mode (`active|general|list|all`).
-  - Fresh selections start at ALL; stored selections and explicit environment overrides take precedence. The public demo remains the default primary session for Tools and session links while ALL is selected.
+  - Fresh selections start at ALL; stored selections and explicit environment overrides take precedence. A new visitor's primary session for Tools and session links is `rxc-ra-2` (the first entry of the default list below) until they choose one; a remembered choice or a session named in the URL wins.
 
 - `REACT_APP_CE_SESSION_SCAN_SLUGS=slug-a,slug-b`
-  - Sets the default list-scope session slugs.
-  - The repo default is the active public demo slug, currently `demo-sh`.
+  - Sets the default list-scope session slugs; the first is a new visitor's primary session.
+  - The repo default is `rxc-ra-2` (the Reverse Alignment Salon); demo affordances stay on `REACT_APP_CE_DEMO_SESSION_SLUGS`.
 
 - `REACT_APP_CE_USER_PROFILE_SCAN_ALL_SESSIONS=false`
   - Legacy broad override for per-user deep scans.

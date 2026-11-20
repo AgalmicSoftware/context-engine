@@ -10,12 +10,14 @@ import {
 } from './publicDeploymentConfig.js';
 
 const DEFAULT_SESSION_SCAN_SCOPE = 'all';
-// Demo-like sessions that should receive public demo UI affordances. The first
-// entry is the About-page CTA target; keep older slugs in the list while links migrate.
+// Demo-like sessions that should receive public demo UI affordances; keep older
+// slugs in the list while links migrate.
 const DEFAULT_DEMO_SESSION_SLUGS = Object.freeze(['demo-sh', 'demo-1', 'demo-3', 'demo-2', 'demo']);
-// Retain the public demo as the fresh primary and initial saved-list choice;
-// the default scan scope includes all sessions.
-const DEFAULT_SESSION_SCAN_SLUGS = Object.freeze([DEFAULT_DEMO_SESSION_SLUGS[0]]);
+// A new visitor's session (the primary, and the initial saved-list choice) until they
+// choose one; a remembered choice or a session in the URL wins. Display and navigation
+// only: it is not a demo, so the demo affordances above do not apply to it.
+const DEFAULT_PRIMARY_SESSION_SLUG = 'rxc-ra-2';
+const DEFAULT_SESSION_SCAN_SLUGS = Object.freeze([DEFAULT_PRIMARY_SESSION_SLUG]);
 
 // ****************************************** BOOLEAN OPTIONS ******************************************* //
 

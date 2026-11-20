@@ -11,6 +11,7 @@ import {
   resolveMainSiteSessionSlugFromProps,
   resolveMainSiteSessionSlugFromPathToken,
 } from './routeSessionResolution.js';
+import { readStoredGlobalSessionSelection } from '../../utilities/session/globalSessionState.js';
 
 describe('routeSessionResolution', () => {
   it('resolves explicit session path slugs before Redux session state', () => {
@@ -30,6 +31,22 @@ describe('routeSessionResolution', () => {
     ).toBe('debate');
 
     expect(resolveSessionSlugFromPathToken).toHaveBeenCalledWith('DEBATE');
+  });
+
+  it("lets a session link win over a new visitor's default session", () => {
+    localStorage.clear();
+    const sessionState = readStoredGlobalSessionSelection() as unknown as Record<string, unknown>;
+    const resolve = (path: string) =>
+      resolveMainSiteSessionSlugFromProps({
+        path,
+        activeSessionSlug: String(sessionState.activeSessionSlug || ''),
+        sessionState,
+        resolveSessionSlugFromPathToken: (token) => token,
+      });
+
+    expect(resolve('/')).toBe('rxc-ra-2');
+    expect(resolve('/session/eddy26')).toBe('eddy26');
+    expect(resolve('/session/demo-sh')).toBe('demo-sh');
   });
 
   it('preserves explicit new and general session path handling', () => {
