@@ -535,15 +535,19 @@ describe('SessionVoiceModeModal', () => {
       <SessionVoiceModeModal {...baseProps} mode="interview" questionPool={[]} questionLoad="loading" />,
     );
     const status = () => screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS);
+    const none = () => screen.queryByText('No accessible questions are available for this interview.');
     expect(status()).toHaveTextContent('Loading questions…');
+    expect(none()).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Interview status: Loading questions…' })).toHaveAttribute(
       'data-tone',
       'busy',
     );
     rerender(<SessionVoiceModeModal {...baseProps} mode="interview" questionPool={[]} questionLoad="failed" />);
     expect(status()).toHaveTextContent("Questions didn't load");
+    expect(none()).not.toBeInTheDocument();
     rerender(<SessionVoiceModeModal {...baseProps} mode="interview" questionPool={[]} />);
     expect(status()).toHaveTextContent('No questions');
+    expect(none()).toBeInTheDocument();
   });
 
   it('submits reviewed values and retains edited unselected predictions only as consented metadata', async () => {
