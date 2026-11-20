@@ -79,6 +79,40 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     min-height: unset;
   }
 
+  // On a phone the embedded map takes the Results panel's whole width, and the branch's name wraps within the map
+  // rather than running off its edge. A title drawn over the circles inside its own circle gets
+  // a wash of the panel behind each line, so the rings under it do not cut through the letters.
+  @media (max-width: 768px) {
+    &.embeddedAtlas {
+      padding-left: 0;
+      padding-right: 0;
+    }
+
+    &.embeddedAtlas .debateMap .atlasViewContainer {
+      .packedAtlasTitleButton {
+        max-width: 100%;
+        padding: 6px 12px;
+        gap: 8px;
+      }
+
+      .packedAtlasTitle {
+        min-width: 0;
+        font-size: 0.95rem;
+        letter-spacing: 0;
+        overflow-wrap: break-word;
+      }
+
+      .packedNodeLabelOverCircles {
+        padding: 0 3px;
+        border-radius: var(--ce-radius-4);
+        // The Results panel's own surface, which the title's colour is chosen against in every theme.
+        background: color-mix(in srgb, var(--ce-surface-sunken) 72%, transparent);
+        -webkit-box-decoration-break: clone;
+        box-decoration-break: clone;
+      }
+    }
+  }
+
   // Embedded in Results the map sits on the theme's panel, not the dark atlas
   // page, so its view switch takes the panel's control colours: white text at
   // half strength fell to 1.05:1 on light themes.
@@ -814,6 +848,13 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
           border-radius: var(--ce-radius-0);
           font-weight: 700;
           letter-spacing: 0.01em;
+        }
+
+        // A built atlas's title, set by the page in whole words: one line each, never broken by the browser.
+        .packedNodeLabelLines {
+          display: block;
+          white-space: nowrap;
+          line-height: 1.12;
         }
 
         &.depthCenter {

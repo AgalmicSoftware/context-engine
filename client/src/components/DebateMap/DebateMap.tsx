@@ -84,6 +84,8 @@ export { buildExpandedHistoricalCaseBriefMap, buildHistoricalCaseBrief, buildHis
 import DebateMapGeneratedSummary from './DebateMapGeneratedSummary';
 import DebateMapSplit from './DebateMapSplit';
 
+import { createTextMeasurer, fitPackedAtlasCirclesToBox, fitPackedAtlasLabel } from './packedAtlasFit';
+
 const StandalonePoliticalCompass = React.lazy(() =>
   import('../DemoViews/DebateHUD/PoliticalCompassView').then((module) => ({
     default: module.StandalonePoliticalCompass,
@@ -991,7 +993,9 @@ const PackedAtlasView = ({
         }
       : getAtlasCenterNode(atlasRoot, data, rootLabel);
     const inset = isMobile ? 12 : 18;
-    const headerHeight = atlasRoot ? (compactHeader ? 96 : isMobile ? 34 : 28) : 0;
+    // On a narrow phone the branch's name has its own row under "Up Level": beside it, a long name had room for
+    // a few letters a line.
+    const headerHeight = atlasRoot ? (compactHeader ? 142 : isMobile ? 34 : 28) : 0;
     const desiredTopGutter = atlasRoot ? (isMobile ? 10 : 8) : isMobile ? 14 : 18;
     const packLayout = d3Pack()
       .size([Math.max(dimensions.w - inset * 2, 1), Math.max(dimensions.h - inset * 2 - headerHeight, 1)])
@@ -1008,15 +1012,28 @@ const PackedAtlasView = ({
     const packedRoot = packLayout(hierarchy);
 
     const layoutNodes = packedRoot.descendants().filter((node: any) => node.depth > 0);
-    const verticalLift = getPackedAtlasVerticalLiftPx(layoutNodes, desiredTopGutter);
+    // On a phone a built atlas's circles are grown to the panel's width, so their titles have room.
+    const phoneFit =
+      readOnly && isMobile
+        ? fitPackedAtlasCirclesToBox(
+            layoutNodes.filter((node: { depth: number }) => node.depth === 1),
+            {
+              width: Math.max(dimensions.w - inset * 2, 1),
+              height: Math.max(dimensions.h - inset * 2 - headerHeight - desiredTopGutter, 1),
+            },
+          )
+        : null;
+    const verticalLift = phoneFit ? 0 : getPackedAtlasVerticalLiftPx(layoutNodes, desiredTopGutter);
 
     const nodes: AtlasRenderNode[] = layoutNodes
       .map((node: any) =>
         buildAtlasRenderNode(node.data, atlasRoot, node.depth, {
           isCenter: false,
-          x: node.x + inset,
-          y: node.y + inset + headerHeight - verticalLift,
-          r: node.r,
+          x: phoneFit ? node.x * phoneFit.scale + phoneFit.dx + inset : node.x + inset,
+          y: phoneFit
+            ? node.y * phoneFit.scale + phoneFit.dy + inset + headerHeight + desiredTopGutter
+            : node.y + inset + headerHeight - verticalLift,
+          r: phoneFit ? node.r * phoneFit.scale : node.r,
           groupId: getPackedAtlasGroupId(node),
         }),
       )
@@ -1031,6 +1048,21 @@ const PackedAtlasView = ({
     () => new Map(layout.nodes.map((node) => [String(node.id || '').trim(), node])),
     [layout.nodes],
   );
+  // A built atlas's titles are measured in the body font they are drawn in. Read again with the layout, so a
+  // theme's font is picked up when the panel next lays out.
+  const measureTitle = useMemo(
+    () =>
+      createTextMeasurer(
+        readOnly && typeof window !== 'undefined'
+          ? window.getComputedStyle(document.documentElement).getPropertyValue('--ce-font-body').trim()
+          : '',
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [layout.nodes, readOnly],
+  );
+  // Each title is fitted once per layout, not again on every hover. A new measurer starts the fits afresh.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fittedTitles = useMemo(() => new Map<string, ReturnType<typeof fitPackedAtlasLabel>>(), [measureTitle]);
 
   return (
     <div ref={containerRef} className={`${styles.atlasViewContainer} ${styles.packedAtlasViewContainer}`}>
@@ -1047,7 +1079,7 @@ const PackedAtlasView = ({
       {packedTitle && (
         <div
           className={styles.packedAtlasTitleRow}
-          style={compactHeader ? { top: 20, left: 148, right: 8, width: 'auto', transform: 'none' } : undefined}
+          style={compactHeader ? { top: 68, left: 8, right: 8, width: 'auto', transform: 'none' } : undefined}
         >
           <button
             type="button"
@@ -1082,6 +1114,24 @@ const PackedAtlasView = ({
           readOnly && node.hierarchyDepth === 1 ? 14 : 0,
           getPackedAtlasLabelFontSizePx(node, diameter, alwaysVisible),
         );
+        // A built atlas's title is set in whole words at the largest size that fits its circle; where even a
+        // small size cannot hold a word whole, the browser breaks it as before.
+        const fittedLabel =
+          readOnly && alwaysVisible
+            ? (() => {
+                const key = `${node.name || ''}|${diameter}|${labelFontSizePx}`;
+                if (!fittedTitles.has(key)) {
+                  fittedTitles.set(
+                    key,
+                    fitPackedAtlasLabel(node.name || '', diameter, {
+                      maxFontPx: labelFontSizePx,
+                      measure: measureTitle,
+                    }),
+                  );
+                }
+                return fittedTitles.get(key) || null;
+              })()
+            : null;
         const activateNode = () => {
           const clickTarget = getPackedAtlasClickTarget(node, layoutNodeMap);
           if (clickTarget) handleAtlasNodeClick(clickTarget);
@@ -1129,13 +1179,34 @@ const PackedAtlasView = ({
               <div
                 className={`${styles.nodeLabel} ${styles.packedNodeLabel} ${alwaysVisible ? styles.alwaysVisible : ''}`}
                 style={{
-                  fontSize: `${labelFontSizePx}px`,
+                  fontSize: `${fittedLabel ? fittedLabel.fontSizePx : readOnly && alwaysVisible ? Math.min(labelFontSizePx, 10) : labelFontSizePx}px`,
                   color: readOnly ? 'var(--ce-panel-text)' : undefined,
                   fontFamily: readOnly ? 'var(--ce-font-body)' : undefined,
                   inset: readOnly ? '6%' : undefined,
                 }}
               >
-                {node.name}
+                {fittedLabel ? (
+                  <span className={styles.packedNodeLabelLines}>
+                    {/* One element holds the whole title, a space before each break, so its text reads as written. */}
+                    <span
+                      className={
+                        Array.isArray(node.children) && node.children.length > 0
+                          ? styles.packedNodeLabelOverCircles
+                          : undefined
+                      }
+                    >
+                      {fittedLabel.lines.map((line, index) => (
+                        <React.Fragment key={`${index}-${line}`}>
+                          {index > 0 ? ' ' : null}
+                          {index > 0 ? <br /> : null}
+                          {line}
+                        </React.Fragment>
+                      ))}
+                    </span>
+                  </span>
+                ) : (
+                  node.name
+                )}
               </div>
             </div>
           </div>
