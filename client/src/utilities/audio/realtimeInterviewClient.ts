@@ -40,6 +40,17 @@ const trim = (value: unknown) => String(value == null ? '' : value).trim();
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
+// GPT-Live may hand a request off, but nothing here takes one. A silent note tells it to answer itself, and
+// an empty spoken part closes the hand-off, which otherwise stays open and stalls the voice. Nothing in it is
+// for the voice to say: it has read out words about tasks before.
+export const REALTIME_INTERVIEW_HANDOFF_ANSWER: ReadonlyArray<{ type: string; content: string }> = [
+  {
+    type: 'session.thinking.append',
+    content: 'Answer it yourself from your instructions and the conversation so far, then go on with the interview.',
+  },
+  { type: 'session.commentary.append', content: '' },
+];
+
 export const REALTIME_INTERVIEW_OPENING_INSTRUCTION =
   'Begin immediately with the opening question specified in your session instructions, or one directly relevant session question. No greeting or preamble. Then listen.';
 
@@ -265,14 +276,8 @@ export const startSessionRealtimeInterview = async ({
     } else if (event.type === 'session.delegation.created' && live) {
       const id = asRecord(event.delegation).id;
       if (typeof id === 'string' && channel?.readyState === 'open')
-        channel.send(
-          JSON.stringify({
-            type: 'session.commentary.append',
-            delegation_id: id,
-            content:
-              'This interview only collects responses. No external task was performed. Drafts will be prepared after the responder stops the interview. Continue asking the interview questions.',
-          }),
-        );
+        for (const { type, content } of REALTIME_INTERVIEW_HANDOFF_ANSWER)
+          channel.send(JSON.stringify({ type, delegation_id: id, content }));
     }
     let changed = false;
     if (

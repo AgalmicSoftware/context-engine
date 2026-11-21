@@ -131,6 +131,46 @@ describe('interview connection lifecycle', () => {
     await session.stop();
   });
 
+  it('answers a hand-off with a silent note and an empty spoken part, so there is nothing to read out', async () => {
+    const h = harness();
+    const session = await h.start();
+    h.channel.send.mockClear();
+    h.channel.emit({
+      type: 'session.delegation.created',
+      delegation: { id: 'del_1', type: 'delegation', target: 'client' },
+    });
+    const sent = h.channel.send.mock.calls.map(([data]) => JSON.parse(data));
+    expect(sent).toEqual([
+      {
+        type: 'session.thinking.append',
+        delegation_id: 'del_1',
+        content:
+          'Answer it yourself from your instructions and the conversation so far, then go on with the interview.',
+      },
+      { type: 'session.commentary.append', delegation_id: 'del_1', content: '' },
+    ]);
+    // The voice read the old answer aloud; nothing it is given now speaks of tasks or collecting responses.
+    expect(JSON.stringify(sent)).not.toMatch(/task|collect|responses|drafts/i);
+    await session.stop();
+  });
+
+  it('answers no hand-off once the channel has closed, or on a Realtime session', async () => {
+    const delegation = { type: 'session.delegation.created', delegation: { id: 'del_2', target: 'client' } };
+    const live = harness();
+    const liveSession = await live.start();
+    live.channel.send.mockClear();
+    live.channel.readyState = 'closed';
+    live.channel.emit(delegation);
+    expect(live.channel.send).not.toHaveBeenCalled();
+    await liveSession.stop();
+    const realtime = harness('realtime');
+    const realtimeSession = await realtime.start();
+    realtime.channel.send.mockClear();
+    realtime.channel.emit(delegation);
+    expect(realtime.channel.send).not.toHaveBeenCalled();
+    await realtimeSession.stop();
+  });
+
   it('can steer an active Live session without reopening it, and rejects paused or stale updates', async () => {
     const h = harness();
     const session = await h.start();
