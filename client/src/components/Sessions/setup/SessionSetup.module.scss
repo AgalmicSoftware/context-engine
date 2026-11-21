@@ -1,3 +1,5 @@
+@use 'scss/compactAddRow' as compactAddRow;
+
 /* @file SessionSetup.module.scss: the one-page setup and edit layout. */
 
 // Sits inside the wizard's .groupWizard, which sets the width and gutters.
@@ -594,5 +596,42 @@ a.button {
 
   .sectionHeader {
     align-items: flex-start;
+  }
+}
+
+// The files-and-links add box, in the look of the question tools' own: the same panel colours, and the very
+// same rules for the one-line "Add URL | Paste | Upload | +" row (scss/_compactAddRow.scss), with this page's
+// rows under it and this page's font.
+.contextAddBox {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-authoring-panel-bg);
+  color: var(--ce-authoring-panel-text);
+
+  @include compactAddRow.rules;
+
+  // The tool spaces its row from a text box above it; here the label is above.
+  .addSourceControls {
+    margin-top: 0;
+  }
+}
+
+.contextAddTitle {
+  min-height: 38px;
+}
+
+.contextAddFile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+
+  > span:first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-weight: 600;
   }
 }

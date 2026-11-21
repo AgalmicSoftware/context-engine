@@ -625,7 +625,6 @@ const SessionSettingsPage = ({
                 sessionSlug={sessionSlug}
                 sessionConfig={saved}
                 account={account}
-                pageLinks={normalizeSessionContext(saved?.sessionContext).links}
                 onSourcesChange={setContextSources}
               />
             </>

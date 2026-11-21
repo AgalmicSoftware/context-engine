@@ -102,7 +102,10 @@ describe('surveyGeneratorHelpers', () => {
     // The session document view sits on the same panel, so its inverse-coloured parts take the panel's text colour.
     expect(scss).toMatch(/\.viewModeShell\s*{[\s\S]*?--ce-text-inverse:\s*#\{\$text-color\};/);
     expect(scss).toMatch(/\$question-background:\s*var\(--ce-authoring-section-bg\);/);
-    expect(scss).toMatch(/\.urlInputField\s*{[\s\S]*?background:\s*var\(--ce-authoring-input-bg\)\s*!important;/);
+    // The add row's rules live in a partial the generator includes, shared with the session's add box.
+    expect(scss).toContain('@include compactAddRow.rules;');
+    const addRow = fs.readFileSync(path.join(__dirname, '../../../scss/_compactAddRow.scss'), 'utf8');
+    expect(addRow).toMatch(/\.urlInputField\s*{[\s\S]*?background:\s*var\(--ce-authoring-input-bg\)\s*!important;/);
     expect(scss).toMatch(/\.typeButton\s*{[\s\S]*?background:\s*var\(--ce-authoring-control-bg\);/);
     expect(scss).toMatch(/\.countInlineLabel\s*{[\s\S]*?color:\s*var\(--ce-authoring-panel-muted\);/);
     expect(scss).toMatch(/\.aiPromptToggleBtn\s*{[\s\S]*?color:\s*var\(--ce-authoring-control-text\);/);

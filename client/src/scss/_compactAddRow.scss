@@ -1,0 +1,113 @@
+// The one-row "Add URL | Paste | Upload | +" control: the question tools' add row, and the same row in a
+// session's files-and-links add box. One set of rules, so the two cannot drift apart.
+@mixin rules {
+  .addSourceControls {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .urlInputContainer {
+    flex-grow: 1;
+    flex-shrink: 1;
+    display: flex;
+    align-items: center;
+    position: relative;
+    min-width: 120px;
+    height: 38px;
+    overflow: visible;
+    border: 1px solid var(--ce-authoring-input-border);
+    border-radius: var(--ce-radius-6);
+    background: var(--ce-authoring-input-bg);
+
+    &:focus-within {
+      border-color: var(--ce-focus-ring);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-focus-ring) 25%, transparent);
+    }
+  }
+
+  .inlineImageChooser {
+    display: block;
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+
+    > div:first-child {
+      flex-wrap: nowrap;
+      gap: 0;
+    }
+
+    button {
+      min-width: 52px;
+      height: 36px;
+      padding: 0 10px;
+      border: none;
+      border-left: 1px solid var(--ce-authoring-input-border);
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+
+      &:hover {
+        background: var(--ce-authoring-control-bg);
+        transform: none;
+      }
+
+      &:focus-visible {
+        position: relative;
+        z-index: 1;
+        outline-offset: -3px;
+      }
+    }
+  }
+
+  .urlInputField {
+    flex: 1 1 auto;
+    min-width: 0;
+    background: var(--ce-authoring-input-bg) !important;
+    color: var(--ce-authoring-input-text) !important;
+    border: none !important;
+    border-radius: var(--ce-radius-6) 0 0 var(--ce-radius-6) !important;
+    padding-right: 12px !important;
+    height: 36px;
+    box-shadow: none !important;
+    outline: none;
+    /* Force consistent height */
+    &::placeholder {
+      color: var(--ce-authoring-input-placeholder);
+    }
+  }
+
+  .internalUrlAddBtn {
+    align-self: stretch;
+    flex: 0 0 40px;
+    background: transparent;
+    border: none;
+    border-left: 1px solid var(--ce-authoring-input-border);
+    border-radius: 0 var(--ce-radius-6) var(--ce-radius-6) 0;
+    color: var(--ce-authoring-control-text);
+    cursor: pointer;
+    padding: 4px 8px;
+    font-size: 0.9rem;
+    transition:
+      background 0.1s ease,
+      color 0.1s ease;
+    &:hover:not(:disabled) {
+      background: var(--ce-authoring-control-bg);
+      color: var(--ce-action-accent);
+    }
+
+    &:focus-visible {
+      position: relative;
+      z-index: 1;
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: -3px;
+    }
+
+    &:disabled {
+      color: var(--ce-authoring-control-muted);
+      cursor: not-allowed;
+    }
+  }
+}

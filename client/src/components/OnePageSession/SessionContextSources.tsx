@@ -386,13 +386,7 @@ const SessionContextSources = ({
           data-testid="ce-session-context-manage"
         >
           <h3 className={setupStyles.fieldLabel}>Manage files and links</h3>
-          <ContextSourcesPanel
-            sessionSlug={sessionSlug}
-            sessionConfig={sessionConfig}
-            account={account}
-            pageLinks={pageLinks}
-            list={list}
-          />
+          <ContextSourcesPanel sessionSlug={sessionSlug} sessionConfig={sessionConfig} account={account} list={list} />
         </div>
       ) : null}
     </>

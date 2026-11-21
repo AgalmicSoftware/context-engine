@@ -105,7 +105,10 @@ may have the AI read it once (see [PDFs and images](#pdfs-and-images)).
   questions**, uploads the transcript as a text file when the questions submit.
 - **Settings (`/session/<slug>/settings`)** and **the session page's Context
   section** (for admins) list the sources with their privacy and what the AI
-  has of each. **Add a link**, **Add a file**, **Refresh** (a link),
+  has of each. One box adds: a link's address, then **+** (or Enter), or
+  **Upload** to choose a file and **Add file** to add it; its **Visible to**
+  choice applies to whichever is added next, and each Add names who it is for
+  (a link takes everyone or admins only). Adding, **Refresh** (a link),
   **Read with AI** (a PDF or image) and **Remove** apply at once; they are not part of
   **Save**. Removing a file also removes the AI's reading of it.
 
