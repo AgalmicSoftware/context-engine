@@ -36,6 +36,7 @@ export const WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
   'adminAddress',
   'adminAddresses',
   'resultsAdminAddresses',
+  'atlasQuestionSummaries',
   'corsWorkerUrl',
   'allowOrigins',
   'sessionModeProfile',
@@ -98,6 +99,8 @@ const CONTENT_FIELDS = new Set([
   // Checked on each atlas build and read and never held in a sign-in, so
   // changing it signs no one out either.
   'resultsAdminAddresses',
+  // Read on each atlas build only, the same way.
+  'atlasQuestionSummaries',
   // Read on each interview request and never held in a sign-in, so changing
   // any interview setting, even turning interviews off, signs no one out.
   'interviewModeEnabled', 'interviewMode',

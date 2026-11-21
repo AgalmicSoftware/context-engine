@@ -788,25 +788,33 @@ describe('an atlas with question summaries, back on a released bundle', () => {
           await admin.upload({ resource: 'questions', data: JSON.stringify({ id, type: 'text', prompt: `Should towns run their own water (${digit})?`, sessionId, sessionSlug: slug }) });
           for (const client of [admin, person]) await client.upload({ resource: 'responses', data: JSON.stringify({ questionId: id, sessionSlug: slug, sessionId, answer: { value: 'Yes, locally.' } }) });
         }
+        // The session's own question summary settings: a summary without categories.
+        expect(await session.signed(current, 'set-config', { config: { atlasQuestionSummaries: { categories: 0 } } })).toEqual({ status: 200, body: { ok: true } });
         const built = await session.signed(current, 'debate-atlas/build');
         expect([built.status, built.body.error]).toEqual([200, undefined]);
         const questions = built.body.build.branches[0].topics[0].questions;
-        expect(questions.map((question) => question.analysis)).toEqual(Array(2).fill({
-          summary: 'Both want local care.', categories: [{ label: 'Local care', participantCount: 2 }], answered: 2,
-        }));
+        expect(questions.map((question) => question.analysis)).toEqual(Array(2).fill({ summary: 'Both want local care.', categories: [], answered: 2 }));
+        expect(built.body.build.questionSummaries).toEqual({ listed: 2, summarised: 2, outOfTime: 0 });
         const atlas = async () => (await admin.request(`/debate-atlas?sessionSlug=${slug}`, { auth: true })).build;
         expect(await atlas()).toEqual(built.body.build);
         expect((await session.readConfig()).debateAtlasQuestionAnalysis).toBe(true);
 
         // Back on the released bundle: the same build, its summaries kept; no flag; saves go through.
+        // The setting stays stored, unread; only a save that sends it is refused there.
         const previous = session.released(bundles[ref]);
         expect(await atlas()).toEqual(built.body.build);
         expect((await session.readConfig()).debateAtlasQuestionAnalysis).toBeUndefined();
         expect(await session.signed(previous, 'set-config', { config: { sessionName: 'Renamed on the way back' } })).toEqual({ status: 200, body: { ok: true } });
+        const refused = await session.signed(previous, 'set-config', { config: { atlasQuestionSummaries: { categories: 3 } } });
+        expect([refused.status, refused.body.error]).toEqual([400, 'Unsupported worker-canonical session config field: atlasQuestionSummaries.']);
 
-        // This Worker again: the build and the edit stand.
-        session.current();
+        // This Worker again: the build, the edit and the setting stand.
+        const back = session.current();
         expect(await atlas()).toEqual(built.body.build);
+        const nextBuild = async () => (await admin.request(`/debate-atlas?sessionSlug=${slug}`, { auth: true })).nextBuild;
+        expect((await nextBuild()).questionSummaries.categories).toBe(0);
+        expect(await session.signed(back, 'set-config', { config: { atlasQuestionSummaries: null } })).toEqual({ status: 200, body: { ok: true } });
+        expect((await nextBuild()).questionSummaries.categories).toBe(5);
         expect(await session.readConfig()).toMatchObject({ sessionName: 'Renamed on the way back', debateAtlasQuestionAnalysis: true });
       } finally {
         globalThis.fetch = realFetch;

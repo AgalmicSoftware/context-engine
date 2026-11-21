@@ -298,6 +298,40 @@ test('set-config takes a group member ceiling from 1 to 10,000, and it reaches t
   }
 });
 
+test('set-config keeps atlas question summary settings within their bounds, signs no one out, and null clears them', () => {
+  const initialized = applySessionConfigMutation({ existingConfig: {}, mutation: { kind: 'set-config', incomingConfig: baseConfig }, slug: 'session-a' });
+  const save = (atlasQuestionSummaries, existingConfig = initialized.config) => applySessionConfigMutation({
+    existingConfig, mutation: { kind: 'set-config', incomingConfig: { atlasQuestionSummaries } }, slug: 'session-a',
+  });
+  const saved = save({ callSeconds: 90, categories: 0, answerChars: 200000 });
+  assert.equal(saved.ok, true, saved.error);
+  assert.deepEqual(saved.config.atlasQuestionSummaries, { callSeconds: 90, categories: 0, answerChars: 200000 });
+  assert.equal(saved.config.authzEpoch, initialized.config.authzEpoch);
+  // Builders read it with the build's prompts, not from the public config.
+  assert.equal('atlasQuestionSummaries' in projectPublicWorkerSessionConfig(saved.config), false);
+  for (const [value, error] of [
+    [{ callSeconds: 19 }, 'atlasQuestionSummaries.callSeconds must be a whole number from 20 to 120.'],
+    [{ answers: 1.5 }, 'atlasQuestionSummaries.answers must be a whole number from 1 to 1000.'],
+    [{ categories: '5' }, 'atlasQuestionSummaries.categories must be a whole number from 0 to 10.'],
+    [{ summaryChars: 1001 }, 'atlasQuestionSummaries.summaryChars must be a whole number from 100 to 1000.'],
+    [{ prompt: 'Summarise.' }, 'atlasQuestionSummaries has no setting prompt.'],
+    [[60], 'atlasQuestionSummaries must be an object.'],
+  ]) {
+    assert.deepEqual(save(value), { ok: false, status: 400, error });
+  }
+  // Saved whole: a later save replaces the earlier one, and {} keeps every default.
+  assert.deepEqual(save({ answers: 50 }, saved.config).config.atlasQuestionSummaries, { answers: 50 });
+  assert.deepEqual(save({}, saved.config).config.atlasQuestionSummaries, {});
+  assert.deepEqual(save(JSON.parse('{"__proto__": {"answers": 5}}')), { ok: false, status: 400, error: 'atlasQuestionSummaries has no setting __proto__.' });
+  const cleared = save(null, saved.config);
+  assert.equal(cleared.ok, true, cleared.error);
+  assert.equal('atlasQuestionSummaries' in cleared.config, false);
+  // A Worker-canonical session takes it too.
+  const canonical = applySessionConfigMutation({ existingConfig: profileBearingConfig, mutation: { kind: 'set-config', incomingConfig: { atlasQuestionSummaries: { answers: 50 } } }, slug: 'session-a' });
+  assert.equal(canonical.ok, true, canonical.error);
+  assert.deepEqual(canonical.config.atlasQuestionSummaries, { answers: 50 });
+});
+
 test('set-config accepts only the two context addition policies', () => {
   for (const contextAdditionPolicy of ['admin_only', 'participants']) {
     const result = applySessionConfigMutation({

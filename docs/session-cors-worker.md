@@ -610,21 +610,39 @@ Admin test panel:
   participants' answers its call read, as the whole they are part of. A branch
   of one topic shares that topic's compass. Branch calls start after every
   topic call, so a build short of time loses a branch's compass before a topic.
-  Last, one call per topic question, for at most 40 questions in topic order
-  and each within 1 minute, stores the question's `analysis`: a summary under
-  400 characters, up to 5 categories of its responses, each with a label, an
-  optional one-sentence summary and `participantCount` (one person may sit in
-  several), most held first, and `answered`; it is kept only with a summary.
-  These calls start after every topic and branch call, so they never delay
-  one, and a build short of time leaves a question without an `analysis`
-  first. Topic and branch calls read the AI sample, at most 420 responses
-  across all questions; a question's call reads every response to that
-  question the build may read (the same sanitizer), up to 200 and 60,000
-  characters, so `answered` matches Results for most sessions. The build's
-  `questionSummaries` counts the questions it shows (`listed`), those with an
-  `analysis` (`summarised`), those whose call had no time or ran out of it
-  (`outOfTime`) and those past the 40 (`overLimit`); the rest failed or kept
-  nothing. Builds from before these calls have neither field.
+  Last, one call per question listed under a topic stores that question's
+  `analysis`: a summary, the categories its responses fall into, each with a
+  label, an optional one-sentence summary and `participantCount` (one person
+  may sit in several), most held first, and `answered`; it is kept only with a
+  summary. These calls start after every topic and branch call, so they never
+  delay one, and they have no ceiling of their own: the build's 4 minutes
+  bound them, and a build short of time leaves a question without an
+  `analysis` first. How many questions there can be is set by the AI sample's
+  limit of 80 questions and the plan's 12 topics. Topic and branch calls read
+  the AI sample, at most 420 responses across all questions; a question's call
+  reads every response to that question the build may read (the same
+  sanitizer, each answer cut as in the sample), so `answered` matches Results
+  unless a setting below cuts it short. The build's `questionSummaries` counts
+  the questions it shows (`listed`), those with an `analysis` (`summarised`)
+  and those whose call had no time or ran out of it (`outOfTime`); the rest
+  failed or kept nothing. Builds from before these calls have neither field.
+  The session setting `atlasQuestionSummaries` sets these calls
+  (shared/atlasQuestionSummaries.mjs); each key is optional and a key left out
+  keeps its default: `callSeconds` (60; 20 to 120), `answers` read per
+  question (200; 1 to 1000), `answerChars`, their text in characters (60000;
+  1000 to 200000), `summaryChars` (400; 100 to 1000), `categories` (5; 0 to
+  10, 0 for none), `labelChars` (80; 20 to 120) and `categorySummaryChars`
+  (200; 0 to 400, 0 for none). An admin saves it with a signed `set-config`,
+  for example `{"atlasQuestionSummaries": {"callSeconds": 90}}`; the object is
+  saved whole, a value out of bounds or an unknown key is refused with 400,
+  and `null` puts every key back to its default. Changing it signs no one out.
+  It is not in the public config; builders see the settings a build would use
+  as `nextBuild.questionSummaries`. A stored value out of bounds is read as its
+  default. An older Worker leaves the setting stored and unread; on a
+  Worker-canonical session it refuses a save that sends it, and on other
+  sessions it saves it unchecked.
+  A question's call reads its answers in order until `answerChars` is spent,
+  cutting the answer that reaches it.
   Each sampled response reaches its topic's call and its branch's, and each
   response its question's call. The AI sees
   synthetic participant IDs only; the Worker maps them back to addresses
