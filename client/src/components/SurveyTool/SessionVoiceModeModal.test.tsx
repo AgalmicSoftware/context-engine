@@ -3722,6 +3722,8 @@ describe('SessionVoiceModeModal', () => {
 describe('Interview cancellation and recovery', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // A review an earlier test kept would come back with its prefill, whose drafts put ids in the brief.
+    window.localStorage.clear();
     jest
       .mocked(useInterviewReadiness)
       .mockReturnValue({ state: 'ready', detail: 'Voice setup ready.', retry: jest.fn() });
