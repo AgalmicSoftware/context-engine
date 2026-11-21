@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.27] - 2026-11-21
+
+The Session Agent reads a session's saved links, a shorter voice brief with a question-order choice, faster group lists in the Session Worker, MCP 0.9.2 (published at merge) and the site. Nothing a session already stores is changed.
+
+### Session Worker — needs a Worker update
+
+- **Saved links are read for the AI.** After a save that changes the session's context links, and after the Session Agent answers, the Worker reads the links saved in the session's context in the background and stores each page as a source everyone the session admits may read, as if an admin had added it. It never reads a link a participant added, a link inside a file, an answer or a question, and a redirect is held to the same rules. A link read once is not read again while it stays saved, so a source an admin removes stays removed; a link that fails waits before it is tried again. Reading never delays a reply. The new admin setting `sessionLinkReading` (on by default) sets how many links (up to 8), how long a page may take, how much of it is kept and how long a failed link waits; it is saved with a signed `set-config` and signs no one out. The Worker lists it as `session_link_reading_v1`. An older Worker reads the stored sources as ordinary rows, reads no new links, and refuses a save that sends the setting.
+- **Question order.** The new interview setting `interviewMode.questionOrder` lets the voice interviewer and the AI prefill take questions in the question pile's order (highlighted first, then the most answered) instead of newest first. The Worker lists it as `interview_question_order_v1`; voice records and prefill drafts mark it `+arranged`. An older Worker refuses every save while the order is "As the session lists them".
+- **Shorter voice brief.** The voice interviewer's brief (`ce-voice-brief-6`) has fewer fixed lines, and a hand-off is answered with nothing for the voice to read out.
+- **Faster group lists.** A session's groups are read side by side instead of one after another. This speeds the interview's group suggestions, the questions read by agents and `contextengine.sh/questions/<slug>`, and the Groups page: about 2 s instead of 9 for 22 groups, by a local run, not measured live.
+
+### MCP 0.9.2
+
+- Packaging only: no tool changes over 0.9.1. The package bundles the shared session-settings code, which now names the new link-reading setting.
+
+### Site — available when the site deploys
+
+- **Question order.** A session's interview settings offer "Question order", where the session's Worker supports it.
+- **Links read by the session.** Where a session reads its context links for the AI by itself, the link's help says so.
+- **Adding context.** Adding a file or link to a session is one compact box with a single "Visible to" choice, and a session's context links each take their own line.
+- **Session box in a tool.** In a tool, the session box stays on the Back row and shortens a long session name instead of dropping to its own row.
+- **Welcome slides on a desktop.** The slides use the window's height, so the picture is as large as on a medium screen.
+- **Deploy helper.** It deploys the 0.9.26 Worker bundles. A Worker updated from the site gets this release's.
+
 ## [0.9.26] - 2026-11-21
 
 Atlas question summaries and a faster question catalogue in the Session Worker, MCP 0.9.1 (published at merge) and the site. Nothing a session already stores is changed: atlas builds made before this release read as before.

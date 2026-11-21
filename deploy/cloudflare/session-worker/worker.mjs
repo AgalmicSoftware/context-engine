@@ -25301,6 +25301,7 @@ var init_sessionConfigEdits = __esm({
       "adminAddresses",
       "resultsAdminAddresses",
       "atlasQuestionSummaries",
+      "sessionLinkReading",
       "corsWorkerUrl",
       "allowOrigins",
       "sessionModeProfile",
@@ -25358,6 +25359,8 @@ var init_sessionConfigEdits = __esm({
       "resultsAdminAddresses",
       // Read on each atlas build only, the same way.
       "atlasQuestionSummaries",
+      // Read on each background reading of the session's saved links, the same way.
+      "sessionLinkReading",
       // Read on each interview request and never held in a sign-in, so changing
       // any interview setting, even turning interviews off, signs no one out.
       "interviewModeEnabled",
@@ -25618,8 +25621,8 @@ var init_storageRefNormalization = __esm({
         resource: opts.resource
       }, opts);
     };
-    resolvePayloadStorageRef = (record6, opts = {}) => {
-      const raw = isObj(record6) ? record6 : {};
+    resolvePayloadStorageRef = (record7, opts = {}) => {
+      const raw = isObj(record7) ? record7 : {};
       const ref = raw.storageRef ? normalizeStorageRef(raw.storageRef, {
         ...opts,
         legacyArweaveTxId: raw.arweaveTxId || raw.txId || opts.legacyArweaveTxId
@@ -25634,17 +25637,17 @@ var init_storageRefNormalization = __esm({
         resource: raw.resource || opts.resource
       });
     };
-    getLegacyArweaveTxId = (record6, opts = {}) => {
-      if (!isObj(record6)) return trim(record6);
-      const storageRef = record6.storageRef ? normalizeStorageRef(record6.storageRef, {
+    getLegacyArweaveTxId = (record7, opts = {}) => {
+      if (!isObj(record7)) return trim(record7);
+      const storageRef = record7.storageRef ? normalizeStorageRef(record7.storageRef, {
         ...opts,
-        legacyArweaveTxId: record6.arweaveTxId || record6.txId || opts.legacyArweaveTxId
+        legacyArweaveTxId: record7.arweaveTxId || record7.txId || opts.legacyArweaveTxId
       }) : null;
       if (storageRef) return isArweaveStorageBackend(storageRef.backend) ? storageRef.id : "";
-      return trim(record6.arweaveTxId || record6.txId || opts.legacyArweaveTxId);
+      return trim(record7.arweaveTxId || record7.txId || opts.legacyArweaveTxId);
     };
-    attachStorageRefCompatibilityFields = (record6, opts = {}) => {
-      const source = isObj(record6) ? { ...record6 } : {};
+    attachStorageRefCompatibilityFields = (record7, opts = {}) => {
+      const source = isObj(record7) ? { ...record7 } : {};
       const storageRef = resolvePayloadStorageRef(source, opts);
       if (!storageRef) return source;
       source.storageRef = storageRef;
@@ -26556,23 +26559,23 @@ var init_workerConfigModeValidation = __esm({
       }, {});
     };
     sessionModeValuesEqual = (left, right) => JSON.stringify(stableSessionModeValue(left)) === JSON.stringify(stableSessionModeValue(right));
-    validateEnumField = (record6, key, path, allowed) => {
-      if (!hasOwn(record6, key)) return valid();
-      const value = record6[key];
+    validateEnumField = (record7, key, path, allowed) => {
+      if (!hasOwn(record7, key)) return valid();
+      const value = record7[key];
       return typeof value === "string" && allowed.has(value) ? valid() : invalid(path);
     };
-    validateRequiredEnumField = (record6, key, path, allowed) => hasOwn(record6, key) ? validateEnumField(record6, key, path, allowed) : invalid(path);
-    validateObjectField = (record6, key, path) => {
-      if (!hasOwn(record6, key)) return { ok: true, value: null };
-      return isObj3(record6[key]) ? { ok: true, value: record6[key] } : { ok: false, path };
+    validateRequiredEnumField = (record7, key, path, allowed) => hasOwn(record7, key) ? validateEnumField(record7, key, path, allowed) : invalid(path);
+    validateObjectField = (record7, key, path) => {
+      if (!hasOwn(record7, key)) return { ok: true, value: null };
+      return isObj3(record7[key]) ? { ok: true, value: record7[key] } : { ok: false, path };
     };
-    validateExactKeys = (record6, path, allowed) => {
+    validateExactKeys = (record7, path, allowed) => {
       const allowedKeys2 = new Set(allowed);
-      const unknownKey = Object.keys(record6).find((key) => !allowedKeys2.has(key));
+      const unknownKey = Object.keys(record7).find((key) => !allowedKeys2.has(key));
       return unknownKey ? invalid(path ? `${path}.${unknownKey}` : unknownKey) : valid();
     };
-    validateRequiredObjectField = (record6, key, path, allowed) => {
-      const result = validateObjectField(record6, key, path);
+    validateRequiredObjectField = (record7, key, path, allowed) => {
+      const result = validateObjectField(record7, key, path);
       if (!result.ok || !result.value) return result.ok ? invalid(path) : result;
       const keysResult = validateExactKeys(result.value, path, allowed);
       return keysResult.ok ? result : keysResult;
@@ -26639,14 +26642,14 @@ var init_workerConfigModeValidation = __esm({
       }
       return { ok: true, sbtChainIds };
     };
-    validatePayloadAccessControl = (record6, path) => {
-      if (!isObj3(record6)) return invalid(path);
+    validatePayloadAccessControl = (record7, path) => {
+      if (!isObj3(record7)) return invalid(path);
       for (const [key, allowed] of [
         ["mode", PAYLOAD_ACCESS_MODES],
         ["gate", PAYLOAD_ACCESS_GATES],
         ["encryption", PAYLOAD_ENCRYPTION_MODES]
       ]) {
-        const result = validateEnumField(record6, key, `${path}.${key}`, allowed);
+        const result = validateEnumField(record7, key, `${path}.${key}`, allowed);
         if (!result.ok) return result;
       }
       return valid();
@@ -27850,14 +27853,14 @@ var init_deployHelperCore = __esm({
         return null;
       }
     };
-    writeDeployJournalRecord = async (binding, key, record6) => binding.put(
+    writeDeployJournalRecord = async (binding, key, record7) => binding.put(
       key,
-      JSON.stringify(record6),
+      JSON.stringify(record7),
       { expirationTtl: DEPLOYMENT_JOURNAL_TTL_SECONDS }
     );
-    writeDurableDeployJournalRecord = async (binding, key, record6) => binding.put(
+    writeDurableDeployJournalRecord = async (binding, key, record7) => binding.put(
       key,
-      JSON.stringify(record6)
+      JSON.stringify(record7)
     );
     normalizeResourceStage = (value, fallback) => {
       const normalized = toStr9(value).trim().toLowerCase();
@@ -29240,9 +29243,9 @@ var init_deployHelperCore = __esm({
       const recoveryKeyRecordPath = `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/ce-deployment-recovery-key:${deploymentId}`;
       if (envelopeKekSecretPreserved) {
         const readback = await cfFetch(apiToken, recoveryKeyRecordPath, { method: "GET" }, cfFetchOptions);
-        const record6 = readback?.data?.result || readback?.data;
-        if (readback.ok && record6?.deploymentId === deploymentId && /^[a-f0-9]{64}$/.test(record6?.fingerprint || "")) {
-          deploymentPayload.recoveryKeyFingerprint = record6.fingerprint;
+        const record7 = readback?.data?.result || readback?.data;
+        if (readback.ok && record7?.deploymentId === deploymentId && /^[a-f0-9]{64}$/.test(record7?.fingerprint || "")) {
+          deploymentPayload.recoveryKeyFingerprint = record7.fingerprint;
         } else if (!readback.ok && Number(readback.status) !== 404) {
           return buildDeploymentFailure(503, {
             error: "Could not read the preserved recovery key fingerprint; retry.",
@@ -29538,13 +29541,13 @@ var init_deployHelperCore = __esm({
           }, { fallbackEligible: true });
         }
       };
-      const buildTerminalJournalReplay = (record6) => {
-        let result2 = record6?.result;
+      const buildTerminalJournalReplay = (record7) => {
+        let result2 = record7?.result;
         if (result2?.ok !== true) return result2;
         if (result2.body?.recoveryKeyFingerprint || result2.body?.envelopeKekSecretSet || result2.body?.envelopeKekSecretPreserved) {
           result2 = { ...result2, body: { ...result2.body, keyPreserved: true } };
         }
-        const recordedFullRequestDigest = toStr9(record6?.fullRequestDigest).trim().toLowerCase();
+        const recordedFullRequestDigest = toStr9(record7?.fullRequestDigest).trim().toLowerCase();
         const fullRequestDigestMatches = recordedFullRequestDigest ? recordedFullRequestDigest === context.fullRequestDigest : context.requestDigest === context.fullRequestDigest;
         if (fullRequestDigestMatches) return result2;
         return {
@@ -29870,9 +29873,9 @@ var init_resultsAnalysisSettings = __esm({
       inputScope: "submitted",
       publication: "latest_success_visible"
     });
-    allowedKeys = (record6, keys) => {
+    allowedKeys = (record7, keys) => {
       const allowed = new Set(keys);
-      const unknown = Object.keys(record6 || {}).find((key) => !allowed.has(key));
+      const unknown = Object.keys(record7 || {}).find((key) => !allowed.has(key));
       return unknown || "";
     };
     normalizeBoolean = (value, fallback) => typeof value === "boolean" ? value : fallback;
@@ -30337,7 +30340,16 @@ var init_sessionConfigAuthority = __esm({
       configReads.forget(key.binding, key.slug);
       resultsAnalysisStatusReads.forget(key.binding, key.slug);
     };
-    KEEPS_CONFIG = /* @__PURE__ */ new Set(["current", "backup/write-revision", "backup/export", "diagnostics", "storage/publish", "worker-groups/mutate"]);
+    KEEPS_CONFIG = /* @__PURE__ */ new Set([
+      "current",
+      "backup/write-revision",
+      "backup/export",
+      "diagnostics",
+      "storage/publish",
+      "worker-groups/mutate",
+      "context-source/claim-links",
+      "context-source/settle-link"
+    ]);
     KEEPS_CONFIG_PREFIXES = ["agent-submit/", "debate-atlas/", "risk-matrix/", "results-job/", "session-feedback/", "session-agent/", "session-agent-history/", "session-names/", "agent-sign-in/"];
     keepsConfig = (path) => KEEPS_CONFIG.has(path) || KEEPS_CONFIG_PREFIXES.some((prefix) => String(path).startsWith(prefix));
     callSessionConfigCoordinator = async ({ env, slug, path, cache = false, ...payload }) => {
@@ -30422,7 +30434,7 @@ var init_workerGroupUrl = __esm({
 });
 
 // shared/interviewSettings.mjs
-var GROUP_SUGGESTION_DATA, GROUP_SUGGESTION_NEVER, GROUP_SUGGESTION_DATA_KINDS, DEFAULT_INTERVIEW_SETTINGS, MAX_HIDDEN_DRAFT_SHARE, MAX_FIDELITY_MINIMUM_PEOPLE, MAX_RECORDING_QUESTION_COUNT, RECORDING_QUESTION_TIMINGS, MAX_DATA_NOTE_CHARS, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
+var GROUP_SUGGESTION_DATA, GROUP_SUGGESTION_NEVER, GROUP_SUGGESTION_DATA_KINDS, DEFAULT_INTERVIEW_SETTINGS, INTERVIEW_QUESTION_ORDERS, MAX_HIDDEN_DRAFT_SHARE, MAX_FIDELITY_MINIMUM_PEOPLE, MAX_RECORDING_QUESTION_COUNT, RECORDING_QUESTION_TIMINGS, MAX_DATA_NOTE_CHARS, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
 var init_interviewSettings = __esm({
   "shared/interviewSettings.mjs"() {
     GROUP_SUGGESTION_DATA = Object.freeze({
@@ -30455,8 +30467,10 @@ var init_interviewSettings = __esm({
       recordingQuestionCount: 3,
       recordingQuestionTiming: "end",
       dataNote: "",
-      voiceSessionContext: false
+      voiceSessionContext: false,
+      questionOrder: "newest"
     });
+    INTERVIEW_QUESTION_ORDERS = Object.freeze(["newest", "arranged"]);
     MAX_HIDDEN_DRAFT_SHARE = 0.5;
     MAX_FIDELITY_MINIMUM_PEOPLE = 50;
     MAX_RECORDING_QUESTION_COUNT = 10;
@@ -30502,8 +30516,10 @@ var init_interviewSettings = __esm({
         recordingQuestionTiming: source.recordingQuestionTiming === "chunk" ? "chunk" : "end",
         dataNote: typeof source.dataNote === "string" ? source.dataNote.trim().slice(0, MAX_DATA_NOTE_CHARS) : "",
         // Whether the voice interviewer is given the session's context (notes, links, sources). Off until
-        // set: a long source slowed every reply, and summaries for the voice come later.
-        voiceSessionContext: source.voiceSessionContext === true
+        // set; summaries for the voice come later.
+        voiceSessionContext: source.voiceSessionContext === true,
+        // The order the interviewer and the AI prefill take questions in when nothing else points to one.
+        questionOrder: source.questionOrder === "arranged" ? "arranged" : "newest"
       };
     };
     validInterviewSettings = (value = {}) => {
@@ -30528,6 +30544,7 @@ var init_interviewSettings = __esm({
         return false;
       if (value.dataNote !== void 0 && (typeof value.dataNote !== "string" || value.dataNote.length > MAX_DATA_NOTE_CHARS))
         return false;
+      if (value.questionOrder !== void 0 && !INTERVIEW_QUESTION_ORDERS.includes(value.questionOrder)) return false;
       return [
         "autoRegenerate",
         "followNewQuestions",
@@ -30567,7 +30584,7 @@ var init_siweMessage = __esm({
 });
 
 // shared/realtimeInterviewConfig.mjs
-var GPT_LIVE_1_1_MODEL, GPT_LIVE_1_1_FEATURE, DEFAULT_REALTIME_INTERVIEW_MODEL, PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL, INTERVIEW_VOICE_CONTEXT_FEATURE, liveModels, REALTIME_INTERVIEW_MODELS, models, isRealtimeInterviewModel, isLiveInterviewModel, normalizeRealtimeInterviewModel, resolveRealtimeInterviewModel;
+var GPT_LIVE_1_1_MODEL, GPT_LIVE_1_1_FEATURE, DEFAULT_REALTIME_INTERVIEW_MODEL, PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL, INTERVIEW_VOICE_CONTEXT_FEATURE, INTERVIEW_QUESTION_ORDER_FEATURE, liveModels, REALTIME_INTERVIEW_MODELS, models, isRealtimeInterviewModel, isLiveInterviewModel, normalizeRealtimeInterviewModel, resolveRealtimeInterviewModel;
 var init_realtimeInterviewConfig = __esm({
   "shared/realtimeInterviewConfig.mjs"() {
     GPT_LIVE_1_1_MODEL = "gpt-live-1.1";
@@ -30575,6 +30592,7 @@ var init_realtimeInterviewConfig = __esm({
     DEFAULT_REALTIME_INTERVIEW_MODEL = GPT_LIVE_1_1_MODEL;
     PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL = "gpt-live-1";
     INTERVIEW_VOICE_CONTEXT_FEATURE = "interview_voice_context_v1";
+    INTERVIEW_QUESTION_ORDER_FEATURE = "interview_question_order_v1";
     liveModels = /* @__PURE__ */ new Set([GPT_LIVE_1_1_MODEL, PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL]);
     REALTIME_INTERVIEW_MODELS = Object.freeze([
       ...liveModels,
@@ -30703,7 +30721,7 @@ var init_secretText = __esm({
     TOKEN_RUN = /(?<![\w/-])[\w-]{40}(?![\w-])/g;
     HEX_KEY_HINT = "has 64 hex digits, the shape of a private key. To cite a transaction, link to it in a block explorer instead.";
     hasHexKey = (text9) => typeof text9 === "string" && HEX_KEY.test(text9);
-    looksSecret = (text9) => typeof text9 === "string" && (hasHexKey(text9) || SECRET_PATTERNS.some((pattern) => pattern.test(text9)) || (text9.match(TOKEN_RUN) || []).some((run) => /[A-Z]/.test(run) && /[a-z]/.test(run) && /\d/.test(run)));
+    looksSecret = (text9) => typeof text9 === "string" && (hasHexKey(text9) || SECRET_PATTERNS.some((pattern) => pattern.test(text9)) || (text9.match(TOKEN_RUN) || []).some((run2) => /[A-Z]/.test(run2) && /[a-z]/.test(run2) && /\d/.test(run2)));
   }
 });
 
@@ -30901,8 +30919,8 @@ var init_contextCards = __esm({
       const model = value.by === "ai" ? line(value.model, L2.modelChars) : "";
       return { ...content, by: value.by, ...at ? { at } : {}, ...model ? { model } : {} };
     };
-    parseContextCardReply = (reply5) => {
-      const raw = typeof reply5 === "string" ? reply5.trim() : "";
+    parseContextCardReply = (reply6) => {
+      const raw = typeof reply6 === "string" ? reply6.trim() : "";
       if (!raw || raw.length > L2.replyChars) return null;
       const body = raw.replace(/^```(?:json)?\s*\n/i, "").replace(/\n```$/, "").trim();
       if (!body.startsWith("{") || !body.endsWith("}")) return null;
@@ -31481,6 +31499,189 @@ var init_atlasQuestionSummaries = __esm({
   }
 });
 
+// shared/sessionContextSources.mjs
+var CONTEXT_ROLE, CONTEXT_TEXT_ROLE, CONTEXT_TAGS, CONTEXT_SOURCE_LIMITS, CONTEXT_FILE_TYPES, CONTEXT_FILE_MIMES, CONTEXT_IMAGE_MIMES, isContextImage, contextFileIsReadByAi, contextFileNoun, ADMINS_ONLY_ACCESS, text4, isRecord6, participantsMayAddContext, contextCardsOn, CONTEXT_AGENT_ADDER, NAME_CONTROLS, contextAdderProblem, groupIdList, groupLockedAccess, groupLockedIds, contextTagValue, contextRoleOf, isAdminsOnlyAccess, lockedGroupsOf, resolveContextFileType, contextFileByteLimit;
+var init_sessionContextSources = __esm({
+  "shared/sessionContextSources.mjs"() {
+    CONTEXT_ROLE = "context";
+    CONTEXT_TEXT_ROLE = "context-text";
+    CONTEXT_TAGS = Object.freeze({
+      role: "CE-DocRole",
+      kind: "CE-DocKind",
+      name: "CE-DocName",
+      mime: "CE-DocMime",
+      url: "CE-ContextUrl",
+      fetchedAt: "CE-ContextFetchedAt",
+      derivedFrom: "CE-DocDerivedFromTx",
+      readBy: "CE-ReadBy",
+      readModel: "CE-ReadModel",
+      readAt: "CE-ReadAt",
+      // Self-declared by an agent on what it adds: a label in the list, never a reason for access.
+      adderKind: "CE-AdderKind",
+      adderName: "CE-AdderName"
+    });
+    CONTEXT_SOURCE_LIMITS = Object.freeze({
+      pdfBytes: 20 * 1024 * 1024,
+      // An image as stored. Sent as base64 it is a third larger, inside what each provider takes for one image.
+      imageBytes: 5 * 1024 * 1024,
+      textFileBytes: 1024 * 1024,
+      // A linked page as fetched, before its text is taken out.
+      pageBytes: 2 * 1024 * 1024,
+      snapshotChars: 1e5,
+      // Text the session's AI returns for a PDF or an image.
+      readTextChars: 1e5,
+      titleChars: 120,
+      // A link is also a storage tag, and tag values stop at 1,024 characters.
+      urlChars: 1e3,
+      // The groups one item may be locked to; reading it checks each in turn.
+      lockedGroups: 20,
+      // An agent's display name, as long as its profile allows.
+      adderNameChars: 80,
+      // Context items one person or agent may add to a session; admins are not limited.
+      perAdder: 20
+    });
+    CONTEXT_FILE_TYPES = Object.freeze({
+      pdf: "application/pdf",
+      md: "text/markdown",
+      markdown: "text/markdown",
+      txt: "text/plain",
+      csv: "text/csv",
+      json: "application/json",
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      webp: "image/webp"
+    });
+    CONTEXT_FILE_MIMES = new Set(Object.values(CONTEXT_FILE_TYPES));
+    CONTEXT_IMAGE_MIMES = /* @__PURE__ */ new Set([CONTEXT_FILE_TYPES.png, CONTEXT_FILE_TYPES.jpeg, CONTEXT_FILE_TYPES.webp]);
+    isContextImage = (contentType) => CONTEXT_IMAGE_MIMES.has(contentType);
+    contextFileIsReadByAi = (contentType) => contentType === CONTEXT_FILE_TYPES.pdf || isContextImage(contentType);
+    contextFileNoun = (contentType) => contentType === CONTEXT_FILE_TYPES.pdf ? "PDF" : isContextImage(contentType) ? "image" : "text file";
+    ADMINS_ONLY_ACCESS = Object.freeze({
+      match: "all",
+      conditions: Object.freeze([Object.freeze({ kind: "worker_role", role: "admin" })])
+    });
+    text4 = (value) => typeof value === "string" ? value.trim() : "";
+    isRecord6 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    participantsMayAddContext = (config) => config?.contextAdditionPolicy !== "admin_only";
+    contextCardsOn = (config) => config?.contextCardsEnabled === true;
+    CONTEXT_AGENT_ADDER = "agent";
+    NAME_CONTROLS = /[\p{Cc}\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/gu;
+    contextAdderProblem = (tags) => {
+      const list2 = Array.isArray(tags) ? tags.filter(isRecord6) : [];
+      const values = (name) => list2.filter((tag2) => text4(tag2.name) === name).map((tag2) => text4(tag2.value));
+      const [kinds, names2] = [values(CONTEXT_TAGS.adderKind), values(CONTEXT_TAGS.adderName)];
+      if (kinds.length > 1 || names2.length > 1) return "An item names who added it once at most.";
+      if (kinds.length && kinds[0] !== CONTEXT_AGENT_ADDER) return 'The only mark for who added an item is "agent".';
+      if (names2.length && !kinds.length) return "Only an item an agent added carries its name.";
+      if (names2.length && (names2[0].length > CONTEXT_SOURCE_LIMITS.adderNameChars || names2[0].search(NAME_CONTROLS) >= 0)) {
+        return `An agent's name is plain text of at most ${CONTEXT_SOURCE_LIMITS.adderNameChars} characters.`;
+      }
+      return "";
+    };
+    groupIdList = (groupIds) => [...new Set((Array.isArray(groupIds) ? groupIds : []).map((id2) => text4(id2).toLowerCase()).filter(Boolean))].sort();
+    groupLockedAccess = (groupIds) => ({
+      match: "any",
+      conditions: [
+        { kind: "worker_role", role: "admin" },
+        { kind: "worker_group", groupIds: groupIdList(groupIds) }
+      ]
+    });
+    groupLockedIds = (accessConditions) => {
+      if (!isRecord6(accessConditions) || text4(accessConditions.match).toLowerCase() !== "any") return null;
+      const conditions = Array.isArray(accessConditions.conditions) ? accessConditions.conditions : [];
+      const [admin, group] = conditions;
+      const groupIds = groupIdList(group?.groupIds);
+      return conditions.length === 2 && isAdminsOnlyAccess({ match: "all", conditions: [admin] }) && isRecord6(group) && text4(group.kind).toLowerCase() === "worker_group" && Object.keys(group).every((key) => key === "kind" || key === "groupIds") && groupIds.length ? groupIds : null;
+    };
+    contextTagValue = (tags, name) => text4((Array.isArray(tags) ? tags : []).find((tag2) => isRecord6(tag2) && text4(tag2.name) === name)?.value);
+    contextRoleOf = (tags) => {
+      const role = contextTagValue(tags, CONTEXT_TAGS.role).toLowerCase();
+      return role === CONTEXT_ROLE || role === CONTEXT_TEXT_ROLE ? role : "";
+    };
+    isAdminsOnlyAccess = (accessConditions) => {
+      if (!isRecord6(accessConditions) || text4(accessConditions.match).toLowerCase() !== "all") return false;
+      const conditions = Array.isArray(accessConditions.conditions) ? accessConditions.conditions : [];
+      return conditions.length === 1 && isRecord6(conditions[0]) && text4(conditions[0].kind).toLowerCase() === "worker_role" && text4(conditions[0].role || "admin").toLowerCase() === "admin" && Object.keys(conditions[0]).every((key) => key === "kind" || key === "role");
+    };
+    lockedGroupsOf = (accessConditions) => {
+      if (!isRecord6(accessConditions) || text4(accessConditions.match).toLowerCase() !== "any") return [];
+      const conditions = Array.isArray(accessConditions.conditions) ? accessConditions.conditions : [];
+      const kindOf = (condition) => isRecord6(condition) ? text4(condition.kind).toLowerCase() : "";
+      const role = conditions.find((condition) => kindOf(condition) === "worker_role");
+      const group = conditions.find((condition) => kindOf(condition) === "worker_group");
+      const groupIds = Array.isArray(group?.groupIds) ? groupIdList(group.groupIds) : [];
+      return conditions.length === 2 && role && text4(role.role).toLowerCase() === "admin" && groupIds.length > 0 && groupIds.length <= CONTEXT_SOURCE_LIMITS.lockedGroups ? groupIds : [];
+    };
+    resolveContextFileType = ({ name = "", type = "" } = {}) => {
+      const declared = text4(type).split(";")[0].toLowerCase();
+      if (CONTEXT_FILE_MIMES.has(declared)) return declared;
+      const extension = /\.([a-z0-9]+)$/i.exec(text4(name))?.[1]?.toLowerCase() || "";
+      return Object.hasOwn(CONTEXT_FILE_TYPES, extension) ? CONTEXT_FILE_TYPES[extension] : "";
+    };
+    contextFileByteLimit = (contentType) => contentType === CONTEXT_FILE_TYPES.pdf ? CONTEXT_SOURCE_LIMITS.pdfBytes : isContextImage(contentType) ? CONTEXT_SOURCE_LIMITS.imageBytes : CONTEXT_SOURCE_LIMITS.textFileBytes;
+  }
+});
+
+// shared/sessionLinkReading.mjs
+var AFTER_REPLY_SECONDS, LINK_READ_ERROR_CHARS, SESSION_LINK_READING_SETTINGS, KEYS3, record4, inBounds2, validateSessionLinkReading, resolveSessionLinkReading, linksOf, claimSessionLinkReads, settleSessionLinkRead;
+var init_sessionLinkReading = __esm({
+  "shared/sessionLinkReading.mjs"() {
+    init_sessionContext();
+    init_sessionContextSources();
+    AFTER_REPLY_SECONDS = 30;
+    LINK_READ_ERROR_CHARS = 300;
+    SESSION_LINK_READING_SETTINGS = Object.freeze({
+      // How many of the saved links are read, in their order; 0 reads none.
+      links: Object.freeze({ default: SESSION_CONTEXT_LIMITS.links, min: 0, max: SESSION_CONTEXT_LIMITS.links }),
+      // Each page's fetch, redirects and body together. The reads run after the
+      // reply, so at most that time less 10 seconds for storing each page and its card.
+      fetchSeconds: Object.freeze({ default: 10, min: 3, max: AFTER_REPLY_SECONDS - 10 }),
+      // A page's text kept, up to the snapshot cap every context link has.
+      pageChars: Object.freeze({ default: CONTEXT_SOURCE_LIMITS.snapshotChars, min: 1e3, max: CONTEXT_SOURCE_LIMITS.snapshotChars }),
+      // A link that could not be read is not tried again sooner.
+      retryMinutes: Object.freeze({ default: 60, min: 10, max: 1440 })
+    });
+    KEYS3 = Object.keys(SESSION_LINK_READING_SETTINGS);
+    record4 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    inBounds2 = (key, value) => Number.isInteger(value) && value >= SESSION_LINK_READING_SETTINGS[key].min && value <= SESSION_LINK_READING_SETTINGS[key].max;
+    validateSessionLinkReading = (value) => {
+      if (!record4(value)) return { ok: false, error: "sessionLinkReading must be an object." };
+      const unknown = Object.keys(value).find((key) => key !== "on" && !KEYS3.includes(key));
+      if (unknown) return { ok: false, error: `sessionLinkReading has no setting ${unknown}.` };
+      if ("on" in value && typeof value.on !== "boolean") return { ok: false, error: "sessionLinkReading.on must be true or false." };
+      const wrong = KEYS3.find((key) => key in value && !inBounds2(key, value[key]));
+      if (wrong) {
+        const { min, max } = SESSION_LINK_READING_SETTINGS[wrong];
+        return { ok: false, error: `sessionLinkReading.${wrong} must be a whole number from ${min} to ${max}.` };
+      }
+      return { ok: true, value: Object.fromEntries(["on", ...KEYS3].filter((key) => key in value).map((key) => [key, value[key]])) };
+    };
+    resolveSessionLinkReading = (config) => {
+      const saved = record4(config?.sessionLinkReading) ? config.sessionLinkReading : {};
+      return {
+        on: saved.on !== false,
+        ...Object.fromEntries(KEYS3.map((key) => [key, inBounds2(key, saved[key]) ? saved[key] : SESSION_LINK_READING_SETTINGS[key].default]))
+      };
+    };
+    linksOf = (state2, sessionId) => record4(state2) && state2.sessionId === sessionId && record4(state2.links) ? state2.links : {};
+    claimSessionLinkReads = ({ state: state2, sessionId, urls, saved = urls, forget = false, retryMs, nowMs: nowMs2 }) => {
+      const kept = linksOf(state2, sessionId);
+      const links = forget ? Object.fromEntries(saved.filter((url) => record4(kept[url])).map((url) => [url, kept[url]])) : { ...kept };
+      const due = urls.filter((url) => !links[url] || links[url].ok !== true && nowMs2 - Number(links[url].at || 0) >= retryMs);
+      for (const url of due) links[url] = { at: nowMs2, ok: false, pending: true };
+      const changed = due.length > 0 || state2?.sessionId !== sessionId || Object.keys(links).length !== Object.keys(kept).length;
+      return { state: { sessionId, links }, due, changed };
+    };
+    settleSessionLinkRead = ({ state: state2, sessionId, url, ok, error, nowMs: nowMs2 }) => {
+      const links = linksOf(state2, sessionId);
+      if (!record4(links[url])) return state2;
+      const entry2 = { at: nowMs2, ok: ok === true, ...ok !== true && error ? { error: String(error).slice(0, LINK_READ_ERROR_CHARS) } : {} };
+      return { sessionId, links: { ...links, [url]: entry2 } };
+    };
+  }
+});
+
 // shared/aiDefaults.mjs
 var DEFAULT_AI_MODEL, DEFAULT_AI_MODELS, DEFAULT_ANTHROPIC_MODEL, TRANSCRIPTION_FALLBACK_MODEL, GROUP_TRANSCRIPTION_MODEL;
 var init_aiDefaults = __esm({
@@ -31592,29 +31793,29 @@ var init_aiModelParams = __esm({
 });
 
 // workers/sessionCorsWorker/aiRequestPolicy.js
-var trim2, record4, tasks, taskName, OPENAI_FAST_SERVICE_TIERS, SESSION_AI_SERVICE_TIERS, modelEntry, configuredModels, resolveSessionAiModel, AI_MODEL_NOT_ALLOWED, isSessionTranscriptionModelAllowed, operationCeilings, tokenFields, effortOrder, minimumTaskEffort, configuredFunctions, boundSessionAiRequest;
+var trim2, record5, tasks, taskName, OPENAI_FAST_SERVICE_TIERS, SESSION_AI_SERVICE_TIERS, modelEntry, configuredModels, resolveSessionAiModel, AI_MODEL_NOT_ALLOWED, isSessionTranscriptionModelAllowed, operationCeilings, tokenFields, effortOrder, minimumTaskEffort, configuredFunctions, boundSessionAiRequest;
 var init_aiRequestPolicy = __esm({
   "workers/sessionCorsWorker/aiRequestPolicy.js"() {
     init_aiDefaults();
     init_aiModelFamily();
     init_aiModelParams();
     trim2 = (value) => typeof value === "string" ? value.trim() : "";
-    record4 = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    record5 = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
     tasks = /* @__PURE__ */ new Set(["generate", "rewrite", "summarize", "rank", "analysis", "compare", "categorize", "interview-map", "interview-opening", "context-read", "context-card", "session-agent"]);
     taskName = (payload) => tasks.has(payload?.taskType) ? payload.taskType : "";
     OPENAI_FAST_SERVICE_TIERS = Object.freeze(["priority", "fast"]);
     SESSION_AI_SERVICE_TIERS = Object.freeze(["default", ...OPENAI_FAST_SERVICE_TIERS]);
     modelEntry = (entry2, provider, fallback = DEFAULT_AI_MODEL) => {
-      const obj = record4(entry2);
+      const obj = record5(entry2);
       return {
         model: trim2(obj.model || obj.name || obj.value || entry2) || fallback,
         provider: (trim2(obj.provider) || provider || "openai").toLowerCase()
       };
     };
     configuredModels = (config, task) => {
-      const ai = record4(config?.ai);
-      const models2 = record4(ai.models);
-      const providers = record4(ai.modelProviders);
+      const ai = record5(config?.ai);
+      const models2 = record5(ai.models);
+      const providers = record5(ai.modelProviders);
       const provider = trim2(ai.mode || ai.provider).toLowerCase() || "openai";
       const fallback = trim2(ai.model) || DEFAULT_AI_MODEL;
       const fast = modelEntry(models2.fast || models2.default, trim2(providers.fast || providers.default) || provider, fallback);
@@ -31631,8 +31832,8 @@ var init_aiRequestPolicy = __esm({
       reason: "ai_model_not_allowed"
     });
     isSessionTranscriptionModelAllowed = ({ config, provider, model, groupSpeakerLabels = false }) => {
-      const ai = record4(config?.ai);
-      const entry2 = record4(ai.models?.transcription || ai.transcription);
+      const ai = record5(config?.ai);
+      const entry2 = record5(ai.models?.transcription || ai.transcription);
       if (groupSpeakerLabels && provider === "openai" && model === GROUP_TRANSCRIPTION_MODEL && (trim2(entry2.provider).toLowerCase() || "openai") === "openai") return true;
       return provider === (trim2(entry2.provider).toLowerCase() || "openai") && model === (trim2(entry2.model) || TRANSCRIPTION_FALLBACK_MODEL);
     };
@@ -31680,7 +31881,7 @@ var init_aiRequestPolicy = __esm({
         return typeof value === "number" && Number.isFinite(value) && value >= 1 ? Math.floor(value) : ceiling;
       });
       const tokens = Math.min(ceiling, ...requested);
-      const ai = record4(config?.ai);
+      const ai = record5(config?.ai);
       const savedEffort = ai.taskReasoningEffort?.[task] || task === "analysis" && ai.taskReasoningEffort?.generate || ai.reasoningEffort || ai.reasoning_effort || "low";
       const sessionEffort = ["low", "medium", "high"].includes(savedEffort) ? savedEffort : "low";
       const floor = ai.taskReasoningEffort?.[task] ? "" : minimumTaskEffort[task];
@@ -31737,6 +31938,7 @@ var init_sessionConfigMutation = __esm({
     init_sessionContext();
     init_sessionAgent();
     init_atlasQuestionSummaries();
+    init_sessionLinkReading();
     init_aiRequestPolicy();
     init_aiRateLimitPolicy();
     init_sessionConfigNormalization();
@@ -32006,6 +32208,11 @@ var init_sessionConfigMutation = __esm({
           if (!summaries.ok) return { ok: false, status: 400, error: summaries.error };
           incomingConfig = { ...incomingConfig, atlasQuestionSummaries: summaries.value };
         }
+        if (hasOwn4(incomingConfig, "sessionLinkReading") && incomingConfig.sessionLinkReading !== null) {
+          const reading = validateSessionLinkReading(incomingConfig.sessionLinkReading);
+          if (!reading.ok) return { ok: false, status: 400, error: reading.error };
+          incomingConfig = { ...incomingConfig, sessionLinkReading: reading.value };
+        }
         const serviceTier = incomingConfig.ai && typeof incomingConfig.ai === "object" ? incomingConfig.ai.serviceTier : void 0;
         if (serviceTier !== void 0 && serviceTier !== null && !SESSION_AI_SERVICE_TIERS.includes(serviceTier)) {
           return { ok: false, status: 400, error: `ai.serviceTier must be one of ${SESSION_AI_SERVICE_TIERS.join(", ")}.` };
@@ -32031,6 +32238,7 @@ var init_sessionConfigMutation = __esm({
         mergedConfig = mergeWorkerConfigRecords({ existingConfig: existing, incomingConfig, slug });
         if (mergedConfig.sessionAgent === null) delete mergedConfig.sessionAgent;
         if (mergedConfig.atlasQuestionSummaries === null) delete mergedConfig.atlasQuestionSummaries;
+        if (mergedConfig.sessionLinkReading === null) delete mergedConfig.sessionLinkReading;
       } else if (kind === "set-limits") {
         const incomingLimits = mutation?.incomingLimits && typeof mutation.incomingLimits === "object" ? mutation.incomingLimits : null;
         if (!incomingLimits) return { ok: false, status: 400, error: "Missing limits." };
@@ -32689,10 +32897,13 @@ var init_workerGroups = __esm({
     listGroupRecords = async ({ store, slug, sessionId, includeDeleted = false }) => {
       const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
       if (!canonicalSessionId) throw new Error("Worker group session identity is invalid.");
-      const canonicalKeys = await kvListKeys(store.store, groupIndexPrefix({ slug, sessionId: canonicalSessionId }));
-      const legacyKeys = await kvListKeys(store.store, legacyGroupIndexPrefix({ slug }));
-      const groups = /* @__PURE__ */ new Map();
-      for (const key of canonicalKeys) {
+      const legacyPrefix = legacyGroupIndexPrefix({ slug });
+      const [canonicalKeys, legacyKeys] = await Promise.all([
+        kvListKeys(store.store, groupIndexPrefix({ slug, sessionId: canonicalSessionId })),
+        // The legacy prefix also lists every canonical key; a group id holds no ':', so those are never legacy keys.
+        kvListKeys(store.store, legacyPrefix).then((keys) => keys.filter((key) => !key.slice(legacyPrefix.length).includes(":")))
+      ]);
+      const canonical = await Promise.all(canonicalKeys.map(async (key) => {
         const groupId = await store.store.get(key);
         const normalizedGroupId = normalizeWorkerGroupId(groupId);
         if (!normalizedGroupId || key !== groupIndexKey({
@@ -32709,28 +32920,28 @@ var init_workerGroups = __esm({
           groupId: normalizedGroupId
         });
         if (!group) throw new Error("Worker group index points to a missing group.");
-        if (includeDeleted || !group.deletedAt) groups.set(normalizedGroupId, group);
-      }
-      for (const key of legacyKeys) {
+        return [normalizedGroupId, group];
+      }));
+      const legacy = await Promise.all(legacyKeys.map(async (key) => {
         let groupId;
         try {
           groupId = await store.store.get(key);
         } catch {
-          continue;
+          return null;
         }
         const normalizedGroupId = normalizeWorkerGroupId(groupId);
-        if (!normalizedGroupId || key !== legacyGroupIndexKey({ slug, groupId: normalizedGroupId })) {
-          continue;
-        }
+        if (!normalizedGroupId || key !== legacyGroupIndexKey({ slug, groupId: normalizedGroupId })) return null;
         const group = await readGroupRecord({
           store,
           slug,
           sessionId: canonicalSessionId,
           groupId: normalizedGroupId
         });
-        if (group && (includeDeleted || !group.deletedAt)) {
-          groups.set(normalizedGroupId, group);
-        }
+        return group ? [normalizedGroupId, group] : null;
+      }));
+      const groups = /* @__PURE__ */ new Map();
+      for (const [groupId, group] of [...canonical, ...legacy.filter(Boolean)]) {
+        if (includeDeleted || !group.deletedAt) groups.set(groupId, group);
       }
       return [...groups.values()];
     };
@@ -35123,7 +35334,7 @@ async function issueAgentCredential({
   const normalizedTtl = Math.max(1, Math.ceil((expiresMs - issuedMs) / 1e3));
   const token = `ceagt_${randomSecret2()}`;
   const tokenHash = await sha256Hex2(token);
-  const record6 = {
+  const record7 = {
     type: "agent_credential",
     version: 2,
     workerVersion: SESSION_AGENT_VERSION,
@@ -35149,7 +35360,7 @@ async function issueAgentCredential({
     expiresAt,
     ttlSeconds: normalizedTtl
   };
-  assertNoSecretShape(record6, "Agent credential records must not serialize bearer tokens.");
+  assertNoSecretShape(record7, "Agent credential records must not serialize bearer tokens.");
   const metadata = {
     v: 2,
     t: "agent_credential",
@@ -35162,7 +35373,7 @@ async function issueAgentCredential({
   assertNoSecretShape(metadata, "Agent credential metadata must not serialize secrets.");
   const recordKey2 = tokenKvKey(tokenHash);
   try {
-    await kv.put(recordKey2, JSON.stringify(record6), {
+    await kv.put(recordKey2, JSON.stringify(record7), {
       expirationTtl: Math.max(60, normalizedTtl),
       metadata
     });
@@ -35201,8 +35412,8 @@ async function issueAgentCredential({
     ok: true,
     token,
     tokenHash,
-    tokenPrefix: record6.tokenPrefix,
-    record: record6
+    tokenPrefix: record7.tokenPrefix,
+    record: record7
   };
 }
 async function loadAgentCredential({ env = {}, token = "", now = null } = {}) {
@@ -35258,8 +35469,8 @@ async function revokeAgentCredentialHash({ env = {}, tokenHash = "" } = {}) {
   }
   return { ok: true, tokenHash: safeString(tokenHash).toLowerCase() };
 }
-function agentCredentialHasScope(record6 = {}, scope = "") {
-  const scopes = new Set(normalizeScopes(record6.scopes || []));
+function agentCredentialHasScope(record7 = {}, scope = "") {
+  const scopes = new Set(normalizeScopes(record7.scopes || []));
   return scopes.has(scope);
 }
 var AGENT_CREDENTIAL_KV_PREFIX, AGENT_CREDENTIAL_SLOT_KV_PREFIX, AGENT_CREDENTIAL_DEFAULT_TTL_SECONDS, AGENT_BROWSER_CREDENTIAL_TTL_SECONDS, AGENT_MEMBER_CREDENTIAL_MAX_TTL_SECONDS, AGENT_CREDENTIAL_AUDIENCES, AGENT_CREDENTIAL_KINDS, AGENT_CREDENTIAL_SCOPES, AGENT_CREDENTIAL_DEFAULT_SCOPES;
@@ -35343,26 +35554,26 @@ var init_authority = __esm({
       };
       return agentEnv;
     };
-    validateCredentialAuthority = async ({ env, record: record6, validateSourceJwt, depth = 0 }) => {
+    validateCredentialAuthority = async ({ env, record: record7, validateSourceJwt, depth = 0 }) => {
       const ctx = env.AGENT_CONTEXT;
       if (!ctx || !agentHttpEnabled(ctx.config)) throw authorityError("agent_http_disabled");
-      if (record6.sessionId !== ctx.sessionId || record6.sessionSlug !== ctx.slug || record6.sessionWorkerOrigin !== ctx.origin || record6.authzEpoch !== ctx.authzEpoch) {
+      if (record7.sessionId !== ctx.sessionId || record7.sessionSlug !== ctx.slug || record7.sessionWorkerOrigin !== ctx.origin || record7.authzEpoch !== ctx.authzEpoch) {
         throw authorityError("agent_credential_authority_stale", 401);
       }
-      if (!Object.values(AGENT_CREDENTIAL_KINDS).includes(record6.credentialKind) || !Object.values(AGENT_CREDENTIAL_AUDIENCES).includes(record6.audience) || record6.credentialKind === "browser" !== (record6.audience === AGENT_CREDENTIAL_AUDIENCES.SESSION_AGENT_BROWSER)) {
+      if (!Object.values(AGENT_CREDENTIAL_KINDS).includes(record7.credentialKind) || !Object.values(AGENT_CREDENTIAL_AUDIENCES).includes(record7.audience) || record7.credentialKind === "browser" !== (record7.audience === AGENT_CREDENTIAL_AUDIENCES.SESSION_AGENT_BROWSER)) {
         throw authorityError("agent_credential_purpose_invalid", 401);
       }
-      if (record6.credentialKind === "browser" && !record6.sourceCredentialHash || record6.credentialKind === "member" && !record6.sourceParticipant) throw authorityError("agent_credential_source_missing", 401);
-      if (record6.sourceCredentialHash) {
+      if (record7.credentialKind === "browser" && !record7.sourceCredentialHash || record7.credentialKind === "member" && !record7.sourceParticipant) throw authorityError("agent_credential_source_missing", 401);
+      if (record7.sourceCredentialHash) {
         if (depth > 0) throw authorityError("agent_credential_source_invalid", 401);
-        const source = await loadAgentCredentialHash({ env, tokenHash: record6.sourceCredentialHash, now: new Date(ctx.now()).toISOString() });
+        const source = await loadAgentCredentialHash({ env, tokenHash: record7.sourceCredentialHash, now: new Date(ctx.now()).toISOString() });
         if (!source.ok) throw authorityError("agent_credential_source_inactive", 401);
         await validateCredentialAuthority({ env, record: source.record, validateSourceJwt, depth: depth + 1 });
-        if (source.record.principal.principalId !== record6.principal.principalId || source.record.accountAddress.toLowerCase() !== record6.accountAddress.toLowerCase() || record6.scopes.some((scope) => !source.record.scopes.includes(scope)) || Date.parse(record6.expiresAt) > Date.parse(source.record.expiresAt)) throw authorityError("agent_credential_source_invalid", 401);
+        if (source.record.principal.principalId !== record7.principal.principalId || source.record.accountAddress.toLowerCase() !== record7.accountAddress.toLowerCase() || record7.scopes.some((scope) => !source.record.scopes.includes(scope)) || Date.parse(record7.expiresAt) > Date.parse(source.record.expiresAt)) throw authorityError("agent_credential_source_invalid", 401);
       }
-      if (record6.sourceParticipant) {
+      if (record7.sourceParticipant) {
         if (!validateSourceJwt) throw authorityError("agent_credential_source_unavailable", 503);
-        await validateSourceJwt(record6.sourceParticipant);
+        await validateSourceJwt(record7.sourceParticipant);
       }
     };
     validateAgentParticipantSource = async ({ request, env, payload, slug, deps = {} }) => {
@@ -35385,8 +35596,8 @@ var init_authority = __esm({
       if (!payload || payload.slug !== context.slug || payload.sessionId !== context.sessionId || payload.authzEpoch !== context.authzEpoch || !Number.isSafeInteger(payload.exp) || payload.exp * 1e3 <= context.now()) {
         throw authorityError("agent_member_source_stale", 401);
       }
-      const record6 = await validateAuthTokenRecord({ env, payload, slug: context.slug });
-      if (!record6.ok) throw authorityError("agent_member_source_revoked", 401);
+      const record7 = await validateAuthTokenRecord({ env, payload, slug: context.slug });
+      if (!record7.ok) throw authorityError("agent_member_source_revoked", 401);
       const source = await validateAgentParticipantSource({ request: new Request(context.origin), env, payload, slug: context.slug, deps });
       if (!source.ok) throw authorityError("agent_member_source_revoked", 401);
       try {
@@ -63300,7 +63511,7 @@ var init_ratingScale = __esm({
       "highLabel"
     ];
     hasMetadataValue = (value) => value !== void 0 && value !== null && trim5(value) !== "";
-    recordHasRatingScaleMetadata = (record6 = {}) => RATING_SCALE_METADATA_KEYS.some((key) => hasMetadataValue(record6[key]));
+    recordHasRatingScaleMetadata = (record7 = {}) => RATING_SCALE_METADATA_KEYS.some((key) => hasMetadataValue(record7[key]));
     pickRatingScaleRecord = (question = {}) => {
       const scale = isObj10(question.scale) ? question.scale : null;
       if (scale && recordHasRatingScaleMetadata(scale)) return scale;
@@ -63342,7 +63553,7 @@ var init_ratingScale = __esm({
     };
     DEFAULT_RATING_SCALE = Object.freeze({ min: 0, max: 10, minLabel: "0", maxLabel: "10" });
     ratingStepFor = (question = {}) => {
-      const source = [question.scale, question.ratingScale].find((record6) => isObj10(record6) && recordHasRatingScaleMetadata(record6)) || question;
+      const source = [question.scale, question.ratingScale].find((record7) => isObj10(record7) && recordHasRatingScaleMetadata(record7)) || question;
       const step = Number(source.step);
       return Number.isFinite(step) && step > 0 ? step : 1;
     };
@@ -63366,9 +63577,9 @@ var init_ratingScale = __esm({
 
 // workers/sessionCorsWorker/agent/ratingScale.mjs
 function normalizeAgentRatingScale(question = {}) {
-  const record6 = withLegacyScale(question);
-  const { min, max } = normalizeRatingScale(record6) || DEFAULT_RATING_SCALE;
-  return { min, max, step: ratingStepFor(record6) };
+  const record7 = withLegacyScale(question);
+  const { min, max } = normalizeRatingScale(record7) || DEFAULT_RATING_SCALE;
+  return { min, max, step: ratingStepFor(record7) };
 }
 function normalizeAgentRatingAnswer(value, question = {}) {
   return normalizeRatingAnswer(value, withLegacyScale(question));
@@ -64211,9 +64422,9 @@ async function listKvRecordsByPrefix(env = {}, prefix = "", {
     for (const entry2 of keys) {
       const key = safeString(entry2?.name || entry2);
       if (!key) continue;
-      const record6 = safeJsonParse(await kv.get(key).catch(() => null), null);
-      if (record6 && typeof record6 === "object" && !Array.isArray(record6)) {
-        records.push({ ...record6, key });
+      const record7 = safeJsonParse(await kv.get(key).catch(() => null), null);
+      if (record7 && typeof record7 === "object" && !Array.isArray(record7)) {
+        records.push({ ...record7, key });
       }
       if (records.length >= maxRecords) return records;
     }
@@ -64252,8 +64463,8 @@ async function listKvKeyMetadataByPrefix(env = {}, prefix = "", {
 async function readKvRecord(env = {}, key = "") {
   const kv = env?.AGENT_ACTION_KV;
   if (!key || !kv || typeof kv.get !== "function") return null;
-  const record6 = safeJsonParse(await kv.get(key).catch(() => null), null);
-  return record6 && typeof record6 === "object" && !Array.isArray(record6) ? { ...record6, key } : null;
+  const record7 = safeJsonParse(await kv.get(key).catch(() => null), null);
+  return record7 && typeof record7 === "object" && !Array.isArray(record7) ? { ...record7, key } : null;
 }
 function buildAgentActivityMetadata({
   type = "",
@@ -64341,31 +64552,31 @@ function publicItem(item = {}, {
   assertNoSecretShape(out, "Agent activity items must not serialize secrets.");
   return out;
 }
-function draftItem(record6 = {}, options = {}) {
+function draftItem(record7 = {}, options = {}) {
   return publicItem({
     type: "answer_draft",
-    sessionSlug: sanitizeSessionSlug(record6.sessionSlug),
-    questionId: safeString(record6.questionId),
-    createdAt: safeString(record6.selectedAt || record6.createdAt),
-    status: safeString(record6.status || "draft_saved"),
-    editCount: Number(record6.editCount || 0),
-    originSource: safeString(record6.originSource || record6.origin?.source),
-    summary: options.includeContent ? `Draft: ${safeString(record6.answerLabel).slice(0, 140)}` : "Answer draft saved for review",
+    sessionSlug: sanitizeSessionSlug(record7.sessionSlug),
+    questionId: safeString(record7.questionId),
+    createdAt: safeString(record7.selectedAt || record7.createdAt),
+    status: safeString(record7.status || "draft_saved"),
+    editCount: Number(record7.editCount || 0),
+    originSource: safeString(record7.originSource || record7.origin?.source),
+    summary: options.includeContent ? `Draft: ${safeString(record7.answerLabel).slice(0, 140)}` : "Answer draft saved for review",
     pendingAction: "review_draft",
     content: {
-      answerLabel: safeString(record6.answerLabel),
-      answerValue: safeString(record6.answerValue),
-      controlType: safeString(record6.controlType)
+      answerLabel: safeString(record7.answerLabel),
+      answerValue: safeString(record7.answerValue),
+      controlType: safeString(record7.controlType)
     }
   }, options);
 }
-function recommendationItems(record6 = {}, options = {}) {
-  const recommendations = Array.isArray(record6.recommendations) ? record6.recommendations : [];
+function recommendationItems(record7 = {}, options = {}) {
+  const recommendations = Array.isArray(record7.recommendations) ? record7.recommendations : [];
   return recommendations.map((recommendation) => publicItem({
     type: "question_vote_recommendation",
-    sessionSlug: sanitizeSessionSlug(record6.sessionSlug),
+    sessionSlug: sanitizeSessionSlug(record7.sessionSlug),
     questionId: safeString(recommendation.questionId),
-    createdAt: safeString(record6.createdAt),
+    createdAt: safeString(record7.createdAt),
     status: "pending_review",
     summary: `Suggested ${safeString(recommendation.suggestedVote || "vote")} vote`,
     pendingAction: "approve_or_override_agent_question_votes",
@@ -64377,13 +64588,13 @@ function recommendationItems(record6 = {}, options = {}) {
     }
   }, options));
 }
-function decisionItems(record6 = {}, options = {}) {
-  const decisions = Array.isArray(record6.decisions) ? record6.decisions : [];
+function decisionItems(record7 = {}, options = {}) {
+  const decisions = Array.isArray(record7.decisions) ? record7.decisions : [];
   return decisions.map((decision) => publicItem({
     type: "question_vote_decision",
-    sessionSlug: sanitizeSessionSlug(record6.sessionSlug),
+    sessionSlug: sanitizeSessionSlug(record7.sessionSlug),
     questionId: safeString(decision.questionId),
-    createdAt: safeString(record6.createdAt),
+    createdAt: safeString(record7.createdAt),
     status: decision.applied ? "applied" : safeString(decision.approvalStatus || "pending_review"),
     summary: decision.applied ? `Applied ${safeString(decision.finalVote || decision.suggestedVote)} vote` : `Pending ${safeString(decision.suggestedVote || decision.finalVote || "vote")} decision`,
     pendingAction: decision.applied ? "" : "approve_or_override_agent_question_votes",
@@ -64396,35 +64607,35 @@ function decisionItems(record6 = {}, options = {}) {
     }
   }, options));
 }
-function proposedQuestionItem(record6 = {}, options = {}) {
-  const prompt = safeString(record6.prompt);
+function proposedQuestionItem(record7 = {}, options = {}) {
+  const prompt = safeString(record7.prompt);
   return publicItem({
     type: "proposed_question",
-    sessionSlug: sanitizeSessionSlug(record6.sessionSlug),
-    questionId: safeString(record6.questionId),
-    createdAt: safeString(record6.createdAt),
-    status: safeString(record6.status || "active"),
+    sessionSlug: sanitizeSessionSlug(record7.sessionSlug),
+    questionId: safeString(record7.questionId),
+    createdAt: safeString(record7.createdAt),
+    status: safeString(record7.status || "active"),
     summary: prompt ? `Question proposed: ${prompt.slice(0, 140)}` : "Question proposed for review",
     pendingAction: "",
     content: {
       prompt,
-      questionType: safeString(record6.questionType),
-      tags: Array.isArray(record6.tags) ? record6.tags.map(safeString).filter(Boolean) : []
+      questionType: safeString(record7.questionType),
+      tags: Array.isArray(record7.tags) ? record7.tags.map(safeString).filter(Boolean) : []
     }
   }, options);
 }
-function groupProposalItem(record6 = {}, options = {}) {
+function groupProposalItem(record7 = {}, options = {}) {
   return publicItem({
     type: "group_proposal",
-    sessionSlug: sanitizeSessionSlug(record6.sessionSlug),
-    createdAt: safeString(record6.createdAt),
-    status: safeString(record6.status || "pending_user_decision"),
-    summary: safeString(record6.message) || "Group membership suggestion",
+    sessionSlug: sanitizeSessionSlug(record7.sessionSlug),
+    createdAt: safeString(record7.createdAt),
+    status: safeString(record7.status || "pending_user_decision"),
+    summary: safeString(record7.message) || "Group membership suggestion",
     pendingAction: "review_group_proposal",
     content: {
-      categoryId: safeString(record6.categoryId),
-      optionIds: Array.isArray(record6.optionIds) ? record6.optionIds.map(safeString).filter(Boolean) : [],
-      message: safeString(record6.message)
+      categoryId: safeString(record7.categoryId),
+      optionIds: Array.isArray(record7.optionIds) ? record7.optionIds.map(safeString).filter(Boolean) : [],
+      message: safeString(record7.message)
     }
   }, options);
 }
@@ -64444,8 +64655,8 @@ async function listMetadataBackedRecords(env = {}, prefix = "", {
       records.push(metadataRecord);
       continue;
     }
-    const record6 = await readKvRecord(env, entry2.key);
-    if (record6 && filter(record6)) records.push(record6);
+    const record7 = await readKvRecord(env, entry2.key);
+    if (record7 && filter(record7)) records.push(record7);
   }
   return records;
 }
@@ -64465,28 +64676,28 @@ async function listAgentActivity({
   const drafts = await listMetadataBackedRecords(env, `${ANSWER_DRAFT_KV_PREFIX2}${userId}:`, {
     includeContent,
     limit: 300,
-    filter: (record6) => !slugSet.size || slugSet.has(sanitizeSessionSlug(record6.sessionSlug))
+    filter: (record7) => !slugSet.size || slugSet.has(sanitizeSessionSlug(record7.sessionSlug))
   });
-  drafts.forEach((record6) => items.push(draftItem(record6, options)));
+  drafts.forEach((record7) => items.push(draftItem(record7, options)));
   for (const slug of slugs) {
     for (const subjectKey of /* @__PURE__ */ new Set([kvKeySafePart(userId), userId])) {
       const recommendations = await listKvRecordsByPrefix(env, `${AGENT_QUESTION_VOTE_RECOMMENDATION_KV_PREFIX}${slug}:${subjectKey}:`, { limit: 300 });
-      recommendations.filter((record6) => safeString(record6.telegramUserId) === userId).forEach((record6) => items.push(...recommendationItems(record6, options)));
+      recommendations.filter((record7) => safeString(record7.telegramUserId) === userId).forEach((record7) => items.push(...recommendationItems(record7, options)));
       const decisions = await listKvRecordsByPrefix(env, `${AGENT_QUESTION_VOTE_DECISION_KV_PREFIX}${slug}:${subjectKey}:`, { limit: 300 });
-      decisions.filter((record6) => safeString(record6.telegramUserId) === userId).forEach((record6) => items.push(...decisionItems(record6, options)));
+      decisions.filter((record7) => safeString(record7.telegramUserId) === userId).forEach((record7) => items.push(...decisionItems(record7, options)));
     }
     const proposed = await listMetadataBackedRecords(env, `${PROPOSED_QUESTION_KV_PREFIX}${slug}:`, {
       includeContent,
       limit: 1e3,
-      filter: (record6) => safeString(record6.createdByTelegramUserId) === userId
+      filter: (record7) => safeString(record7.createdByTelegramUserId) === userId
     });
-    proposed.forEach((record6) => items.push(proposedQuestionItem(record6, options)));
+    proposed.forEach((record7) => items.push(proposedQuestionItem(record7, options)));
     const groupProposals = await listMetadataBackedRecords(env, `${LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX}${slug}:`, {
       includeContent,
       limit: 1e3,
-      filter: (record6) => [record6.proposedBy, record6.targetTelegramUserId].map(safeString).includes(userId)
+      filter: (record7) => [record7.proposedBy, record7.targetTelegramUserId].map(safeString).includes(userId)
     });
-    groupProposals.forEach((record6) => items.push(groupProposalItem(record6, options)));
+    groupProposals.forEach((record7) => items.push(groupProposalItem(record7, options)));
   }
   return items.filter(Boolean).sort((left, right) => Date.parse(createdAtOf(right)) - Date.parse(createdAtOf(left))).slice(0, Math.max(1, Math.min(100, Number(limit) || 50)));
 }
@@ -64524,16 +64735,16 @@ function answerDraftViewKey({
   const qid = questionIdKeyPart(selectedQuestionId || "question");
   return telegramUserId && slug && qid ? `${ANSWER_DRAFT_VIEW_KV_PREFIX}${telegramUserId}:${slug}:${qid}` : "";
 }
-function answerDraftFingerprint(record6 = {}) {
+function answerDraftFingerprint(record7 = {}) {
   return stableFingerprint({
-    answerLabel: safeString(record6.answerLabel),
-    answerValue: safeString(record6.answerValue),
-    controlType: safeString(record6.controlType)
+    answerLabel: safeString(record7.answerLabel),
+    answerValue: safeString(record7.answerValue),
+    controlType: safeString(record7.controlType)
   });
 }
-function answerDraftOrigin(record6 = null) {
-  if (!record6 || typeof record6 !== "object" || Array.isArray(record6)) return null;
-  const origin = record6.origin && typeof record6.origin === "object" && !Array.isArray(record6.origin) ? record6.origin : null;
+function answerDraftOrigin(record7 = null) {
+  if (!record7 || typeof record7 !== "object" || Array.isArray(record7)) return null;
+  const origin = record7.origin && typeof record7.origin === "object" && !Array.isArray(record7.origin) ? record7.origin : null;
   if (origin) {
     return {
       source: safeString(origin.source) || null,
@@ -64546,23 +64757,23 @@ function answerDraftOrigin(record6 = null) {
     };
   }
   return {
-    source: safeString(record6.source) || null,
-    agentMetadata: record6.agentMetadata && typeof record6.agentMetadata === "object" && !Array.isArray(record6.agentMetadata) ? record6.agentMetadata : null,
-    answerLabel: safeString(record6.answerLabel),
-    answerValue: safeString(record6.answerValue),
-    controlType: safeString(record6.controlType),
-    fingerprint: safeString(record6.fingerprint) || answerDraftFingerprint(record6),
-    savedAt: safeString(record6.selectedAt) || null
+    source: safeString(record7.source) || null,
+    agentMetadata: record7.agentMetadata && typeof record7.agentMetadata === "object" && !Array.isArray(record7.agentMetadata) ? record7.agentMetadata : null,
+    answerLabel: safeString(record7.answerLabel),
+    answerValue: safeString(record7.answerValue),
+    controlType: safeString(record7.controlType),
+    fingerprint: safeString(record7.fingerprint) || answerDraftFingerprint(record7),
+    savedAt: safeString(record7.selectedAt) || null
   };
 }
 async function writeDraftLifecycleEvent() {
   return false;
 }
-function canonicalDraftAnswerForm(record6 = {}) {
-  const raw = safeString(record6.answerValue);
+function canonicalDraftAnswerForm(record7 = {}) {
+  const raw = safeString(record7.answerValue);
   const parsed = safeEnvJsonParse(raw, null);
   const source = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
-  const type = CANONICAL_ANSWER_KINDS[lower2(safeString(source?.questionType))] || CANONICAL_ANSWER_KINDS[lower2(safeString(record6.controlType))] || "unknown";
+  const type = CANONICAL_ANSWER_KINDS[lower2(safeString(source?.questionType))] || CANONICAL_ANSWER_KINDS[lower2(safeString(record7.controlType))] || "unknown";
   const text9 = safeString(source ? source.text ?? source.value ?? "" : raw);
   const comments = safeString(source?.comments);
   if (type === "binary") {
@@ -64582,8 +64793,8 @@ function canonicalDraftAnswerForm(record6 = {}) {
   }
   return { type, text: text9, comments };
 }
-function answerDraftSemanticFingerprint(record6 = {}) {
-  return stableFingerprint(canonicalDraftAnswerForm(record6));
+function answerDraftSemanticFingerprint(record7 = {}) {
+  return stableFingerprint(canonicalDraftAnswerForm(record7));
 }
 function buildDraftDelta(origin = null, finalAnswer = null) {
   if (!origin || !finalAnswer) return null;
@@ -64727,7 +64938,7 @@ async function persistAnswerDraft({
   const existing = safeEnvJsonParse(stored, null);
   const previous = existing && typeof existing === "object" && !Array.isArray(existing) ? existing : null;
   const savedAt = createdAt || nowIso2();
-  const record6 = {
+  const record7 = {
     version: 2,
     telegramUserId: safeString(normalized.user?.telegramUserId),
     chatId: safeString(normalized.chat?.chatId),
@@ -64742,64 +64953,64 @@ async function persistAnswerDraft({
     selectedAt: savedAt
   };
   if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
-    record6.source = safeString(metadata.source) || null;
-    record6.actionMetadata = { ...metadata };
+    record7.source = safeString(metadata.source) || null;
+    record7.actionMetadata = { ...metadata };
   }
   if (agentMetadata && typeof agentMetadata === "object" && !Array.isArray(agentMetadata)) {
-    record6.agentMetadata = { ...agentMetadata };
+    record7.agentMetadata = { ...agentMetadata };
   }
-  if (!record6.telegramUserId || !record6.sessionSlug || !record6.questionId || !record6.answerLabel) {
+  if (!record7.telegramUserId || !record7.sessionSlug || !record7.questionId || !record7.answerLabel) {
     return { ok: false, reason: "answer_draft_incomplete" };
   }
-  record6.fingerprint = answerDraftFingerprint(record6);
-  record6.semanticFingerprint = answerDraftSemanticFingerprint(record6);
-  record6.origin = answerDraftOrigin(previous) || {
-    source: record6.source || null,
-    agentMetadata: record6.agentMetadata || null,
-    answerLabel: record6.answerLabel,
-    answerValue: record6.answerValue,
-    controlType: record6.controlType,
-    fingerprint: record6.fingerprint,
+  record7.fingerprint = answerDraftFingerprint(record7);
+  record7.semanticFingerprint = answerDraftSemanticFingerprint(record7);
+  record7.origin = answerDraftOrigin(previous) || {
+    source: record7.source || null,
+    agentMetadata: record7.agentMetadata || null,
+    answerLabel: record7.answerLabel,
+    answerValue: record7.answerValue,
+    controlType: record7.controlType,
+    fingerprint: record7.fingerprint,
     savedAt
   };
   const previousSemanticFingerprint = previous ? safeString(previous.semanticFingerprint) || answerDraftSemanticFingerprint(previous) : "";
-  const contentChanged = Boolean(previous) && previousSemanticFingerprint !== record6.semanticFingerprint;
-  const isAgentWrite = record6.source === "agent_handoff";
-  record6.editCount = Number(previous?.editCount || 0) + (contentChanged ? 1 : 0);
-  record6.lastEditedAt = contentChanged ? savedAt : safeString(previous?.lastEditedAt) || null;
-  record6.humanEditCount = Number(previous?.humanEditCount || 0) + (contentChanged && !isAgentWrite ? 1 : 0);
-  record6.lastEditSource = contentChanged ? record6.source || null : safeString(previous?.lastEditSource) || null;
+  const contentChanged = Boolean(previous) && previousSemanticFingerprint !== record7.semanticFingerprint;
+  const isAgentWrite = record7.source === "agent_handoff";
+  record7.editCount = Number(previous?.editCount || 0) + (contentChanged ? 1 : 0);
+  record7.lastEditedAt = contentChanged ? savedAt : safeString(previous?.lastEditedAt) || null;
+  record7.humanEditCount = Number(previous?.humanEditCount || 0) + (contentChanged && !isAgentWrite ? 1 : 0);
+  record7.lastEditSource = contentChanged ? record7.source || null : safeString(previous?.lastEditSource) || null;
   const previousAgentRevision = previous?.agentRevision && typeof previous.agentRevision === "object" && !Array.isArray(previous.agentRevision) ? previous.agentRevision : null;
-  record6.agentRevision = isAgentWrite ? { semanticFingerprint: record6.semanticFingerprint, savedAt } : previousAgentRevision;
-  assertNoSecretShape(record6, "Agent answer drafts must not serialize secrets.");
+  record7.agentRevision = isAgentWrite ? { semanticFingerprint: record7.semanticFingerprint, savedAt } : previousAgentRevision;
+  assertNoSecretShape(record7, "Agent answer drafts must not serialize secrets.");
   const activityMetadata = buildAgentActivityMetadata({
     type: "answer_draft",
-    status: record6.status,
-    createdAt: record6.selectedAt,
+    status: record7.status,
+    createdAt: record7.selectedAt,
     pendingAction: "review_draft",
-    sessionSlug: record6.sessionSlug,
-    questionId: record6.questionId,
-    telegramUserId: record6.telegramUserId,
-    editCount: record6.editCount,
-    originSource: record6.origin?.source || ""
+    sessionSlug: record7.sessionSlug,
+    questionId: record7.questionId,
+    telegramUserId: record7.telegramUserId,
+    editCount: record7.editCount,
+    originSource: record7.origin?.source || ""
   });
-  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record6), {
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record7), {
     expirationTtl: DEFAULT_GROUP_SESSION_TTL_SECONDS,
     metadata: activityMetadata
   });
   if (!previous || contentChanged) {
     await writeDraftLifecycleEvent(env, {
       event: previous ? "draft_edited" : "draft_created",
-      sessionSlug: record6.sessionSlug,
-      questionId: record6.questionId,
-      source: safeString(record6.source),
-      originSource: safeString(record6.origin?.source),
-      controlType: record6.controlType,
-      editCount: record6.editCount,
-      telegramUserId: record6.telegramUserId
+      sessionSlug: record7.sessionSlug,
+      questionId: record7.questionId,
+      source: safeString(record7.source),
+      originSource: safeString(record7.origin?.source),
+      controlType: record7.controlType,
+      editCount: record7.editCount,
+      telegramUserId: record7.telegramUserId
     });
   }
-  return { ok: true, key, draft: record6 };
+  return { ok: true, key, draft: record7 };
 }
 var init_answerDrafts = __esm({
   "workers/sessionCorsWorker/agent/answerDrafts.mjs"() {
@@ -64894,7 +65105,7 @@ async function listKvRecordsByPrefix2(env = {}, prefix = "", {
   limit = Infinity,
   parseJson: parseJson4 = safeJsonParse,
   // Applied as each batch arrives, so only what a caller keeps stays in memory.
-  select = (record6) => record6
+  select = (record7) => record7
 } = {}) {
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.list !== "function" || typeof kv.get !== "function") return [];
@@ -64912,9 +65123,9 @@ async function listKvRecordsByPrefix2(env = {}, prefix = "", {
       const batch = keys.slice(offset, offset + BULK_GET_KEYS);
       const values = await getBatch(kv, batch);
       for (const key of batch) {
-        const record6 = parseJson4(values.get(key), null);
-        if (!record6 || typeof record6 !== "object" || Array.isArray(record6)) continue;
-        const selected = select({ ...record6, key });
+        const record7 = parseJson4(values.get(key), null);
+        if (!record7 || typeof record7 !== "object" || Array.isArray(record7)) continue;
+        const selected = select({ ...record7, key });
         if (selected) records.push(selected);
         if (records.length >= maxRecords) return records;
       }
@@ -64943,15 +65154,15 @@ function normalizeResultAnswerLabel(value = "") {
 function selectCurrentSubmittedAnswers(records = []) {
   const byParticipantQuestion = /* @__PURE__ */ new Map();
   const anonymous = [];
-  for (const record6 of Array.isArray(records) ? records : []) {
-    const participant = safeString(record6.telegramUserId);
+  for (const record7 of Array.isArray(records) ? records : []) {
+    const participant = safeString(record7.telegramUserId);
     if (!participant) {
-      anonymous.push(record6);
+      anonymous.push(record7);
       continue;
     }
-    const key = JSON.stringify([sanitizeSessionSlug(record6.sessionSlug) || safeString(record6.sessionId), participant, safeString(record6.questionId)]);
+    const key = JSON.stringify([sanitizeSessionSlug(record7.sessionSlug) || safeString(record7.sessionId), participant, safeString(record7.questionId)]);
     const existing = byParticipantQuestion.get(key);
-    if (!existing || compareAnswers(existing, record6) < 0) byParticipantQuestion.set(key, record6);
+    if (!existing || compareAnswers(existing, record7) < 0) byParticipantQuestion.set(key, record7);
   }
   return [...byParticipantQuestion.values(), ...anonymous].sort(compareAnswerChronology);
 }
@@ -64961,52 +65172,52 @@ async function loadSubmittedResultRecords(env = {}, sessionSlug = "", { includeR
   if (!prefix) return [];
   const rows = await listKvRecordsByPrefix2(env, prefix, {
     parseJson: safeEnvJsonParse,
-    select: (record6) => safeString(record6.status) === "direct_submitted" && sanitizeSessionSlug(record6.sessionSlug) === slug && safeString(record6.questionId) ? resultRecord(record6, slug, includeRawAnswer) : null
+    select: (record7) => safeString(record7.status) === "direct_submitted" && sanitizeSessionSlug(record7.sessionSlug) === slug && safeString(record7.questionId) ? resultRecord(record7, slug, includeRawAnswer) : null
   });
   return rows.sort((left, right) => safeString(left.createdAt).localeCompare(safeString(right.createdAt)));
 }
-function resultRecord(record6, slug, includeRawAnswer) {
-  const answer = structuredResultAnswer(record6);
+function resultRecord(record7, slug, includeRawAnswer) {
+  const answer = structuredResultAnswer(record7);
   return {
-    key: safeString(record6.key),
-    requestId: safeString(record6.requestId),
-    createdAt: safeString(record6.createdAt),
+    key: safeString(record7.key),
+    requestId: safeString(record7.requestId),
+    createdAt: safeString(record7.createdAt),
     sessionSlug: slug,
-    answerRevision: answerRevision(record6),
-    telegramUserId: safeString(record6.telegramUserId),
-    questionId: safeString(record6.questionId),
+    answerRevision: answerRevision(record7),
+    telegramUserId: safeString(record7.telegramUserId),
+    questionId: safeString(record7.questionId),
     label: normalizeResultAnswerLabel(firstAnswerValue(
       answer.label,
       answer.value,
       answer.text,
-      record6.answerLabel,
-      record6.answerValue
+      record7.answerLabel,
+      record7.answerValue
     )),
     value: safeAnswerString(firstAnswerValue(
       answer.value,
       answer.text,
       answer.label,
-      record6.answerValue,
-      record6.answerLabel
+      record7.answerValue,
+      record7.answerLabel
     )),
-    questionType: safeString(answer.questionType || record6.questionType || record6.controlType),
-    ...includeRawAnswer ? { answer: record6.answer || null } : answer.questionType === "quadratic" ? { answer: { value: answer.value, encrypted: answer.encrypted === true } } : {},
+    questionType: safeString(answer.questionType || record7.questionType || record7.controlType),
+    ...includeRawAnswer ? { answer: record7.answer || null } : answer.questionType === "quadratic" ? { answer: { value: answer.value, encrypted: answer.encrypted === true } } : {},
     text: safeAnswerString(firstAnswerValue(
       answer.text,
-      record6.answerText
+      record7.answerText
     )),
     comments: safeAnswerString(firstAnswerValue(
       answer.comments,
       answer.additionalComments,
-      record6.comments,
-      record6.answerComments
+      record7.comments,
+      record7.answerComments
     )),
-    txHash: safeString(record6.onChain?.txHash)
+    txHash: safeString(record7.onChain?.txHash)
   };
 }
-function structuredResultAnswer(record6 = {}) {
-  const answer = record6.answer && typeof record6.answer === "object" && !Array.isArray(record6.answer) ? { ...record6.answer } : {};
-  const parsed = safeEnvJsonParse(answer.value || record6.answerValue, null);
+function structuredResultAnswer(record7 = {}) {
+  const answer = record7.answer && typeof record7.answer === "object" && !Array.isArray(record7.answer) ? { ...record7.answer } : {};
+  const parsed = safeEnvJsonParse(answer.value || record7.answerValue, null);
   if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
     return {
       ...answer,
@@ -65043,20 +65254,20 @@ function consensusQuestionsForResults(questions = []) {
 function summarizeQuestionResults(records = [], questions = []) {
   const promptMap = questionPromptById(questions);
   const byQuestion = /* @__PURE__ */ new Map();
-  for (const record6 of records) {
-    if (!byQuestion.has(record6.questionId)) {
-      byQuestion.set(record6.questionId, {
-        questionId: record6.questionId,
-        prompt: promptMap.get(record6.questionId) || shortQuestionId(record6.questionId),
+  for (const record7 of records) {
+    if (!byQuestion.has(record7.questionId)) {
+      byQuestion.set(record7.questionId, {
+        questionId: record7.questionId,
+        prompt: promptMap.get(record7.questionId) || shortQuestionId(record7.questionId),
         total: 0,
         participants: /* @__PURE__ */ new Set(),
         counts: /* @__PURE__ */ new Map()
       });
     }
-    const item = byQuestion.get(record6.questionId);
+    const item = byQuestion.get(record7.questionId);
     item.total += 1;
-    if (record6.telegramUserId) item.participants.add(record6.telegramUserId);
-    item.counts.set(record6.label, (item.counts.get(record6.label) || 0) + 1);
+    if (record7.telegramUserId) item.participants.add(record7.telegramUserId);
+    item.counts.set(record7.label, (item.counts.get(record7.label) || 0) + 1);
   }
   return Array.from(byQuestion.values()).map((item) => {
     const counts = Array.from(item.counts.entries()).sort(([left], [right]) => left.localeCompare(right));
@@ -65079,7 +65290,7 @@ var init_submittedResults = __esm({
     init_agentSubmitQueue();
     init_runtimeCore();
     compareText = (left, right) => left === right ? 0 : left < right ? -1 : 1;
-    answerRevision = (record6) => Number.isSafeInteger(record6.answerRevision) && record6.answerRevision >= 0 ? record6.answerRevision : 0;
+    answerRevision = (record7) => Number.isSafeInteger(record7.answerRevision) && record7.answerRevision >= 0 ? record7.answerRevision : 0;
     compareAnswerChronology = (left, right) => compareText(safeString(left.createdAt), safeString(right.createdAt)) || compareText(safeString(left.requestId), safeString(right.requestId)) || compareText(stableJson(left), stableJson(right));
     compareAnswers = (left, right) => answerRevision(left) - answerRevision(right) || compareAnswerChronology(left, right);
   }
@@ -65099,14 +65310,14 @@ function answerScore(label = "", value = "", question = {}) {
   return 2 * (answer.value - min) / (max - min) - 1;
 }
 function averageAnswerScore(records = [], questionLookup = /* @__PURE__ */ new Map()) {
-  const scored = records.map((record6) => answerScore(record6.label, record6.value, questionLookup.get(record6.questionId))).filter((score) => Number.isFinite(score));
+  const scored = records.map((record7) => answerScore(record7.label, record7.value, questionLookup.get(record7.questionId))).filter((score) => Number.isFinite(score));
   if (!scored.length) return null;
   return scored.reduce((sum, score) => sum + score, 0) / scored.length;
 }
 function countResultVotes(records = [], questionLookup = /* @__PURE__ */ new Map()) {
   const counts = { agree: 0, disagree: 0, unsure: 0, responded: 0 };
-  for (const record6 of records) {
-    const score = answerScore(record6.label, record6.value, questionLookup.get(record6.questionId));
+  for (const record7 of records) {
+    const score = answerScore(record7.label, record7.value, questionLookup.get(record7.questionId));
     if (!Number.isFinite(score)) continue;
     if (score > 0.25) counts.agree += 1;
     else if (score < -0.25) counts.disagree += 1;
@@ -65128,10 +65339,10 @@ function questionTypeById(questions = []) {
   }
   return map;
 }
-function qualitativeTextFromResultRecord(record6 = {}, questionTypeLookup = /* @__PURE__ */ new Map()) {
-  const type = lower2(record6.questionType || questionTypeLookup.get(record6.questionId));
-  const text9 = safeAnswerString(record6.text);
-  const comments = safeAnswerString(record6.comments);
+function qualitativeTextFromResultRecord(record7 = {}, questionTypeLookup = /* @__PURE__ */ new Map()) {
+  const type = lower2(record7.questionType || questionTypeLookup.get(record7.questionId));
+  const text9 = safeAnswerString(record7.text);
+  const comments = safeAnswerString(record7.comments);
   const parts = [];
   if (type === "freeform" && text9) parts.push(text9);
   if (comments) parts.push(comments);
@@ -65146,14 +65357,14 @@ function qualitativeResponsesForGroup({
   limit = 8
 } = {}) {
   const responses = [];
-  for (const record6 of records) {
-    const text9 = qualitativeTextFromResultRecord(record6, questionTypeLookup);
+  for (const record7 of records) {
+    const text9 = qualitativeTextFromResultRecord(record7, questionTypeLookup);
     if (!text9) continue;
     responses.push({
-      participant: aliases.get(record6.telegramUserId) || "Participant",
-      questionId: record6.questionId,
-      questionLabel: questionIndex.get(record6.questionId) || "Q?",
-      prompt: promptMap.get(record6.questionId) || shortQuestionId(record6.questionId),
+      participant: aliases.get(record7.telegramUserId) || "Participant",
+      questionId: record7.questionId,
+      questionLabel: questionIndex.get(record7.questionId) || "Q?",
+      prompt: promptMap.get(record7.questionId) || shortQuestionId(record7.questionId),
       text: text9.slice(0, 500)
     });
     if (responses.length >= limit) break;
@@ -65177,7 +65388,7 @@ function requestedScoreBuckets({ records = [], participantIds = [], questionLook
   if (!Number.isFinite(count2) || count2 <= 0) return null;
   const scored = participantIds.map((id2) => ({
     id: id2,
-    score: averageAnswerScore(records.filter((record6) => record6.telegramUserId === id2), questionLookup)
+    score: averageAnswerScore(records.filter((record7) => record7.telegramUserId === id2), questionLookup)
   })).sort((left, right) => (right.score ?? 0) - (left.score ?? 0) || String(left.id).localeCompare(String(right.id)));
   const resolvedCount = Math.max(1, Math.min(6, Math.floor(count2), scored.length));
   if (!resolvedCount || !scored.length) return [];
@@ -65217,7 +65428,7 @@ function buildParticipantResultGroups({
   const buckets = Array.isArray(requestedBuckets) ? requestedBuckets : (() => {
     const out = /* @__PURE__ */ new Map();
     for (const id2 of participantIds) {
-      const participantRecords = records.filter((record6) => record6.telegramUserId === id2);
+      const participantRecords = records.filter((record7) => record7.telegramUserId === id2);
       const score = averageAnswerScore(participantRecords, questionLookup);
       const bucket = groupBucketForScore(score);
       if (!out.has(bucket.bucketId)) {
@@ -65240,7 +65451,7 @@ function buildParticipantResultGroups({
   })();
   return buckets.filter((bucket) => bucket.participantIds.length).sort((left, right) => bucketAverageScore(right) - bucketAverageScore(left) || right.participantIds.length - left.participantIds.length || left.theme.localeCompare(right.theme)).map((bucket, index) => {
     const participantSet = new Set(bucket.participantIds);
-    const clusterRecords = records.filter((record6) => participantSet.has(record6.telegramUserId));
+    const clusterRecords = records.filter((record7) => participantSet.has(record7.telegramUserId));
     const qualitativeResponses = qualitativeResponsesForGroup({
       records: clusterRecords,
       aliases,
@@ -65249,8 +65460,8 @@ function buildParticipantResultGroups({
       questionTypeLookup
     });
     const topStatements = questionIds.map((id2, questionNumber) => {
-      const clusterQuestionRecords = clusterRecords.filter((record6) => record6.questionId === id2);
-      const overallQuestionRecords = records.filter((record6) => record6.questionId === id2);
+      const clusterQuestionRecords = clusterRecords.filter((record7) => record7.questionId === id2);
+      const overallQuestionRecords = records.filter((record7) => record7.questionId === id2);
       const clusterAverage = averageAnswerScore(clusterQuestionRecords, questionLookup);
       const overallAverage = averageAnswerScore(overallQuestionRecords, questionLookup);
       return {
@@ -65278,25 +65489,25 @@ function buildParticipantResultGroups({
 function buildParticipantGraph(records = [], questions = [], options = {}) {
   const questionTypeLookup = questionTypeById(questions);
   const questionLookup = new Map(questions.map((question) => [questionId(question), question]));
-  const graphRecords = (Array.isArray(records) ? records : []).map((record6) => ({
-    ...record6,
-    questionType: safeString(questionTypeLookup.get(record6.questionId) || record6.questionType)
+  const graphRecords = (Array.isArray(records) ? records : []).map((record7) => ({
+    ...record7,
+    questionType: safeString(questionTypeLookup.get(record7.questionId) || record7.questionType)
   }));
-  const questionIds = Array.from(new Set(graphRecords.map((record6) => record6.questionId).filter(Boolean)));
+  const questionIds = Array.from(new Set(graphRecords.map((record7) => record7.questionId).filter(Boolean)));
   const questionIndex = new Map(questionIds.map((id2, index) => [id2, `Q${index + 1}`]));
-  const participants = Array.from(new Set(graphRecords.map((record6) => record6.telegramUserId).filter(Boolean)));
+  const participants = Array.from(new Set(graphRecords.map((record7) => record7.telegramUserId).filter(Boolean)));
   const aliases = new Map(participants.map((id2, index) => [id2, participantAlias(id2, index)]));
   const lines = participants.map((id2) => {
-    const answered = graphRecords.filter((record6) => record6.telegramUserId === id2).map((record6) => `${questionIndex.get(record6.questionId) || "Q?"}:${record6.label}`);
+    const answered = graphRecords.filter((record7) => record7.telegramUserId === id2).map((record7) => `${questionIndex.get(record7.questionId) || "Q?"}:${record7.label}`);
     return `${aliases.get(id2)} -> ${answered.join(", ") || "No answers"}`;
   });
   const promptMap = questionPromptById(questions);
   const legend = questionIds.slice(0, 5).map((id2, index) => `${index + 1}. ${promptMap.get(id2) || shortQuestionId(id2)}`);
   const imageParticipants = participants.slice(0, 8).map((id2) => ({
     participant: aliases.get(id2),
-    answers: graphRecords.filter((record6) => record6.telegramUserId === id2).map((record6) => ({
-      question: questionIndex.get(record6.questionId) || "Q?",
-      label: record6.label
+    answers: graphRecords.filter((record7) => record7.telegramUserId === id2).map((record7) => ({
+      question: questionIndex.get(record7.questionId) || "Q?",
+      label: record7.label
     }))
   }));
   const groups = buildParticipantResultGroups({
@@ -66921,45 +67132,45 @@ function questionIdFromPrompt({
   ].join("|");
   return `${PROPOSED_QUESTION_ID_PREFIX}${buildOpaqueActionId(seed).replace(/^ceab_/, "")}`;
 }
-function proposedAnswerSchema(record6 = {}) {
-  const type = normalizeQuestionType3(record6.questionType);
+function proposedAnswerSchema(record7 = {}) {
+  const type = normalizeQuestionType3(record7.questionType);
   return JSON.stringify({
     type,
-    options: type === "multichoice" || type === "quadratic" ? record6.options ?? [] : [],
-    singleSelect: type === "multichoice" && record6.singleSelect === true,
-    ratingScale: type === "rating" ? record6.ratingScale || normalizeRatingScale2(DEFAULT_RATING_SCALE) : null,
-    voiceCredits: type === "quadratic" ? record6.voiceCredits ?? 99 : null
+    options: type === "multichoice" || type === "quadratic" ? record7.options ?? [] : [],
+    singleSelect: type === "multichoice" && record7.singleSelect === true,
+    ratingScale: type === "rating" ? record7.ratingScale || normalizeRatingScale2(DEFAULT_RATING_SCALE) : null,
+    voiceCredits: type === "quadratic" ? record7.voiceCredits ?? 99 : null
   });
 }
-function proposedRecordToQuestion(record6 = {}) {
-  const questionId4 = safeString(record6.questionId);
-  const prompt = normalizePrompt(record6.prompt || record6.questionText);
+function proposedRecordToQuestion(record7 = {}) {
+  const questionId4 = safeString(record7.questionId);
+  const prompt = normalizePrompt(record7.prompt || record7.questionText);
   if (!questionId4 || !prompt) return null;
-  const questionType = normalizeQuestionType3(record6.questionType);
-  const tags = normalizeQuestionTags(record6.tags);
-  const references = normalizeQuestionReferences(record6.references);
-  const geoRefs = normalizeQuestionGeoRefs(record6.geoRefs || record6.geoIds || record6.geoId);
+  const questionType = normalizeQuestionType3(record7.questionType);
+  const tags = normalizeQuestionTags(record7.tags);
+  const references = normalizeQuestionReferences(record7.references);
+  const geoRefs = normalizeQuestionGeoRefs(record7.geoRefs || record7.geoIds || record7.geoId);
   const question = {
     questionId: questionId4,
     id: questionId4,
     questionType,
     prompt,
     questionText: prompt,
-    sessionSlug: sanitizeSessionSlug(record6.sessionSlug),
+    sessionSlug: sanitizeSessionSlug(record7.sessionSlug),
     source: "telegram_question_proposal",
     visibility: "public",
     canAnswer: true,
     proposed: true,
-    createdAt: safeString(record6.createdAt) || null
+    createdAt: safeString(record7.createdAt) || null
   };
-  const options = questionType === "quadratic" && Array.isArray(record6.options) ? record6.options : normalizeOptions3(record6.options);
+  const options = questionType === "quadratic" && Array.isArray(record7.options) ? record7.options : normalizeOptions3(record7.options);
   if (options.length) question.options = options;
-  if (questionType === "multichoice" && record6.singleSelect === true) {
+  if (questionType === "multichoice" && record7.singleSelect === true) {
     question.singleSelect = true;
   }
-  if (questionType === "quadratic") question.voiceCredits = record6.voiceCredits ?? 99;
+  if (questionType === "quadratic") question.voiceCredits = record7.voiceCredits ?? 99;
   if (questionType === "rating") {
-    const ratingScale = normalizeRatingScale2(record6.ratingScale || record6.rating_scale);
+    const ratingScale = normalizeRatingScale2(record7.ratingScale || record7.rating_scale);
     if (ratingScale) question.ratingScale = ratingScale;
   }
   if (tags.length) question.tags = tags;
@@ -66976,16 +67187,16 @@ function questionTagsShapeIsValid(value) {
   if (value === null) return false;
   return Array.isArray(value) || typeof value === "string";
 }
-function proposedRecordMalformedReason(record6 = {}) {
-  if (!record6 || typeof record6 !== "object" || Array.isArray(record6)) return "record_not_object";
+function proposedRecordMalformedReason(record7 = {}) {
+  if (!record7 || typeof record7 !== "object" || Array.isArray(record7)) return "record_not_object";
   let questionId4 = "";
   try {
-    questionId4 = safeString(record6.questionId);
+    questionId4 = safeString(record7.questionId);
   } catch {
     return "question_id_invalid";
   }
   if (!questionId4) return "question_id_missing";
-  const promptValue = record6.prompt ?? record6.questionText;
+  const promptValue = record7.prompt ?? record7.questionText;
   if (!questionTextValueIsString(promptValue)) return "question_prompt_invalid";
   let prompt = "";
   try {
@@ -66994,7 +67205,7 @@ function proposedRecordMalformedReason(record6 = {}) {
     return "question_prompt_invalid";
   }
   if (!prompt) return "question_prompt_missing";
-  if (!questionTagsShapeIsValid(record6.tags)) return "question_tags_invalid";
+  if (!questionTagsShapeIsValid(record7.tags)) return "question_tags_invalid";
   return "";
 }
 async function persistAgentProposedQuestion({
@@ -67054,7 +67265,7 @@ async function persistAgentProposedQuestion({
     telegramUserId,
     chatId
   });
-  const record6 = {
+  const record7 = {
     version: 1,
     questionId: questionId4,
     sessionSlug: slug,
@@ -67075,32 +67286,32 @@ async function persistAgentProposedQuestion({
     createdAt: nowIso2(createdAt)
   };
   if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
-    record6.actionMetadata = { ...metadata };
+    record7.actionMetadata = { ...metadata };
   }
   const key = `${prefix}${questionId4}`;
   const stored = await env.AGENT_ACTION_KV.get(key);
   if (stored != null) {
     const existing = safeJsonParse(stored, null);
-    const sameSchema = !!existing && typeof existing === "object" && !Array.isArray(existing) && proposedAnswerSchema(existing) === proposedAnswerSchema(record6);
+    const sameSchema = !!existing && typeof existing === "object" && !Array.isArray(existing) && proposedAnswerSchema(existing) === proposedAnswerSchema(record7);
     if (!sameSchema) return { ok: false, reason: "question_schema_conflict", questionId: questionId4 };
     if (lower2(existing.status) !== "active") return { ok: false, reason: "question_archived", questionId: questionId4 };
     return { ok: true, questionId: questionId4, question: proposedRecordToQuestion(existing), record: existing };
   }
-  assertNoSecretShape(record6, "Agent proposed questions must not serialize secrets.");
+  assertNoSecretShape(record7, "Agent proposed questions must not serialize secrets.");
   const activityMetadata = buildAgentActivityMetadata({
     type: "proposed_question",
-    status: record6.status,
-    createdAt: record6.createdAt,
+    status: record7.status,
+    createdAt: record7.createdAt,
     pendingAction: "",
-    sessionSlug: record6.sessionSlug,
-    questionId: record6.questionId,
-    telegramUserId: record6.createdByTelegramUserId
+    sessionSlug: record7.sessionSlug,
+    questionId: record7.questionId,
+    telegramUserId: record7.createdByTelegramUserId
   });
-  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record6), {
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record7), {
     expirationTtl: ttlSeconds,
     metadata: activityMetadata
   });
-  return { ok: true, questionId: questionId4, question: proposedRecordToQuestion(record6), record: record6 };
+  return { ok: true, questionId: questionId4, question: proposedRecordToQuestion(record7), record: record7 };
 }
 async function archiveAgentProposedQuestion({
   env = {},
@@ -67121,25 +67332,25 @@ async function archiveAgentProposedQuestion({
   if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
     throw new Error("proposed_question_record_invalid");
   }
-  const record6 = {
+  const record7 = {
     ...existing,
     status: "archived",
     archivedAt: lower2(existing.status) === "archived" && safeString(existing.archivedAt) ? safeString(existing.archivedAt) : nowIso2(now),
     archivedBy: "service"
   };
-  assertNoSecretShape(record6, "Agent proposed questions must not serialize secrets.");
+  assertNoSecretShape(record7, "Agent proposed questions must not serialize secrets.");
   const existingMetadata = await readProposedQuestionMetadata(env, key);
   const metadata = existingMetadata ? { ...existingMetadata, s: "archived" } : buildAgentActivityMetadata({
     type: "proposed_question",
-    status: record6.status,
-    createdAt: record6.createdAt,
+    status: record7.status,
+    createdAt: record7.createdAt,
     pendingAction: "",
-    sessionSlug: record6.sessionSlug,
-    questionId: record6.questionId,
-    telegramUserId: record6.createdByTelegramUserId
+    sessionSlug: record7.sessionSlug,
+    questionId: record7.questionId,
+    telegramUserId: record7.createdByTelegramUserId
   });
   assertNoSecretShape(metadata, "Agent proposed question metadata must not serialize secrets.");
-  await kv.put(key, JSON.stringify(record6), {
+  await kv.put(key, JSON.stringify(record7), {
     expirationTtl: DEFAULT_PROPOSED_QUESTION_TTL_SECONDS,
     metadata
   });
@@ -67970,7 +68181,7 @@ async function persistDraftEditMetric({
     metrics
   });
   const key = `${DRAFT_EDIT_METRIC_KV_PREFIX}${slug}:${questionIdKeyPart(qid)}:${fingerprint}`;
-  const record6 = {
+  const record7 = {
     type: "telegram_draft_edit_metric",
     version: 1,
     sessionSlug: slug,
@@ -67982,8 +68193,8 @@ async function persistDraftEditMetric({
     metrics,
     createdAt: recordedAt
   };
-  assertNoSecretShape(record6, "Agent draft-edit metric records must not serialize secrets.");
-  await kv.put(key, JSON.stringify(record6));
+  assertNoSecretShape(record7, "Agent draft-edit metric records must not serialize secrets.");
+  await kv.put(key, JSON.stringify(record7));
   return { ok: true, stored: true, key, metrics };
 }
 var DRAFT_EDIT_METRIC_KV_PREFIX;
@@ -68165,7 +68376,7 @@ async function executeAgentSubmitRequest({
     telegramUserId
   });
   if (agentSubmitQueueEnabled(env)) {
-    const record7 = buildQueuedSubmitRecord({
+    const record8 = buildQueuedSubmitRecord({
       session,
       canonicalBody: {
         session: slug,
@@ -68205,7 +68416,7 @@ async function executeAgentSubmitRequest({
         createdAt
       }
     });
-    const queued = await queueAgentSubmitRecord({ env, kvKey, record: record7 }).catch((error) => ({
+    const queued = await queueAgentSubmitRecord({ env, kvKey, record: record8 }).catch((error) => ({
       ok: false,
       reason: "agent_submit_queue_failed",
       retryable: true,
@@ -68216,8 +68427,8 @@ async function executeAgentSubmitRequest({
       return {
         ok: true,
         requestId,
-        status: record7.status,
-        canonicalApiRequest: record7.canonicalApiRequest,
+        status: record8.status,
+        canonicalApiRequest: record8.canonicalApiRequest,
         idempotencyKey,
         queued: true,
         replayed: false
@@ -68310,19 +68521,19 @@ async function executeAgentSubmitRequest({
   if (directSubmit.replayed) return { ...directSubmit, requestId, idempotencyKey };
   if (!admitted) return { ...directSubmit, ok: false, requestId, idempotencyKey };
   const status = directSubmit.ok === true ? "direct_submitted" : directSubmit.reconciliationRequired ? "direct_submit_reconciliation_required" : "direct_submit_failed";
-  const record6 = {
+  const record7 = {
     ...baseRecord,
     status,
     onChain: { ...directSubmit, submissionAttemptId },
     canonicalApiRequest: { ...baseRecord.canonicalApiRequest, status: directSubmit.ok ? "executed_direct_onchain" : status }
   };
-  assertNoSecretShape(record6, "Agent direct submit records must not serialize secrets.");
-  const persisted = await env.AGENT_SERVICES.persistSubmitOutcome(record6);
+  assertNoSecretShape(record7, "Agent direct submit records must not serialize secrets.");
+  const persisted = await env.AGENT_SERVICES.persistSubmitOutcome(record7);
   if (persisted.replayed && persisted.record) return resultFromRecord(persisted.record, true);
   if (!persisted.ok || persisted.replayed) return { ...persisted, requestId, idempotencyKey };
   if (directSubmit.ok) await emitSubmittedEvent().catch(() => {
   });
-  return resultFromRecord(persisted.record || record6, persisted.replayed);
+  return resultFromRecord(persisted.record || record7, persisted.replayed);
 }
 var activeSubmissions, resultFromRecord;
 var init_answerSubmission = __esm({
@@ -68340,15 +68551,15 @@ var init_answerSubmission = __esm({
     init_draftAnswerEncoding();
     init_answerDrafts();
     activeSubmissions = /* @__PURE__ */ new Map();
-    resultFromRecord = (record6, replayed = false) => ({
-      ok: ["direct_submitted", "submit_queued"].includes(record6.status),
-      requestId: record6.requestId,
-      status: record6.status,
-      idempotencyKey: record6.idempotencyKey,
-      canonicalApiRequest: record6.canonicalApiRequest || null,
-      onChain: record6.onChain || null,
-      reason: record6.onChain?.reason || (record6.status === "submit_request_created" ? "direct_submit_unavailable" : record6.status),
-      retryable: record6.onChain?.retryable === true,
+    resultFromRecord = (record7, replayed = false) => ({
+      ok: ["direct_submitted", "submit_queued"].includes(record7.status),
+      requestId: record7.requestId,
+      status: record7.status,
+      idempotencyKey: record7.idempotencyKey,
+      canonicalApiRequest: record7.canonicalApiRequest || null,
+      onChain: record7.onChain || null,
+      reason: record7.onChain?.reason || (record7.status === "submit_request_created" ? "direct_submit_unavailable" : record7.status),
+      retryable: record7.onChain?.retryable === true,
       replayed
     });
   }
@@ -68377,7 +68588,7 @@ async function writeAgentSkillUpdateFlag({
 } = {}) {
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.put !== "function") return { ok: false, reason: "action_kv_unavailable" };
-  const record6 = {
+  const record7 = {
     version: 1,
     updateAvailable: true,
     latestVersion: safeString(latestVersion).slice(0, 40),
@@ -68385,9 +68596,9 @@ async function writeAgentSkillUpdateFlag({
     updatedBy: accountAddress ? shortAddress(accountAddress) : "",
     updatedAt: createdAt || nowIso2()
   };
-  assertNoSecretShape(record6, "Agent skill-update flag must not serialize secrets.");
-  await kv.put(AGENT_SKILL_UPDATE_KV_KEY, JSON.stringify(record6));
-  return { ok: true, latestVersion: record6.latestVersion };
+  assertNoSecretShape(record7, "Agent skill-update flag must not serialize secrets.");
+  await kv.put(AGENT_SKILL_UPDATE_KV_KEY, JSON.stringify(record7));
+  return { ok: true, latestVersion: record7.latestVersion };
 }
 async function clearAgentSkillUpdateFlag(env = {}) {
   const kv = env?.AGENT_ACTION_KV;
@@ -68450,9 +68661,9 @@ function submitRequestSessionKvPrefix(sessionSlug = "") {
   const slug = sanitizeSessionSlug(sessionSlug);
   return slug ? `${SUBMIT_REQUEST_SESSION_KV_PREFIX}${slug}:` : "";
 }
-function submitRequestSessionKvKey(record6 = {}) {
-  const prefix = submitRequestSessionKvPrefix(record6.sessionSlug);
-  const requestId = safeString(record6.requestId);
+function submitRequestSessionKvKey(record7 = {}) {
+  const prefix = submitRequestSessionKvPrefix(record7.sessionSlug);
+  const requestId = safeString(record7.requestId);
   return prefix && requestId ? `${prefix}${requestId}` : "";
 }
 function submitRequestUserKvPrefix({
@@ -68463,17 +68674,17 @@ function submitRequestUserKvPrefix({
   const userId = safeString(telegramUserId).replace(/[^0-9A-Za-z_-]/g, "").slice(0, 128);
   return slug && userId ? `${SUBMIT_REQUEST_USER_KV_PREFIX}${slug}:${userId}:` : "";
 }
-function submitRequestUserKvKey(record6 = {}) {
+function submitRequestUserKvKey(record7 = {}) {
   const prefix = submitRequestUserKvPrefix({
-    sessionSlug: record6.sessionSlug,
-    telegramUserId: record6.telegramUserId
+    sessionSlug: record7.sessionSlug,
+    telegramUserId: record7.telegramUserId
   });
-  const questionId4 = safeString(record6.questionId).replace(/[^0-9A-Za-z._:-]/g, "").slice(0, 160);
-  const requestId = safeString(record6.requestId);
+  const questionId4 = safeString(record7.questionId).replace(/[^0-9A-Za-z._:-]/g, "").slice(0, 160);
+  const requestId = safeString(record7.requestId);
   return prefix && requestId ? `${prefix}${questionId4 || "question"}:${requestId}` : "";
 }
-function canonicalAnswerKvKey(record6 = {}) {
-  const requestId = safeString(record6.requestId || record6.idempotencyKey).replace(/[^0-9A-Za-z_-]/g, "").slice(0, 160);
+function canonicalAnswerKvKey(record7 = {}) {
+  const requestId = safeString(record7.requestId || record7.idempotencyKey).replace(/[^0-9A-Za-z_-]/g, "").slice(0, 160);
   return requestId ? `${CANONICAL_ANSWER_KV_PREFIX}${requestId}` : "";
 }
 function canonicalAnswerSessionKvPrefix(sessionSlug = "") {
@@ -68484,9 +68695,9 @@ function canonicalAnswerUserKvPrefix({ sessionSlug = "", telegramUserId = "" } =
   const prefix = submitRequestUserKvPrefix({ sessionSlug, telegramUserId });
   return prefix ? `${CANONICAL_ANSWER_USER_KV_PREFIX}${prefix.slice(SUBMIT_REQUEST_USER_KV_PREFIX.length)}` : "";
 }
-function canonicalAnswerSessionKvKey(record6 = {}) {
-  const prefix = canonicalAnswerSessionKvPrefix(record6.sessionSlug);
-  const requestId = safeString(record6.requestId || record6.idempotencyKey).replace(/[^0-9A-Za-z_-]/g, "").slice(0, 160);
+function canonicalAnswerSessionKvKey(record7 = {}) {
+  const prefix = canonicalAnswerSessionKvPrefix(record7.sessionSlug);
+  const requestId = safeString(record7.requestId || record7.idempotencyKey).replace(/[^0-9A-Za-z_-]/g, "").slice(0, 160);
   return prefix && requestId ? `${prefix}${requestId}` : "";
 }
 function agentSubmitQueueEnabled(env = {}) {
@@ -68518,44 +68729,44 @@ function safeSessionSnapshotForSubmitQueue(session = {}) {
 function objectOrNull(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }
-function normalizeSubmitRecordTimestamps(record6 = {}) {
-  const createdAt = safeString(record6.createdAt || record6.processedAt || record6.updatedAt) || nowIso2();
+function normalizeSubmitRecordTimestamps(record7 = {}) {
+  const createdAt = safeString(record7.createdAt || record7.processedAt || record7.updatedAt) || nowIso2();
   return {
-    ...record6,
+    ...record7,
     createdAt
   };
 }
-function buildCanonicalAnswerRecord(record6 = {}, {
+function buildCanonicalAnswerRecord(record7 = {}, {
   sourceKey = ""
 } = {}) {
-  const requestId = safeString(record6.requestId || record6.idempotencyKey);
-  const sessionSlug = sanitizeSessionSlug(record6.sessionSlug);
-  const questionId4 = safeString(record6.questionId);
+  const requestId = safeString(record7.requestId || record7.idempotencyKey);
+  const sessionSlug = sanitizeSessionSlug(record7.sessionSlug);
+  const questionId4 = safeString(record7.questionId);
   if (!requestId || !sessionSlug || !questionId4) return null;
-  const createdAt = safeString(record6.createdAt || record6.processedAt || record6.updatedAt);
-  const updatedAt = safeString(record6.processedAt || record6.updatedAt || createdAt);
+  const createdAt = safeString(record7.createdAt || record7.processedAt || record7.updatedAt);
+  const updatedAt = safeString(record7.processedAt || record7.updatedAt || createdAt);
   const canonical = {
     version: 1,
     type: "telegram_canonical_answer",
     requestId,
-    idempotencyKey: safeString(record6.idempotencyKey),
-    status: safeString(record6.status),
-    lane: safeString(record6.lane),
-    telegramUserId: safeString(record6.telegramUserId),
-    username: safeString(record6.username),
-    languageCode: safeString(record6.languageCode),
-    chatId: safeString(record6.chatId),
+    idempotencyKey: safeString(record7.idempotencyKey),
+    status: safeString(record7.status),
+    lane: safeString(record7.lane),
+    telegramUserId: safeString(record7.telegramUserId),
+    username: safeString(record7.username),
+    languageCode: safeString(record7.languageCode),
+    chatId: safeString(record7.chatId),
     sessionSlug,
     questionId: questionId4,
-    questionIdShort: safeString(record6.questionIdShort),
-    answerFingerprint: safeString(record6.answerFingerprint),
-    ...Number.isSafeInteger(record6.answerRevision) ? { answerRevision: record6.answerRevision } : {},
-    answer: objectOrNull(record6.answer),
-    onChainAnswer: objectOrNull(record6.onChainAnswer),
-    answerRef: objectOrNull(record6.answerRef),
-    canonicalApiRequest: objectOrNull(record6.canonicalApiRequest),
-    onChain: objectOrNull(record6.onChain),
-    directSubmitAttempt: objectOrNull(record6.directSubmitAttempt),
+    questionIdShort: safeString(record7.questionIdShort),
+    answerFingerprint: safeString(record7.answerFingerprint),
+    ...Number.isSafeInteger(record7.answerRevision) ? { answerRevision: record7.answerRevision } : {},
+    answer: objectOrNull(record7.answer),
+    onChainAnswer: objectOrNull(record7.onChainAnswer),
+    answerRef: objectOrNull(record7.answerRef),
+    canonicalApiRequest: objectOrNull(record7.canonicalApiRequest),
+    onChain: objectOrNull(record7.onChain),
+    directSubmitAttempt: objectOrNull(record7.directSubmitAttempt),
     sourceKey: safeString(sourceKey),
     createdAt,
     updatedAt
@@ -68568,7 +68779,7 @@ function buildQueuedSubmitRecord({
   session = {},
   canonicalBody = {}
 } = {}) {
-  const record6 = normalizeSubmitRecordTimestamps({
+  const record7 = normalizeSubmitRecordTimestamps({
     ...baseRecord,
     action: AGENT_ACTIONS.DIRECT_SUBMIT_RESPONSE,
     status: "submit_queued",
@@ -68580,28 +68791,28 @@ function buildQueuedSubmitRecord({
     },
     sessionSnapshot: safeSessionSnapshotForSubmitQueue(session)
   });
-  assertNoSecretShape(record6, "Queued Agent submit records must not serialize secrets.");
-  return record6;
+  assertNoSecretShape(record7, "Queued Agent submit records must not serialize secrets.");
+  return record7;
 }
 async function persistQueuedSubmitRecord({
   env = {},
   kvKey = "",
-  record: record6 = {}
+  record: record7 = {}
 } = {}) {
   if (!env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== "function") {
     return { ok: false, reason: "action_kv_unavailable" };
   }
-  assertNoSecretShape(record6, "Queued Agent submit records must not serialize secrets.");
-  await persistAgentSubmitRecord({ env, kvKey, record: record6 });
+  assertNoSecretShape(record7, "Queued Agent submit records must not serialize secrets.");
+  await persistAgentSubmitRecord({ env, kvKey, record: record7 });
   return { ok: true };
 }
 async function persistCanonicalAnswerRecord({
   kv,
-  record: record6 = {},
+  record: record7 = {},
   sourceKey = ""
 } = {}) {
   if (!kv || typeof kv.put !== "function") return { ok: false, reason: "action_kv_unavailable" };
-  const canonical = buildCanonicalAnswerRecord(record6, { sourceKey });
+  const canonical = buildCanonicalAnswerRecord(record7, { sourceKey });
   if (!canonical) return { ok: false, reason: "canonical_answer_incomplete" };
   const userPrefix = canonicalAnswerUserKvPrefix(canonical);
   const keys = [
@@ -68617,16 +68828,16 @@ async function persistCanonicalAnswerRecord({
 async function persistAgentSubmitRecord({
   env = {},
   kvKey = "",
-  record: record6 = {}
+  record: record7 = {}
 } = {}) {
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.put !== "function") {
     return { ok: false, reason: "action_kv_unavailable" };
   }
-  const requestId = safeString(record6.requestId);
+  const requestId = safeString(record7.requestId);
   const canonicalKey = kvKey || submitRequestKvKey(requestId);
   if (!canonicalKey) return { ok: false, reason: "submit_request_key_missing" };
-  const storedRecord = normalizeSubmitRecordTimestamps(record6);
+  const storedRecord = normalizeSubmitRecordTimestamps(record7);
   assertNoSecretShape(storedRecord, "Agent submit records must not serialize secrets.");
   const serialized = JSON.stringify(storedRecord);
   const canonical = await persistCanonicalAnswerRecord({ kv, record: storedRecord, sourceKey: canonicalKey });
@@ -68651,7 +68862,7 @@ async function persistAgentSubmitRecord({
 }
 async function enqueueAgentSubmitRecord({
   env = {},
-  record: record6 = {}
+  record: record7 = {}
 } = {}) {
   if (!agentSubmitQueueEnabled(env)) {
     return { ok: false, skipped: true, reason: "agent_submit_queue_disabled" };
@@ -68659,8 +68870,8 @@ async function enqueueAgentSubmitRecord({
   const body = {
     type: AGENT_SUBMIT_QUEUE_MESSAGE_TYPE,
     version: 1,
-    requestId: safeString(record6.requestId),
-    record: record6
+    requestId: safeString(record7.requestId),
+    record: record7
   };
   assertNoSecretShape(body, "Queued Agent submit messages must not serialize secrets.");
   await env.AGENT_RESPONSE_QUEUE.send(body, { contentType: "json" });
@@ -68669,17 +68880,17 @@ async function enqueueAgentSubmitRecord({
 async function queueAgentSubmitRecord({
   env = {},
   kvKey = "",
-  record: record6 = {}
+  record: record7 = {}
 } = {}) {
   const normalizedRecord = {
-    ...normalizeSubmitRecordTimestamps(record6),
-    queueGeneration: safeString(record6.queueGeneration) || crypto.randomUUID()
+    ...normalizeSubmitRecordTimestamps(record7),
+    queueGeneration: safeString(record7.queueGeneration) || crypto.randomUUID()
   };
   const persisted = await persistQueuedSubmitRecord({ env, kvKey, record: normalizedRecord });
   if (!persisted.ok) return persisted;
   const queued = await enqueueAgentSubmitRecord({ env, record: normalizedRecord });
   if (!queued.ok) return queued;
-  return { ok: true, queued: true, requestId: record6.requestId };
+  return { ok: true, queued: true, requestId: record7.requestId };
 }
 function queueAttemptPolicy(env, attempts = 1) {
   const configured = Number(env.AGENT_CONTEXT?.config?.agentHttp?.submitMaxAttempts);
@@ -68703,16 +68914,16 @@ function withRetryExhaustion(outcome, policy) {
 function outcomeStatus(outcome) {
   return outcome.ok === true ? "direct_submitted" : outcome.retryable === true ? "submit_queued" : outcome.reconciliationRequired === true ? "direct_submit_reconciliation_required" : "direct_submit_failed";
 }
-function replayResult(record6) {
+function replayResult(record7) {
   return {
-    ok: record6.status === "direct_submitted",
-    requestId: record6.requestId,
+    ok: record7.status === "direct_submitted",
+    requestId: record7.requestId,
     replayed: true,
-    status: record6.status,
+    status: record7.status,
     retryable: false,
-    reconciliationRequired: record6.status === "direct_submit_reconciliation_required" || record6.onChain?.reconciliationRequired === true,
-    reason: record6.onChain?.reason || null,
-    onChain: record6.onChain || null
+    reconciliationRequired: record7.status === "direct_submit_reconciliation_required" || record7.onChain?.reconciliationRequired === true,
+    reason: record7.onChain?.reason || null,
+    onChain: record7.onChain || null
   };
 }
 function sameQueuedRequest(left, right) {
@@ -68755,26 +68966,26 @@ async function newerRevisionStored({ env, kv, source }) {
   }
   return false;
 }
-function recoveryDiagnostics(record6, reason) {
+function recoveryDiagnostics(record7, reason) {
   return {
     event: "agent_submit_recovery_required",
     reason,
-    requestId: safeString(record6.requestId),
-    status: safeString(record6.status),
-    sessionSlug: safeString(record6.sessionSlug),
-    txHash: safeString(record6.onChain?.txHash),
-    storageId: safeString(record6.onChain?.storageId),
-    createdAt: safeString(record6.createdAt),
-    queueGeneration: safeString(record6.queueGeneration)
+    requestId: safeString(record7.requestId),
+    status: safeString(record7.status),
+    sessionSlug: safeString(record7.sessionSlug),
+    txHash: safeString(record7.onChain?.txHash),
+    storageId: safeString(record7.onChain?.storageId),
+    createdAt: safeString(record7.createdAt),
+    queueGeneration: safeString(record7.queueGeneration)
   };
 }
-async function retainOutcomeForRecovery(env, record6, error) {
-  const recovery = record6.onChain?.retryable === true ? {
-    ...record6,
+async function retainOutcomeForRecovery(env, record7, error) {
+  const recovery = record7.onChain?.retryable === true ? {
+    ...record7,
     status: "direct_submit_failed",
-    canonicalApiRequest: { ...record6.canonicalApiRequest, status: "direct_submit_failed" },
-    onChain: { ...record6.onChain, retryable: false, safeToRetry: true, recoveryReason: "submit_result_persistence_failed" }
-  } : { ...record6, canonicalApiRequest: { ...record6.canonicalApiRequest, status: record6.status === "direct_submitted" ? "executed_direct_onchain" : record6.status } };
+    canonicalApiRequest: { ...record7.canonicalApiRequest, status: "direct_submit_failed" },
+    onChain: { ...record7.onChain, retryable: false, safeToRetry: true, recoveryReason: "submit_result_persistence_failed" }
+  } : { ...record7, canonicalApiRequest: { ...record7.canonicalApiRequest, status: record7.status === "direct_submitted" ? "executed_direct_onchain" : record7.status } };
   const body = { type: AGENT_SUBMIT_QUEUE_MESSAGE_TYPE, version: 1, requestId: recovery.requestId, persistenceOnly: true, record: recovery };
   let retained = false;
   try {
@@ -68792,7 +69003,7 @@ async function retainOutcomeForRecovery(env, record6, error) {
     reason: "submit_result_persistence_failed",
     error: safeString(error?.message || error),
     retryable: false,
-    reconciliationRequired: record6.onChain?.ok === true || record6.onChain?.reconciliationRequired === true,
+    reconciliationRequired: record7.onChain?.ok === true || record7.onChain?.reconciliationRequired === true,
     persistenceOnlyQueued: retained,
     diagnosticsRetained: retained,
     onChain: recovery.onChain
@@ -68854,50 +69065,50 @@ async function persistQueueOutcome({ env, source, outcome, now }) {
   };
 }
 async function persistRecoveryMessage({ env, body, requireExisting = false }) {
-  const record6 = objectOrNull(body.record);
-  if (!record6 || safeString(body.requestId) !== safeString(record6.requestId) || !record6.requestId || !record6.sessionSlug || !record6.questionId || !["direct_submitted", "direct_submit_failed", "direct_submit_reconciliation_required"].includes(record6.status) || !objectOrNull(record6.onChain)) {
+  const record7 = objectOrNull(body.record);
+  if (!record7 || safeString(body.requestId) !== safeString(record7.requestId) || !record7.requestId || !record7.sessionSlug || !record7.questionId || !["direct_submitted", "direct_submit_failed", "direct_submit_reconciliation_required"].includes(record7.status) || !objectOrNull(record7.onChain)) {
     return { ok: false, retryable: false, reason: "submit_recovery_record_invalid" };
   }
-  if (record6.submissionJournal === true) {
-    const result = await env.AGENT_SERVICES.recoverSubmitOutcome(record6);
+  if (record7.submissionJournal === true) {
+    const result = await env.AGENT_SERVICES.recoverSubmitOutcome(record7);
     return result.record ? { ...replayResult(result.record), persistenceOnly: true } : result;
   }
   try {
     const kv = env.AGENT_ACTION_KV;
     if (typeof kv?.get !== "function" || typeof kv?.put !== "function") throw new Error("action_kv_unavailable");
-    const raw = await kv.get(submitRequestKvKey(record6.requestId));
+    const raw = await kv.get(submitRequestKvKey(record7.requestId));
     const existing = raw == null ? null : objectOrNull(safeJsonParse(raw, null));
     if (requireExisting && !existing) return { ok: false, reason: "submit_intent_missing" };
-    if (raw != null && (!existing || !sameQueuedRequest(existing, record6))) {
+    if (raw != null && (!existing || !sameQueuedRequest(existing, record7))) {
       return { ok: false, retryable: false, reason: "submit_recovery_request_mismatch" };
     }
-    if (staleQueueGeneration(existing, record6)) return { ok: true, replayed: true, reason: "stale_submit_recovery" };
-    if (existing?.status === "direct_submitted" && record6.status !== "direct_submitted") return replayResult(existing);
-    if (existing?.status === "direct_submit_failed" && existing.onChain?.safeToRetry !== true && record6.onChain.safeToRetry === true) {
+    if (staleQueueGeneration(existing, record7)) return { ok: true, replayed: true, reason: "stale_submit_recovery" };
+    if (existing?.status === "direct_submitted" && record7.status !== "direct_submitted") return replayResult(existing);
+    if (existing?.status === "direct_submit_failed" && existing.onChain?.safeToRetry !== true && record7.onChain.safeToRetry === true) {
       return replayResult(existing);
     }
-    if ((existing?.status === "direct_submit_reconciliation_required" || existing?.onChain?.reconciliationRequired === true) && record6.onChain.safeToRetry === true && (!record6.onChain.submissionAttemptId || record6.onChain.submissionAttemptId !== existing.onChain?.submissionAttemptId)) {
+    if ((existing?.status === "direct_submit_reconciliation_required" || existing?.onChain?.reconciliationRequired === true) && record7.onChain.safeToRetry === true && (!record7.onChain.submissionAttemptId || record7.onChain.submissionAttemptId !== existing.onChain?.submissionAttemptId)) {
       return replayResult(existing);
     }
-    if (existing?.onChain?.txHash && record6.onChain?.txHash && existing.onChain.txHash !== record6.onChain.txHash) {
-      return { ok: false, requestId: record6.requestId, retryable: true, persistenceOnly: true, reason: "submit_recovery_outcome_conflict" };
+    if (existing?.onChain?.txHash && record7.onChain?.txHash && existing.onChain.txHash !== record7.onChain.txHash) {
+      return { ok: false, requestId: record7.requestId, retryable: true, persistenceOnly: true, reason: "submit_recovery_outcome_conflict" };
     }
-    const persisted = await persistAgentSubmitRecord({ env, record: { ...record6, createdAt: existing?.createdAt || record6.createdAt } });
+    const persisted = await persistAgentSubmitRecord({ env, record: { ...record7, createdAt: existing?.createdAt || record7.createdAt } });
     if (!persisted.ok) throw new Error(persisted.reason || "submit_recovery_write_failed");
-    return { ok: true, requestId: record6.requestId, status: record6.status, persistenceOnly: true };
+    return { ok: true, requestId: record7.requestId, status: record7.status, persistenceOnly: true };
   } catch (error) {
-    return { ok: false, requestId: record6.requestId, retryable: true, persistenceOnly: true, reason: "submit_recovery_write_failed", error: safeString(error?.message || error) };
+    return { ok: false, requestId: record7.requestId, retryable: true, persistenceOnly: true, reason: "submit_recovery_write_failed", error: safeString(error?.message || error) };
   }
 }
 async function processQueuedAgentSubmitRecord({
   env = {},
-  record: record6 = {},
+  record: record7 = {},
   createdAt = null,
   now = /* @__PURE__ */ new Date(),
   attempts = 1,
   contractFactory
 } = {}) {
-  const requestId = safeString(record6.requestId);
+  const requestId = safeString(record7.requestId);
   const retryPolicy = queueAttemptPolicy(env, attempts);
   const kvKey = submitRequestKvKey(requestId);
   if (!kvKey) return { ok: false, retryable: false, reason: "submit_request_key_missing" };
@@ -68911,13 +69122,13 @@ async function processQueuedAgentSubmitRecord({
   } catch (error) {
     const outcome = withRetryExhaustion({ ok: false, retryable: true, reason: "submit_request_read_failed", error: safeString(error?.message || error) }, retryPolicy);
     if (outcome.retryable) return { ...outcome, requestId };
-    return retainOutcomeForRecovery(env, { ...record6, status: "direct_submit_failed", onChain: outcome }, error);
+    return retainOutcomeForRecovery(env, { ...record7, status: "direct_submit_failed", onChain: outcome }, error);
   }
   const existing = rawExisting == null ? null : objectOrNull(safeJsonParse(rawExisting, null));
-  if (rawExisting != null && (!existing || !sameQueuedRequest(existing, record6))) {
+  if (rawExisting != null && (!existing || !sameQueuedRequest(existing, record7))) {
     return { ok: false, requestId, retryable: false, reason: "submit_request_record_invalid" };
   }
-  if (staleQueueGeneration(existing, record6)) return { ok: true, requestId, replayed: true, reason: "stale_submit_delivery" };
+  if (staleQueueGeneration(existing, record7)) return { ok: true, requestId, replayed: true, reason: "stale_submit_delivery" };
   if (existing?.status === "direct_submit_failed") return replayResult(existing);
   if (existing?.status === "direct_submitted") {
     return { ok: true, requestId, replayed: true, status: "direct_submitted" };
@@ -68934,7 +69145,7 @@ async function processQueuedAgentSubmitRecord({
       onChain: existing.onChain || null
     };
   }
-  const source = existing || record6;
+  const source = existing || record7;
   const executionTime = now instanceof Date ? now : new Date(now);
   if (!Number.isFinite(executionTime.getTime())) {
     return { ok: false, requestId, retryable: false, reason: "submit_execution_time_invalid" };
@@ -69125,16 +69336,16 @@ async function scheduleProjectionRepair(coordinator) {
   if (!current || current <= Number(coordinator.now()) || current > nextAt) await coordinator.state.storage.setAlarm(nextAt);
 }
 async function projectOutcome(coordinator, key, stored) {
-  const record6 = journalRecord(stored);
-  const projectionKey = `${PROJECTION_PREFIX}${record6.sessionId}:${record6.requestId}`;
-  const digest2 = await sha256Hex2(stableJson(record6));
+  const record7 = journalRecord(stored);
+  const projectionKey = `${PROJECTION_PREFIX}${record7.sessionId}:${record7.requestId}`;
+  const digest2 = await sha256Hex2(stableJson(record7));
   const previous = stored.kvProjection || {};
   if (previous.digest === digest2 && previous.pending !== true) return;
   const now = Number(coordinator.now());
   let notBeforeMs = Number(previous.notBeforeMs) || now;
   const pending = { digest: digest2, pending: true, notBeforeMs };
   await coordinator.state.storage.transaction(async (storage) => {
-    await storage.put(key, { ...record6, kvProjection: pending });
+    await storage.put(key, { ...record7, kvProjection: pending });
     await storage.put(projectionKey, { key, notBeforeMs });
   });
   if (now < notBeforeMs) {
@@ -69143,18 +69354,18 @@ async function projectOutcome(coordinator, key, stored) {
   }
   notBeforeMs = now + 1e3;
   await coordinator.state.storage.transaction(async (storage) => {
-    await storage.put(key, { ...record6, kvProjection: { ...pending, notBeforeMs } });
+    await storage.put(key, { ...record7, kvProjection: { ...pending, notBeforeMs } });
     await storage.put(projectionKey, { key, notBeforeMs });
   });
   await scheduleProjectionRepair(coordinator);
   try {
-    const kv = createAgentStorage({ kv: coordinator.env.GROUP_KV, sessionId: record6.sessionId, cursorSecret: coordinator.env.TOKEN_HMAC_SECRET });
-    const persisted = await persistAgentSubmitRecord({ env: { AGENT_ACTION_KV: kv }, record: record6 });
+    const kv = createAgentStorage({ kv: coordinator.env.GROUP_KV, sessionId: record7.sessionId, cursorSecret: coordinator.env.TOKEN_HMAC_SECRET });
+    const persisted = await persistAgentSubmitRecord({ env: { AGENT_ACTION_KV: kv }, record: record7 });
     if (!persisted.ok) throw new Error(persisted.reason);
   } catch {
     notBeforeMs = Number(coordinator.now()) + 1e3;
     await coordinator.state.storage.transaction(async (storage) => {
-      await storage.put(key, { ...record6, kvProjection: { ...pending, notBeforeMs } });
+      await storage.put(key, { ...record7, kvProjection: { ...pending, notBeforeMs } });
       await storage.put(projectionKey, { key, notBeforeMs });
     });
     await scheduleProjectionRepair(coordinator);
@@ -69162,7 +69373,7 @@ async function projectOutcome(coordinator, key, stored) {
   }
   notBeforeMs = Number(coordinator.now()) + 1e3;
   await coordinator.state.storage.transaction(async (storage) => {
-    await storage.put(key, { ...record6, kvProjection: { digest: digest2, pending: false, notBeforeMs } });
+    await storage.put(key, { ...record7, kvProjection: { digest: digest2, pending: false, notBeforeMs } });
     await storage.delete(projectionKey);
   });
 }
@@ -69188,50 +69399,50 @@ var init_submissionJournal = __esm({
     init_agentSubmitQueue();
     init_runtimePrimitives();
     PROJECTION_PREFIX = "ce-agent-submit-projection:";
-    answerHeadKey = async (record6) => `ce-agent-answer-head:${record6.sessionId}:${await sha256Hex2(stableJson([record6.principalId, record6.questionId]))}`;
+    answerHeadKey = async (record7) => `ce-agent-answer-head:${record7.sessionId}:${await sha256Hex2(stableJson([record7.principalId, record7.questionId]))}`;
     reply = (body, status = 200) => Response.json(body, { status });
     sameRequest = (a, b2) => ["sessionId", "sessionSlug", "workerOrigin", "accountAddress", "principalId", "questionId", "idempotencyKey", "requestId"].every((key) => a[key] === b2[key]);
     journalRecord = (stored) => {
       if (!stored) return null;
-      const { kvProjection: _projection, ...record6 } = stored;
-      return record6;
+      const { kvProjection: _projection, ...record7 } = stored;
+      return record7;
     };
     dispatchAgentSubmissionJournal = (coordinator, operation, payload) => coordinator.serializeSessionConfigOperation(async () => {
-      const record6 = payload?.record;
+      const record7 = payload?.record;
       if (operation === "head") {
-        if (!record6 || record6.sessionSlug !== payload.slug || ["principalId", "questionId"].some((key2) => typeof record6[key2] !== "string" || !record6[key2])) {
+        if (!record7 || record7.sessionSlug !== payload.slug || ["principalId", "questionId"].some((key2) => typeof record7[key2] !== "string" || !record7[key2])) {
           return reply({ ok: false, reason: "submit_journal_record_invalid" }, 400);
         }
         const authority2 = await coordinator.readSessionConfigAuthority(payload.slug);
-        if (resolveCanonicalWorkerSessionIdHex(authority2?.config) !== record6.sessionId) return reply({ ok: false, reason: "submit_journal_session_mismatch" }, 409);
-        return reply({ ok: true, head: await coordinator.state.storage.get(await answerHeadKey(record6)) || null });
+        if (resolveCanonicalWorkerSessionIdHex(authority2?.config) !== record7.sessionId) return reply({ ok: false, reason: "submit_journal_session_mismatch" }, 409);
+        return reply({ ok: true, head: await coordinator.state.storage.get(await answerHeadKey(record7)) || null });
       }
       if (operation === "claim") {
-        if (!record6 || record6.sessionSlug !== payload.slug || ["principalId", "questionId", "transport", "contentDigest"].some((key3) => typeof record6[key3] !== "string" || !record6[key3])) {
+        if (!record7 || record7.sessionSlug !== payload.slug || ["principalId", "questionId", "transport", "contentDigest"].some((key3) => typeof record7[key3] !== "string" || !record7[key3])) {
           return reply({ ok: false, reason: "submit_journal_record_invalid" }, 400);
         }
         const authority2 = await coordinator.readSessionConfigAuthority(payload.slug);
-        if (resolveCanonicalWorkerSessionIdHex(authority2?.config) !== record6.sessionId) return reply({ ok: false, reason: "submit_journal_session_mismatch" }, 409);
-        const key2 = await answerHeadKey(record6);
+        if (resolveCanonicalWorkerSessionIdHex(authority2?.config) !== record7.sessionId) return reply({ ok: false, reason: "submit_journal_session_mismatch" }, 409);
+        const key2 = await answerHeadKey(record7);
         const head = await coordinator.state.storage.get(key2);
-        if (head?.contentDigest === record6.contentDigest) return reply({ ok: true, head });
+        if (head?.contentDigest === record7.contentDigest) return reply({ ok: true, head });
         assertExpectedSessionAuthority(authority2, payload.expectedAuthority, payload.slug);
         const revision = (head?.revision || 0) + 1;
         if (!Number.isSafeInteger(revision)) return reply({ ok: false, reason: "submit_revision_exhausted" }, 409);
-        const next2 = { revision, contentDigest: record6.contentDigest, ...await answerRevisionIdentity({ ...record6, revision }) };
+        const next2 = { revision, contentDigest: record7.contentDigest, ...await answerRevisionIdentity({ ...record7, revision }) };
         await coordinator.state.storage.put(key2, next2);
         return reply({ ok: true, head: next2 });
       }
-      if (!["begin", "finish", "read"].includes(operation) || !record6 || !/^[A-Za-z0-9_-]{1,160}$/.test(record6.requestId || "") || !record6.idempotencyKey || record6.sessionSlug !== payload.slug || operation !== "read" && !record6.onChain?.submissionAttemptId) {
+      if (!["begin", "finish", "read"].includes(operation) || !record7 || !/^[A-Za-z0-9_-]{1,160}$/.test(record7.requestId || "") || !record7.idempotencyKey || record7.sessionSlug !== payload.slug || operation !== "read" && !record7.onChain?.submissionAttemptId) {
         return reply({ ok: false, reason: "submit_journal_record_invalid" }, 400);
       }
       const authority = await coordinator.readSessionConfigAuthority(payload.slug);
-      if (resolveCanonicalWorkerSessionIdHex(authority?.config) !== record6.sessionId) return reply({ ok: false, reason: "submit_journal_session_mismatch" }, 409);
-      const key = `ce-agent-submit:${record6.sessionId}:${record6.requestId}`;
+      if (resolveCanonicalWorkerSessionIdHex(authority?.config) !== record7.sessionId) return reply({ ok: false, reason: "submit_journal_session_mismatch" }, 409);
+      const key = `ce-agent-submit:${record7.sessionId}:${record7.requestId}`;
       const stored = await coordinator.state.storage.get(key);
       const existing = journalRecord(stored);
-      if (existing && !sameRequest(existing, record6)) return reply({ ok: false, reason: "submit_journal_request_mismatch" }, 409);
-      let next = record6;
+      if (existing && !sameRequest(existing, record7)) return reply({ ok: false, reason: "submit_journal_request_mismatch" }, 409);
+      let next = record7;
       let replayed = false;
       if (operation === "read") {
         if (!existing) return reply({ ok: true, record: null });
@@ -69245,31 +69456,31 @@ var init_submissionJournal = __esm({
         } else if (existing?.status === "direct_submit_in_progress") {
           next = existing;
         } else if (existing) next = {
-          ...record6,
+          ...record7,
           createdAt: existing.createdAt,
           draftProvenance: existing.draftProvenance,
           responsePayload: existing.responsePayload,
-          onChain: { ...record6.onChain, ...existing.onChain?.storageId ? { storageId: existing.onChain.storageId, storageRef: existing.onChain.storageRef } : {} }
+          onChain: { ...record7.onChain, ...existing.onChain?.storageId ? { storageId: existing.onChain.storageId, storageRef: existing.onChain.storageRef } : {} }
         };
       } else {
         if (!existing) return reply({ ok: false, reason: "submit_intent_missing" }, 409);
-        if (!["direct_submitted", "direct_submit_failed", "direct_submit_reconciliation_required"].includes(record6.status)) return reply({ ok: false, reason: "submit_journal_outcome_invalid" }, 400);
-        if (existing.status === "direct_submitted" || record6.onChain.safeToRetry === true && existing.onChain?.submissionAttemptId !== record6.onChain.submissionAttemptId) {
+        if (!["direct_submitted", "direct_submit_failed", "direct_submit_reconciliation_required"].includes(record7.status)) return reply({ ok: false, reason: "submit_journal_outcome_invalid" }, 400);
+        if (existing.status === "direct_submitted" || record7.onChain.safeToRetry === true && existing.onChain?.submissionAttemptId !== record7.onChain.submissionAttemptId) {
           next = existing;
           replayed = true;
         } else next = {
-          ...record6,
+          ...record7,
           createdAt: existing.createdAt,
           draftProvenance: existing.draftProvenance,
           responsePayload: existing.responsePayload,
-          onChain: { ...record6.onChain, ...existing.onChain?.storageId && !record6.onChain?.storageId ? { storageId: existing.onChain.storageId, storageRef: existing.onChain.storageRef } : {} }
+          onChain: { ...record7.onChain, ...existing.onChain?.storageId && !record7.onChain?.storageId ? { storageId: existing.onChain.storageId, storageRef: existing.onChain.storageRef } : {} }
         };
       }
       if (operation === "begin" && !replayed) {
         next = { ...next, admissionComplete: true };
         await coordinator.state.storage.transaction(async (storage) => {
           await storage.put(key, { ...next, kvProjection: { ...stored?.kvProjection, pending: false } });
-          await storage.delete(`${PROJECTION_PREFIX}${record6.sessionId}:${record6.requestId}`);
+          await storage.delete(`${PROJECTION_PREFIX}${record7.sessionId}:${record7.requestId}`);
         });
       } else if (operation === "finish" || stored?.kvProjection?.pending) {
         await projectOutcome(coordinator, key, { ...next, kvProjection: stored?.kvProjection });
@@ -69426,7 +69637,7 @@ async function saveAgentQuestionQueueConfig({
   }
   const existing = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
   const now = safeString(createdAt) || (/* @__PURE__ */ new Date()).toISOString();
-  const record6 = {
+  const record7 = {
     type: "telegram_question_queue_config",
     version: 1,
     sessionSlug: sanitizeSessionSlug(sessionSlug),
@@ -69436,9 +69647,9 @@ async function saveAgentQuestionQueueConfig({
     createdAt: safeString(existing?.createdAt) || now,
     updatedAt: now
   };
-  assertNoSecretShape(record6, "Agent question queue config records must not serialize secrets.");
-  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record6));
-  return { ok: true, key, config: record6 };
+  assertNoSecretShape(record7, "Agent question queue config records must not serialize secrets.");
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record7));
+  return { ok: true, key, config: record7 };
 }
 function normalizeQuestionQueueCriteria(input = {}) {
   const criteria = input.criteria && typeof input.criteria === "object" && !Array.isArray(input.criteria) ? input.criteria : {};
@@ -69568,7 +69779,7 @@ async function advanceAgentQuestionQueueState({
         selectedAt: now
       }] : []
     ].slice(-MAX_HISTORY);
-    const record6 = {
+    const record7 = {
       type: "telegram_question_queue_state",
       version: 1,
       sessionSlug: sanitizeSessionSlug(sessionSlug),
@@ -69581,8 +69792,8 @@ async function advanceAgentQuestionQueueState({
       createdAt: safeString(existing?.createdAt) || now,
       updatedAt: now
     };
-    assertNoSecretShape(record6, "Agent question queue state records must not serialize secrets.");
-    await kv.put(key, JSON.stringify(record6));
+    assertNoSecretShape(record7, "Agent question queue state records must not serialize secrets.");
+    await kv.put(key, JSON.stringify(record7));
     advanced = true;
   }
   return { questionId: questionId4, sponsored, cycled, advanced, replayed: false, servedCount: nextServed.length, candidateCount: candidates.length };
@@ -69774,8 +69985,8 @@ function wrappedImageRunKey(sessionSlug = "", telegramUserId = "", mode = "", ru
   const slug = sanitizeSessionSlug(sessionSlug);
   const user = kvKeySafePart(telegramUserId);
   const imageMode = lower2(mode).replace(/[^a-z0-9_-]+/g, "_").slice(0, 48) || "wrapped";
-  const run = normalizeAgentOnlyRunId(runId);
-  return slug && user && run ? `${AGENT_ONLY_WRAPPED_IMAGE_RUN_KV_PREFIX}${slug}:${user}:${imageMode}:${run}` : "";
+  const run2 = normalizeAgentOnlyRunId(runId);
+  return slug && user && run2 ? `${AGENT_ONLY_WRAPPED_IMAGE_RUN_KV_PREFIX}${slug}:${user}:${imageMode}:${run2}` : "";
 }
 function normalizeWrappedImageViewId(value = "") {
   const id2 = lower2(value).replace(/[^a-f0-9]/g, "").slice(0, 32);
@@ -69869,23 +70080,23 @@ var init_wrappedJournal = __esm({
     reply4 = (body, status = 200) => Response.json(body, { status });
     busy = () => reply4({ ok: false, status: 503, reason: "wrapped_storage_busy", retryable: true, retryAfterSeconds: 1 }, 503);
     dispatchWrappedResearch = (coordinator, payload) => coordinator.serializeSessionConfigOperation(async () => {
-      const record6 = payload?.record;
-      if (!record6 || !["answers", "votes"].includes(record6.kind) || record6.sessionSlug !== payload.slug || typeof record6.subjectId !== "string" || !record6.subjectId || record6.subjectId.length > 256 || typeof record6.requestId !== "string" || !record6.requestId || record6.requestId.length > 160 || !/^[a-f0-9]{64}$/.test(record6.summaryHash || "") || !Array.isArray(record6.events) || record6.events.length < 1 || record6.events.length > 50 || record6.kind === "votes" && !["linear", "quadratic"].includes(record6.mode)) {
+      const record7 = payload?.record;
+      if (!record7 || !["answers", "votes"].includes(record7.kind) || record7.sessionSlug !== payload.slug || typeof record7.subjectId !== "string" || !record7.subjectId || record7.subjectId.length > 256 || typeof record7.requestId !== "string" || !record7.requestId || record7.requestId.length > 160 || !/^[a-f0-9]{64}$/.test(record7.summaryHash || "") || !Array.isArray(record7.events) || record7.events.length < 1 || record7.events.length > 50 || record7.kind === "votes" && !["linear", "quadratic"].includes(record7.mode)) {
         return reply4({ ok: false, reason: "wrapped_request_invalid" }, 400);
       }
       const authority = await coordinator.readSessionConfigAuthority(payload.slug);
       assertExpectedSessionAuthority(authority, payload.expectedAuthority, payload.slug);
-      if (resolveCanonicalWorkerSessionIdHex(authority?.config) !== record6.sessionId) {
+      if (resolveCanonicalWorkerSessionIdHex(authority?.config) !== record7.sessionId) {
         return reply4({ ok: false, reason: "wrapped_session_mismatch" }, 409);
       }
-      const kv = createAgentStorage({ kv: coordinator.env.GROUP_KV, sessionId: record6.sessionId, cursorSecret: coordinator.env.TOKEN_HMAC_SECRET });
+      const kv = createAgentStorage({ kv: coordinator.env.GROUP_KV, sessionId: record7.sessionId, cursorSecret: coordinator.env.TOKEN_HMAC_SECRET });
       const storage = coordinator.state.storage;
-      const stateKey = record6.kind === "answers" ? answerStateKey(record6.sessionSlug, record6.subjectId) : voteStateKey(record6.sessionSlug, record6.subjectId, record6.mode);
-      const namespace = `ce-agent-wrapped:${record6.sessionId}:${await sha256Hex2(stateKey)}`;
+      const stateKey = record7.kind === "answers" ? answerStateKey(record7.sessionSlug, record7.subjectId) : voteStateKey(record7.sessionSlug, record7.subjectId, record7.mode);
+      const namespace = `ce-agent-wrapped:${record7.sessionId}:${await sha256Hex2(stateKey)}`;
       const durableStateKey = `${namespace}:state`;
-      const requestKey = `${namespace}:request:${await sha256Hex2(record6.requestId)}`;
+      const requestKey = `${namespace}:request:${await sha256Hex2(record7.requestId)}`;
       const existing = await storage.get(requestKey);
-      if (existing && existing.summaryHash !== record6.summaryHash) return reply4({ ok: false, status: 409, reason: "request_id_conflict" }, 409);
+      if (existing && existing.summaryHash !== record7.summaryHash) return reply4({ ok: false, status: 409, reason: "request_id_conflict" }, 409);
       if (existing?.complete) return reply4({ ...existing.response, replay: true });
       let state2 = await storage.get(durableStateKey);
       if (!state2) state2 = { value: safeJsonParse(await kv.get(stateKey), null), notBeforeMs: 0, pending: null };
@@ -69919,20 +70130,20 @@ var init_wrappedJournal = __esm({
         if (existing) return reply4({ ...existing.response, replay: true });
       }
       if (now < state2.notBeforeMs) return busy();
-      const base = state2.value || record6.initialState;
-      if (!base || !record6.changes || typeof record6.changes !== "object") return reply4({ ok: false, reason: "wrapped_state_invalid" }, 400);
+      const base = state2.value || record7.initialState;
+      if (!base || !record7.changes || typeof record7.changes !== "object") return reply4({ ok: false, reason: "wrapped_state_invalid" }, 400);
       let value;
-      let events = record6.events;
-      if (record6.kind === "answers") {
+      let events = record7.events;
+      if (record7.kind === "answers") {
         const runScopes = (base.runScopes || []).map((scope) => ({ ...scope }));
         for (const event of events) {
           const { runId, questionId: questionId4, eventKind } = event.value;
           let scope = runScopes.find((entry2) => entry2.runId === runId);
           if (!scope) {
-            if (!Array.isArray(record6.runStatementIds) || !record6.runStatementIds.length) {
+            if (!Array.isArray(record7.runStatementIds) || !record7.runStatementIds.length) {
               return reply4({ ok: false, status: 400, reason: "wrapped_run_scope_invalid" }, 400);
             }
-            scope = { runId, runStatementIds: [...new Set(record6.runStatementIds)], coverage: "" };
+            scope = { runId, runStatementIds: [...new Set(record7.runStatementIds)], coverage: "" };
             scope.coverage = "0".repeat(scope.runStatementIds.length);
             runScopes.push(scope);
           }
@@ -69948,7 +70159,7 @@ var init_wrappedJournal = __esm({
           }, 409);
         }
         const byStatement = { ...base.byStatement };
-        for (const [id2, change] of Object.entries(record6.changes)) {
+        for (const [id2, change] of Object.entries(record7.changes)) {
           byStatement[id2] = { ...byStatement[id2], agent: change.agent, agentSkip: change.agentSkip };
         }
         const counts = { answers: 0, skips: 0 };
@@ -69956,151 +70167,27 @@ var init_wrappedJournal = __esm({
           if (entry2.agent) counts.answers++;
           if (entry2.agentSkip) counts.skips++;
         }
-        value = { ...base, byStatement, runScopes, counts, updatedAt: record6.createdAt };
-      } else value = { ...base, ...record6.changes, updatedAt: record6.createdAt };
+        value = { ...base, byStatement, runScopes, counts, updatedAt: record7.createdAt };
+      } else value = { ...base, ...record7.changes, updatedAt: record7.createdAt };
       value.recentRequestIds = [
-        ...(base.recentRequestIds || []).filter((entry2) => entry2.requestId !== record6.requestId),
-        { requestId: record6.requestId, summaryHash: record6.summaryHash, at: record6.createdAt }
+        ...(base.recentRequestIds || []).filter((entry2) => entry2.requestId !== record7.requestId),
+        { requestId: record7.requestId, summaryHash: record7.summaryHash, at: record7.createdAt }
       ].slice(-MAX_RECENT_REQUEST_IDS);
       const pending = {
-        summaryHash: record6.summaryHash,
+        summaryHash: record7.summaryHash,
         events,
-        stateMetadata: record6.stateMetadata,
-        response: record6.response,
+        stateMetadata: record7.stateMetadata,
+        response: record7.response,
         complete: false
       };
-      if (record6.kind === "answers") pending.stateMetadata = { ...pending.stateMetadata, a: value.counts.answers, s: value.counts.skips };
+      if (record7.kind === "answers") pending.stateMetadata = { ...pending.stateMetadata, a: value.counts.answers, s: value.counts.skips };
       state2 = { ...state2, value, pending: requestKey };
       await storage.transaction(async (tx) => {
         await tx.put(requestKey, pending);
         await tx.put(durableStateKey, state2);
       });
-      return await project() ? reply4(record6.response) : busy();
+      return await project() ? reply4(record7.response) : busy();
     });
-  }
-});
-
-// shared/sessionContextSources.mjs
-var CONTEXT_ROLE, CONTEXT_TEXT_ROLE, CONTEXT_TAGS, CONTEXT_SOURCE_LIMITS, CONTEXT_FILE_TYPES, CONTEXT_FILE_MIMES, CONTEXT_IMAGE_MIMES, isContextImage, contextFileIsReadByAi, contextFileNoun, ADMINS_ONLY_ACCESS, text4, isRecord6, participantsMayAddContext, contextCardsOn, CONTEXT_AGENT_ADDER, NAME_CONTROLS, contextAdderProblem, groupIdList, groupLockedAccess, groupLockedIds, contextTagValue, contextRoleOf, isAdminsOnlyAccess, lockedGroupsOf, resolveContextFileType, contextFileByteLimit;
-var init_sessionContextSources = __esm({
-  "shared/sessionContextSources.mjs"() {
-    CONTEXT_ROLE = "context";
-    CONTEXT_TEXT_ROLE = "context-text";
-    CONTEXT_TAGS = Object.freeze({
-      role: "CE-DocRole",
-      kind: "CE-DocKind",
-      name: "CE-DocName",
-      mime: "CE-DocMime",
-      url: "CE-ContextUrl",
-      fetchedAt: "CE-ContextFetchedAt",
-      derivedFrom: "CE-DocDerivedFromTx",
-      readBy: "CE-ReadBy",
-      readModel: "CE-ReadModel",
-      readAt: "CE-ReadAt",
-      // Self-declared by an agent on what it adds: a label in the list, never a reason for access.
-      adderKind: "CE-AdderKind",
-      adderName: "CE-AdderName"
-    });
-    CONTEXT_SOURCE_LIMITS = Object.freeze({
-      pdfBytes: 20 * 1024 * 1024,
-      // An image as stored. Sent as base64 it is a third larger, inside what each provider takes for one image.
-      imageBytes: 5 * 1024 * 1024,
-      textFileBytes: 1024 * 1024,
-      // A linked page as fetched, before its text is taken out.
-      pageBytes: 2 * 1024 * 1024,
-      snapshotChars: 1e5,
-      // Text the session's AI returns for a PDF or an image.
-      readTextChars: 1e5,
-      titleChars: 120,
-      // A link is also a storage tag, and tag values stop at 1,024 characters.
-      urlChars: 1e3,
-      // The groups one item may be locked to; reading it checks each in turn.
-      lockedGroups: 20,
-      // An agent's display name, as long as its profile allows.
-      adderNameChars: 80,
-      // Context items one person or agent may add to a session; admins are not limited.
-      perAdder: 20
-    });
-    CONTEXT_FILE_TYPES = Object.freeze({
-      pdf: "application/pdf",
-      md: "text/markdown",
-      markdown: "text/markdown",
-      txt: "text/plain",
-      csv: "text/csv",
-      json: "application/json",
-      png: "image/png",
-      jpg: "image/jpeg",
-      jpeg: "image/jpeg",
-      webp: "image/webp"
-    });
-    CONTEXT_FILE_MIMES = new Set(Object.values(CONTEXT_FILE_TYPES));
-    CONTEXT_IMAGE_MIMES = /* @__PURE__ */ new Set([CONTEXT_FILE_TYPES.png, CONTEXT_FILE_TYPES.jpeg, CONTEXT_FILE_TYPES.webp]);
-    isContextImage = (contentType) => CONTEXT_IMAGE_MIMES.has(contentType);
-    contextFileIsReadByAi = (contentType) => contentType === CONTEXT_FILE_TYPES.pdf || isContextImage(contentType);
-    contextFileNoun = (contentType) => contentType === CONTEXT_FILE_TYPES.pdf ? "PDF" : isContextImage(contentType) ? "image" : "text file";
-    ADMINS_ONLY_ACCESS = Object.freeze({
-      match: "all",
-      conditions: Object.freeze([Object.freeze({ kind: "worker_role", role: "admin" })])
-    });
-    text4 = (value) => typeof value === "string" ? value.trim() : "";
-    isRecord6 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-    participantsMayAddContext = (config) => config?.contextAdditionPolicy !== "admin_only";
-    contextCardsOn = (config) => config?.contextCardsEnabled === true;
-    CONTEXT_AGENT_ADDER = "agent";
-    NAME_CONTROLS = /[\p{Cc}\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/gu;
-    contextAdderProblem = (tags) => {
-      const list2 = Array.isArray(tags) ? tags.filter(isRecord6) : [];
-      const values = (name) => list2.filter((tag2) => text4(tag2.name) === name).map((tag2) => text4(tag2.value));
-      const [kinds, names2] = [values(CONTEXT_TAGS.adderKind), values(CONTEXT_TAGS.adderName)];
-      if (kinds.length > 1 || names2.length > 1) return "An item names who added it once at most.";
-      if (kinds.length && kinds[0] !== CONTEXT_AGENT_ADDER) return 'The only mark for who added an item is "agent".';
-      if (names2.length && !kinds.length) return "Only an item an agent added carries its name.";
-      if (names2.length && (names2[0].length > CONTEXT_SOURCE_LIMITS.adderNameChars || names2[0].search(NAME_CONTROLS) >= 0)) {
-        return `An agent's name is plain text of at most ${CONTEXT_SOURCE_LIMITS.adderNameChars} characters.`;
-      }
-      return "";
-    };
-    groupIdList = (groupIds) => [...new Set((Array.isArray(groupIds) ? groupIds : []).map((id2) => text4(id2).toLowerCase()).filter(Boolean))].sort();
-    groupLockedAccess = (groupIds) => ({
-      match: "any",
-      conditions: [
-        { kind: "worker_role", role: "admin" },
-        { kind: "worker_group", groupIds: groupIdList(groupIds) }
-      ]
-    });
-    groupLockedIds = (accessConditions) => {
-      if (!isRecord6(accessConditions) || text4(accessConditions.match).toLowerCase() !== "any") return null;
-      const conditions = Array.isArray(accessConditions.conditions) ? accessConditions.conditions : [];
-      const [admin, group] = conditions;
-      const groupIds = groupIdList(group?.groupIds);
-      return conditions.length === 2 && isAdminsOnlyAccess({ match: "all", conditions: [admin] }) && isRecord6(group) && text4(group.kind).toLowerCase() === "worker_group" && Object.keys(group).every((key) => key === "kind" || key === "groupIds") && groupIds.length ? groupIds : null;
-    };
-    contextTagValue = (tags, name) => text4((Array.isArray(tags) ? tags : []).find((tag2) => isRecord6(tag2) && text4(tag2.name) === name)?.value);
-    contextRoleOf = (tags) => {
-      const role = contextTagValue(tags, CONTEXT_TAGS.role).toLowerCase();
-      return role === CONTEXT_ROLE || role === CONTEXT_TEXT_ROLE ? role : "";
-    };
-    isAdminsOnlyAccess = (accessConditions) => {
-      if (!isRecord6(accessConditions) || text4(accessConditions.match).toLowerCase() !== "all") return false;
-      const conditions = Array.isArray(accessConditions.conditions) ? accessConditions.conditions : [];
-      return conditions.length === 1 && isRecord6(conditions[0]) && text4(conditions[0].kind).toLowerCase() === "worker_role" && text4(conditions[0].role || "admin").toLowerCase() === "admin" && Object.keys(conditions[0]).every((key) => key === "kind" || key === "role");
-    };
-    lockedGroupsOf = (accessConditions) => {
-      if (!isRecord6(accessConditions) || text4(accessConditions.match).toLowerCase() !== "any") return [];
-      const conditions = Array.isArray(accessConditions.conditions) ? accessConditions.conditions : [];
-      const kindOf = (condition) => isRecord6(condition) ? text4(condition.kind).toLowerCase() : "";
-      const role = conditions.find((condition) => kindOf(condition) === "worker_role");
-      const group = conditions.find((condition) => kindOf(condition) === "worker_group");
-      const groupIds = Array.isArray(group?.groupIds) ? groupIdList(group.groupIds) : [];
-      return conditions.length === 2 && role && text4(role.role).toLowerCase() === "admin" && groupIds.length > 0 && groupIds.length <= CONTEXT_SOURCE_LIMITS.lockedGroups ? groupIds : [];
-    };
-    resolveContextFileType = ({ name = "", type = "" } = {}) => {
-      const declared = text4(type).split(";")[0].toLowerCase();
-      if (CONTEXT_FILE_MIMES.has(declared)) return declared;
-      const extension = /\.([a-z0-9]+)$/i.exec(text4(name))?.[1]?.toLowerCase() || "";
-      return Object.hasOwn(CONTEXT_FILE_TYPES, extension) ? CONTEXT_FILE_TYPES[extension] : "";
-    };
-    contextFileByteLimit = (contentType) => contentType === CONTEXT_FILE_TYPES.pdf ? CONTEXT_SOURCE_LIMITS.pdfBytes : isContextImage(contentType) ? CONTEXT_SOURCE_LIMITS.imageBytes : CONTEXT_SOURCE_LIMITS.textFileBytes;
   }
 });
 
@@ -70398,15 +70485,15 @@ var init_storageEnvelopeEncryption = __esm({
       const envelope = isObj12(config.storageEnvelope) ? config.storageEnvelope : {};
       return isObj12(envelope.sessionKey) ? envelope.sessionKey : null;
     };
-    isCoordinatorWrappedSessionKeyRecord = (record6, slug) => {
-      if (!isObj12(record6)) return false;
-      const createdAt = trim9(record6.createdAt);
+    isCoordinatorWrappedSessionKeyRecord = (record7, slug) => {
+      if (!isObj12(record7)) return false;
+      const createdAt = trim9(record7.createdAt);
       const createdAtMs2 = Date.parse(createdAt);
-      return record6.version === ENVELOPE_VERSION && record6.keyProvider === "worker_secret" && record6.alg === AES_256_GCM && record6.wrapAlg === "AES-GCM-KW-v1" && Number.isFinite(createdAtMs2) && new Date(createdAtMs2).toISOString() === createdAt && trim9(record6.keyId) === `session:${safeSlugPart(slug)}:${createdAt}` && /^[A-Za-z0-9_-]{16}$/.test(trim9(record6.iv)) && /^[A-Za-z0-9_-]{64}$/.test(trim9(record6.wrappedKey));
+      return record7.version === ENVELOPE_VERSION && record7.keyProvider === "worker_secret" && record7.alg === AES_256_GCM && record7.wrapAlg === "AES-GCM-KW-v1" && Number.isFinite(createdAtMs2) && new Date(createdAtMs2).toISOString() === createdAt && trim9(record7.keyId) === `session:${safeSlugPart(slug)}:${createdAt}` && /^[A-Za-z0-9_-]{16}$/.test(trim9(record7.iv)) && /^[A-Za-z0-9_-]{64}$/.test(trim9(record7.wrappedKey));
     };
     unwrapSessionKeyBytes = async ({ env, config, slug, deps = {} }) => {
-      const record6 = readSessionKeyRecord(config);
-      if (!record6) throw new Error("Storage envelope session key is missing.");
+      const record7 = readSessionKeyRecord(config);
+      if (!record7) throw new Error("Storage envelope session key is missing.");
       const aad = `ce-storage-envelope:session:${safeSlugPart(slug)}`;
       const attempts = [false, true];
       let lastError = null;
@@ -70414,7 +70501,7 @@ var init_storageEnvelopeEncryption = __esm({
         if (previous && !trim9(readDeploymentSecret({ env, previous, deps }))) continue;
         try {
           const deploymentKey = await importDeploymentKek({ env, previous, deps });
-          return await unwrapBytesWithKey({ wrappingKey: deploymentKey, wrapped: record6, aad, deps });
+          return await unwrapBytesWithKey({ wrappingKey: deploymentKey, wrapped: record7, aad, deps });
         } catch (error) {
           lastError = error;
         }
@@ -70454,8 +70541,8 @@ var init_storageEnvelopeEncryption = __esm({
           })
         };
       }
-      const coordinate3 = deps.getOrCreateCoordinatedStorageEnvelopeSessionKey || getOrCreateCoordinatedStorageEnvelopeSessionKey;
-      const coordinated = await coordinate3({
+      const coordinate4 = deps.getOrCreateCoordinatedStorageEnvelopeSessionKey || getOrCreateCoordinatedStorageEnvelopeSessionKey;
+      const coordinated = await coordinate4({
         env,
         slug,
         baseConfig: config,
@@ -72612,11 +72699,11 @@ var init_contextDocumentRead = __esm({
         const detail = trim13(data?.error?.message).slice(0, 300);
         return fail6(502, `The session\u2019s AI could not read this ${noun}${detail ? `: ${detail}` : "."}`, "context_pdf_provider_error");
       }
-      const reply5 = readReply(provider, data);
-      if (reply5.refused) return fail6(422, `The session\u2019s AI declined to read this ${noun}.`, "context_pdf_refused");
-      const text9 = trim13(reply5.text);
+      const reply6 = readReply(provider, data);
+      if (reply6.refused) return fail6(422, `The session\u2019s AI declined to read this ${noun}.`, "context_pdf_refused");
+      const text9 = trim13(reply6.text);
       if (!text9) return fail6(422, `The session\u2019s AI found no text in this ${noun}.`, "context_pdf_empty");
-      return { ok: true, text: text9, model: payload.model, provider, truncated: !!reply5.truncated };
+      return { ok: true, text: text9, model: payload.model, provider, truncated: !!reply6.truncated };
     };
   }
 });
@@ -72891,7 +72978,7 @@ var init_fetchExecution = __esm({
 });
 
 // workers/sessionCorsWorker/contextSourceRoute.js
-var encoder7, trim14, isObj19, clip3, commonTags, isReadingOf, readingsOf, storeRecord, adderTagsOf, linkAccessOf, addLink, coordinate2, readAtOf, finishContextPdfReading, readAndStorePdf, readPdf, removeContextSource, remove2, setCard, makeCard, ACTIONS, contextSourceRoute;
+var encoder7, trim14, isObj19, clip3, commonTags, isReadingOf, readingsOf, storeRecord, adderTagsOf, linkAccessOf, addLink, addContextLink, coordinate2, readAtOf, finishContextPdfReading, readAndStorePdf, readPdf, removeContextSource, remove2, setCard, makeCard, ACTIONS, contextSourceRoute;
 var init_contextSourceRoute = __esm({
   "workers/sessionCorsWorker/contextSourceRoute.js"() {
     init_sessionContextSources();
@@ -72948,7 +73035,7 @@ var init_contextSourceRoute = __esm({
       const access2 = Array.isArray(named) ? groupLockedAccess(named) : null;
       return access2 && lockedGroupsOf(access2).length ? { accessConditions: access2 } : { error: `Name between 1 and ${CONTEXT_SOURCE_LIMITS.lockedGroups} of the session\u2019s groups.` };
     };
-    addLink = async ({ body, env, config, slug, deps, store, json: json12, now }) => {
+    addLink = async ({ body, env, config, slug, deps, store, json: json12, now, snapshotChars = CONTEXT_SOURCE_LIMITS.snapshotChars }) => {
       const url = trim14(body.url);
       let parsed = null;
       try {
@@ -72985,14 +73072,14 @@ var init_contextSourceRoute = __esm({
           fetched.status >= 500 ? 502 : 422
         );
       }
-      const text9 = fetched.text.slice(0, CONTEXT_SOURCE_LIMITS.snapshotChars);
+      const text9 = fetched.text.slice(0, Math.min(snapshotChars, CONTEXT_SOURCE_LIMITS.snapshotChars));
       if (!text9.trim()) return json12({ error: "The page has no text to read.", reason: "context_link_empty" }, 422);
       const title = clip3(
         (replaces ? contextTagValue(replaces.tags, CONTEXT_TAGS.name) : trim14(body.title)) || fetched.title || parsed.hostname,
         CONTEXT_SOURCE_LIMITS.titleChars
       );
       const fetchedAt = now();
-      const record6 = {
+      const record7 = {
         v: 1,
         kind: "link",
         url: parsed.toString(),
@@ -73001,18 +73088,18 @@ var init_contextSourceRoute = __esm({
         snapshot: { text: text9, fetchedAt, contentType: fetched.mediaType, truncated: fetched.text.length > text9.length }
       };
       const stored = await storeRecord(store, {
-        bytes: encoder7.encode(JSON.stringify(record6)),
+        bytes: encoder7.encode(JSON.stringify(record7)),
         contentType: "application/json",
         accessConditions: access2.accessConditions,
         // A refreshed link stays its first adder's, who may still remove it. A new
         // one is counted by its address: its page text and time change each fetch.
-        ...replaces ? { contextUploader: replaces.uploader } : { countKey: `link:${record6.url}` },
+        ...replaces ? { contextUploader: replaces.uploader } : { countKey: `link:${record7.url}` },
         tags: [
           ...commonTags("link"),
           { name: CONTEXT_TAGS.role, value: CONTEXT_ROLE },
           { name: CONTEXT_TAGS.name, value: title },
           { name: CONTEXT_TAGS.mime, value: "application/json" },
-          { name: CONTEXT_TAGS.url, value: record6.url },
+          { name: CONTEXT_TAGS.url, value: record7.url },
           { name: CONTEXT_TAGS.fetchedAt, value: fetchedAt },
           ...adderTags
         ]
@@ -73031,15 +73118,16 @@ var init_contextSourceRoute = __esm({
           id: stored.id,
           kind: "link",
           title,
-          url: record6.url,
+          url: record7.url,
           fetchedAt,
           adminsOnly: isAdminsOnlyAccess(access2.accessConditions),
           lockedGroupIds: lockedGroupsOf(access2.accessConditions),
           chars: text9.length,
-          truncated: record6.snapshot.truncated
+          truncated: record7.snapshot.truncated
         }
       });
     };
+    addContextLink = addLink;
     coordinate2 = (deps, args) => (deps?.executeCoordinatedContextSourceOperation || executeCoordinatedContextSourceOperation)(args);
     readAtOf = (row) => contextTagValue(row.tags, CONTEXT_TAGS.readAt);
     finishContextPdfReading = async ({ env, slug, pdfId, readingId, readAt, markWrite }) => {
@@ -73152,8 +73240,8 @@ var init_contextSourceRoute = __esm({
     };
     remove2 = async ({ body, env, slug, deps, json: json12 }) => {
       const removed = await coordinate2(deps, { env, slug, operation: "remove", id: trim14(body.id), readingIds: body.readingIds });
-      const { card: _card, ...reply5 } = removed.body || {};
-      return json12(reply5, removed.status);
+      const { card: _card, ...reply6 } = removed.body || {};
+      return json12(reply6, removed.status);
     };
     setCard = async ({ body, env, slug, admin, isAdmin, deps, json: json12, now }) => {
       const content = body.card === null ? null : contextCardContent(body.card);
@@ -73358,12 +73446,13 @@ var init_researchFieldAccess = __esm({
 });
 
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder8, decoder7, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_SESSION_GATE_YES, STORAGE_GROUP_READ_INVITE, STORAGE_GROUP_READ_INVITE_ORIGIN, STORAGE_GROUP_READ_INVITE_FROM, senderForCounting, STORAGE_GROUP_READ_CODE_READS, groupReadInviteDeps, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim16, isObj22, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, MAX_ANSWER_LIST_PAGE_SIZE, MAX_CONTEXT_LIST_KV_PAGES, MINE_LIST_KV_KEYS, MINE_LIST_KV_PAGES, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, storageIndexPutOptions, CONTEXT_ADD_WINDOW_MS, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress2, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, sbtUnavailable, evaluateSbtOnchainCondition, checkWorkerGroupMembership, checkGroupReadInvite, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, admittedByReadInvite, membersSeeAllResponses, canReadPrivateResponse, authorizeCloudflareStorageAccess, sessionGateOnce, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, createRequesterAccessChecks, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, RESPONSE_ROWS_PER_QUESTION, AUTOMATIC_ANALYSIS_MODES, countQuestionsOnce, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, MAX_READ_BATCH_IDS, MAX_READ_BATCH_BYTES, READ_BATCH_CONCURRENCY, prefetchKvPayloads, handleCloudflareReadBatch, handleCloudflareList, KV_BULK_GET_KEYS2, LIST_BULK_GETS_AT_ONCE, KV_BULK_REPLY_BYTES, listedAnswerVersions, listLatestResponseRows, listCloudflareMetadataRows, decodeBulkPayloadEnvelope, readStoredCloudflarePayloadsBulk, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
+var encoder8, decoder7, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_SESSION_GATE_YES, STORAGE_GROUP_READ_INVITE, STORAGE_GROUP_READ_INVITE_ORIGIN, STORAGE_GROUP_READ_INVITE_FROM, senderForCounting, STORAGE_GROUP_READ_CODE_READS, groupReadInviteDeps, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim16, isObj22, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, MAX_ANSWER_LIST_PAGE_SIZE, MAX_CONTEXT_LIST_KV_PAGES, MINE_LIST_KV_KEYS, MINE_LIST_KV_PAGES, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, storageIndexPutOptions, CONTEXT_ADD_WINDOW_MS, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress2, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, sbtUnavailable, evaluateSbtOnchainCondition, checkWorkerGroupMembership, checkGroupReadInvite, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, admittedByReadInvite, membersSeeAllResponses, canReadPrivateResponse, authorizeCloudflareStorageAccess, sessionGateOnce, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, createRequesterAccessChecks, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, RESPONSE_ROWS_PER_QUESTION, AUTOMATIC_ANALYSIS_MODES, countQuestionsOnce, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, MAX_READ_BATCH_IDS, MAX_READ_BATCH_BYTES, READ_BATCH_CONCURRENCY, prefetchKvPayloads, handleCloudflareReadBatch, handleCloudflareList, KV_BULK_GET_KEYS2, LIST_BULK_GETS_AT_ONCE, KV_BULK_REPLY_BYTES, listedAnswerVersions, listLatestResponseRows, listCloudflareMetadataRows, decodeBulkPayloadEnvelope, readStoredCloudflarePayloadsBulk, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, storeSessionLinkSource, sessionStoresPlainContext, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_sessionContextSources();
     init_sessionCoordinatorBusy();
     init_storageBackupRevision();
+    init_authorizationScopeFreshness();
     init_resultsAnalysisSettings();
     init_storageRefNormalization();
     init_payloadAccessControl();
@@ -76161,6 +76250,18 @@ ${version2.responder}`;
       });
       return rows.map((row) => row.metadata).filter((metadata) => metadata?.contextSource === true);
     };
+    storeSessionLinkSource = ({ env, config, slug, admin, payload, deps }) => handleCloudflareUpload({
+      env,
+      config,
+      slug,
+      uploaderAddress: admin,
+      authScopes: { storage: true },
+      baseHeaders: new Headers(),
+      expectedAuthority: { actor: admin, revision: 0, authzEpoch: readAuthorizationEpoch(config) },
+      deps: createStorageRouteGateDeps({ config, env, slug, deps }),
+      payload: { resource: "docsContext", groupIds: [], uploadPolicy: null, payloadEncrypted: false, ...payload, contextOrigin: "worker" }
+    });
+    sessionStoresPlainContext = (config) => resolveConfiguredStorageBackend({ config }) === STORAGE_BACKENDS.CLOUDFLARE && resolvePayloadAccessControl(config).encryption !== PAYLOAD_ENCRYPTION_MODES3.LIT;
     readContextSourceRow = async ({ env, slug, id: id2, strict = false } = {}) => {
       const index = getStorageIndexBinding(env);
       if (!isSafeCloudflareStorageRefId(trim16(id2)) || typeof index?.get !== "function") return null;
@@ -76771,9 +76872,9 @@ var init_sessionDiagnostics = __esm({
         try {
           if (!HASH.test(owner)) throw unavailable();
           const ownerStub = env.CE_SESSION_COORDINATOR.get(env.CE_SESSION_COORDINATOR.idFromName(owner));
-          const reply5 = await ownerStub.fetch("https://session-coordinator.internal/upload-receipts/diagnostics", { method: "POST", body: "{}" });
-          const counts = await reply5.json();
-          if (!reply5.ok) throw unavailable();
+          const reply6 = await ownerStub.fetch("https://session-coordinator.internal/upload-receipts/diagnostics", { method: "POST", body: "{}" });
+          const counts = await reply6.json();
+          if (!reply6.ok) throw unavailable();
           totals.pendingLeases += counts.pendingLeases;
           totals.settledCount += counts.settledCount;
           if (counts.oldestPendingAgeMs !== null) totals.oldestPendingAgeMs = Math.max(totals.oldestPendingAgeMs ?? 0, counts.oldestPendingAgeMs);
@@ -76795,21 +76896,21 @@ var init_recoveryKeyExport = __esm({
     init_sessionSlugResolution();
     exportCoordinatorRecoveryKey = async (coordinator, payload) => {
       const headers2 = { "Cache-Control": "no-store" };
-      const reply5 = (body, status) => Response.json(body, { status, headers: headers2 });
+      const reply6 = (body, status) => Response.json(body, { status, headers: headers2 });
       try {
         const authority = await coordinator.assertSessionAuthority(payload);
-        if (!authority) return reply5({ error: "Session config is not initialized." }, 409);
+        if (!authority) return reply6({ error: "Session config is not initialized." }, 409);
         const pinnedSlug = getDefaultWorkerSessionSlug(coordinator.env);
         if (!pinnedSlug || pinnedSlug !== normalizeWorkerSessionSlug(authority.slug)) {
-          return reply5({
+          return reply6({
             error: "The deployment operator holds the recovery key for this Worker.",
             reason: "recovery_key_deployment_scoped"
           }, 403);
         }
-        if (payload?.confirm !== "export-recovery-key") return reply5({ error: "Confirm export-recovery-key in the signed payload." }, 400);
+        if (payload?.confirm !== "export-recovery-key") return reply6({ error: "Confirm export-recovery-key in the signed payload." }, 400);
         const rawKey = String(coordinator.env.CE_STORAGE_ENVELOPE_KEK || "").trim();
         const recoveryKey = /^[a-f0-9]{64}$/i.test(rawKey) ? rawKey.toLowerCase() : rawKey;
-        if (!recoveryKey) return reply5({ error: "Recovery key is not configured." }, 503);
+        if (!recoveryKey) return reply6({ error: "Recovery key is not configured." }, 503);
         const fingerprint = await recoveryKeyFingerprint(recoveryKey);
         const now = Number(coordinator.now()) || Date.now();
         const day = Math.floor(now / 864e5);
@@ -76820,7 +76921,7 @@ var init_recoveryKeyExport = __esm({
           await transaction.put("recovery-key-export-counter", { day, count: used + 1 });
           return used + 1;
         });
-        if (!count2) return reply5({ error: "Recovery key export is limited to three times per UTC day.", reason: "recovery_key_export_limit" }, 429);
+        if (!count2) return reply6({ error: "Recovery key export is limited to three times per UTC day.", reason: "recovery_key_export_limit" }, 429);
         const audit = coordinator.env.CE_STORAGE_AUDIT_KV;
         if (audit) {
           await audit.put(`ce-recovery-key-audit:${authority.slug}:${day}:${count2}`, JSON.stringify({
@@ -76830,9 +76931,9 @@ var init_recoveryKeyExport = __esm({
             timestamp: new Date(now).toISOString()
           }));
         }
-        return reply5({ ok: true, recoveryKey, fingerprint }, 200);
+        return reply6({ ok: true, recoveryKey, fingerprint }, 200);
       } catch (error) {
-        return reply5({ error: error.status === 409 ? error.message : "Recovery key export is unavailable; retry." }, error.status || 503);
+        return reply6({ error: error.status === 409 ? error.message : "Recovery key export is unavailable; retry." }, error.status || 503);
       }
     };
   }
@@ -76849,14 +76950,14 @@ var init_operationQueue = __esm({
       const keyTails = /* @__PURE__ */ new Map();
       return {
         exclusive(operation) {
-          const run = allTail.then(() => operation());
-          exclusiveTail = allTail = settled(run);
-          return run;
+          const run2 = allTail.then(() => operation());
+          exclusiveTail = allTail = settled(run2);
+          return run2;
         },
         shared(key, operation) {
           const before = key && keyTails.get(key);
-          const run = (before ? Promise.all([exclusiveTail, before]) : exclusiveTail).then(() => operation());
-          const done = settled(run);
+          const run2 = (before ? Promise.all([exclusiveTail, before]) : exclusiveTail).then(() => operation());
+          const done = settled(run2);
           allTail = Promise.all([allTail, done]).then(() => void 0);
           if (key) {
             keyTails.set(key, done);
@@ -76864,7 +76965,7 @@ var init_operationQueue = __esm({
               if (keyTails.get(key) === done) keyTails.delete(key);
             });
           }
-          return run;
+          return run2;
         }
       };
     };
@@ -76883,11 +76984,11 @@ var init_sessionSecretsAuthority = __esm({
       throw new Error("Invalid session secrets authority.");
     };
     readSessionSecretsAuthority = async (coordinator, storage, slug) => {
-      const record6 = await storage.get(SESSION_SECRETS_AUTHORITY_KEY);
-      if (record6 != null) {
-        if (record6.version !== 1 || record6.slug !== slug || !Number.isSafeInteger(record6.revision) || record6.revision < 1) fail8();
-        await decryptSessionSecretsEnvelope(record6.envelope, { env: coordinator.env, slug });
-        return record6;
+      const record7 = await storage.get(SESSION_SECRETS_AUTHORITY_KEY);
+      if (record7 != null) {
+        if (record7.version !== 1 || record7.slug !== slug || !Number.isSafeInteger(record7.revision) || record7.revision < 1) fail8();
+        await decryptSessionSecretsEnvelope(record7.envelope, { env: coordinator.env, slug });
+        return record7;
       }
       const raw = await coordinator.env.GROUP_KV.get(`session:${normalizeWorkerSessionSlug(slug)}:secrets`);
       if (raw == null) return null;
@@ -76899,8 +77000,8 @@ var init_sessionSecretsAuthority = __esm({
       return adopted;
     };
     readCommittedSessionSecrets = async (coordinator, storage, slug) => {
-      const record6 = await readSessionSecretsAuthority(coordinator, storage, slug);
-      return record6 ? decryptSessionSecretsEnvelope(record6.envelope, { env: coordinator.env, slug }) : {};
+      const record7 = await readSessionSecretsAuthority(coordinator, storage, slug);
+      return record7 ? decryptSessionSecretsEnvelope(record7.envelope, { env: coordinator.env, slug }) : {};
     };
     commitSessionSecrets = async (coordinator, storage, slug, secrets) => {
       const previous = await storage.get(SESSION_SECRETS_AUTHORITY_KEY);
@@ -76915,13 +77016,13 @@ var init_sessionSecretsAuthority = __esm({
       return envelope;
     };
     repairPendingSessionSecretsProjection = async (coordinator) => {
-      const record6 = await coordinator.state.storage.get(SESSION_SECRETS_AUTHORITY_KEY);
-      if (!record6?.projectionPending) return;
-      await decryptSessionSecretsEnvelope(record6.envelope, { env: coordinator.env, slug: record6.slug });
-      await putKvJson(coordinator.env, `session:${normalizeWorkerSessionSlug(record6.slug)}:secrets`, record6.envelope);
+      const record7 = await coordinator.state.storage.get(SESSION_SECRETS_AUTHORITY_KEY);
+      if (!record7?.projectionPending) return;
+      await decryptSessionSecretsEnvelope(record7.envelope, { env: coordinator.env, slug: record7.slug });
+      await putKvJson(coordinator.env, `session:${normalizeWorkerSessionSlug(record7.slug)}:secrets`, record7.envelope);
       await coordinator.state.storage.transaction(async (transaction) => {
         const current = await transaction.get(SESSION_SECRETS_AUTHORITY_KEY);
-        if (current?.revision === record6.revision) {
+        if (current?.revision === record7.revision) {
           await transaction.put(SESSION_SECRETS_AUTHORITY_KEY, { ...current, projectionPending: false });
         }
       });
@@ -77418,9 +77519,9 @@ var init_sessionNames = __esm({
           await storage.delete(sessionNameKey(address3));
           return json5({ ok: true, name: null, setAt: null });
         }
-        const record6 = { name: normalized.name, setAt: new Date(Number.isFinite(payload.now) ? payload.now : Date.now()).toISOString() };
-        await storage.put(sessionNameKey(address3), record6);
-        return json5({ ok: true, ...record6 });
+        const record7 = { name: normalized.name, setAt: new Date(Number.isFinite(payload.now) ? payload.now : Date.now()).toISOString() };
+        await storage.put(sessionNameKey(address3), record7);
+        return json5({ ok: true, ...record7 });
       }
       if (operation === "clear") {
         await storage.delete(sessionNameKey(address3));
@@ -77487,10 +77588,10 @@ var init_agentSignInStore = __esm({
       return ADDRESS_RE4.test(text9) ? text9 : "";
     };
     refused = (reason, status = 409) => ({ ok: false, reason, status });
-    linkOf = (record6) => record6 && addressOf3(record6.passkey) ? {
-      passkey: record6.passkey,
-      linkedAt: record6.linkedAt || null,
-      agentAccess: record6.agentAccess === AGENT_ACCESS.CANCELLED ? AGENT_ACCESS.CANCELLED : AGENT_ACCESS.ACTIVE
+    linkOf = (record7) => record7 && addressOf3(record7.passkey) ? {
+      passkey: record7.passkey,
+      linkedAt: record7.linkedAt || null,
+      agentAccess: record7.agentAccess === AGENT_ACCESS.CANCELLED ? AGENT_ACCESS.CANCELLED : AGENT_ACCESS.ACTIVE
     } : null;
     operations = {
       // What is kept about one address: the passkey attached to it, and the account it is a passkey for.
@@ -77518,12 +77619,12 @@ var init_agentSignInStore = __esm({
       // A code shown is a code spent, whatever came of it: it is deleted before anything about it is judged.
       "code-redeem": async (txn, { codeHash, origin, now }) => {
         if (!HASH_RE.test(codeHash)) return refused("sign_in_code_invalid", 401);
-        const record6 = await txn.get(codeKey(codeHash));
-        if (!record6) return refused("sign_in_code_invalid", 401);
+        const record7 = await txn.get(codeKey(codeHash));
+        if (!record7) return refused("sign_in_code_invalid", 401);
         await txn.delete(codeKey(codeHash));
-        const account = addressOf3(record6.account);
+        const account = addressOf3(record7.account);
         if (account && await txn.get(liveKey(account)) === codeHash) await txn.delete(liveKey(account));
-        if (!account || !(Number(record6.expiresAt) > now) || !origin || record6.origin !== origin) return refused("sign_in_code_invalid", 401);
+        if (!account || !(Number(record7.expiresAt) > now) || !origin || record7.origin !== origin) return refused("sign_in_code_invalid", 401);
         const link = linkOf(await txn.get(accountKey(account)));
         if (link?.agentAccess === AGENT_ACCESS.CANCELLED) return refused("sign_in_code_invalid", 401);
         return { ok: true, account, link };
@@ -77540,18 +77641,18 @@ var init_agentSignInStore = __esm({
           txn.get(passkeyKey(account))
         ]);
         if (taken || passkeyIsAccount || accountIsPasskey) return refused("passkey_in_use");
-        const record6 = { passkey: passkeyAddress, linkedAt: new Date(now).toISOString(), agentAccess: AGENT_ACCESS.ACTIVE };
-        await txn.put(accountKey(account), record6);
+        const record7 = { passkey: passkeyAddress, linkedAt: new Date(now).toISOString(), agentAccess: AGENT_ACCESS.ACTIVE };
+        await txn.put(accountKey(account), record7);
         await txn.put(passkeyKey(passkeyAddress), { account });
-        return { ok: true, link: linkOf(record6) };
+        return { ok: true, link: linkOf(record7) };
       },
       // Only the attached passkey ends, or restores, the agent's use of the account.
       access: async (txn, { address: account, passkey, agentAccess, now }) => {
         if (![AGENT_ACCESS.ACTIVE, AGENT_ACCESS.CANCELLED].includes(agentAccess)) return refused("invalid_agent_access", 400);
-        const record6 = await txn.get(accountKey(account));
-        const link = linkOf(record6);
+        const record7 = await txn.get(accountKey(account));
+        const link = linkOf(record7);
         if (!link || link.passkey !== addressOf3(passkey)) return refused("passkey_not_attached", 403);
-        await txn.put(accountKey(account), { ...record6, agentAccess, changedAt: new Date(now).toISOString() });
+        await txn.put(accountKey(account), { ...record7, agentAccess, changedAt: new Date(now).toISOString() });
         if (agentAccess === AGENT_ACCESS.CANCELLED) {
           const live = await txn.get(liveKey(account));
           if (HASH_RE.test(live || "")) await txn.delete(codeKey(live));
@@ -77616,12 +77717,12 @@ var init_agentSignInStore = __esm({
       return { written, skipped };
     };
     dispatchAgentSignInStore = async (coordinator, operation, payload = {}) => {
-      const run = Object.hasOwn(operations, operation) ? operations[operation] : null;
-      if (!run) return json6({ ok: false, error: "Not found." }, 404);
+      const run2 = Object.hasOwn(operations, operation) ? operations[operation] : null;
+      if (!run2) return json6({ ok: false, error: "Not found." }, 404);
       const address3 = addressOf3(payload.address);
       if (operation !== "code-redeem" && !address3) return json6({ ok: false, reason: "invalid_address" }, 400);
       const now = Number.isFinite(payload.now) ? payload.now : Date.now();
-      const result = await coordinator.state.storage.transaction((txn) => run(txn, { ...payload, address: address3, now }));
+      const result = await coordinator.state.storage.transaction((txn) => run2(txn, { ...payload, address: address3, now }));
       const { status, ...body } = result;
       return json6(body, result.ok ? 200 : status || 409);
     };
@@ -78468,9 +78569,9 @@ var init_sponsoredBootstrapGrantStore = __esm({
       const getKvJsonFn = typeof deps.getKvJson === "function" ? deps.getKvJson : getKvJson;
       return getKvJsonFn(env, buildSponsoredGrantKvKey(token));
     };
-    writeSponsoredGrantRecord = async (env, token, record6, ttlSeconds = null, deps = {}) => {
+    writeSponsoredGrantRecord = async (env, token, record7, ttlSeconds = null, deps = {}) => {
       const putKvJsonFn = typeof deps.putKvJson === "function" ? deps.putKvJson : putKvJson;
-      return putKvJsonFn(env, buildSponsoredGrantKvKey(token), record6, ttlSeconds || void 0);
+      return putKvJsonFn(env, buildSponsoredGrantKvKey(token), record7, ttlSeconds || void 0);
     };
     deleteSponsoredGrantRecord = async (env, token) => env?.GROUP_KV?.delete?.(buildSponsoredGrantKvKey(token));
     normalizeSensitiveValues = (values = []) => Array.from(new Set(
@@ -78702,7 +78803,7 @@ JSON shape:
 Session input:
 ${JSON.stringify(input, null, 2)}${contextText ? `
 
-The session's hosts gave this background. Use it only to understand the topic; ground every claim, citation and group in the responses above, never in this background.
+This is the session's background, from its hosts and, where the session allows, its participants. Use it only to understand the topic; ground every claim, citation and group in the responses above, never in this background.
 ${contextText}` : ""}`;
     };
   }
@@ -78834,9 +78935,9 @@ var init_resultsAnalysisArtifactValidation = __esm({
       });
       return refs;
     };
-    normalizeSourceFields = (record6, allowed, errors, participantLimit = LIMITS.sourceRefs) => {
-      const participantIds = normalizeIdRefs({ value: record6.participantIds, allowed: allowed.participants, label: "participantId", errors, limit: participantLimit });
-      const questionIds = normalizeIdRefs({ value: record6.questionIds, allowed: allowed.questions, label: "questionId", errors });
+    normalizeSourceFields = (record7, allowed, errors, participantLimit = LIMITS.sourceRefs) => {
+      const participantIds = normalizeIdRefs({ value: record7.participantIds, allowed: allowed.participants, label: "participantId", errors, limit: participantLimit });
+      const questionIds = normalizeIdRefs({ value: record7.questionIds, allowed: allowed.questions, label: "questionId", errors });
       if (participantIds.length && questionIds.length) {
         for (const participantId of participantIds) {
           if (!questionIds.some((questionId4) => allowed.questionsByParticipant.get(participantId)?.has(questionId4))) {
@@ -78855,9 +78956,9 @@ var init_resultsAnalysisArtifactValidation = __esm({
       };
     };
     normalizeSummaryRecord = (value) => {
-      const record6 = isObj23(value) ? value : {};
-      const overview = cleanText(record6.overview || record6.summary || record6.interpretation || record6.narrative);
-      const themes = toArray(record6.themes || record6.keyFindings || record6.findings).slice(0, LIMITS.breakdownThemes).map((entry2, index) => {
+      const record7 = isObj23(value) ? value : {};
+      const overview = cleanText(record7.overview || record7.summary || record7.interpretation || record7.narrative);
+      const themes = toArray(record7.themes || record7.keyFindings || record7.findings).slice(0, LIMITS.breakdownThemes).map((entry2, index) => {
         const item = isObj23(entry2) ? entry2 : { summary: entry2 };
         const label = cleanText(item.label || item.name || item.title || `Theme ${index + 1}`, LIMITS.labelChars);
         const summary = cleanText(item.summary || item.description || item.finding || item.body);
@@ -79041,11 +79142,11 @@ var init_resultsAnalysisArtifactValidation = __esm({
     });
     normalizeRiskAxis = (axis, fallback) => {
       if (!isObj23(axis)) return null;
-      const record6 = axis;
-      const label = cleanText(record6.label || record6.name, LIMITS.labelChars);
+      const record7 = axis;
+      const label = cleanText(record7.label || record7.name, LIMITS.labelChars);
       if (!label) return null;
-      const id2 = slugId(record6.id || label, fallback.id);
-      const rawLevels = toArray(record6.levels);
+      const id2 = slugId(record7.id || label, fallback.id);
+      const rawLevels = toArray(record7.levels);
       const seen = /* @__PURE__ */ new Set();
       const levels = rawLevels.slice(0, LIMITS.riskAxisLevels).map((level, index) => {
         const levelRecord = isObj23(level) ? level : { label: level, id: level };
@@ -79368,11 +79469,11 @@ var init_storageAudience = __esm({
       return source.map((entry2) => trim17(entry2).toLowerCase()).filter(Boolean).sort();
     };
     normalizeAccessAudienceExtras = ({ value, metadata } = {}) => {
-      const record6 = parseAccessRecord(value);
+      const record7 = parseAccessRecord(value);
       return {
-        groupIds: normalizeAccessGroupIds(record6.groupIds || metadata?.groupIds),
-        role: trim17(record6.role || metadata?.role).toLowerCase(),
-        accessConditions: stableCanonicalSerialize(record6.accessConditions || metadata?.accessConditions || null)
+        groupIds: normalizeAccessGroupIds(record7.groupIds || metadata?.groupIds),
+        role: trim17(record7.role || metadata?.role).toLowerCase(),
+        accessConditions: stableCanonicalSerialize(record7.accessConditions || metadata?.accessConditions || null)
       };
     };
     metadataAccessMatchesPublishedAudience = (metadata = {}, config = {}) => {
@@ -79603,9 +79704,9 @@ var init_contextSourceLoader = __esm({
         let url = "";
         if (kind === "link") {
           try {
-            const record6 = JSON.parse(text9);
-            text9 = typeof record6?.snapshot?.text === "string" ? record6.snapshot.text : "";
-            url = typeof record6?.url === "string" ? record6.url : "";
+            const record7 = JSON.parse(text9);
+            text9 = typeof record7?.snapshot?.text === "string" ? record7.snapshot.text : "";
+            url = typeof record7?.url === "string" ? record7.url : "";
           } catch {
             unreadable += 1;
             continue;
@@ -79650,9 +79751,9 @@ var init_storedRating = __esm({
     RATING_MAX = 10;
     LEGACY_RATING_MAX = 100;
     readStoredRating = (value) => {
-      const record6 = value && typeof value === "object" && !Array.isArray(value) ? value : null;
-      if (record6?.encrypted === true) return null;
-      const raw = record6 ? record6.value : value;
+      const record7 = value && typeof value === "object" && !Array.isArray(value) ? value : null;
+      if (record7?.encrypted === true) return null;
+      const raw = record7 ? record7.value : value;
       if (typeof raw !== "number" && typeof raw !== "string") return null;
       if (typeof raw === "string" && !raw.trim()) return null;
       const rating = Number(raw);
@@ -81319,7 +81420,7 @@ Session: ${JSON.stringify(text7(sessionName, 200))}
 Questions (responses is how many answers each has):
 ${JSON.stringify(questions)}${contextText ? `
 
-The session's hosts gave this background. Use it only to understand the subject; group and name only what the questions ask.
+This is the session's background, from its hosts and, where the session allows, its participants. Use it only to understand the subject; group and name only what the questions ask.
 ${contextText}` : ""}`;
     buildDebateAtlasTopicPrompt = ({ branch = "", topic = "", questions = [], responses = [], placeParticipants = [] } = {}) => `You are mapping ${topic ? "one topic" : "one branch, across all its topics,"} of a Context Engine debate atlas from survey responses.
 Branch: ${JSON.stringify(text7(branch, 120))}.${topic ? ` Topic: ${JSON.stringify(text7(topic, 120))}.` : ""}
@@ -81367,7 +81468,7 @@ ${JSON.stringify({ question, responses })}`;
           plan: unquote(buildDebateAtlasPlanPrompt({
             sessionName: config?.sessionName,
             questions: "<Questions>",
-            contextText: "<Background, when the hosts gave some>"
+            contextText: "<Background, when the session has some>"
           })),
           map: unquote(buildDebateAtlasTopicPrompt({
             branch: "<Branch>",
@@ -81415,10 +81516,10 @@ ${JSON.stringify({ question, responses })}`;
       return { title: text7(value?.title, 120), branches };
     };
     normalizeCompass = (value) => {
-      const axis = (record6, ends) => {
-        const out = { label: text7(record6?.label, 80) };
+      const axis = (record7, ends) => {
+        const out = { label: text7(record7?.label, 80) };
         ends.forEach((end) => {
-          out[end] = text7(record6?.[end], 80);
+          out[end] = text7(record7?.[end], 80);
         });
         return Object.values(out).every(Boolean) ? out : null;
       };
@@ -81873,8 +81974,8 @@ var init_sessionFeedback = __esm({
       const storage = coordinator.state.storage;
       const nowMs2 = Number(coordinator.now?.()) || Date.now();
       if (operation === "add") {
-        const record6 = payload.record;
-        if (!record6 || typeof record6 !== "object") return refuse3(400, "feedback_invalid");
+        const record7 = payload.record;
+        if (!record7 || typeof record7 !== "object") return refuse3(400, "feedback_invalid");
         return storage.transaction(async (transaction) => {
           const meta = await transaction.get(META_KEY2);
           const counts = countsOf(meta, nowMs2);
@@ -81882,7 +81983,7 @@ var init_sessionFeedback = __esm({
           if (counts.today >= SESSION_FEEDBACK_LIMITS.perSessionPerDay) return refuse3(429, "feedback_session_limit");
           const atMs = Math.max(nowMs2, (Number(meta?.lastMs) || 0) + 1);
           const createdAt = new Date(atMs).toISOString();
-          await transaction.put(`${PREFIX4}${createdAt}:${randomHex4(8)}`, { ...record6, createdAt });
+          await transaction.put(`${PREFIX4}${createdAt}:${randomHex4(8)}`, { ...record7, createdAt });
           await transaction.put(META_KEY2, { day: counts.day, stored: counts.stored + 1, today: counts.today + 1, lastMs: atMs });
           return json9({ ok: true });
         });
@@ -81894,7 +81995,7 @@ var init_sessionFeedback = __esm({
           return refuse3(400, "feedback_page_invalid");
         }
         const page = [...await storage.list({ prefix: PREFIX4, reverse: true, limit: limit + 1, ...cursor ? { end: PREFIX4 + cursor } : {} })];
-        const messages = page.slice(0, limit).map(([key, record6]) => ({ id: key.slice(PREFIX4.length), ...record6 }));
+        const messages = page.slice(0, limit).map(([key, record7]) => ({ id: key.slice(PREFIX4.length), ...record7 }));
         return json9({
           ok: true,
           messages,
@@ -82508,11 +82609,11 @@ var init_litWorkerAuthorization = __esm({
       jsParams.authorization.signature = await wallet.signMessage(message);
       return { privateKey: replyKeys.privateKey, message };
     };
-    openLitReply = async (reply5, context) => {
-      if (reply5?.version !== LIT_AUTHORIZATION_VERSION || !/^0x04[0-9a-f]{128}$/.test(reply5.publicKey || "") || !/^0x[0-9a-f]{24}$/.test(reply5.iv || "") || !/^0x[0-9a-f]+$/.test(reply5.ciphertext || "")) {
+    openLitReply = async (reply6, context) => {
+      if (reply6?.version !== LIT_AUTHORIZATION_VERSION || !/^0x04[0-9a-f]{128}$/.test(reply6.publicKey || "") || !/^0x[0-9a-f]{24}$/.test(reply6.iv || "") || !/^0x[0-9a-f]+$/.test(reply6.ciphertext || "")) {
         throw new Error("Invalid encrypted Lit authorization reply.");
       }
-      const publicKey = await crypto.subtle.importKey("raw", bytes2(reply5.publicKey), { name: "ECDH", namedCurve: "P-256" }, false, []);
+      const publicKey = await crypto.subtle.importKey("raw", bytes2(reply6.publicKey), { name: "ECDH", namedCurve: "P-256" }, false, []);
       const sharedSecret = await crypto.subtle.deriveBits({ name: "ECDH", public: publicKey }, context.privateKey, 256);
       const material = await crypto.subtle.importKey("raw", sharedSecret, "HKDF", false, ["deriveKey"]);
       const aad = utils2.toUtf8Bytes(context.message);
@@ -82528,7 +82629,7 @@ var init_litWorkerAuthorization = __esm({
         false,
         ["decrypt"]
       );
-      return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes2(reply5.iv), additionalData: aad }, key, bytes2(reply5.ciphertext)));
+      return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes2(reply6.iv), additionalData: aad }, key, bytes2(reply6.ciphertext)));
     };
     isLitAuthorizationReady = ({ secrets = {}, config = {} } = {}) => {
       try {
@@ -83877,9 +83978,9 @@ var init_sessionLitAuthorizationCoordinator = __esm({
       if (signer == null && version2 == null) return;
       if (!hasExistingKey || version2 !== LIT_AUTHORIZATION_VERSION || typeof signer !== "string" || signer.toLowerCase() !== wallet.address.toLowerCase()) fail12();
     };
-    readSignerSecrets = async (record6, env, slug) => {
-      if (!isRecord7(record6) || record6.version !== 1 || record6.slug !== slug) fail12();
-      const secrets = await decryptSessionSecretsEnvelope(record6.envelope, { env, slug });
+    readSignerSecrets = async (record7, env, slug) => {
+      if (!isRecord7(record7) || record7.version !== 1 || record7.slug !== slug) fail12();
+      const secrets = await decryptSessionSecretsEnvelope(record7.envelope, { env, slug });
       if (!isRecord7(secrets) || Object.keys(secrets).some((key) => !SECRET_KEYS.includes(key)) || Object.values(secrets).some((value) => typeof value !== "string")) fail12();
       walletFor(secrets[PRIVATE_KEY]);
       return secrets;
@@ -83892,13 +83993,13 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         await coordinator.assertSessionAuthority(payload);
         await coordinator.repairPendingSessionConfigProjection();
         const privateKey = await coordinator.state.storage.transaction(async (transaction) => {
-          const record6 = await transaction.get(SIGNER_RECORD);
+          const record7 = await transaction.get(SIGNER_RECORD);
           const config = authorityConfig(await transaction.get(CONFIG_RECORD), payload.baseConfig, slug);
-          const secrets = record6 != null ? await readSignerSecrets(record6, coordinator.env, slug) : await readCommittedSessionSecrets(coordinator, transaction, slug);
+          const secrets = record7 != null ? await readSignerSecrets(record7, coordinator.env, slug) : await readCommittedSessionSecrets(coordinator, transaction, slug);
           const hasExistingKey = hasOwn7(secrets, PRIVATE_KEY);
           const chosen = hasExistingKey ? walletFor(secrets[PRIVATE_KEY]) : proposed;
           assertConfiguredSigner(config, chosen, hasExistingKey);
-          if (record6 == null) {
+          if (record7 == null) {
             const envelope = await buildEncryptedSessionSecretsEnvelope({ [PRIVATE_KEY]: chosen.privateKey }, { env: coordinator.env, slug });
             await transaction.put(SIGNER_RECORD, { version: 1, slug, envelope });
           }
@@ -83923,9 +84024,9 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         if (current?.revision === pending.revision) await transaction.delete(SETUP_RECORD);
       });
     };
-    readProvisioning = async (record6, env, slug) => {
-      if (!isRecord7(record6) || record6.version !== 1 || record6.slug !== slug) fail12();
-      const checkpoint = await decryptSessionSecretsEnvelope(record6.envelope, { env, slug });
+    readProvisioning = async (record7, env, slug) => {
+      if (!isRecord7(record7) || record7.version !== 1 || record7.slug !== slug) fail12();
+      const checkpoint = await decryptSessionSecretsEnvelope(record7.envelope, { env, slug });
       if (!isRecord7(checkpoint) || Object.keys(checkpoint).some((key) => !PROVISIONING_FIELDS.has(key)) || Object.values(checkpoint).some((value) => typeof value !== "string" && typeof value !== "boolean")) fail12();
       return checkpoint;
     };
@@ -83938,18 +84039,18 @@ var init_sessionLitAuthorizationCoordinator = __esm({
           await coordinator.repairPendingSessionConfigProjection();
         }
         const result = await coordinator.state.storage.transaction(async (transaction) => {
-          const record6 = await transaction.get(PROVISIONING_RECORD);
+          const record7 = await transaction.get(PROVISIONING_RECORD);
           const now = coordinator.now();
           if (operation === "begin" || operation === "preflight") {
-            if (record6?.leaseUntilMs > now) fail12();
-            const saved = record6 ? await readProvisioning(record6, coordinator.env, slug) : {};
+            if (record7?.leaseUntilMs > now) fail12();
+            const saved = record7 ? await readProvisioning(record7, coordinator.env, slug) : {};
             const resourceIds = Object.fromEntries(["litGroupId", "litPkpId", "litActionCid"].filter((key) => typeof saved[key] === "string" && saved[key].trim()).map((key) => [key, saved[key]]));
             const hasResources = !!saved.accountWalletAddress || Object.keys(resourceIds).length > 0;
             const suppliedKeys = Array.isArray(payload.accountApiKeys) ? payload.accountApiKeys : [];
             if (hasResources && saved.litAccountApiKey && suppliedKeys.some((key) => typeof key === "string" && key.trim() && key.trim() !== saved.litAccountApiKey)) {
               throw Object.assign(new Error(LIT_PROVISIONING_CREDENTIALS_CONFLICT), { status: 409, code: "lit_provisioning_credentials_conflict" });
             }
-            if (record6 && record6.freshAuthority !== (payload.freshAuthority === true) && Object.keys(resourceIds).length) {
+            if (record7 && record7.freshAuthority !== (payload.freshAuthority === true) && Object.keys(resourceIds).length) {
               const names2 = { litGroupId: "group", litPkpId: "PKP", litActionCid: "action" };
               const resources = Object.entries(resourceIds).map(([key, id2]) => `${names2[key]} ${id2}`).join(", ");
               throw Object.assign(
@@ -83972,23 +84073,23 @@ var init_sessionLitAuthorizationCoordinator = __esm({
             return { attemptId, checkpoint: checkpoint2 };
           }
           if (operation === "check") {
-            if (!record6 || record6.leaseUntilMs > now) fail12();
-            const checkpoint2 = await readProvisioning(record6, coordinator.env, slug);
+            if (!record7 || record7.leaseUntilMs > now) fail12();
+            const checkpoint2 = await readProvisioning(record7, coordinator.env, slug);
             const attemptId = crypto.randomUUID();
-            await transaction.put(PROVISIONING_RECORD, { ...record6, attemptId, leaseUntilMs: now + PROVISIONING_LEASE_MS });
+            await transaction.put(PROVISIONING_RECORD, { ...record7, attemptId, leaseUntilMs: now + PROVISIONING_LEASE_MS });
             return { attemptId, checkpoint: checkpoint2 };
           }
           if (operation === "release") {
-            if (record6?.slug === slug && record6.attemptId === payload.attemptId)
-              await transaction.put(PROVISIONING_RECORD, { ...record6, leaseUntilMs: 0 });
+            if (record7?.slug === slug && record7.attemptId === payload.attemptId)
+              await transaction.put(PROVISIONING_RECORD, { ...record7, leaseUntilMs: 0 });
             return {};
           }
-          if (!["checkpoint", "discard"].includes(operation) || !record6 || !payload.attemptId || record6.attemptId !== payload.attemptId) fail12();
-          const previous = await readProvisioning(record6, coordinator.env, slug);
+          if (!["checkpoint", "discard"].includes(operation) || !record7 || !payload.attemptId || record7.attemptId !== payload.attemptId) fail12();
+          const previous = await readProvisioning(record7, coordinator.env, slug);
           if (operation === "discard") {
             const kept = payload.keepAccount === true ? Object.fromEntries(ACCOUNT_FIELDS.filter((key) => hasOwn7(previous, key)).map((key) => [key, previous[key]])) : {};
             const envelope2 = await buildEncryptedSessionSecretsEnvelope(kept, { env: coordinator.env, slug });
-            await transaction.put(PROVISIONING_RECORD, { ...record6, envelope: envelope2 });
+            await transaction.put(PROVISIONING_RECORD, { ...record7, envelope: envelope2 });
             return {};
           }
           const checkpoint = payload.checkpoint;
@@ -83997,7 +84098,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
             if (key !== "litPkpId" && hasOwn7(checkpoint, key) && checkpoint[key] !== value) fail12();
           }
           const envelope = await buildEncryptedSessionSecretsEnvelope({ ...previous, ...checkpoint }, { env: coordinator.env, slug });
-          await transaction.put(PROVISIONING_RECORD, { ...record6, leaseUntilMs: now + PROVISIONING_LEASE_MS, envelope });
+          await transaction.put(PROVISIONING_RECORD, { ...record7, leaseUntilMs: now + PROVISIONING_LEASE_MS, envelope });
           return {};
         });
         return json10({ ok: true, ...result });
@@ -84027,8 +84128,8 @@ var init_sessionLitAuthorizationCoordinator = __esm({
           }
           if (hasOwn7(checkpoint, "litUsageApiKey") && checkpoint.litUsageApiKey !== outputs.litUsageApiKey) fail12();
           if (hasOwn7(checkpoint, "accountSecretOutput") && checkpoint.accountSecretOutput !== outputs.litAccountApiKey) fail12();
-          const record6 = await transaction.get(SIGNER_RECORD);
-          const signerSecrets = await readSignerSecrets(record6, coordinator.env, slug);
+          const record7 = await transaction.get(SIGNER_RECORD);
+          const signerSecrets = await readSignerSecrets(record7, coordinator.env, slug);
           const wallet = walletFor(signerSecrets[PRIVATE_KEY]);
           if (walletFor(outputs[PRIVATE_KEY]).privateKey !== wallet.privateKey) fail12();
           assertConfiguredSigner({ litCredentials: payload.litCredentials }, wallet, true);
@@ -84087,15 +84188,15 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         await coordinator.repairPendingSessionConfigProjection();
         await coordinator.state.storage.transaction(async (transaction) => {
           const existing = await readCommittedSessionSecrets(coordinator, transaction, slug);
-          const record6 = await transaction.get(SIGNER_RECORD);
-          const litSecrets = record6 == null ? null : await readSignerSecrets(record6, coordinator.env, slug);
+          const record7 = await transaction.get(SIGNER_RECORD);
+          const litSecrets = record7 == null ? null : await readSignerSecrets(record7, coordinator.env, slug);
           const nextSecrets = { ...existing, ...litSecrets };
           for (const [key, value] of Object.entries(patch)) {
             if (value.trim()) nextSecrets[key] = value.trim();
             else delete nextSecrets[key];
           }
           await commitSessionSecrets(coordinator, transaction, slug, nextSecrets);
-          if (record6 && Object.keys(patch).some((key) => SECRET_KEYS.includes(key))) {
+          if (record7 && Object.keys(patch).some((key) => SECRET_KEYS.includes(key))) {
             const nextLitSecrets = Object.fromEntries(SECRET_KEYS.filter((key) => hasOwn7(nextSecrets, key)).map((key) => [key, nextSecrets[key]]));
             const envelope = await buildEncryptedSessionSecretsEnvelope(nextLitSecrets, { env: coordinator.env, slug });
             await transaction.put(SIGNER_RECORD, { version: 1, slug, envelope });
@@ -84183,7 +84284,7 @@ __export(sessionWriteCoordinator_exports, {
   settleCoordinatedAuthRateKey: () => settleCoordinatedAuthRateKey,
   withCoordinatedFaucetWalletTurn: () => withCoordinatedFaucetWalletTurn
 });
-var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, AUTH_RATE_KEY_HOLD_MS, AUTH_RATE_KEY_LEASE_MS, AUTH_RATE_KEY_RE, HOSTED_FAUCET_QUOTA_KEY, FAUCET_WALLET_TURN_KEY, FAUCET_WALLET_TURN_MS, FAUCET_WALLET_RENEW_MS, FAUCET_WALLET_WAIT_MS, FAUCET_WALLET_POLL_MS, CONTEXT_PDF_READING_PREFIX, CONTEXT_PDF_READING_LEASE_MS, CONTEXT_PDF_HAS_READING_PREFIX, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY, RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, uploadCountKey, MAX_ANSWER_VERSIONS, MAX_UPLOAD_QUESTION_IDS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_MAX_DRAFT_CHARS, millionChars, draftTooLargeError, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength2, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, WORKER_GROUP_MEMBER_MUTATIONS, WORKER_GROUP_SECRET_OPERATIONS, WORKER_GROUP_REVOKE_BATCH, NEEDS_EXCLUSIVE_WORKER_GROUP_OPERATION, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, workerGroupJoinRefused, admitWorkerGroupJoin, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, withCoordinatedFaucetWalletTurn, checkCoordinatedAuthRateLimit, settleCoordinatedAuthRateKey, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveResultsAnalysisCall, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, finalizeResultsAnalysisCall, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, AUTH_RATE_KEY_HOLD_MS, AUTH_RATE_KEY_LEASE_MS, AUTH_RATE_KEY_RE, HOSTED_FAUCET_QUOTA_KEY, FAUCET_WALLET_TURN_KEY, FAUCET_WALLET_TURN_MS, FAUCET_WALLET_RENEW_MS, FAUCET_WALLET_WAIT_MS, FAUCET_WALLET_POLL_MS, CONTEXT_PDF_READING_PREFIX, CONTEXT_PDF_READING_LEASE_MS, CONTEXT_PDF_HAS_READING_PREFIX, SESSION_LINK_READS_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY, RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, uploadCountKey, MAX_ANSWER_VERSIONS, MAX_UPLOAD_QUESTION_IDS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_MAX_DRAFT_CHARS, millionChars, draftTooLargeError, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength2, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, WORKER_GROUP_MEMBER_MUTATIONS, WORKER_GROUP_SECRET_OPERATIONS, WORKER_GROUP_REVOKE_BATCH, NEEDS_EXCLUSIVE_WORKER_GROUP_OPERATION, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, workerGroupJoinRefused, admitWorkerGroupJoin, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, withCoordinatedFaucetWalletTurn, checkCoordinatedAuthRateLimit, settleCoordinatedAuthRateKey, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveResultsAnalysisCall, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, finalizeResultsAnalysisCall, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
     init_lib2();
@@ -84209,6 +84310,7 @@ var init_sessionWriteCoordinator = __esm({
     init_storageRouteExecution();
     init_contextCard();
     init_contextSourceRoute();
+    init_sessionLinkReading();
     init_resultsBuildStore();
     init_resultsJobs();
     init_resultsJobRunners();
@@ -84250,6 +84352,7 @@ var init_sessionWriteCoordinator = __esm({
     CONTEXT_PDF_READING_PREFIX = "context-pdf-reading:";
     CONTEXT_PDF_READING_LEASE_MS = 5 * 60 * 1e3;
     CONTEXT_PDF_HAS_READING_PREFIX = "context-pdf-has-reading:";
+    SESSION_LINK_READS_KEY = "session-link-reads";
     WORKER_GROUP_CAPACITY_META_KEY = "worker-group-capacity-meta-v3";
     WORKER_GROUP_CAPACITY_GROUP_PREFIX = "worker-group-capacity-group-v3:";
     WORKER_GROUP_CAPACITY_MEMBER_PREFIX = "worker-group-capacity-member-v3:";
@@ -84263,7 +84366,7 @@ var init_sessionWriteCoordinator = __esm({
     UPLOAD_RECEIPT_PREFIX = "upload-receipt-v1:";
     UPLOAD_RECEIPT_LEASE_MS = 12e4;
     UPLOAD_RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1e3;
-    uploadReceiptExpiresAt = (record6) => record6.state === "settled" ? record6.settledAt + UPLOAD_RECEIPT_RETENTION_MS : record6.state === "pending" ? record6.reservedAt + UPLOAD_RECEIPT_RETENTION_MS : 0;
+    uploadReceiptExpiresAt = (record7) => record7.state === "settled" ? record7.settledAt + UPLOAD_RECEIPT_RETENTION_MS : record7.state === "pending" ? record7.reservedAt + UPLOAD_RECEIPT_RETENTION_MS : 0;
     MAX_UPLOAD_RECEIPTS = 2e3;
     uploadCountKey = (person, questionKey = "", bundle = false) => `upload-count-v1:${person}:${questionKey ? `question:${questionKey}` : bundle ? "bundles" : "total"}`;
     MAX_ANSWER_VERSIONS = 20;
@@ -84308,8 +84411,8 @@ var init_sessionWriteCoordinator = __esm({
       if (!numeric || numeric <= nowMs2 || numeric > nowMs2 + maxAheadMs) return 0;
       return numeric;
     };
-    readActiveAuthNonces = (record6, nowMs2) => {
-      const entries = Array.isArray(record6?.entries) ? record6.entries : record6?.nonce ? [{ nonce: record6.nonce, expiresAtMs: record6.expiresAtMs }] : [];
+    readActiveAuthNonces = (record7, nowMs2) => {
+      const entries = Array.isArray(record7?.entries) ? record7.entries : record7?.nonce ? [{ nonce: record7.nonce, expiresAtMs: record7.expiresAtMs }] : [];
       return entries.map((entry2) => ({ nonce: toTrimmedString10(entry2?.nonce), expiresAtMs: Number(entry2?.expiresAtMs || 0) })).filter((entry2) => entry2.nonce && entry2.expiresAtMs > nowMs2);
     };
     putActiveAuthNonces = async (transaction, entries) => {
@@ -84576,16 +84679,16 @@ ${expiry}`);
       async pruneUploadReceipts(transaction, nowMs2) {
         const records = await transaction.list({ prefix: UPLOAD_RECEIPT_PREFIX });
         const retained = [];
-        for (const [key, record6] of records) {
-          const live = record6.state === "pending" && record6.leaseUntil > nowMs2;
-          const expiresAt = uploadReceiptExpiresAt(record6);
+        for (const [key, record7] of records) {
+          const live = record7.state === "pending" && record7.leaseUntil > nowMs2;
+          const expiresAt = uploadReceiptExpiresAt(record7);
           if (!live && !(expiresAt > nowMs2)) await transaction.delete(key);
-          else retained.push({ key, live, expiresAt: Math.max(expiresAt, live ? record6.leaseUntil : 0) });
+          else retained.push({ key, live, expiresAt: Math.max(expiresAt, live ? record7.leaseUntil : 0) });
         }
-        const removable = retained.filter((record6) => !record6.live).sort((a, b2) => a.expiresAt - b2.expiresAt);
-        const evicted = new Set(removable.slice(0, Math.max(0, retained.length - MAX_UPLOAD_RECEIPTS)).map((record6) => record6.key));
+        const removable = retained.filter((record7) => !record7.live).sort((a, b2) => a.expiresAt - b2.expiresAt);
+        const evicted = new Set(removable.slice(0, Math.max(0, retained.length - MAX_UPLOAD_RECEIPTS)).map((record7) => record7.key));
         for (const key of evicted) await transaction.delete(key);
-        return retained.reduce((next, record6) => evicted.has(record6.key) ? next : Math.min(next, record6.expiresAt), Infinity);
+        return retained.reduce((next, record7) => evicted.has(record7.key) ? next : Math.min(next, record7.expiresAt), Infinity);
       }
       async scheduleUploadReceiptCleanup() {
         const nextExpiry = await this.state.storage.transaction((transaction) => this.pruneUploadReceipts(transaction, Number(this.now()) || Date.now()));
@@ -84647,41 +84750,41 @@ ${expiry}`);
         const nowMs2 = Number(this.now()) || Date.now();
         const result = await this.state.storage.transaction(async (transaction) => {
           if (reserve) await this.pruneUploadReceipts(transaction, nowMs2);
-          const record6 = await transaction.get(key);
+          const record7 = await transaction.get(key);
           if (withdraw) {
-            const adopted = record6?.state === "settled" ? record6.storageRef?.id === storageId : record6?.storageId === storageId;
-            if (!record6 || adopted || record6.attemptId === payload.attemptId) {
+            const adopted = record7?.state === "settled" ? record7.storageRef?.id === storageId : record7?.storageId === storageId;
+            if (!record7 || adopted || record7.attemptId === payload.attemptId) {
               return { status: 409, error: "This upload target is still in use.", reason: "upload_target_in_use" };
             }
-            if (record6.priorStorageIds?.includes(storageId)) {
-              await transaction.put(key, { ...record6, priorStorageIds: record6.priorStorageIds.filter((id2) => id2 !== storageId) });
+            if (record7.priorStorageIds?.includes(storageId)) {
+              await transaction.put(key, { ...record7, priorStorageIds: record7.priorStorageIds.filter((id2) => id2 !== storageId) });
             }
             return { status: 200, ok: true };
           }
           if (settle) {
-            if (record6?.state !== "pending" || record6.attemptId !== payload.attemptId) {
+            if (record7?.state !== "pending" || record7.attemptId !== payload.attemptId) {
               return { status: 409, error: "Upload attempt no longer owns this receipt.", reason: "upload_attempt_superseded" };
             }
-            if (record6.storageId !== storageRef.id && !record6.priorStorageIds?.includes(storageRef.id)) {
+            if (record7.storageId !== storageRef.id && !record7.priorStorageIds?.includes(storageRef.id)) {
               return { status: 409, error: "Upload target does not match this receipt.", reason: "upload_receipt_target_mismatch" };
             }
-            await transaction.put(key, { state: "settled", payloadDigest: record6.payloadDigest, storageRef, settledAt: nowMs2 });
-            const countKeys = record6.person ? [
-              uploadCountKey(record6.person, "", record6.bundle === true),
-              ...(record6.questionKeys || []).map((questionKey) => uploadCountKey(record6.person, questionKey))
+            await transaction.put(key, { state: "settled", payloadDigest: record7.payloadDigest, storageRef, settledAt: nowMs2 });
+            const countKeys = record7.person ? [
+              uploadCountKey(record7.person, "", record7.bundle === true),
+              ...(record7.questionKeys || []).map((questionKey) => uploadCountKey(record7.person, questionKey))
             ] : [];
             for (const countKey of countKeys) await transaction.put(countKey, (await transaction.get(countKey) || 0) + 1);
             await this.pruneUploadReceipts(transaction, nowMs2);
             return { status: 200, ok: true };
           }
-          if (record6?.state === "settled" && nowMs2 - record6.settledAt < UPLOAD_RECEIPT_RETENTION_MS) {
-            return equalText(record6.payloadDigest, payloadDigest) ? { status: 200, kind: "replay", storageRef: record6.storageRef } : { status: 409, error: "This upload request id already stored different content.", reason: "upload_request_conflict" };
+          if (record7?.state === "settled" && nowMs2 - record7.settledAt < UPLOAD_RECEIPT_RETENTION_MS) {
+            return equalText(record7.payloadDigest, payloadDigest) ? { status: 200, kind: "replay", storageRef: record7.storageRef } : { status: 409, error: "This upload request id already stored different content.", reason: "upload_request_conflict" };
           }
-          if (record6?.state === "pending" && record6.leaseUntil > nowMs2) {
+          if (record7?.state === "pending" && record7.leaseUntil > nowMs2) {
             return { status: 503, error: "This upload is still in progress; retry shortly.", reason: "upload_in_progress" };
           }
-          const resumed = record6?.state === "pending" && uploadReceiptExpiresAt(record6) > nowMs2;
-          if (resumed && !equalText(record6.payloadDigest, payloadDigest)) {
+          const resumed = record7?.state === "pending" && uploadReceiptExpiresAt(record7) > nowMs2;
+          if (resumed && !equalText(record7.payloadDigest, payloadDigest)) {
             return { status: 409, error: "This upload request id already reserved different content.", reason: "upload_request_conflict" };
           }
           const records = await transaction.list({ prefix: UPLOAD_RECEIPT_PREFIX });
@@ -84702,9 +84805,9 @@ ${expiry}`);
           }
           const target = resumed ? {
             storageId,
-            createdAt: record6.createdAt,
-            reservedAt: record6.reservedAt,
-            priorStorageIds: [...record6.priorStorageIds || [], record6.storageId].slice(-MAX_PRIOR_UPLOAD_TARGETS)
+            createdAt: record7.createdAt,
+            reservedAt: record7.reservedAt,
+            priorStorageIds: [...record7.priorStorageIds || [], record7.storageId].slice(-MAX_PRIOR_UPLOAD_TARGETS)
           } : { storageId, createdAt, reservedAt: nowMs2 };
           const attemptId = createAttemptId(this.crypto);
           await transaction.put(key, {
@@ -84739,12 +84842,12 @@ ${expiry}`);
         let cursor = "";
         for (; ; ) {
           const records = await this.state.storage.list({ prefix: UPLOAD_RECEIPT_PREFIX, ...cursor ? { startAfter: cursor } : {}, limit: 500 });
-          for (const record6 of records.values()) {
-            if (record6.state === "pending" && record6.leaseUntil > nowMs2) {
+          for (const record7 of records.values()) {
+            if (record7.state === "pending" && record7.leaseUntil > nowMs2) {
               pendingLeases += 1;
-              oldestPendingAgeMs = Math.max(oldestPendingAgeMs ?? 0, nowMs2 - (record6.leaseUntil - UPLOAD_RECEIPT_LEASE_MS));
+              oldestPendingAgeMs = Math.max(oldestPendingAgeMs ?? 0, nowMs2 - (record7.leaseUntil - UPLOAD_RECEIPT_LEASE_MS));
             }
-            if (record6.state === "settled" && nowMs2 - record6.settledAt < UPLOAD_RECEIPT_RETENTION_MS) settledCount += 1;
+            if (record7.state === "settled" && nowMs2 - record7.settledAt < UPLOAD_RECEIPT_RETENTION_MS) settledCount += 1;
           }
           if (records.size < 500) break;
           cursor = [...records.keys()].at(-1);
@@ -84768,9 +84871,9 @@ ${expiry}`);
         });
       }
       serializeStorageOwnerOperation(operation) {
-        const run = this.storageOwnerTail.then(operation);
-        this.storageOwnerTail = run.catch(() => void 0);
-        return run;
+        const run2 = this.storageOwnerTail.then(operation);
+        this.storageOwnerTail = run2.catch(() => void 0);
+        return run2;
       }
       // Answers whether a question or survey id was stored before first-writer
       // records existed. The scan runs in bounded steps and keeps its progress and
@@ -84819,12 +84922,12 @@ ${expiry}`);
         });
       }
       serializeResultsAnalysisOperation(operation) {
-        const run = this.resultsAnalysisTail.then(operation);
-        this.resultsAnalysisTail = run.catch(() => void 0);
-        return run;
+        const run2 = this.resultsAnalysisTail.then(operation);
+        this.resultsAnalysisTail = run2.catch(() => void 0);
+        return run2;
       }
-      normalizeResultsAnalysisRecord(record6) {
-        const source = isObjectRecord(record6) && record6.version === 1 ? record6 : {};
+      normalizeResultsAnalysisRecord(record7) {
+        const source = isObjectRecord(record7) && record7.version === 1 ? record7 : {};
         const requests = isObjectRecord(source.requests) ? source.requests : {};
         return {
           version: 1,
@@ -84849,9 +84952,9 @@ ${expiry}`);
         }
       }
       async readResultsAnalysisDraft(storage = this.state.storage) {
-        const record6 = await storage.get(RESULTS_ANALYSIS_DRAFT_KEY);
-        if (!isObjectRecord(record6) || record6.chunked !== true) return record6;
-        const chunkCount = Number(record6.chunkCount || 0) || 0;
+        const record7 = await storage.get(RESULTS_ANALYSIS_DRAFT_KEY);
+        if (!isObjectRecord(record7) || record7.chunked !== true) return record7;
+        const chunkCount = Number(record7.chunkCount || 0) || 0;
         if (!chunkCount || chunkCount > RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS) return null;
         let serialized = "";
         for (let index = 0; index < chunkCount; index += 1) {
@@ -85020,9 +85123,9 @@ ${expiry}`);
             limit: RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE
           });
           let next = Number(cursor?.next) || Infinity;
-          for (const [key, record6] of page) {
-            if (record6.expiresAt <= nowMs2) await transaction.delete(key);
-            else next = Math.min(next, record6.expiresAt);
+          for (const [key, record7] of page) {
+            if (record7.expiresAt <= nowMs2) await transaction.delete(key);
+            else next = Math.min(next, record7.expiresAt);
           }
           if (page.size >= RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE) {
             await transaction.put(RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY, { after: [...page.keys()].at(-1), next });
@@ -85039,13 +85142,13 @@ ${expiry}`);
         const nowMs2 = Number(this.now()) || Date.now();
         const retryDelayMs = await this.state.storage.transaction(async (transaction) => {
           const queued = await transaction.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-          const record6 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+          const record7 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
           const sameJob = !job || queued?.queuedAtMs === job.queuedAtMs;
           const retryable = error?.retryable !== false && RESULTS_ANALYSIS_RETRYABLE_STATUSES.has(Number(error?.status));
           const retryAttempt = (Number(queued?.retryAttempt) || 0) + 1;
           const scheduledDelay = retryable && sameJob && isObjectRecord(queued) ? RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS[retryAttempt - 1] : void 0;
           const delayMs = scheduledDelay ? Math.min(Math.max(scheduledDelay, Number(error?.retryAfterMs) || 0), 30 * 6e4) : void 0;
-          record6.lastFailure = {
+          record7.lastFailure = {
             ok: false,
             error: error?.message || error?.error || toTrimmedString10(error) || "Automatic results analysis job failed.",
             status: Number(error?.status) >= 400 && Number(error?.status) <= 599 ? Number(error.status) : 502,
@@ -85062,7 +85165,7 @@ ${expiry}`);
           } else if (sameJob) {
             await transaction.delete(RESULTS_ANALYSIS_AUTO_JOB_KEY);
           }
-          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record6);
+          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record7);
           return delayMs;
         });
         if (retryDelayMs) await this.scheduleResultsAnalysisAlarm(retryDelayMs);
@@ -85168,8 +85271,8 @@ ${expiry}`);
       async releaseResultsAnalysisRequest(requestId, failure4 = null) {
         const id2 = toTrimmedString10(requestId);
         if (!id2) return;
-        const record6 = this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY));
-        const active = record6.active;
+        const record7 = this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY));
+        const active = record7.active;
         if (active?.requestId === id2 && failure4) {
           await this.finalizeResultsAnalysis({
             requestId: id2,
@@ -85190,18 +85293,18 @@ ${expiry}`);
       }
       async readResultsAnalysisStatus() {
         const existing = await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY);
-        const record6 = this.normalizeResultsAnalysisRecord(existing);
+        const record7 = this.normalizeResultsAnalysisRecord(existing);
         const latestDraft = await this.readResultsAnalysisDraft();
         const queued = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-        const lastGood = record6.lastGood && latestDraft?.draftId === record6.lastGood.draftId ? { ...record6.lastGood, ...latestDraft } : record6.lastGood;
+        const lastGood = record7.lastGood && latestDraft?.draftId === record7.lastGood.draftId ? { ...record7.lastGood, ...latestDraft } : record7.lastGood;
         const nowMs2 = Number(this.now()) || Date.now();
         return {
           version: 1,
-          jobState: this.isResultsAnalysisActiveFresh(record6.active, nowMs2) ? "running" : isObjectRecord(queued) ? "queued" : record6.lastFailure ? "failed" : lastGood ? "succeeded" : "idle",
+          jobState: this.isResultsAnalysisActiveFresh(record7.active, nowMs2) ? "running" : isObjectRecord(queued) ? "queued" : record7.lastFailure ? "failed" : lastGood ? "succeeded" : "idle",
           queued: isObjectRecord(queued) ? { requestId: toTrimmedString10(queued.requestId), queuedAtMs: Number(queued.queuedAtMs || 0) || 0 } : null,
-          active: this.isResultsAnalysisActiveFresh(record6.active, nowMs2) ? record6.active : null,
+          active: this.isResultsAnalysisActiveFresh(record7.active, nowMs2) ? record7.active : null,
           lastGood,
-          lastFailure: record6.lastFailure
+          lastFailure: record7.lastFailure
         };
       }
       async reserveResultsAnalysis(payload = {}) {
@@ -85217,9 +85320,9 @@ ${expiry}`);
         }
         const nowMs2 = Number(this.now()) || Date.now();
         return this.state.storage.transaction(async (transaction) => {
-          const record6 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+          const record7 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
           const latestDraft = await this.readResultsAnalysisDraft(transaction);
-          const prior = requestId ? record6.requests[requestId] : null;
+          const prior = requestId ? record7.requests[requestId] : null;
           if (prior?.state === "succeeded" && prior.draftId) {
             if (latestDraft?.draftId === prior.draftId) {
               return { kind: "terminal", draft: latestDraft, draftId: prior.draftId };
@@ -85229,30 +85332,30 @@ ${expiry}`);
           if (prior?.state === "failed") {
             return { kind: "failed", status: prior.status || 502, error: prior.error || "Results analysis generation failed." };
           }
-          if (prior?.state === "running" && record6.active?.requestId === requestId && this.isResultsAnalysisActiveFresh(record6.active, nowMs2)) {
+          if (prior?.state === "running" && record7.active?.requestId === requestId && this.isResultsAnalysisActiveFresh(record7.active, nowMs2)) {
             return { kind: "pending" };
           }
-          if (!refresh && record6.lastGood?.sourceSignature === sourceSignature && record6.lastGood?.viewSignature === viewSignature && latestDraft?.draftId === record6.lastGood.draftId) {
+          if (!refresh && record7.lastGood?.sourceSignature === sourceSignature && record7.lastGood?.viewSignature === viewSignature && latestDraft?.draftId === record7.lastGood.draftId) {
             if (requestId) {
-              record6.requests[requestId] = { state: "succeeded", draftId: latestDraft.draftId, updatedAtMs: nowMs2 };
-              record6.requests = this.pruneResultsAnalysisRequests(record6.requests);
-              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record6);
+              record7.requests[requestId] = { state: "succeeded", draftId: latestDraft.draftId, updatedAtMs: nowMs2 };
+              record7.requests = this.pruneResultsAnalysisRequests(record7.requests);
+              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record7);
             }
             return { kind: "terminal", draft: latestDraft, draftId: latestDraft.draftId };
           }
-          if (trigger === "automatic" && record6.lastFailure?.sourceSignature === sourceSignature && record6.lastFailure?.viewSignature === viewSignature) {
-            return { kind: "failed", status: record6.lastFailure.status || 502, error: record6.lastFailure.error || "Results analysis generation failed." };
+          if (trigger === "automatic" && record7.lastFailure?.sourceSignature === sourceSignature && record7.lastFailure?.viewSignature === viewSignature) {
+            return { kind: "failed", status: record7.lastFailure.status || 502, error: record7.lastFailure.error || "Results analysis generation failed." };
           }
-          if (this.isResultsAnalysisActiveFresh(record6.active, nowMs2)) {
-            if (requestId && !record6.requests[requestId]) {
-              record6.requests[requestId] = { state: "running", updatedAtMs: nowMs2 };
-              record6.requests = this.pruneResultsAnalysisRequests(record6.requests);
-              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record6);
+          if (this.isResultsAnalysisActiveFresh(record7.active, nowMs2)) {
+            if (requestId && !record7.requests[requestId]) {
+              record7.requests[requestId] = { state: "running", updatedAtMs: nowMs2 };
+              record7.requests = this.pruneResultsAnalysisRequests(record7.requests);
+              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record7);
             }
             return { kind: "pending" };
           }
           const attemptId = createAttemptId(this.crypto);
-          record6.active = {
+          record7.active = {
             reservationKey,
             requestId,
             attemptId,
@@ -85262,9 +85365,9 @@ ${expiry}`);
             trigger,
             startedAtMs: nowMs2
           };
-          if (requestId) record6.requests[requestId] = { state: "running", updatedAtMs: nowMs2 };
-          record6.requests = this.pruneResultsAnalysisRequests(record6.requests);
-          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record6);
+          if (requestId) record7.requests[requestId] = { state: "running", updatedAtMs: nowMs2 };
+          record7.requests = this.pruneResultsAnalysisRequests(record7.requests);
+          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record7);
           return { kind: "execute", attemptId };
         });
       }
@@ -85277,12 +85380,12 @@ ${expiry}`);
         if (!reservationKey || !attemptId || !receipt) return { ok: false, status: 400 };
         const nowMs2 = Number(this.now()) || Date.now();
         return this.state.storage.transaction(async (transaction) => {
-          const record6 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
-          if (record6.active?.reservationKey !== reservationKey || record6.active?.attemptId !== attemptId) {
+          const record7 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+          if (record7.active?.reservationKey !== reservationKey || record7.active?.attemptId !== attemptId) {
             return { ok: false, status: 409 };
           }
-          const active = record6.active;
-          record6.active = null;
+          const active = record7.active;
+          record7.active = null;
           if (success) {
             const draft = receipt.draft && isObjectRecord(receipt.draft) ? receipt.draft : receipt;
             const draftId = toTrimmedString10(draft.draftId);
@@ -85290,7 +85393,7 @@ ${expiry}`);
             try {
               await this.putResultsAnalysisDraft(transaction, draft);
             } catch (error) {
-              record6.lastFailure = {
+              record7.lastFailure = {
                 ok: false,
                 error: error?.message || "Results analysis draft exceeds durable storage limits.",
                 status: Number(error?.status || 0) || 413,
@@ -85301,17 +85404,17 @@ ${expiry}`);
                 trigger: active.trigger,
                 failedAtMs: nowMs2
               };
-              if (requestId) record6.requests[requestId] = {
+              if (requestId) record7.requests[requestId] = {
                 state: "failed",
-                error: record6.lastFailure.error,
-                status: record6.lastFailure.status,
+                error: record7.lastFailure.error,
+                status: record7.lastFailure.status,
                 updatedAtMs: nowMs2
               };
-              record6.requests = this.pruneResultsAnalysisRequests(record6.requests);
-              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record6);
-              return { ok: false, status: record6.lastFailure.status, error: record6.lastFailure.error };
+              record7.requests = this.pruneResultsAnalysisRequests(record7.requests);
+              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record7);
+              return { ok: false, status: record7.lastFailure.status, error: record7.lastFailure.error };
             }
-            record6.lastGood = {
+            record7.lastGood = {
               draftId,
               generatedAt: draft.generatedAt,
               requestId,
@@ -85323,11 +85426,11 @@ ${expiry}`);
               sections: Array.isArray(draft.sections) ? draft.sections : [],
               completedAtMs: nowMs2
             };
-            if (active.trigger === "automatic") record6.lastAutomaticSuccessAtMs = nowMs2;
-            record6.lastFailure = null;
-            if (requestId) record6.requests[requestId] = { state: "succeeded", draftId, updatedAtMs: nowMs2 };
+            if (active.trigger === "automatic") record7.lastAutomaticSuccessAtMs = nowMs2;
+            record7.lastFailure = null;
+            if (requestId) record7.requests[requestId] = { state: "succeeded", draftId, updatedAtMs: nowMs2 };
           } else {
-            record6.lastFailure = {
+            record7.lastFailure = {
               ok: false,
               error: toTrimmedString10(receipt.error) || "Results analysis generation failed.",
               status: Number(receipt.status || 0) || 502,
@@ -85338,15 +85441,15 @@ ${expiry}`);
               trigger: active.trigger,
               failedAtMs: nowMs2
             };
-            if (requestId) record6.requests[requestId] = {
+            if (requestId) record7.requests[requestId] = {
               state: "failed",
-              error: record6.lastFailure.error,
-              status: record6.lastFailure.status,
+              error: record7.lastFailure.error,
+              status: record7.lastFailure.status,
               updatedAtMs: nowMs2
             };
           }
-          record6.requests = this.pruneResultsAnalysisRequests(record6.requests);
-          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record6);
+          record7.requests = this.pruneResultsAnalysisRequests(record7.requests);
+          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record7);
           return { ok: true, status: 200 };
         });
       }
@@ -86314,10 +86417,10 @@ ${expiry}`);
           const counts = workerGroupInviteCounts(state2);
           let revoked = 0;
           for (const key of keys) {
-            const record6 = await transaction.get(key);
-            if (record6?.state === "used" && !all) await transaction.put(key, { ...record6, revokeOnRestore: true });
-            if (record6?.state !== "unused") continue;
-            await transaction.put(key, { ...record6, state: "revoked", revokedAt: nowIso4 });
+            const record7 = await transaction.get(key);
+            if (record7?.state === "used" && !all) await transaction.put(key, { ...record7, revokeOnRestore: true });
+            if (record7?.state !== "unused") continue;
+            await transaction.put(key, { ...record7, state: "revoked", revokedAt: nowIso4 });
             counts.unused = Math.max(0, counts.unused - 1);
             counts.revoked += 1;
             revoked += 1;
@@ -86335,7 +86438,7 @@ ${expiry}`);
         do {
           const page = [...await this.state.storage.list({ prefix, startAfter: after, limit: WORKER_GROUP_REVOKE_BATCH })];
           after = page.length === WORKER_GROUP_REVOKE_BATCH ? page.at(-1)[0] : "";
-          const keys = page.filter(([, record6]) => record6?.state === "unused").map(([key]) => key);
+          const keys = page.filter(([, record7]) => record7?.state === "unused").map(([key]) => key);
           const batch = await this.revokeWorkerGroupInvites(groupId, keys, { nowIso: nowIso4, all: true });
           revoked += batch.revoked;
           counts = batch.counts;
@@ -86415,12 +86518,12 @@ ${expiry}`);
             limit: limit + 1
           });
           const entries = [...page].slice(0, limit);
-          const invites = entries.map(([key, record6]) => ({
+          const invites = entries.map(([key, record7]) => ({
             hash: key.slice(prefix.length),
-            state: record6?.state,
-            createdAt: record6?.createdAt,
-            ...record6?.expiresAt ? { expiresAt: record6.expiresAt } : {},
-            ...record6?.usedAt ? { usedAt: record6.usedAt } : {}
+            state: record7?.state,
+            createdAt: record7?.createdAt,
+            ...record7?.expiresAt ? { expiresAt: record7.expiresAt } : {},
+            ...record7?.usedAt ? { usedAt: record7.usedAt } : {}
           }));
           return jsonResponse2({
             ok: true,
@@ -86524,15 +86627,15 @@ ${expiry}`);
         const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
         if (!slug) return jsonResponse2({ error: "Invalid session slug." }, 400);
         const authority = await this.readSessionConfigAuthority(slug);
-        const record6 = this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY));
+        const record7 = this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY));
         const queued = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-        const failure4 = record6.lastFailure?.trigger === "automatic" ? record6.lastFailure : null;
+        const failure4 = record7.lastFailure?.trigger === "automatic" ? record7.lastFailure : null;
         return jsonResponse2({
           ok: true,
           config: authority?.config ?? null,
           revision: authority?.revision ?? 0,
           analysis: {
-            lastSuccessAtMs: record6.lastAutomaticSuccessAtMs,
+            lastSuccessAtMs: record7.lastAutomaticSuccessAtMs,
             retryAttempt: Number(queued?.retryAttempt ?? failure4?.retryAttempt) || 0,
             nextAttemptAtMs: queued ? Number(failure4?.nextAttemptAtMs) || null : null,
             retriesExhausted: failure4?.retriesExhausted === true
@@ -86563,7 +86666,7 @@ ${expiry}`);
         });
       }
       async executeStorageVisibilityMutation(payload) {
-        const run = this.storageVisibilityTail.then(async () => {
+        const run2 = this.storageVisibilityTail.then(async () => {
           try {
             const runVisibilityMutation = (operation) => this.serializeSessionConfigOperation(async () => {
               const authority2 = await this.assertSessionAuthority(payload);
@@ -86587,15 +86690,15 @@ ${expiry}`);
             return jsonResponse2({ error: error.message || "Storage visibility update failed." }, error.status || 503);
           }
         });
-        this.storageVisibilityTail = run.catch(() => void 0);
-        return run;
+        this.storageVisibilityTail = run2.catch(() => void 0);
+        return run2;
       }
       // Context changes to a PDF's readings run one at a time per session, so a
       // reading, a removal and the PDF's pointer to its reading never interleave.
       // A card is written to its source's row here too, and a refreshed link's old
       // record is removed here, so a card write never undoes one of them.
       async executeContextSourceOperation(operation, payload) {
-        const run = this.contextSourceTail.then(async () => {
+        const run2 = this.contextSourceTail.then(async () => {
           try {
             const slug = normalizeWorkerSessionSlug(payload?.slug);
             const id2 = toTrimmedString10(payload?.id);
@@ -86638,6 +86741,36 @@ ${expiry}`);
               if (result.status === 200) await this.state.storage.delete(readKey);
               return jsonResponse2(result.body, result.status);
             }
+            if (operation === "claim-links" || operation === "settle-link") {
+              const nowMs2 = Number(this.now()) || Date.now();
+              const state2 = await this.state.storage.get(SESSION_LINK_READS_KEY);
+              const sessionId = toTrimmedString10(payload?.sessionId);
+              if (operation === "settle-link") {
+                await this.state.storage.put(SESSION_LINK_READS_KEY, settleSessionLinkRead({
+                  state: state2,
+                  sessionId,
+                  url: toTrimmedString10(payload?.url),
+                  ok: payload?.ok === true,
+                  error: payload?.error,
+                  nowMs: nowMs2
+                }) || {});
+                return jsonResponse2({ ok: true });
+              }
+              const listOf = (value) => Array.isArray(value) ? [...new Set(value.map(toTrimmedString10).filter(Boolean))].slice(0, SESSION_LINK_READING_SETTINGS.links.max) : [];
+              const urls = listOf(payload?.urls);
+              const retryMs = Number.isSafeInteger(payload?.retryMs) && payload.retryMs > 0 ? payload.retryMs : SESSION_LINK_READING_SETTINGS.retryMinutes.default * 6e4;
+              const claimed = claimSessionLinkReads({
+                state: state2,
+                sessionId,
+                urls,
+                saved: payload?.saved === void 0 ? urls : listOf(payload.saved),
+                forget: payload?.forget === true,
+                retryMs,
+                nowMs: nowMs2
+              });
+              if (claimed.changed) await this.state.storage.put(SESSION_LINK_READS_KEY, claimed.state);
+              return jsonResponse2({ ok: true, due: claimed.due });
+            }
             if (operation === "set-card") {
               await assertNoActiveBackupImport(this);
               const result = await storeContextCard({ env: this.env, slug, id: id2, card: payload.card, markWrite });
@@ -86648,8 +86781,8 @@ ${expiry}`);
             return jsonResponse2({ error: error.message || "Context update failed." }, error.status || 503);
           }
         });
-        this.contextSourceTail = run.catch(() => void 0);
-        return run;
+        this.contextSourceTail = run2.catch(() => void 0);
+        return run2;
       }
       async finalizeSessionConfigProjection(revision) {
         await this.state.storage.transaction(async (transaction) => {
@@ -86827,13 +86960,13 @@ ${expiry}`);
         const existing = await this.state.storage.get(AUTH_NONCE_MAC_KEY);
         if (/^[0-9a-f]{64}$/.test(toTrimmedString10(existing?.key)) || !create2) return toTrimmedString10(existing?.key);
         const candidate = { version: 1, key: bytesToHex3(this.crypto.getRandomValues(new Uint8Array(32))) };
-        const record6 = await this.state.storage.transaction(async (transaction) => {
+        const record7 = await this.state.storage.transaction(async (transaction) => {
           const current = await transaction.get(AUTH_NONCE_MAC_KEY);
           if (/^[0-9a-f]{64}$/.test(toTrimmedString10(current?.key))) return current;
           await transaction.put(AUTH_NONCE_MAC_KEY, candidate);
           return candidate;
         });
-        return record6.key;
+        return record7.key;
       }
       async executeAuthNonceIssue(payload) {
         const nowMs2 = Number(this.now()) || Date.now();
@@ -89355,7 +89488,7 @@ var require_ar = __commonJS({
           return new instance(value);
         };
       }
-      winstonToAr(winstonString, { formatted = false, decimals = 12, trim: trim31 = true } = {}) {
+      winstonToAr(winstonString, { formatted = false, decimals = 12, trim: trim32 = true } = {}) {
         let number2 = this.stringToBigNum(winstonString, decimals).shiftedBy(-12);
         return formatted ? number2.toFormat(decimals) : number2.toFixed(decimals);
       }
@@ -91553,7 +91686,7 @@ var attestRpcEndpointChain = async ({
   const expected = toChainId2(expectedChainId);
   const target = typeof rpcUrl === "string" ? rpcUrl.trim() : "";
   const cacheKey3 = `${expected}\0${target}`;
-  const run = async () => {
+  const run2 = async () => {
     if (!expected || !target || typeof rpcRequest2 !== "function") {
       return {
         ok: false,
@@ -91590,8 +91723,8 @@ var attestRpcEndpointChain = async ({
       };
     }
   };
-  if (!(cache instanceof Map)) return run();
-  if (!cache.has(cacheKey3)) cache.set(cacheKey3, run());
+  if (!(cache instanceof Map)) return run2();
+  if (!cache.has(cacheKey3)) cache.set(cacheKey3, run2());
   return cache.get(cacheKey3);
 };
 
@@ -93686,8 +93819,8 @@ var createRateLimitFaucetSupportWithWorkerDeps = ({
     if (!numeric || Number.isNaN(numeric) || numeric <= 0) return true;
     const routeKey = toTrimmedString2(route, deps).toLowerCase() || "default";
     const identity = toTrimmedString2(address3, deps).toLowerCase() || "anonymous";
-    const coordinate3 = deps?.checkCoordinatedAuthRateLimit || checkCoordinatedAuthRateLimit;
-    const result = await coordinate3({
+    const coordinate4 = deps?.checkCoordinatedAuthRateLimit || checkCoordinatedAuthRateLimit;
+    const result = await coordinate4({
       env,
       slug,
       route: routeKey,
@@ -96471,6 +96604,104 @@ var transcribe = async ({
 
 // workers/sessionCorsWorker/workerExecutionServiceBinding.js
 init_storageRouteExecution();
+
+// workers/sessionCorsWorker/sessionLinkReading.js
+init_sessionContextSources();
+init_sessionContext();
+init_sessionLinkReading();
+init_sessionLifecycle();
+init_contextSourceRoute();
+init_contextSourceLoader();
+init_sessionConfigAuthority();
+init_storageRouteExecution();
+var trim23 = (value) => typeof value === "string" ? value.trim() : "";
+var canonicalUrl = (value) => {
+  try {
+    return new URL(trim23(value)).toString();
+  } catch {
+    return "";
+  }
+};
+var coordinate3 = (deps, args) => (deps?.executeCoordinatedContextSourceOperation || executeCoordinatedContextSourceOperation)(args);
+var reply5 = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+var savedLinks = (config) => {
+  const seen = /* @__PURE__ */ new Map();
+  for (const { label, url } of normalizeSessionContext(config?.sessionContext).links) {
+    const address3 = canonicalUrl(url);
+    if (address3.startsWith("https://") && !seen.has(address3)) seen.set(address3, trim23(label));
+  }
+  return [...seen].map(([url, label]) => ({ url, label }));
+};
+var heldByAdmins = (rows, config) => new Set(rows.filter((row) => contextRoleOf(row.tags) === CONTEXT_ROLE && contextTagValue(row.tags, CONTEXT_TAGS.kind) === "link" && row.uploadAuthority === "admin" && forEveryone(row, config)).map((row) => contextTagValue(row.tags, CONTEXT_TAGS.url)));
+var currentConfig = async (env, slug) => {
+  const current = await callSessionConfigCoordinator({ env, slug, path: "current" });
+  return current?.ok && current.body?.config && typeof current.body.config === "object" ? current.body.config : null;
+};
+var run = async ({ env, config, slug, deps, afterSave }) => {
+  const session = config || await currentConfig(env, slug);
+  const settings = resolveSessionLinkReading(session);
+  if (!session || !settings.on || !settings.links || !sessionStoresPlainContext(session)) return { read: [] };
+  if (resolveSessionLifecycle(session, { now: deps?.now }).ended) return { read: [] };
+  const admin = [...resolveSessionAdminAddresses(session)][0];
+  const saved = savedLinks(session);
+  const links = saved.slice(0, settings.links);
+  if (!admin || !links.length && !afterSave) return { read: [] };
+  const sessionId = trim23(session.sessionId || session.sessionIdHex);
+  const claimed = await coordinate3(deps, {
+    env,
+    slug,
+    operation: "claim-links",
+    sessionId,
+    urls: links.map((link) => link.url),
+    retryMs: settings.retryMinutes * 6e4,
+    // Only a save forgets links, those it took out; a question may hold a config a second old.
+    saved: saved.map((link) => link.url),
+    forget: afterSave
+  });
+  const due = new Set(claimed?.ok && Array.isArray(claimed.body?.due) ? claimed.body.due : []);
+  if (!due.size) return { read: [] };
+  const held = heldByAdmins(await listContextSourceRows({ env, slug }), session);
+  const settle = (url, ok, error) => coordinate3(deps, { env, slug, operation: "settle-link", sessionId, url, ok, error });
+  const now = () => new Date(deps?.now?.() || Date.now()).toISOString();
+  const read = await Promise.all(links.filter((link) => due.has(link.url)).map(async ({ url, label }) => {
+    if (held.has(url)) {
+      await settle(url, true);
+      return { url, ok: true, held: true };
+    }
+    let ok = false;
+    let error = "";
+    try {
+      const response3 = await addContextLink({
+        body: { url, title: label },
+        env,
+        config: session,
+        slug,
+        json: reply5,
+        now,
+        deps: { ...deps, fetchTimeoutMs: settings.fetchSeconds * 1e3 },
+        store: (payload) => storeSessionLinkSource({ env, config: session, slug, admin, payload, deps }),
+        snapshotChars: settings.pageChars
+      });
+      ok = response3.status === 200;
+      if (!ok) error = trim23((await response3.json().catch(() => ({})))?.error) || `status ${response3.status}`;
+    } catch (failure4) {
+      error = trim23(failure4?.message) || "read failed";
+    }
+    await settle(url, ok, error);
+    return { url, ok, ...error ? { error } : {} };
+  }));
+  return { read };
+};
+var readSessionLinks = ({ env, config = null, slug, deps = {}, afterSave = false }) => {
+  const work2 = run({ env, config, slug, deps, afterSave }).catch((error) => {
+    deps?.log?.warn?.("[session-links] read failed", { slug, error: error?.message || String(error || "") });
+    return { read: [] };
+  });
+  if (typeof deps?.waitUntil === "function") deps.waitUntil(work2);
+  return work2;
+};
+
+// workers/sessionCorsWorker/workerExecutionServiceBinding.js
 init_resultsAnalysisGeneration();
 init_sessionWriteCoordinator();
 var createWorkerExecutionServicesWithWorkerDeps = ({
@@ -96592,42 +96823,41 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
       toRegistrySessionSlug: deps?.toRegistrySessionSlug
     }
   });
-  const storageRoute2 = async (value = {}) => storageRoute({
-    ...value,
-    deps: {
-      json: deps?.json,
-      getSessionSecrets: deps?.getSessionSecrets,
-      // Context links and PDFs: the guarded page fetch and the provider call.
-      fetch: deps?.fetch,
-      safeFetch: deps?.safeFetch,
-      isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
-      arweaveUpload: arweaveUpload2,
-      randomUUID: deps?.randomUUID,
-      now: deps?.now,
-      log: workerLog,
-      isAddress: deps?.isAddress,
-      getAddress: deps?.getAddress,
-      putSessionConfig: deps?.putSessionConfig,
-      // Draft text export: only whoever may change the session config.
-      validateAdmin: deps?.validateAdmin,
-      readResourceGateOnChain: deps?.readResourceGateOnChain,
-      resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
-      toRegistrySessionSlug: deps?.toRegistrySessionSlug,
-      resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
-      checkSbtGate: deps?.checkSbtGate,
-      proxyAnthropic: aiProxies.proxyAnthropic,
-      proxyOpenAI: aiProxies.proxyOpenAI,
-      proxyOpenRouter: aiProxies.proxyOpenRouter,
-      proxyCustomRPC: aiProxies.proxyCustomRPC,
-      reserveCoordinatedResultsAnalysis: deps?.reserveCoordinatedResultsAnalysis,
-      finalizeCoordinatedResultsAnalysis: deps?.finalizeCoordinatedResultsAnalysis,
-      readCoordinatedResultsAnalysisStatus: deps?.readCoordinatedResultsAnalysisStatus,
-      generateAnalysisArtifact: deps?.generateAnalysisArtifact,
-      maybeTriggerAutomaticResultsAnalysis: deps?.maybeTriggerAutomaticResultsAnalysis || maybeTriggerAutomaticResultsAnalysis,
-      enqueueResultsAnalysisAutoJob: deps?.enqueueResultsAnalysisAutoJob || enqueueCoordinatedResultsAnalysisAutoJob,
-      waitUntil: deps?.waitUntil
-    }
-  });
+  const storageDeps = {
+    json: deps?.json,
+    getSessionSecrets: deps?.getSessionSecrets,
+    // Context links and PDFs: the guarded page fetch and the provider call.
+    fetch: deps?.fetch,
+    safeFetch: deps?.safeFetch,
+    isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
+    arweaveUpload: arweaveUpload2,
+    randomUUID: deps?.randomUUID,
+    now: deps?.now,
+    log: workerLog,
+    isAddress: deps?.isAddress,
+    getAddress: deps?.getAddress,
+    putSessionConfig: deps?.putSessionConfig,
+    // Draft text export: only whoever may change the session config.
+    validateAdmin: deps?.validateAdmin,
+    readResourceGateOnChain: deps?.readResourceGateOnChain,
+    resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
+    toRegistrySessionSlug: deps?.toRegistrySessionSlug,
+    resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
+    checkSbtGate: deps?.checkSbtGate,
+    proxyAnthropic: aiProxies.proxyAnthropic,
+    proxyOpenAI: aiProxies.proxyOpenAI,
+    proxyOpenRouter: aiProxies.proxyOpenRouter,
+    proxyCustomRPC: aiProxies.proxyCustomRPC,
+    reserveCoordinatedResultsAnalysis: deps?.reserveCoordinatedResultsAnalysis,
+    finalizeCoordinatedResultsAnalysis: deps?.finalizeCoordinatedResultsAnalysis,
+    readCoordinatedResultsAnalysisStatus: deps?.readCoordinatedResultsAnalysisStatus,
+    generateAnalysisArtifact: deps?.generateAnalysisArtifact,
+    maybeTriggerAutomaticResultsAnalysis: deps?.maybeTriggerAutomaticResultsAnalysis || maybeTriggerAutomaticResultsAnalysis,
+    enqueueResultsAnalysisAutoJob: deps?.enqueueResultsAnalysisAutoJob || enqueueCoordinatedResultsAnalysisAutoJob,
+    waitUntil: deps?.waitUntil
+  };
+  const storageRoute2 = async (value = {}) => storageRoute({ ...value, deps: storageDeps });
+  const readSessionLinks2 = (value = {}) => readSessionLinks({ ...value, deps: storageDeps });
   const verifyAdminSignatureExecution = deps?.verifyAdminSignature || verifyAdminSignature;
   const verifyAdminSignature2 = async ({
     env,
@@ -96679,6 +96909,7 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
     fetchUrl: fetchHelpers.fetchUrl,
     arweaveUpload: arweaveUpload2,
     storageRoute: storageRoute2,
+    readSessionLinks: readSessionLinks2,
     verifyAdminSignature: verifyAdminSignature2
   };
 };
@@ -96858,13 +97089,13 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
     const ok = !!ctx.address && !ctx.auth?.delegation?.sourceParticipant && await deps.validateAdmin({ env, slug: ctx.slug, address: ctx.address, config: ctx.config });
     return { ok: !!ok, accountAddress: ctx.address };
   };
-  const submitJournal = async (operation, record6) => {
-    if (record6.sessionId !== ctx.sessionId || record6.sessionSlug !== ctx.slug || record6.workerOrigin !== ctx.origin) throw authorityError("submit_outcome_identity_mismatch");
+  const submitJournal = async (operation, record7) => {
+    if (record7.sessionId !== ctx.sessionId || record7.sessionSlug !== ctx.slug || record7.workerOrigin !== ctx.origin) throw authorityError("submit_outcome_identity_mismatch");
     const result = await callSessionConfigCoordinator({
       env,
       slug: ctx.slug,
       path: `agent-submit/${operation}`,
-      record: record6,
+      record: record7,
       ...["begin", "claim"].includes(operation) ? { expectedAuthority: expectedAuthority() } : {}
     });
     if (!result.ok) return { ok: false, retryable: true, reason: result.body?.reason || "submit_coordinator_unavailable" };
@@ -96872,32 +97103,32 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
   };
   return Object.freeze({
     current,
-    async commitWrappedResearch(record6) {
+    async commitWrappedResearch(record7) {
       await current();
       const result = await callSessionConfigCoordinator({
         env,
         slug: ctx.slug,
         path: "agent-wrapped/commit",
         expectedAuthority: expectedAuthority(),
-        record: { ...record6, sessionId: ctx.sessionId, sessionSlug: ctx.slug }
+        record: { ...record7, sessionId: ctx.sessionId, sessionSlug: ctx.slug }
       });
       return result.body || { ok: false, status: 503, reason: "wrapped_coordinator_unavailable", retryable: true };
     },
-    claimAnswerSubmission: (record6) => submitJournal("claim", record6),
-    readSubmitRecord: (record6) => submitJournal("read", record6),
-    readAnswerHead: (record6) => submitJournal("head", record6),
-    async persistSubmitIntent(record6) {
+    claimAnswerSubmission: (record7) => submitJournal("claim", record7),
+    readSubmitRecord: (record7) => submitJournal("read", record7),
+    readAnswerHead: (record7) => submitJournal("head", record7),
+    async persistSubmitIntent(record7) {
       await current();
-      return submitJournal("begin", record6);
+      return submitJournal("begin", record7);
     },
-    recoverSubmitOutcome: (record6) => submitJournal("finish", record6),
-    async persistSubmitOutcome(record6) {
-      if (record6.sessionId !== ctx.sessionId || record6.sessionSlug !== ctx.slug || record6.workerOrigin !== ctx.origin || record6.accountAddress !== ctx.address || record6.sourceCredentialHash !== ctx.auth?.delegation?.tokenHash) {
+    recoverSubmitOutcome: (record7) => submitJournal("finish", record7),
+    async persistSubmitOutcome(record7) {
+      if (record7.sessionId !== ctx.sessionId || record7.sessionSlug !== ctx.slug || record7.workerOrigin !== ctx.origin || record7.accountAddress !== ctx.address || record7.sourceCredentialHash !== ctx.auth?.delegation?.tokenHash) {
         throw authorityError("submit_outcome_identity_mismatch");
       }
       const persistenceEnv = { ...agentEnv, AGENT_ACTION_KV: createAgentStorage({ kv: env.GROUP_KV, sessionId: ctx.sessionId, cursorSecret: env.TOKEN_HMAC_SECRET }) };
-      const result = record6.submissionJournal === true ? await submitJournal("finish", record6) : await persistRecoveryMessage({ env: persistenceEnv, body: { requestId: record6.requestId, record: record6 }, requireExisting: true });
-      return result.ok || result.replayed ? result : retainOutcomeForRecovery(persistenceEnv, record6, new Error(result.reason));
+      const result = record7.submissionJournal === true ? await submitJournal("finish", record7) : await persistRecoveryMessage({ env: persistenceEnv, body: { requestId: record7.requestId, record: record7 }, requireExisting: true });
+      return result.ok || result.replayed ? result : retainOutcomeForRecovery(persistenceEnv, record7, new Error(result.reason));
     },
     paginate: createAgentPagination(env.TOKEN_HMAC_SECRET, ctx),
     admin,
@@ -97075,18 +97306,18 @@ init_agentSubmitQueue();
 var dispatchSessionAgentQueue = async ({ batch, env, deps }) => {
   const results = [];
   for (const message of batch.messages || []) {
-    const record6 = message.body?.record;
-    if (message.body?.type !== AGENT_SUBMIT_QUEUE_MESSAGE_TYPE || !record6 || !validateInboundWorkerSessionSlug(record6.sessionSlug).ok || !record6.sessionSlug || !/^0x[0-9a-f]{32}$/.test(record6.sessionId || "")) {
+    const record7 = message.body?.record;
+    if (message.body?.type !== AGENT_SUBMIT_QUEUE_MESSAGE_TYPE || !record7 || !validateInboundWorkerSessionSlug(record7.sessionSlug).ok || !record7.sessionSlug || !/^0x[0-9a-f]{32}$/.test(record7.sessionId || "")) {
       message.ack?.();
       results.push({ ok: false, reason: "unsupported_queue_message" });
       continue;
     }
     try {
-      const { config, revision } = await (deps.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug: record6.sessionSlug });
+      const { config, revision } = await (deps.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug: record7.sessionSlug });
       const origin = new URL(config.corsWorkerUrl).origin;
-      const agentEnv = createAgentEnvironment({ env, config, revision, slug: record6.sessionSlug, origin, now: deps.now, persistenceOnly: true, fetchImpl: deps.fetch });
+      const agentEnv = createAgentEnvironment({ env, config, revision, slug: record7.sessionSlug, origin, now: deps.now, persistenceOnly: true, fetchImpl: deps.fetch });
       const ctx = agentEnv.AGENT_CONTEXT;
-      if (ctx.sessionId !== record6.sessionId || origin !== record6.workerOrigin) {
+      if (ctx.sessionId !== record7.sessionId || origin !== record7.workerOrigin) {
         message.ack?.();
         results.push({ ok: false, reason: "queue_session_mismatch" });
         continue;
@@ -97767,7 +97998,7 @@ async function saveAgentOnlyModeConfig({
   const loaded = await loadAgentOnlyModeConfig({ env, sessionSlug: slug });
   const normalized = normalizeAgentOnlyModeConfigPatch(patch, loaded.config);
   const timestamp = nowIsoOrCurrent(createdAt);
-  const record6 = {
+  const record7 = {
     ...defaultAgentOnlyModeConfig(slug),
     ...loaded.config,
     ...normalized,
@@ -97776,11 +98007,11 @@ async function saveAgentOnlyModeConfig({
     updatedAt: timestamp,
     updatedBy: safeString(updatedBy) || "service"
   };
-  assertNoSecretShape(record6, "Agent-only config records must not serialize secrets.");
-  await kv.put(key, JSON.stringify(record6), {
-    metadata: { v: 1, t: "ao_config", sg: slug, q: record6.enabledQuestionIds.length }
+  assertNoSecretShape(record7, "Agent-only config records must not serialize secrets.");
+  await kv.put(key, JSON.stringify(record7), {
+    metadata: { v: 1, t: "ao_config", sg: slug, q: record7.enabledQuestionIds.length }
   });
-  return { ok: true, source: "kv", config: record6 };
+  return { ok: true, source: "kv", config: record7 };
 }
 
 // workers/sessionCorsWorker/agent/wrappedStatements.mjs
@@ -98817,7 +99048,7 @@ async function submitAgentOnlyAnswersBulk({
     const isSkip = row.skipped === true;
     const key = `${answerEventPrefix(slug, userPart)}${kvKeySafePart(requestId)}:${kvKeySafePart(row.statementId)}`;
     const semanticFingerprint = isSkip ? "" : await semanticFingerprintForAgentOnlyAnswer(row.answer, row.answerSchema);
-    const record6 = {
+    const record7 = {
       type: "telegram_agent_only_answer_event",
       version: 1,
       sessionSlug: slug,
@@ -98838,8 +99069,8 @@ async function submitAgentOnlyAnswersBulk({
       semanticFingerprint,
       createdAt
     };
-    assertNoSecretShape(record6, "Agent-only answer events must not serialize secrets.");
-    events.push({ key, value: record6, metadata: { v: 1, t: "ao_evt", sg: slug, k: isSkip ? "s" : "a", src: "agent_autofill" } });
+    assertNoSecretShape(record7, "Agent-only answer events must not serialize secrets.");
+    events.push({ key, value: record7, metadata: { v: 1, t: "ao_evt", sg: slug, k: isSkip ? "s" : "a", src: "agent_autofill" } });
     const current = state2.byStatement[row.statementId] && typeof state2.byStatement[row.statementId] === "object" ? state2.byStatement[row.statementId] : {};
     changes[row.statementId] = isSkip ? {
       ...current,
@@ -98927,7 +99158,7 @@ async function recordAgentOnlyAttemptEvent({
   const ok = result?.ok === false ? false : httpStatus >= 200 && httpStatus < 400;
   const normalizedStage = normalizeAttemptStage(stage);
   const reason = attemptReasonFromResult(result);
-  const record6 = {
+  const record7 = {
     type: "telegram_agent_only_attempt_event",
     version: 1,
     sessionSlug: slug,
@@ -98943,9 +99174,9 @@ async function recordAgentOnlyAttemptEvent({
     counts: attemptCountsFromResult(result),
     createdAt: nowIsoOrCurrent(now)
   };
-  assertNoSecretShape(record6, "Agent-only attempt events must not serialize secrets.");
+  assertNoSecretShape(record7, "Agent-only attempt events must not serialize secrets.");
   const key = `${prefix}${eventId()}`;
-  await kv.put(key, JSON.stringify(record6), {
+  await kv.put(key, JSON.stringify(record7), {
     metadata: {
       v: 1,
       t: "ao_attempt",
@@ -98953,9 +99184,9 @@ async function recordAgentOnlyAttemptEvent({
       st: normalizedStage.slice(0, 16),
       ok: ok ? 1 : 0,
       r: reason.slice(0, 48),
-      u: record6.telegramUserId,
-      run: record6.runId,
-      at: record6.createdAt
+      u: record7.telegramUserId,
+      run: record7.runId,
+      at: record7.createdAt
     }
   });
   return { ok: true, key };
@@ -99201,7 +99432,7 @@ async function saveAgentOnlyWrappedImage({
   const key = `${prefix}${imageId}`;
   const viewKey = wrappedImageViewKey(imageViewId);
   const runKey = wrappedImageRunKey(sessionSlug, telegramUserId, mode, normalizedRunId);
-  const record6 = {
+  const record7 = {
     type: "telegram_agent_only_wrapped_image",
     version: 1,
     sessionId,
@@ -99227,7 +99458,7 @@ async function saveAgentOnlyWrappedImage({
     createdAt
   };
   assertNoSecretShape({
-    ...record6,
+    ...record7,
     imageBase64: "[image omitted]"
   }, "Agent-only wrapped image metadata must not serialize secrets.");
   const viewRecord = {
@@ -99237,14 +99468,14 @@ async function saveAgentOnlyWrappedImage({
     expiresAt,
     imageViewId,
     imageKey: key,
-    sessionSlug: record6.sessionSlug,
-    runId: record6.runId,
-    mode: record6.mode,
-    mediaKind: record6.mediaKind,
-    frameCount: record6.frameCount,
-    storyDurationSeconds: record6.storyDurationSeconds,
-    frameKeys: record6.frameKeys,
-    imageContentType: record6.imageContentType,
+    sessionSlug: record7.sessionSlug,
+    runId: record7.runId,
+    mode: record7.mode,
+    mediaKind: record7.mediaKind,
+    frameCount: record7.frameCount,
+    storyDurationSeconds: record7.storyDurationSeconds,
+    frameKeys: record7.frameKeys,
+    imageContentType: record7.imageContentType,
     createdAt
   };
   const runRecord = {
@@ -99252,14 +99483,14 @@ async function saveAgentOnlyWrappedImage({
     version: 1,
     sessionId,
     expiresAt,
-    sessionSlug: record6.sessionSlug,
-    telegramUserId: record6.telegramUserId,
-    runId: record6.runId,
-    mode: record6.mode,
-    mediaKind: record6.mediaKind,
-    frameCount: record6.frameCount,
-    storyDurationSeconds: record6.storyDurationSeconds,
-    frameKeys: record6.frameKeys,
+    sessionSlug: record7.sessionSlug,
+    telegramUserId: record7.telegramUserId,
+    runId: record7.runId,
+    mode: record7.mode,
+    mediaKind: record7.mediaKind,
+    frameCount: record7.frameCount,
+    storyDurationSeconds: record7.storyDurationSeconds,
+    frameKeys: record7.frameKeys,
     imageKey: key,
     imageId,
     imageViewId,
@@ -99268,13 +99499,13 @@ async function saveAgentOnlyWrappedImage({
   };
   assertNoSecretShape(viewRecord, "Agent-only wrapped image view metadata must not serialize secrets.");
   assertNoSecretShape(runRecord, "Agent-only wrapped image run metadata must not serialize secrets.");
-  await kv.put(key, JSON.stringify(record6), {
+  await kv.put(key, JSON.stringify(record7), {
     expirationTtl: 7 * 86400,
     metadata: {
       v: 1,
       t: "ao_img",
       m: wrappedImageModeMetadata(mode),
-      b: record6.imageByteLengthApprox
+      b: record7.imageByteLengthApprox
     }
   });
   await kv.put(viewKey, JSON.stringify(viewRecord), {
@@ -99282,7 +99513,7 @@ async function saveAgentOnlyWrappedImage({
     metadata: {
       v: 1,
       t: "ao_img_view",
-      m: wrappedImageModeMetadata(record6.mode)
+      m: wrappedImageModeMetadata(record7.mode)
     }
   });
   if (runKey) {
@@ -99291,7 +99522,7 @@ async function saveAgentOnlyWrappedImage({
       metadata: {
         v: 1,
         t: "ao_img_run",
-        m: wrappedImageModeMetadata(record6.mode)
+        m: wrappedImageModeMetadata(record7.mode)
       }
     });
   }
@@ -100063,13 +100294,13 @@ async function exportAgentOnlyData({
   const answerKey = (user, question) => JSON.stringify([safeString(user), safeString(question)]);
   if (view === "gold" || view === "wide" && !compactExport) {
     const records = await loadSubmittedResultRecords(env, slug, { includeRawAnswer: true });
-    for (const record6 of records) {
-      const key = answerKey(record6.telegramUserId, record6.questionId);
+    for (const record7 of records) {
+      const key = answerKey(record7.telegramUserId, record7.questionId);
       if (!submittedHistory.has(key)) submittedHistory.set(key, []);
-      submittedHistory.get(key).push(record6);
+      submittedHistory.get(key).push(record7);
     }
-    for (const record6 of selectCurrentSubmittedAnswers(records)) {
-      currentSubmitted.set(answerKey(record6.telegramUserId, record6.questionId), record6);
+    for (const record7 of selectCurrentSubmittedAnswers(records)) {
+      currentSubmitted.set(answerKey(record7.telegramUserId, record7.questionId), record7);
     }
   }
   if (["answers", "wide", "calibration", "gold"].includes(view)) {
@@ -100126,54 +100357,54 @@ async function exportAgentOnlyData({
       const eventEntries = listed.entries;
       nextCursor = listed.nextCursor;
       for (const entry2 of eventEntries) {
-        const record6 = await readKvJson2(env, entry2.key);
-        if (!record6) continue;
-        if (!readable.has(record6.questionId)) continue;
-        const principalId = await agentOnlyPrincipalId(env, record6.telegramUserId);
+        const record7 = await readKvJson2(env, entry2.key);
+        if (!record7) continue;
+        if (!readable.has(record7.questionId)) continue;
+        const principalId = await agentOnlyPrincipalId(env, record7.telegramUserId);
         if (view === "answers") {
           rows.push({
             principal_id: principalId,
-            statement_id: safeString(record6.questionId),
-            statement: record6.statement || null,
-            run_id: safeString(record6.runId),
-            source: safeString(record6.source),
-            event_kind: safeString(record6.eventKind),
-            answer: record6.answer || null,
-            confidence: record6.confidence ?? null,
-            rationale: safeString(record6.eventKind) === "privacy_protective_skip" ? null : safeString(record6.rationale),
-            agent_initialized_at: safeString(record6.agentMetadata?.agentInitializedAt),
-            model: safeString(record6.agentMetadata?.model),
-            scaffold_version: safeString(record6.agentMetadata?.scaffoldVersion),
-            token_current_run_total: normalizeTokenCount(record6.agentMetadata?.tokenUsage?.currentRunTotalTokens),
-            token_recent_sessions_total: normalizeTokenCount(record6.agentMetadata?.tokenUsage?.recentSessionsTotalTokens),
-            token_input: normalizeTokenCount(record6.agentMetadata?.tokenUsage?.inputTokens),
-            token_output: normalizeTokenCount(record6.agentMetadata?.tokenUsage?.outputTokens),
-            token_daily_usage_30d: normalizeDailyTokenUsage(record6.agentMetadata?.tokenUsage?.dailyUsage30d),
-            token_edge_in_person_dates: normalizeTokenUsageDates(record6.agentMetadata?.tokenUsage?.edgeInPersonDates),
-            token_usage_source: safeString(record6.agentMetadata?.tokenUsage?.source),
-            instructions_version: safeString(record6.instructionsVersion),
-            request_id: safeString(record6.requestId),
-            created_at: safeString(record6.createdAt)
+            statement_id: safeString(record7.questionId),
+            statement: record7.statement || null,
+            run_id: safeString(record7.runId),
+            source: safeString(record7.source),
+            event_kind: safeString(record7.eventKind),
+            answer: record7.answer || null,
+            confidence: record7.confidence ?? null,
+            rationale: safeString(record7.eventKind) === "privacy_protective_skip" ? null : safeString(record7.rationale),
+            agent_initialized_at: safeString(record7.agentMetadata?.agentInitializedAt),
+            model: safeString(record7.agentMetadata?.model),
+            scaffold_version: safeString(record7.agentMetadata?.scaffoldVersion),
+            token_current_run_total: normalizeTokenCount(record7.agentMetadata?.tokenUsage?.currentRunTotalTokens),
+            token_recent_sessions_total: normalizeTokenCount(record7.agentMetadata?.tokenUsage?.recentSessionsTotalTokens),
+            token_input: normalizeTokenCount(record7.agentMetadata?.tokenUsage?.inputTokens),
+            token_output: normalizeTokenCount(record7.agentMetadata?.tokenUsage?.outputTokens),
+            token_daily_usage_30d: normalizeDailyTokenUsage(record7.agentMetadata?.tokenUsage?.dailyUsage30d),
+            token_edge_in_person_dates: normalizeTokenUsageDates(record7.agentMetadata?.tokenUsage?.edgeInPersonDates),
+            token_usage_source: safeString(record7.agentMetadata?.tokenUsage?.source),
+            instructions_version: safeString(record7.instructionsVersion),
+            request_id: safeString(record7.requestId),
+            created_at: safeString(record7.createdAt)
           });
-        } else if (safeString(record6.source) === "agent_autofill" && record6.eventKind === "answer") {
-          const beforeMs = Date.parse(record6.createdAt);
-          const history = submittedHistory.get(answerKey(record6.telegramUserId, record6.questionId)) || [];
+        } else if (safeString(record7.source) === "agent_autofill" && record7.eventKind === "answer") {
+          const beforeMs = Date.parse(record7.createdAt);
+          const history = submittedHistory.get(answerKey(record7.telegramUserId, record7.questionId)) || [];
           const [prior] = selectCurrentSubmittedAnswers(history.filter((answer) => Date.parse(answer.createdAt) < beforeMs));
           if (!prior) continue;
           rows.push({
             principal_id: principalId,
-            statement_id: safeString(record6.questionId),
-            statement: record6.statement || null,
-            run_id: safeString(record6.runId),
+            statement_id: safeString(record7.questionId),
+            statement: record7.statement || null,
+            run_id: safeString(record7.runId),
             prior_human_answer: prior.answer || null,
             prior_human_created_at: safeString(prior.createdAt),
-            agent_prediction: record6.answer || null,
-            agent_confidence: record6.confidence ?? null,
-            model: safeString(record6.agentMetadata?.model),
-            scaffold_version: safeString(record6.agentMetadata?.scaffoldVersion),
-            instructions_version: safeString(record6.instructionsVersion),
-            eval_type: compactExport ? "" : safeString(record6.evalType),
-            created_at: safeString(record6.createdAt)
+            agent_prediction: record7.answer || null,
+            agent_confidence: record7.confidence ?? null,
+            model: safeString(record7.agentMetadata?.model),
+            scaffold_version: safeString(record7.agentMetadata?.scaffoldVersion),
+            instructions_version: safeString(record7.instructionsVersion),
+            eval_type: compactExport ? "" : safeString(record7.evalType),
+            created_at: safeString(record7.createdAt)
           });
         }
       }
@@ -100218,24 +100449,24 @@ async function exportAgentOnlyData({
     for (const prefix of prefixes2) {
       const entries = await listKvEntriesByPrefix(env, prefix);
       for (const entry2 of entries) {
-        const record6 = await readKvJson2(env, entry2.key);
-        if (!record6) continue;
-        const principalId = await agentOnlyPrincipalId(env, record6.telegramUserId);
-        const votes = record6.votes || record6.nets || {};
+        const record7 = await readKvJson2(env, entry2.key);
+        if (!record7) continue;
+        const principalId = await agentOnlyPrincipalId(env, record7.telegramUserId);
+        const votes = record7.votes || record7.nets || {};
         Object.entries(votes).forEach(([statementId, votesValue]) => {
           if (!readable.has(statementId)) return;
           rows.push({
             principal_id: principalId,
             statement_id: statementId,
-            statement: record6.statements?.[statementId] || null,
-            run_id: safeString(record6.runId),
-            source: safeString(record6.source),
-            mode: safeString(record6.mode),
+            statement: record7.statements?.[statementId] || null,
+            run_id: safeString(record7.runId),
+            source: safeString(record7.source),
+            mode: safeString(record7.mode),
             votes: Number(votesValue) || 0,
-            budget_used: Number(record6.budgetUsed) || 0,
-            request_id: safeString(record6.requestId),
-            created_at: safeString(record6.createdAt),
-            updated_at: safeString(record6.updatedAt || record6.createdAt)
+            budget_used: Number(record7.budgetUsed) || 0,
+            request_id: safeString(record7.requestId),
+            created_at: safeString(record7.createdAt),
+            updated_at: safeString(record7.updatedAt || record7.createdAt)
           });
         });
       }
@@ -100245,26 +100476,26 @@ async function exportAgentOnlyData({
     const entries = listed.entries;
     nextCursor = listed.nextCursor;
     for (const entry2 of entries) {
-      const record6 = await readKvJson2(env, entry2.key);
-      if (!record6) continue;
+      const record7 = await readKvJson2(env, entry2.key);
+      if (!record7) continue;
       rows.push({
-        principal_id: await agentOnlyPrincipalId(env, record6.telegramUserId),
-        run_id: safeString(record6.runId),
-        stage: safeString(record6.stage),
-        mode: safeString(record6.mode),
-        ok: record6.ok === true,
-        status: Number(record6.status) || 0,
-        reason: safeString(record6.reason),
-        request_id: safeString(record6.requestId),
-        replay: record6.replay === true,
-        accepted: record6.counts?.accepted ?? null,
-        skips_recorded: record6.counts?.skipsRecorded ?? null,
-        budget_used: record6.counts?.budgetUsed ?? null,
-        statement_count: record6.counts?.statementCount ?? null,
-        agent_prediction_count: record6.counts?.agentPredictionCount ?? null,
-        agent_response_count: record6.counts?.agentResponseCount ?? null,
-        privacy_skip_count: record6.counts?.privacySkipCount ?? null,
-        created_at: safeString(record6.createdAt)
+        principal_id: await agentOnlyPrincipalId(env, record7.telegramUserId),
+        run_id: safeString(record7.runId),
+        stage: safeString(record7.stage),
+        mode: safeString(record7.mode),
+        ok: record7.ok === true,
+        status: Number(record7.status) || 0,
+        reason: safeString(record7.reason),
+        request_id: safeString(record7.requestId),
+        replay: record7.replay === true,
+        accepted: record7.counts?.accepted ?? null,
+        skips_recorded: record7.counts?.skipsRecorded ?? null,
+        budget_used: record7.counts?.budgetUsed ?? null,
+        statement_count: record7.counts?.statementCount ?? null,
+        agent_prediction_count: record7.counts?.agentPredictionCount ?? null,
+        agent_response_count: record7.counts?.agentResponseCount ?? null,
+        privacy_skip_count: record7.counts?.privacySkipCount ?? null,
+        created_at: safeString(record7.createdAt)
       });
     }
   } else if (view === "summary") {
@@ -100284,7 +100515,7 @@ async function exportAgentOnlyData({
         unreadableAttemptEventCount += 1;
         continue;
       }
-      const record6 = {
+      const record7 = {
         telegramUserId: metadata.u,
         runId: metadata.run,
         createdAt: metadata.at,
@@ -100292,10 +100523,10 @@ async function exportAgentOnlyData({
         ok: metadata.ok === 1
       };
       includedAttemptEventCount += 1;
-      const createdAt = safeString(record6.createdAt);
+      const createdAt = safeString(record7.createdAt);
       if (createdAt && (!firstAttemptAt || createdAt < firstAttemptAt)) firstAttemptAt = createdAt;
       if (createdAt && (!latestAttemptAt || createdAt > latestAttemptAt)) latestAttemptAt = createdAt;
-      const principalId = await agentOnlyPrincipalId(env, record6.telegramUserId);
+      const principalId = await agentOnlyPrincipalId(env, record7.telegramUserId);
       if (!principalRows.has(principalId)) {
         principalRows.set(principalId, {
           principal_id: principalId,
@@ -100312,7 +100543,7 @@ async function exportAgentOnlyData({
       principal.attempt_event_count += 1;
       if (createdAt && (!principal.first_attempt_at || createdAt < principal.first_attempt_at)) principal.first_attempt_at = createdAt;
       if (createdAt && (!principal.latest_attempt_at || createdAt > principal.latest_attempt_at)) principal.latest_attempt_at = createdAt;
-      const runId = normalizeAgentOnlyRunId(record6.runId) || "unknown";
+      const runId = normalizeAgentOnlyRunId(record7.runId) || "unknown";
       const runKey = `${principalId}	${runId}`;
       if (!runRows.has(runKey)) {
         runRows.set(runKey, {
@@ -100328,12 +100559,12 @@ async function exportAgentOnlyData({
           latest_attempt_at: createdAt
         });
       }
-      const run = runRows.get(runKey);
-      run.attempt_event_count += 1;
-      if (createdAt && (!run.first_attempt_at || createdAt < run.first_attempt_at)) run.first_attempt_at = createdAt;
-      if (createdAt && (!run.latest_attempt_at || createdAt > run.latest_attempt_at)) run.latest_attempt_at = createdAt;
-      const stage = safeString(record6.stage);
-      if (stage === "wrapped_image" && record6.ok === true) run.wrapped_image_ok = true;
+      const run2 = runRows.get(runKey);
+      run2.attempt_event_count += 1;
+      if (createdAt && (!run2.first_attempt_at || createdAt < run2.first_attempt_at)) run2.first_attempt_at = createdAt;
+      if (createdAt && (!run2.latest_attempt_at || createdAt > run2.latest_attempt_at)) run2.latest_attempt_at = createdAt;
+      const stage = safeString(record7.stage);
+      if (stage === "wrapped_image" && record7.ok === true) run2.wrapped_image_ok = true;
     }
     const coverageByRun = /* @__PURE__ */ new Map();
     const stateEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_STATE_KV_PREFIX}${slug}:`);
@@ -100349,26 +100580,26 @@ async function exportAgentOnlyData({
         coverageByRun.set(`${principalId}	${scope.runId}`, agentOnlyRunResponseCoverage(scope));
       }
     }
-    const runs = [...runRows.values()].map((run) => {
-      const coverage = coverageByRun.get(`${run.principal_id}	${run.run_id}`) || agentOnlyRunResponseCoverage();
+    const runs = [...runRows.values()].map((run2) => {
+      const coverage = coverageByRun.get(`${run2.principal_id}	${run2.run_id}`) || agentOnlyRunResponseCoverage();
       const answerComplete = coverage.allStatementsCovered;
       return {
-        ...run,
+        ...run2,
         accepted_answer_count: coverage.agentResponseCount,
         statement_count: coverage.statementCount,
         agent_response_count: coverage.agentResponseCount,
         privacy_skip_count: coverage.privacySkipCount,
         answer_complete: answerComplete,
-        successful: answerComplete || run.wrapped_image_ok
+        successful: answerComplete || run2.wrapped_image_ok
       };
     }).sort((left, right) => safeString(left.first_attempt_at).localeCompare(safeString(right.first_attempt_at)));
-    for (const run of runs) {
-      const principal = principalRows.get(run.principal_id);
+    for (const run2 of runs) {
+      const principal = principalRows.get(run2.principal_id);
       if (!principal) continue;
       principal.run_count += 1;
-      if (run.answer_complete) principal.answer_complete_run_count += 1;
-      if (run.wrapped_image_ok) principal.wrapped_image_run_count += 1;
-      if (run.successful) principal.successful_run_count += 1;
+      if (run2.answer_complete) principal.answer_complete_run_count += 1;
+      if (run2.wrapped_image_ok) principal.wrapped_image_run_count += 1;
+      if (run2.successful) principal.successful_run_count += 1;
     }
     const principals = [...principalRows.values()].sort((left, right) => safeString(left.first_attempt_at).localeCompare(safeString(right.first_attempt_at)));
     const complete = unreadableAttemptEventCount === 0 && unreadableAnswerStateCount === 0;
@@ -100385,9 +100616,9 @@ async function exportAgentOnlyData({
       wrapped_image_principal_count: principals.filter((principal) => principal.wrapped_image_run_count > 0).length,
       successful_principal_count: principals.filter((principal) => principal.successful_run_count > 0).length,
       run_count: runs.length,
-      answer_complete_run_count: runs.filter((run) => run.answer_complete).length,
-      wrapped_image_run_count: runs.filter((run) => run.wrapped_image_ok).length,
-      successful_run_count: runs.filter((run) => run.successful).length,
+      answer_complete_run_count: runs.filter((run2) => run2.answer_complete).length,
+      wrapped_image_run_count: runs.filter((run2) => run2.wrapped_image_ok).length,
+      successful_run_count: runs.filter((run2) => run2.successful).length,
       first_attempt_at: firstAttemptAt,
       latest_attempt_at: latestAttemptAt,
       principals,
@@ -100414,27 +100645,27 @@ async function exportAgentOnlyData({
     const entries = listed.entries;
     nextCursor = listed.nextCursor;
     for (const entry2 of entries) {
-      const record6 = await readKvJson2(env, entry2.key);
-      if (!record6) continue;
+      const record7 = await readKvJson2(env, entry2.key);
+      if (!record7) continue;
       rows.push({
-        principal_id: await agentOnlyPrincipalId(env, record6.telegramUserId),
-        image_id: safeString(record6.imageId) || safeString(entry2.key).split(":").pop() || "",
-        image_view_id: safeString(record6.imageViewId),
-        run_id: safeString(record6.runId),
-        mode: safeString(record6.mode),
-        model: safeString(record6.model),
-        size: safeString(record6.size),
-        quality: safeString(record6.quality),
-        reference_image: safeString(record6.referenceImage),
-        media_kind: safeString(record6.mediaKind),
-        frame_count: Number(record6.frameCount || 0) || 0,
-        story_duration_seconds: Number(record6.storyDurationSeconds || 0) || 0,
-        frame_keys: Array.isArray(record6.frameKeys) ? record6.frameKeys.join(",") : "",
-        image_content_type: safeString(record6.imageContentType),
-        image_byte_length_approx: Number(record6.imageByteLengthApprox || 0) || 0,
-        prompt_hash: safeString(record6.promptHash),
-        created_at: safeString(record6.createdAt),
-        ...includeImageBase64 ? { image_base64: safeString(record6.imageBase64) } : {}
+        principal_id: await agentOnlyPrincipalId(env, record7.telegramUserId),
+        image_id: safeString(record7.imageId) || safeString(entry2.key).split(":").pop() || "",
+        image_view_id: safeString(record7.imageViewId),
+        run_id: safeString(record7.runId),
+        mode: safeString(record7.mode),
+        model: safeString(record7.model),
+        size: safeString(record7.size),
+        quality: safeString(record7.quality),
+        reference_image: safeString(record7.referenceImage),
+        media_kind: safeString(record7.mediaKind),
+        frame_count: Number(record7.frameCount || 0) || 0,
+        story_duration_seconds: Number(record7.storyDurationSeconds || 0) || 0,
+        frame_keys: Array.isArray(record7.frameKeys) ? record7.frameKeys.join(",") : "",
+        image_content_type: safeString(record7.imageContentType),
+        image_byte_length_approx: Number(record7.imageByteLengthApprox || 0) || 0,
+        prompt_hash: safeString(record7.promptHash),
+        created_at: safeString(record7.createdAt),
+        ...includeImageBase64 ? { image_base64: safeString(record7.imageBase64) } : {}
       });
     }
   } else {
@@ -100640,21 +100871,21 @@ function delegationScopeForRequest(pathname = "", method = "GET") {
   return "";
 }
 function applyDelegationToInput(auth = {}, input = {}, pathname = "", method = "GET") {
-  const record6 = auth.delegation;
-  if (record6) {
+  const record7 = auth.delegation;
+  if (record7) {
     const scope = delegationScopeForRequest(pathname, method);
-    if (!scope || !agentCredentialHasScope(record6, scope)) return { ok: false, status: 403, reason: "agent_token_scope_denied", requiredScope: scope };
-    if (input.sessionSlug && sanitizeSessionSlug(input.sessionSlug) !== record6.sessionSlug) return { ok: false, status: 403, reason: "agent_token_session_mismatch" };
+    if (!scope || !agentCredentialHasScope(record7, scope)) return { ok: false, status: 403, reason: "agent_token_scope_denied", requiredScope: scope };
+    if (input.sessionSlug && sanitizeSessionSlug(input.sessionSlug) !== record7.sessionSlug) return { ok: false, status: 403, reason: "agent_token_session_mismatch" };
   }
-  const principal = record6?.principal || auth.principal;
+  const principal = record7?.principal || auth.principal;
   if (!principal?.principalId) return { ok: false, status: 401, reason: "agent_principal_required" };
   return { ok: true, input: {
     ...input,
     principalId: principal.principalId,
     principalAdapter: principal.adapter,
     username: principal.label || "",
-    accountAddress: record6?.accountAddress || auth.address,
-    sessionSlug: record6?.sessionSlug || auth.slug
+    accountAddress: record7?.accountAddress || auth.address,
+    sessionSlug: record7?.sessionSlug || auth.slug
   } };
 }
 async function resolveHandoffContext({ env, auth = env.AGENT_CONTEXT.auth, input = {} }) {
@@ -100939,15 +101170,15 @@ async function listMetricKvEntriesByPrefix(env = {}, prefix = "", { limit = 1e4 
 async function readMetricRecord(env = {}, key = "") {
   const kv = env?.AGENT_ACTION_KV;
   if (!key || !kv || typeof kv.get !== "function") return null;
-  const record6 = safeJsonParse(await kv.get(key).catch(() => null), null);
-  return record6 && typeof record6 === "object" && !Array.isArray(record6) ? record6 : null;
+  const record7 = safeJsonParse(await kv.get(key).catch(() => null), null);
+  return record7 && typeof record7 === "object" && !Array.isArray(record7) ? record7 : null;
 }
 async function listHandoffKvRecordsByPrefix(env = {}, prefix = "", { limit = 1e4 } = {}) {
   const entries = await listMetricKvEntriesByPrefix(env, prefix, { limit });
   const records = [];
   for (const entry2 of entries) {
-    const record6 = await readMetricRecord(env, entry2.key);
-    if (record6) records.push({ ...record6, key: entry2.key });
+    const record7 = await readMetricRecord(env, entry2.key);
+    if (record7) records.push({ ...record7, key: entry2.key });
   }
   return records;
 }
@@ -101106,24 +101337,24 @@ function agentQuestionAnswerRef(sessionSlug = "", questionId4 = "") {
 function firstAnswerValue2(...values) {
   return values.find((value) => safeAnswerString2(value) !== "");
 }
-function submitRecordAnswerForAgent(record6 = {}) {
-  const answer = record6.answer && typeof record6.answer === "object" && !Array.isArray(record6.answer) ? record6.answer : {};
-  const parsed = safeJsonParse(answer.value || record6.answerValue, null);
+function submitRecordAnswerForAgent(record7 = {}) {
+  const answer = record7.answer && typeof record7.answer === "object" && !Array.isArray(record7.answer) ? record7.answer : {};
+  const parsed = safeJsonParse(answer.value || record7.answerValue, null);
   const structured = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
   const questionType = safeString(
-    firstAnswerValue2(structured.questionType, record6.questionType, answer.questionType, record6.controlType)
+    firstAnswerValue2(structured.questionType, record7.questionType, answer.questionType, record7.controlType)
   );
-  const label = safeAnswerString2(firstAnswerValue2(answer.label, structured.label, record6.answerLabel));
+  const label = safeAnswerString2(firstAnswerValue2(answer.label, structured.label, record7.answerLabel));
   const base = {
-    requestId: safeString(record6.requestId),
-    answeredAt: safeString(record6.createdAt),
-    status: safeString(record6.status),
+    requestId: safeString(record7.requestId),
+    answeredAt: safeString(record7.createdAt),
+    status: safeString(record7.status),
     questionType,
     ...label ? { label } : {}
   };
   if (questionType === "quadratic") return { ...base, value: structured.value ?? answer.value, comments: safeString(structured.comments || answer.comments) };
   if (questionType === "multichoice") {
-    const values = Array.isArray(structured.values) ? structured.values.map(safeAnswerString2).filter(Boolean) : [firstAnswerValue2(structured.value, answer.value, record6.answerValue)].map(safeAnswerString2).filter(Boolean);
+    const values = Array.isArray(structured.values) ? structured.values.map(safeAnswerString2).filter(Boolean) : [firstAnswerValue2(structured.value, answer.value, record7.answerValue)].map(safeAnswerString2).filter(Boolean);
     return {
       ...base,
       values,
@@ -101134,12 +101365,12 @@ function submitRecordAnswerForAgent(record6 = {}) {
     return {
       ...base,
       text: safeAnswerString2(
-        firstAnswerValue2(structured.text, structured.value, answer.text, answer.value, record6.answerText)
+        firstAnswerValue2(structured.text, structured.value, answer.text, answer.value, record7.answerText)
       ),
       ...safeAnswerString2(structured.comments) ? { comments: safeAnswerString2(structured.comments) } : {}
     };
   }
-  const value = Object.hasOwn(structured, "value") ? structured.value : firstAnswerValue2(answer.value, record6.answerValue);
+  const value = Object.hasOwn(structured, "value") ? structured.value : firstAnswerValue2(answer.value, record7.answerValue);
   return {
     ...base,
     value,
@@ -101173,21 +101404,21 @@ async function loadAgentQuestionAnswerState({ env = {}, context = {}, questions 
     [...sessionSlugs].flatMap((sessionSlug) => indexes.map(async ([prefixOf, statuses]) => {
       const prefix = prefixOf({ sessionSlug, telegramUserId });
       const listed = prefix ? await listHandoffKvRecordsByPrefix(env, prefix, { limit: ADMIN_METRICS_SUBMIT_ENTRY_LIMIT }) : [];
-      return listed.filter((record6) => statuses.has(safeString(record6.status)));
+      return listed.filter((record7) => statuses.has(safeString(record7.status)));
     }))
   );
-  const records = selectCurrentSubmittedAnswers(indexedRecordGroups.flat().filter((record6) => safeString(record6.telegramUserId) === telegramUserId));
+  const records = selectCurrentSubmittedAnswers(indexedRecordGroups.flat().filter((record7) => safeString(record7.telegramUserId) === telegramUserId));
   const answeredByRef = /* @__PURE__ */ new Map();
-  records.forEach((record6) => {
-    if (safeString(record6.telegramUserId) !== telegramUserId) return;
-    if (!submittedStatuses.has(safeString(record6.status))) return;
-    const ref = agentQuestionAnswerRef(record6.sessionSlug, record6.questionId);
+  records.forEach((record7) => {
+    if (safeString(record7.telegramUserId) !== telegramUserId) return;
+    if (!submittedStatuses.has(safeString(record7.status))) return;
+    const ref = agentQuestionAnswerRef(record7.sessionSlug, record7.questionId);
     if (!questionByRef.has(ref)) return;
     answeredByRef.set(ref, {
       answeredByUser: true,
-      answeredAt: safeString(record6.createdAt),
-      answerStatus: safeString(record6.status),
-      myAnswer: submitRecordAnswerForAgent(record6)
+      answeredAt: safeString(record7.createdAt),
+      answerStatus: safeString(record7.status),
+      myAnswer: submitRecordAnswerForAgent(record7)
     });
   });
   return {
@@ -102339,9 +102570,9 @@ async function buildAdminMetricsSnapshot({
     let tokenSessionSlug = sanitizeSessionSlug(metadata?.sg);
     let telegramUserId = safeString(metadata?.p || metadata?.u);
     if (!tokenSessionSlug || !telegramUserId) {
-      const record6 = await readMetricRecord(env, entry2.key);
-      tokenSessionSlug = sanitizeSessionSlug(record6?.sessionSlug);
-      telegramUserId = safeString(record6?.principal?.principalId || record6?.telegramUserId);
+      const record7 = await readMetricRecord(env, entry2.key);
+      tokenSessionSlug = sanitizeSessionSlug(record7?.sessionSlug);
+      telegramUserId = safeString(record7?.principal?.principalId || record7?.telegramUserId);
     }
     if (!tokenSessionSlug || !inScope(tokenSessionSlug)) continue;
     totals.agentsOnboarded += 1;
@@ -102403,10 +102634,10 @@ async function buildAdminMetricsSnapshot({
     let slug = sanitizeSessionSlug(meta?.sg);
     let telegramUserId = safeString(meta?.u);
     if (!status || !slug) {
-      const record6 = await readMetricRecord(env, entry2.key);
-      status = status || safeString(record6?.status);
-      slug = slug || sanitizeSessionSlug(record6?.sessionSlug);
-      telegramUserId = telegramUserId || safeString(record6?.telegramUserId);
+      const record7 = await readMetricRecord(env, entry2.key);
+      status = status || safeString(record7?.status);
+      slug = slug || sanitizeSessionSlug(record7?.sessionSlug);
+      telegramUserId = telegramUserId || safeString(record7?.telegramUserId);
     }
     slug = slug || scopedSessionSlug || sessionFromSessionFirstKey(entry2.key, SUBMIT_REQUEST_SESSION_KV_PREFIX);
     if (!slug || !inScope(slug)) continue;
@@ -102856,15 +103087,15 @@ async function writeCustomGroupConfig(env = {}, sessionSlug = "", categories = [
     ...category,
     source: "cloudflare_custom"
   })));
-  const record6 = {
+  const record7 = {
     version: 1,
     sessionSlug: sanitizeSessionSlug(sessionSlug),
     categories: merged,
     updatedBy: safeString(updatedBy) || null,
     updatedAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
   };
-  assertNoSecretShape(record6, "Agent lightweight group config must not serialize secrets.");
-  await kv.put(key, JSON.stringify(record6));
+  assertNoSecretShape(record7, "Agent lightweight group config must not serialize secrets.");
+  await kv.put(key, JSON.stringify(record7));
   return { ok: true, categories: merged };
 }
 async function readMembership(env = {}, {
@@ -103031,7 +103262,7 @@ async function saveAgentLightweightGroupMembership({
   const bucketKey = bucketMembershipKey({ sessionSlug, accountAddress });
   const kv = env?.AGENT_ACTION_KV;
   if (!key && !bucketKey || !kv || typeof kv.put !== "function") return { ok: false, reason: "action_kv_unavailable" };
-  const record6 = {
+  const record7 = {
     version: 1,
     sessionSlug,
     telegramUserId: safeString(telegramUserId),
@@ -103039,9 +103270,9 @@ async function saveAgentLightweightGroupMembership({
     details: normalizedDetails,
     updatedAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
   };
-  assertNoSecretShape(record6, "Agent lightweight group memberships must not serialize secrets.");
+  assertNoSecretShape(record7, "Agent lightweight group memberships must not serialize secrets.");
   if (key) {
-    await kv.put(key, JSON.stringify(record6));
+    await kv.put(key, JSON.stringify(record7));
   }
   if (bucketKey) {
     const bucketRecord = {
@@ -103051,7 +103282,7 @@ async function saveAgentLightweightGroupMembership({
       accountAddress: normalizeAddress3(accountAddress),
       selections: normalizedSelections,
       details: normalizedDetails,
-      updatedAt: record6.updatedAt
+      updatedAt: record7.updatedAt
     };
     assertNoSecretShape(bucketRecord, "Agent KV bucket memberships must not serialize secrets.");
     await kv.put(bucketKey, JSON.stringify(bucketRecord));
@@ -103063,7 +103294,7 @@ async function saveAgentLightweightGroupMembership({
       selections: normalizedSelections,
       details: normalizedDetails,
       membershipSource: key ? "agent_principal" : "managed_wallet",
-      updatedAt: record6.updatedAt
+      updatedAt: record7.updatedAt
     }
   };
 }
@@ -103103,7 +103334,7 @@ async function persistAgentLightweightGroupProposal({
     targetTelegramUserId: input.targetTelegramUserId,
     createdAt
   })}`;
-  const record6 = {
+  const record7 = {
     version: 1,
     proposalId,
     sessionSlug,
@@ -103116,26 +103347,26 @@ async function persistAgentLightweightGroupProposal({
     createdAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
   };
   if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
-    record6.actionMetadata = { ...metadata };
+    record7.actionMetadata = { ...metadata };
   }
-  assertNoSecretShape(record6, "Agent lightweight group proposals must not serialize secrets.");
+  assertNoSecretShape(record7, "Agent lightweight group proposals must not serialize secrets.");
   const activityMetadata = buildAgentActivityMetadata({
     type: "group_proposal",
-    status: record6.status,
-    createdAt: record6.createdAt,
+    status: record7.status,
+    createdAt: record7.createdAt,
     pendingAction: "review_group_proposal",
-    sessionSlug: record6.sessionSlug,
-    telegramUserId: record6.proposedBy,
-    targetTelegramUserId: record6.targetTelegramUserId
+    sessionSlug: record7.sessionSlug,
+    telegramUserId: record7.proposedBy,
+    targetTelegramUserId: record7.targetTelegramUserId
   });
-  await kv.put(`${proposalPrefix(sessionSlug)}${proposalId}`, JSON.stringify(record6), {
+  await kv.put(`${proposalPrefix(sessionSlug)}${proposalId}`, JSON.stringify(record7), {
     metadata: activityMetadata
   });
   return {
     ok: true,
     sessionSlug,
     category,
-    proposal: record6,
+    proposal: record7,
     requiresUserApproval: true
   };
 }
@@ -103154,7 +103385,7 @@ async function persistAgentChildSession({
     return { ok: false, reason: "action_kv_unavailable" };
   }
   const groups = normalizeAgentGroupCategories(input.groups || input.lightweightGroups || []);
-  const record6 = {
+  const record7 = {
     version: 1,
     sessionSlug: childSessionSlug,
     parentSessionSlug,
@@ -103167,8 +103398,8 @@ async function persistAgentChildSession({
     createdByTelegramUserId: safeString(normalized.user?.telegramUserId) || null,
     createdAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
   };
-  assertNoSecretShape(record6, "Agent child session records must not serialize secrets.");
-  await kv.put(childSessionKey(childSessionSlug), JSON.stringify(record6));
+  assertNoSecretShape(record7, "Agent child session records must not serialize secrets.");
+  await kv.put(childSessionKey(childSessionSlug), JSON.stringify(record7));
   if (groups.length) {
     await writeCustomGroupConfig(env, childSessionSlug, groups, {
       createdAt,
@@ -103177,7 +103408,7 @@ async function persistAgentChildSession({
   }
   return {
     ok: true,
-    session: record6,
+    session: record7,
     canonicalStatus: "worker_local_until_session_registry_parity"
   };
 }
@@ -103375,10 +103606,10 @@ async function loadAgentSettings({
   const defaults = defaultAgentSettings(env);
   const key = agentSettingsKey({ sessionSlug, telegramUserId });
   if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.get !== "function") return defaults;
-  const record6 = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
-  if (!record6 || typeof record6 !== "object" || Array.isArray(record6)) return defaults;
-  assertNoSecretShape(record6, "Agent settings records must not serialize secrets.");
-  const settings = record6.settings && typeof record6.settings === "object" && !Array.isArray(record6.settings) ? record6.settings : record6;
+  const record7 = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
+  if (!record7 || typeof record7 !== "object" || Array.isArray(record7)) return defaults;
+  assertNoSecretShape(record7, "Agent settings records must not serialize secrets.");
+  const settings = record7.settings && typeof record7.settings === "object" && !Array.isArray(record7.settings) ? record7.settings : record7;
   return {
     draftStyle: normalizeDraftStyle(settings.draftStyle || defaults.draftStyle),
     showUnansweredFirst: normalizeBoolean4(settings.showUnansweredFirst, defaults.showUnansweredFirst),
@@ -103420,7 +103651,7 @@ async function saveAgentSettingsPatch({
     ...normalized.publicSummary
   };
   const existing = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
-  const record6 = {
+  const record7 = {
     type: "telegram_agent_settings",
     version: 1,
     sessionSlug: sanitizeSessionSlug(sessionSlug) || "global",
@@ -103429,8 +103660,8 @@ async function saveAgentSettingsPatch({
     createdAt: safeString(existing?.createdAt) || createdAt,
     updatedAt: createdAt
   };
-  assertNoSecretShape(record6, "Agent settings records must not serialize secrets.");
-  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record6));
+  assertNoSecretShape(record7, "Agent settings records must not serialize secrets.");
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record7));
   return {
     ok: true,
     key,
@@ -104840,8 +105071,8 @@ function topicForQuestion(question = {}, session = {}) {
 }
 function recordsByQuestion(records = []) {
   const byQuestion = /* @__PURE__ */ new Map();
-  for (const record6 of Array.isArray(records) ? records : []) {
-    const qid = safeString(record6.questionId);
+  for (const record7 of Array.isArray(records) ? records : []) {
+    const qid = safeString(record7.questionId);
     if (!qid) continue;
     if (!byQuestion.has(qid)) {
       byQuestion.set(qid, {
@@ -104852,8 +105083,8 @@ function recordsByQuestion(records = []) {
     }
     const item = byQuestion.get(qid);
     item.responseCount += 1;
-    if (record6.telegramUserId) item.participants.add(safeString(record6.telegramUserId));
-    const createdAt = safeString(record6.createdAt);
+    if (record7.telegramUserId) item.participants.add(safeString(record7.telegramUserId));
+    const createdAt = safeString(record7.createdAt);
     if (createdAt && createdAt > item.latestCreatedAt) item.latestCreatedAt = createdAt;
   }
   return byQuestion;
@@ -104909,7 +105140,7 @@ function buildAgentTopicMapSignature({
     participantCount: item.participants.size,
     latestCreatedAt: item.latestCreatedAt
   })).sort((left, right) => left.questionId.localeCompare(right.questionId));
-  const participantIds = new Set((Array.isArray(records) ? records : []).map((record6) => safeString(record6.telegramUserId)).filter(Boolean));
+  const participantIds = new Set((Array.isArray(records) ? records : []).map((record7) => safeString(record7.telegramUserId)).filter(Boolean));
   return {
     questionCount: questionParts.length,
     responseCount: responseParts.reduce((sum, item) => sum + item.responseCount, 0),
@@ -105440,18 +105671,18 @@ function buildAgentPolisDataset({ sessionSlug = "", sourceRecords = [], sourceQu
     binaryQuestions.map((question) => safeString(question.questionId || question.id)).filter(Boolean)
   );
   const records = (Array.isArray(sourceRecords) ? sourceRecords : []).filter(
-    (record6) => binaryQuestionIds.has(safeString(record6.questionId)) && AGENT_POLIS_BINARY_LABELS.has(safeString(record6.label)) && safeString(record6.telegramUserId)
+    (record7) => binaryQuestionIds.has(safeString(record7.questionId)) && AGENT_POLIS_BINARY_LABELS.has(safeString(record7.label)) && safeString(record7.telegramUserId)
   );
   const latestRecords = demo ? records : selectCurrentSubmittedAnswers(records);
-  const participants = Array.from(new Set(latestRecords.map((record6) => safeString(record6.telegramUserId))));
+  const participants = Array.from(new Set(latestRecords.map((record7) => safeString(record7.telegramUserId))));
   const aliasById = new Map(participants.map((id2, index) => [id2, `P${index + 1}`]));
   const responses = {};
-  for (const record6 of latestRecords) {
-    const questionIdValue = safeString(record6.questionId);
+  for (const record7 of latestRecords) {
+    const questionIdValue = safeString(record7.questionId);
     if (!responses[questionIdValue]) responses[questionIdValue] = [];
     responses[questionIdValue].push({
-      responder: aliasById.get(safeString(record6.telegramUserId)),
-      value: safeString(record6.label)
+      responder: aliasById.get(safeString(record7.telegramUserId)),
+      value: safeString(record7.label)
     });
   }
   const questions = binaryQuestions.map((question) => ({
@@ -105480,7 +105711,7 @@ function aggregateQuestionRows(records = [], questions = [], view = "consensus")
   const consensusQuestionIds = new Set(
     consensusQuestions.map((question) => safeString(question.questionId || question.id)).filter(Boolean)
   );
-  const consensusRecords = records.filter((record6) => consensusQuestionIds.has(safeString(record6.questionId)));
+  const consensusRecords = records.filter((record7) => consensusQuestionIds.has(safeString(record7.questionId)));
   const rows = summarizeQuestionResults(consensusRecords, consensusQuestions).map((summary) => {
     const counts = summary.counts.map(([label, count2]) => ({ label, count: count2 }));
     const maxCount = counts.reduce((max, item) => Math.max(max, Number(item.count || 0)), 0);
@@ -106169,7 +106400,7 @@ async function persistAgentQuestionVoteRecommendations({
   const requestId = safeString(input.requestId || input.idempotencyKey) || buildOpaqueActionId(
     `agent_question_vote_recommendations|${sessionSlug}|${telegramUserId}|${stableFingerprint(recommendations)}|${createdAt}`
   );
-  const record6 = {
+  const record7 = {
     type: "telegram_agent_question_vote_recommendation",
     version: 1,
     requestId,
@@ -106187,12 +106418,12 @@ async function persistAgentQuestionVoteRecommendations({
     })),
     createdAt
   };
-  assertNoSecretShape(record6, "Agent question vote recommendation records must not serialize secrets.");
+  assertNoSecretShape(record7, "Agent question vote recommendation records must not serialize secrets.");
   await kv.put(
     `${AGENT_QUESTION_VOTE_RECOMMENDATION_KV_PREFIX}${sessionSlug}:${kvKeySafePart(telegramUserId)}:${requestId}`,
-    JSON.stringify(record6)
+    JSON.stringify(record7)
   );
-  return { ok: true, requestId, record: record6 };
+  return { ok: true, requestId, record: record7 };
 }
 var SECRETISH_METADATA_KEY_RE = /(?:secret|token|api.?key|private.?key|password|authorization|bearer|signature|mnemonic|seed)/i;
 function sanitizeResearchMetadata(value, { depth = 0, maxString = 600 } = {}) {
@@ -106853,7 +107084,7 @@ function isSessionWrappedOnboardingRequest(body = {}) {
 function trustedOnboardingInviteRecords(env = {}) {
   const ctx = env.AGENT_CONTEXT;
   const configured = ctx.config.agentHttp?.invites;
-  return (Array.isArray(configured) ? configured : []).filter((record6) => record6 && /^[a-f0-9]{64}$/.test(record6.tokenHash || "") && record6.enabled !== false).map((record6) => ({ tokenHash: record6.tokenHash, sessionSlug: ctx.slug, label: safeString(record6.label).slice(0, 120), source: safeString(record6.source).slice(0, 160) }));
+  return (Array.isArray(configured) ? configured : []).filter((record7) => record7 && /^[a-f0-9]{64}$/.test(record7.tokenHash || "") && record7.enabled !== false).map((record7) => ({ tokenHash: record7.tokenHash, sessionSlug: ctx.slug, label: safeString(record7.label).slice(0, 120), source: safeString(record7.source).slice(0, 160) }));
 }
 async function resolveTrustedOnboardingInvite(env = {}, inviteToken = "") {
   const supplied = safeString(inviteToken);
@@ -106866,16 +107097,16 @@ async function resolveTrustedOnboardingInvite(env = {}, inviteToken = "") {
       reason: "invite_onboarding_not_configured"
     };
   const suppliedHash = await sha256Hex2(supplied);
-  for (const record6 of records) {
-    const recordHash = /^[0-9a-f]{64}$/.test(safeString(record6.tokenHash)) ? safeString(record6.tokenHash).toLowerCase() : record6.token ? await sha256Hex2(record6.token) : "";
+  for (const record7 of records) {
+    const recordHash = /^[0-9a-f]{64}$/.test(safeString(record7.tokenHash)) ? safeString(record7.tokenHash).toLowerCase() : record7.token ? await sha256Hex2(record7.token) : "";
     if (recordHash && timingSafeEqualString(recordHash, suppliedHash)) {
       return {
         ok: true,
         tokenHash: suppliedHash,
         invite: {
-          sessionSlug: sanitizeSessionSlug(record6.sessionSlug),
-          label: safeString(record6.label),
-          source: safeString(record6.source)
+          sessionSlug: sanitizeSessionSlug(record7.sessionSlug),
+          label: safeString(record7.label),
+          source: safeString(record7.source)
         }
       };
     }
@@ -107494,8 +107725,8 @@ init_blockedQuestionIds();
 // shared/interviewQuestionCatalog.mjs
 init_ratingScale();
 var BINARY_RESPONSE_OPTIONS = ["Agree", "Unsure", "Disagree"];
-var trim23 = (value) => String(value == null ? "" : value).trim();
-var lower10 = (value) => trim23(value).toLowerCase();
+var trim24 = (value) => String(value == null ? "" : value).trim();
+var lower10 = (value) => trim24(value).toLowerCase();
 var isObj29 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var hasRestrictedPrompt = (question = {}) => {
   const visibility = lower10(question.visibility || question.access || question.questionVisibility);
@@ -107506,14 +107737,14 @@ var hasRestrictedPrompt = (question = {}) => {
 var normalizeQuestion = (value = {}) => {
   const question = isObj29(value) ? value : {};
   const id2 = lower10(question.id || question.questionId);
-  const prompt = trim23(question.prompt || question.question || question.title);
+  const prompt = trim24(question.prompt || question.question || question.title);
   if (!id2 || !prompt || hasRestrictedPrompt(question) || /^(?:\[encrypted\]|encrypted prompt[.!]?(?:\s*connect.+decrypt[.!]?)?|connect(?: wallet)? to decrypt(?: encrypted prompt)?[.!]?)$/i.test(
     prompt
   ))
     return null;
   const type = lower10(question.type || question.questionType || "freeform") || "freeform";
   const rawOptions = question.options || question.choices;
-  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry2) => trim23(isObj29(entry2) ? entry2.label || entry2.value : entry2)).filter(Boolean);
+  const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry2) => trim24(isObj29(entry2) ? entry2.label || entry2.value : entry2)).filter(Boolean);
   const ratingScale = type === "rating" ? normalizeRatingScale(question) : null;
   const ratingStep = ratingStepFor(question);
   return {
@@ -107558,8 +107789,8 @@ var READ_BATCH_IDS = 100;
 var MAX_CANDIDATES = 2e3;
 var catalog = (questions = [], incomplete = false, refused2 = false) => ({ questions, incomplete, refused: refused2 });
 var retryableReadStatus = (status) => !status || status === 408 || status === 429 || status >= 500;
-var trim24 = (value) => String(value == null ? "" : value).trim();
-var lower11 = (value) => trim24(value).toLowerCase();
+var trim25 = (value) => String(value == null ? "" : value).trim();
+var lower11 = (value) => trim25(value).toLowerCase();
 var isObj30 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var dedupeQuestions = (questions) => normalizePublicInterviewQuestions(questions, MAX_QUESTIONS);
 var payloadQuestionId = (payload) => lower11(payload?.id || payload?.questionId);
@@ -107597,7 +107828,7 @@ var listQuestionRows = async (callStorage) => {
       complete = true;
       break;
     }
-    cursor = trim24(listing.cursor);
+    cursor = trim25(listing.cursor);
     if (!cursor || seenCursors.has(cursor)) break;
     seenCursors.add(cursor);
   }
@@ -107605,11 +107836,11 @@ var listQuestionRows = async (callStorage) => {
 };
 var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageRoute2, reader, readInvite, workerOrigin: workerOrigin2 }) => {
   if (typeof storageRoute2 !== "function") return catalog();
-  const origin = trim24(readInvite) && trim24(workerOrigin2) ? trim24(workerOrigin2) : "https://session-worker.invalid";
+  const origin = trim25(readInvite) && trim25(workerOrigin2) ? trim25(workerOrigin2) : "https://session-worker.invalid";
   const requestHeaders = (json12) => {
     const headers2 = new Headers();
     if (json12) headers2.set("content-type", "application/json");
-    if (trim24(readInvite)) headers2.set(WORKER_GROUP_READ_INVITE_HEADER, trim24(readInvite));
+    if (trim25(readInvite)) headers2.set(WORKER_GROUP_READ_INVITE_HEADER, trim25(readInvite));
     return headers2;
   };
   const callStorage = (path, query, body) => storageRoute2({
@@ -107678,13 +107909,13 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   const versions = [];
   const legacyVersions = [];
   for (const item of items) {
-    const storageRefId = trim24(item?.storageRef?.id || item?.metadata?.id || item?.id);
+    const storageRefId = trim25(item?.storageRef?.id || item?.metadata?.id || item?.id);
     if (!storageRefId || item?.hidden === true) continue;
     const version2 = {
       resourceId: lower11(item?.metadata?.resourceId),
-      createdAtMs: Date.parse(trim24(item?.metadata?.createdAt)) || 0,
+      createdAtMs: Date.parse(trim25(item?.metadata?.createdAt)) || 0,
       storageRefId,
-      uploader: trim24(item?.metadata?.uploader),
+      uploader: trim25(item?.metadata?.uploader),
       uploadAuthority: item?.metadata?.uploadAuthority
     };
     (version2.resourceId ? versions : legacyVersions).push(version2);
@@ -107719,10 +107950,10 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
 var pickContractAddress = (config = {}) => {
   const contracts = isObj30(config.contracts) ? config.contracts : {};
   const surveys = isObj30(contracts.surveys) ? contracts.surveys.address : contracts.surveys;
-  return trim24(surveys || contracts.survey || config.surveysAddress || config.surveyAddress);
+  return trim25(surveys || contracts.survey || config.surveysAddress || config.surveyAddress);
 };
 var pickRpcUrls = (config = {}) => {
-  const chainId = trim24(config.networkChainId || config.registryChainId || config.chainId || "11155420");
+  const chainId = trim25(config.networkChainId || config.registryChainId || config.chainId || "11155420");
   const rpcConfig = isObj30(config.rpc) ? config.rpc : {};
   const pathProvider = isObj30(rpcConfig?.providers?.path) ? rpcConfig.providers.path : isObj30(rpcConfig.path) ? rpcConfig.path : {};
   const byChainMap = isObj30(config.rpcUrlsByChainId) ? config.rpcUrlsByChainId : isObj30(pathProvider.rpcUrlsByChainId) ? pathProvider.rpcUrlsByChainId : {};
@@ -107732,7 +107963,7 @@ var pickRpcUrls = (config = {}) => {
     ...Array.isArray(config.rpcUrls) ? config.rpcUrls : [config.rpcUrl],
     ...Array.isArray(pathProvider.rpcUrls) ? pathProvider.rpcUrls : [pathProvider.rpcUrl]
   ];
-  return [...new Set(source.map(trim24).filter((value) => /^https:\/\//i.test(value)))];
+  return [...new Set(source.map(trim25).filter((value) => /^https:\/\//i.test(value)))];
 };
 var rpc = async ({ rpcUrls, method, params, fetchImpl }) => {
   let lastError;
@@ -107752,9 +107983,9 @@ var rpc = async ({ rpcUrls, method, params, fetchImpl }) => {
   }
   throw lastError || new Error(`No RPC URL succeeded for ${method}.`);
 };
-var wordAt2 = (hex2, index) => trim24(hex2).replace(/^0x/, "").slice(index * 64, index * 64 + 64);
+var wordAt2 = (hex2, index) => trim25(hex2).replace(/^0x/, "").slice(index * 64, index * 64 + 64);
 var decodeQuestionIds = (data = "") => {
-  const clean = trim24(data).replace(/^0x/, "");
+  const clean = trim25(data).replace(/^0x/, "");
   if (clean.length < 128) return [];
   const offsetBytes = Number(BigInt(`0x${wordAt2(clean, 0) || "0"}`));
   const lengthWordIndex = offsetBytes / 32;
@@ -107767,7 +107998,7 @@ var decodeQuestionIds = (data = "") => {
   return ids;
 };
 var base64urlFromHex = (hex2 = "") => {
-  const clean = trim24(hex2).replace(/^0x/, "");
+  const clean = trim25(hex2).replace(/^0x/, "");
   if (!/^[0-9a-fA-F]{64}$/.test(clean)) return "";
   const bytes3 = new Uint8Array(clean.match(/.{2}/g).map((part) => Number.parseInt(part, 16)));
   let binary = "";
@@ -108218,7 +108449,7 @@ var VOTE_ITEMS_MAX = 40;
 var VOTE_ITEM_MAX = 120;
 var VOTE_MORE_MAX = 40;
 var VOTE_SHOWN = 3;
-var record5 = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+var record6 = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 var flat = (value) => typeof value === "string" || typeof value === "number" ? String(value).normalize("NFC").replace(/\s+/g, " ").trim() : "";
 var capped = (value, max) => [...flat(value)].slice(0, max).join("").trim();
 var atWord = (value, max) => {
@@ -108230,35 +108461,35 @@ var atWord = (value, max) => {
   return `${(space > max / 2 ? cut2.slice(0, space) : cut2).trim()}\u2026`;
 };
 var work = (value) => {
-  const pick = record5(value);
+  const pick = record6(value);
   const title = capped(pick.title, WORK_MAX);
   return title ? { title, by: capped(pick.by, WORK_MAX) } : null;
 };
 var yesNoOf = (value) => {
-  const answer = record5(value);
+  const answer = record6(value);
   const prompt = atWord(answer.prompt, PROMPT_MAX);
   const text9 = capped(answer.text, STANCE_MAX);
   return prompt && text9 ? { prompt, text: text9 } : null;
 };
 var ownWordsOf = (value) => {
-  const answer = record5(value);
+  const answer = record6(value);
   const prompt = atWord(answer.prompt, PROMPT_MAX);
   const text9 = atWord(answer.text, ANSWER_MAX);
   return prompt && text9 ? { prompt, text: text9, stance: capped(answer.stance, STANCE_MAX), trimmed: answer.trimmed === true } : null;
 };
 var voteOf = (value) => {
-  const answer = record5(value);
+  const answer = record6(value);
   const prompt = atWord(answer.prompt, PROMPT_MAX);
   const items = (Array.isArray(answer.items) ? answer.items : []).map((item) => flat(item)).filter(Boolean).slice(0, VOTE_ITEMS_MAX).map((item, index) => atWord(item, index < VOTE_SHOWN ? VOTE_ITEM_MAX : VOTE_MORE_MAX));
   return prompt && items.length ? { prompt, kind: answer.kind === "votes" ? "votes" : "chose", items } : null;
 };
 var normalizeSavedAnalysisCard = (value) => {
-  const card = record5(value);
+  const card = record6(value);
   const figure = parseAnalysisCardFigure(card.figure)?.figure;
   const title = capped(card.title, TITLE_MAX);
   if (!figure || !title) return null;
-  const tastes = record5(card.tastes);
-  const answers = record5(card.answers);
+  const tastes = record6(card.tastes);
+  const answers = record6(card.answers);
   const saved = {
     title,
     matchNote: capped(card.matchNote, MATCH_NOTE_MAX),
@@ -108298,7 +108529,7 @@ var normalizeAnalysisCardDrawing = (value) => {
   if (!Array.isArray(value) || !value.length || value.length > ANALYSIS_CARD_DRAWING_PAGES_MAX) return null;
   const pages = [];
   for (const entry2 of value) {
-    const page = record5(entry2);
+    const page = record6(entry2);
     if (!isAnalysisCardPicture(page.mime, page.base64, { maxBytes: ANALYSIS_CARD_DRAWING_PAGE_MAX_BYTES, types: ["image/jpeg"] })) return null;
     pages.push({ mime: page.mime, base64: page.base64 });
   }
@@ -108341,6 +108572,8 @@ var FEATURES = Object.freeze([
   "interview_data_note_v1",
   // interviewMode.realtimeModel may be gpt-live-1.1; older Workers refuse it on save.
   GPT_LIVE_1_1_FEATURE,
+  // interviewMode.questionOrder sets the order interviews take questions in; older Workers reject the key.
+  INTERVIEW_QUESTION_ORDER_FEATURE,
   // interviewMode.voiceSessionContext gives the voice interviewer the session's context; older Workers reject the key.
   INTERVIEW_VOICE_CONTEXT_FEATURE,
   "participant_context_links_v1",
@@ -108354,6 +108587,9 @@ var FEATURES = Object.freeze([
   "session_agent_signed_out",
   "session_backup_v1",
   "session_feedback",
+  // The Worker reads the links saved in sessionContext as context sources, in the background;
+  // sessionLinkReading sets how. An older Worker refuses the key on save and reads no links itself.
+  "session_link_reading_v1",
   // GET /names, GET /names/me, POST /names/set and POST /admin/names/clear; namesEnabled turns them off.
   "session_names_v1",
   "storage_read_batch_v1",
@@ -108361,7 +108597,7 @@ var FEATURES = Object.freeze([
   "worker_groups"
 ]);
 var WORKERS_AI_FEATURE = "workers_ai_v1";
-var workerRelease = () => "0.9.26" ? "0.9.26" : null;
+var workerRelease = () => "0.9.27" ? "0.9.27" : null;
 var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 = {} }) => {
   const deployed = FEATURES.filter((feature) => feature !== WORKER_GROUP_READ_CODE_FEATURE || workerGroupCodeReadsOn(env));
   const body = {
@@ -108766,8 +109002,8 @@ var SESSION_AGENT_PATHS = Object.freeze([
 var OPT_OUTS_UNAVAILABLE = "Who turned the Session Agent off couldn\u2019t be read just now. Try again shortly.";
 var callOptOutStore = (env, slug, operation, payload = {}) => callSessionConfigCoordinator({ env, slug, path: `session-agent/${operation}`, ...payload });
 var callSessionAgentHistoryStore = (env, slug, operation, payload = {}) => callSessionConfigCoordinator({ env, slug, path: `session-agent-history/${operation}`, ...payload });
-var trim25 = (value) => typeof value === "string" ? value.trim() : "";
-var lower12 = (value) => trim25(value).toLowerCase();
+var trim26 = (value) => typeof value === "string" ? value.trim() : "";
+var lower12 = (value) => trim26(value).toLowerCase();
 var clip5 = (value, max) => value.length <= max ? value : `${value.slice(0, Math.max(0, max - 1)).trimEnd()}\u2026`;
 var NOT_ADMITTED = {
   ok: false,
@@ -108814,7 +109050,7 @@ var resultsText = (artifact) => {
   const walk = (value) => {
     if (Array.isArray(value)) return value.forEach(walk);
     if (!value || typeof value !== "object" || value.available === false) return void 0;
-    const own = TEXT_FIELDS.map((field) => trim25(value[field])).filter(Boolean);
+    const own = TEXT_FIELDS.map((field) => trim26(value[field])).filter(Boolean);
     if (own.length) lines.push(own.join(": "));
     return Object.values(value).forEach(walk);
   };
@@ -108831,7 +109067,7 @@ var resultsQuestions = ({ artifact, snapshot, config, hidden = [] }) => {
   };
   walk(artifact?.sections);
   const removed = new Set([...blockedQuestionIds(config), ...hidden].map(lower12));
-  return (Array.isArray(snapshot?.questions) ? snapshot.questions : []).map((question) => ({ id: lower12(question?.id), question: trim25(question?.prompt) })).filter(({ id: id2, question }) => id2 && question && cited.has(id2) && !removed.has(id2));
+  return (Array.isArray(snapshot?.questions) ? snapshot.questions : []).map((question) => ({ id: lower12(question?.id), question: trim26(question?.prompt) })).filter(({ id: id2, question }) => id2 && question && cited.has(id2) && !removed.has(id2));
 };
 var NO_RESULTS = Object.freeze({ text: "", questions: [] });
 var readVisibleResults = async ({ env, slug, config, address: address3, scopes, deps }) => {
@@ -108876,7 +109112,7 @@ var readVisibleResults = async ({ env, slug, config, address: address3, scopes, 
 var COUNTED_TYPES = /* @__PURE__ */ new Set(["binary", "rating", "multichoice"]);
 var scaleText = ({ scale } = {}) => {
   if (!scale) return "";
-  const end = (value, label) => trim25(label) && trim25(label) !== String(value) ? `${value} (${trim25(label)})` : `${value}`;
+  const end = (value, label) => trim26(label) && trim26(label) !== String(value) ? `${value} (${trim26(label)})` : `${value}`;
   return `${end(scale.min, scale.minLabel)} to ${end(scale.max, scale.maxLabel)}`;
 };
 var TOO_MANY_STORED = Symbol("too many stored versions");
@@ -108894,7 +109130,7 @@ var readMemberAnswers = async ({ env, slug, config, optedOut, minAnswers = 1, wr
   const questions = source.snapshot.questions.map((question) => ({ ...question, scale: scaleText(question) }));
   const byQuestion = new Map(questions.map((question) => [
     question.id,
-    { id: lower12(question.id), question: trim25(question.prompt), scale: question.scale, counted: COUNTED_TYPES.has(question.type), answers: [] }
+    { id: lower12(question.id), question: trim26(question.prompt), scale: question.scale, counted: COUNTED_TYPES.has(question.type), answers: [] }
   ]));
   source.snapshot.responses.forEach((response3) => {
     const from = source.participantAddresses?.get(response3.participantId);
@@ -108908,8 +109144,8 @@ var readMemberAnswers = async ({ env, slug, config, optedOut, minAnswers = 1, wr
       leftOut.optedOut += 1;
       return;
     }
-    const given = (Array.isArray(response3.answer) ? response3.answer : [response3.answer]).map(trim25).filter(Boolean);
-    const comment = trim25(response3.additional);
+    const given = (Array.isArray(response3.answer) ? response3.answer : [response3.answer]).map(trim26).filter(Boolean);
+    const comment = trim26(response3.additional);
     const answer = group.counted ? { choices: given, text: comment } : { choices: [], text: [given.join("; "), comment].filter(Boolean).join(" \u2014 ") };
     if (answer.choices.length || answer.text) group.answers.push(writers ? { ...answer, from } : answer);
   });
@@ -108969,14 +109205,14 @@ var TITLE_CHARS = 200;
 var sourcesRead = ({ contextItems, material }) => {
   const { notes, links } = sessionContextNotes(material.sessionContext);
   return contextItems.flatMap(({ part, index }) => {
-    if (part === "links") return links[index] ? [{ kind: "session-link", title: clip5(trim25(links[index].label) || trim25(links[index].url), TITLE_CHARS), url: trim25(links[index].url) }] : [];
-    if (part === "notes") return notes[index] ? [{ kind: "session-note", title: clip5(trim25(notes[index]).replace(/\s+/g, " "), 80) }] : [];
+    if (part === "links") return links[index] ? [{ kind: "session-link", title: clip5(trim26(links[index].label) || trim26(links[index].url), TITLE_CHARS), url: trim26(links[index].url) }] : [];
+    if (part === "notes") return notes[index] ? [{ kind: "session-note", title: clip5(trim26(notes[index]).replace(/\s+/g, " "), 80) }] : [];
     const source = material.sources[index];
     if (!source) return [];
     return [{
       kind: source.kind === "link" ? "link" : "file",
-      title: clip5(trim25(source.title), TITLE_CHARS) || "Untitled",
-      ...trim25(source.url) ? { url: trim25(source.url) } : {},
+      title: clip5(trim26(source.title), TITLE_CHARS) || "Untitled",
+      ...trim26(source.url) ? { url: trim26(source.url) } : {},
       ...source.readByAi ? { readByAi: true } : {}
     }];
   });
@@ -109006,7 +109242,7 @@ var askAi = async ({ messages, config, secrets, address: address3, scopes, env, 
   if (!response3.ok) {
     return response3.status === 429 ? { ok: false, status: 429, body: { error: "The session\u2019s AI is busy. Try again shortly." } } : { ok: false, status: 502, body: { error: "The session\u2019s AI couldn\u2019t answer. Try again." } };
   }
-  const answer = clip5(trim25(data?.completion), SESSION_AGENT_LIMITS.answerChars);
+  const answer = clip5(trim26(data?.completion), SESSION_AGENT_LIMITS.answerChars);
   return answer ? { ok: true, answer } : { ok: false, status: 502, body: { error: "The Session Agent gave no answer. Try again." } };
 };
 var storeRequestOf = ({ body, setting, address: address3 }) => {
@@ -109016,19 +109252,19 @@ var storeRequestOf = ({ body, setting, address: address3 }) => {
     return { error: "A stored chat carries your address or no address." };
   }
   if (name !== void 0 && typeof name !== "string") return { error: "A name must be text." };
-  if (trim25(name).length > SESSION_AGENT_LIMITS.nameChars) {
+  if (trim26(name).length > SESSION_AGENT_LIMITS.nameChars) {
     return { error: `A name can be at most ${SESSION_AGENT_LIMITS.nameChars} characters.` };
   }
   if (!sessionAgentStoresChats(setting) || store !== true) return { keep: false };
-  return { keep: true, by: attribution === "address" && canOptOut(address3) ? lower12(address3) : "", name: trim25(name) };
+  return { keep: true, by: attribution === "address" && canOptOut(address3) ? lower12(address3) : "", name: trim26(name) };
 };
-var storeExchange = async ({ env, slug, request, question, reply: reply5, style, adminOnly, lockedTo, signedOut, deps }) => {
+var storeExchange = async ({ env, slug, request, question, reply: reply6, style, adminOnly, lockedTo, signedOut, deps }) => {
   if (namesSomeone(question)) return { stored: false, why: "This chat wasn\u2019t stored: the question holds an address, an email or a long number." };
   const entry2 = {
     day: new Date(deps.now?.() ?? Date.now()).toISOString().slice(0, 10),
     answers: style,
     question,
-    answer: reply5,
+    answer: reply6,
     ...adminOnly ? { scope: "admin" } : {},
     ...!adminOnly && lockedTo.length ? { groups: lockedTo } : {},
     // So an admin can tell a visitor's chats from members' with no address.
@@ -109097,7 +109333,7 @@ var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: addr
   }
   if (ended) return ended;
   if (aiOff) return json12({ error: "AI is turned off for this session.", reason: "ai_disabled" }, 403);
-  const question = trim25(body?.question);
+  const question = trim26(body?.question);
   if (!question) return json12({ error: "Ask a question." }, 400);
   if (question.length > SESSION_AGENT_LIMITS.questionChars) {
     return json12({ error: `A question can be at most ${SESSION_AGENT_LIMITS.questionChars} characters.` }, 400);
@@ -109184,27 +109420,28 @@ var dispatchSessionAgentRoute = async ({ path, body, config, slug, address: addr
     material,
     context: contextLimits
   });
-  const reply5 = await askAi({ messages, config, secrets: secretContext?.ok ? secretContext.secrets : {}, address: address3, scopes: currentScopes, env, headers: headers2, deps });
-  if (!reply5.ok) return json12(reply5.body, reply5.status);
+  const reply6 = await askAi({ messages, config, secrets: secretContext?.ok ? secretContext.secrets : {}, address: address3, scopes: currentScopes, env, headers: headers2, deps });
+  if (!reply6.ok) return json12(reply6.body, reply6.status);
   const kept = storeRequest.keep ? await storeExchange({
     env,
     slug,
     request: storeRequest,
     question,
-    reply: reply5.answer,
+    reply: reply6.answer,
     style: asker.answers,
     lockedTo,
     deps,
     signedOut: !!signedOut,
     adminOnly: asker.audience === "admin" || isListedResultsBuilder(config, address3)
   }) : null;
+  deps.readSessionLinks?.({ env, config, slug });
   const notes = [
     answersUnavailable === "too_many" ? `Members\u2019 answers weren\u2019t read: this session stores more than ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString("en-US")} question and answer versions, the most the Session Agent can read at once.` : answersUnavailable === "too_large" ? "Members\u2019 answers weren\u2019t read: together they hold more text than the Session Agent can read at once." : answersUnavailable === "too_much" ? "Members\u2019 answers weren\u2019t read: there are more than the Session Agent can read at once." : answersUnavailable ? "Members\u2019 answers couldn\u2019t be read for this answer." : "",
     contextLeftOut > 0 || contextOmitted > 0 ? `Some of the session\u2019s context wasn\u2019t read: the Session Agent reads at most ${contextLimits.totalChars.toLocaleString("en-US")} characters or ${contextLimits.items} items of it, and ${contextLimits.itemChars.toLocaleString("en-US")} characters of any one.` : "",
     kept?.why || ""
   ].filter(Boolean);
   return json12({
-    answer: reply5.answer,
+    answer: reply6.answer,
     answers: asker.answers,
     audience: asker.audience,
     read,
@@ -109700,15 +109937,15 @@ var create = async ({ request, env, baseHeaders, slug, deps }) => {
   });
   if (!signed2.ok) return signed2.response;
   const { address: address3, config, headers: headers2, scopes, targetSlug, siwe } = signed2;
-  const reply5 = new Headers(headers2 || {});
-  reply5.set("cache-control", "no-store");
-  if (!isWorkerCanonical(config)) return deps.json({ error: "Not available in this session.", reason: "hosted_session_required" }, 400, reply5);
-  if (linksRefusal(config)) return deps.json(linksRefusal(config), 403, reply5);
+  const reply6 = new Headers(headers2 || {});
+  reply6.set("cache-control", "no-store");
+  if (!isWorkerCanonical(config)) return deps.json({ error: "Not available in this session.", reason: "hosted_session_required" }, 400, reply6);
+  if (linksRefusal(config)) return deps.json(linksRefusal(config), 403, reply6);
   const account = lower13(address3);
   if (scopes?.admin === true || namedForPower(config, account)) {
-    return deps.json({ error: "An admin\u2019s account can\u2019t be signed in to this way.", reason: "admin_account_not_supported" }, 403, reply5);
+    return deps.json({ error: "An admin\u2019s account can\u2019t be signed in to this way.", reason: "admin_account_not_supported" }, 403, reply6);
   }
-  const limited = await countOrRefuse({ deps, env, slug: targetSlug, identity: account, route: "agent-link-create", limit: AGENT_SIGN_IN_LIMITS.create, headers: reply5 });
+  const limited = await countOrRefuse({ deps, env, slug: targetSlug, identity: account, route: "agent-link-create", limit: AGENT_SIGN_IN_LIMITS.create, headers: reply6 });
   if (limited) return limited;
   const origin = originOf(siwe.uri);
   const bytes3 = new Uint8Array(32);
@@ -109717,8 +109954,8 @@ var create = async ({ request, env, baseHeaders, slug, deps }) => {
   const now = nowMs(deps);
   const expiresAt = now + AGENT_SIGN_IN_CODE_TTL_SECONDS * 1e3;
   const stored = await callAgentSignInStore(env, targetSlug, "code-create", { address: account, codeHash: await sha256Hex4(code), origin, expiresAt, now });
-  if (!stored.ok) return storeRefusal(stored, deps.json, reply5);
-  return deps.json({ ok: true, code, expiresAt, address: deps.getAddress(account), origin, sessionSlug: targetSlug }, 200, reply5);
+  if (!stored.ok) return storeRefusal(stored, deps.json, reply6);
+  return deps.json({ ok: true, code, expiresAt, address: deps.getAddress(account), origin, sessionSlug: targetSlug }, 200, reply6);
 };
 var exchange = async ({ request, env, baseHeaders, slug, deps }) => {
   const body = await readBody2(request);
@@ -110067,7 +110304,7 @@ init_workerGroupJoin();
 init_realtimeInterviewConfig();
 var OPENAI_LIVE_SESSIONS_URL = "https://api.openai.com/v1/live/sessions";
 var OPENAI_REALTIME_CALLS_URL = "https://api.openai.com/v1/realtime/calls";
-var trim26 = (value) => String(value == null ? "" : value).trim();
+var trim27 = (value) => String(value == null ? "" : value).trim();
 var isObj31 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewModeEnabled = (config = {}) => {
   const interview = isObj31(config?.interviewMode || config?.interview) ? config.interviewMode || config.interview : {};
@@ -110102,7 +110339,7 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
   }
   if (!isObj31(body)) return { ok: false, status: 400, error: "Invalid JSON." };
   const sdp = String(body.sdp == null ? "" : body.sdp);
-  const instructions = trim26(body.instructions);
+  const instructions = trim27(body.instructions);
   if (!sdp || !/^v=0(?:\r?\n|$)/.test(sdp)) return { ok: false, status: 400, error: "Invalid SDP offer." };
   if (sdp.length > 64e3) return { ok: false, status: 413, error: "SDP offer is too large." };
   if (!instructions || instructions.length > 32e3) {
@@ -110112,7 +110349,7 @@ var readRealtimeCallRequestPayload = async ({ request } = {}) => {
 };
 var resolveRealtimeConfig = (config = {}) => {
   const interview = isObj31(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
-  const provider = trim26(interview.provider || "openai").toLowerCase();
+  const provider = trim27(interview.provider || "openai").toLowerCase();
   const model = resolveRealtimeInterviewModel(config);
   return { provider, model };
 };
@@ -110129,7 +110366,7 @@ var proxyOpenAiRealtimeCall = async ({
   if (realtime.provider !== "openai") {
     return deps?.json?.({ error: "Realtime interview voice currently requires the OpenAI provider." }, 400, baseHeaders);
   }
-  const key = trim26(secrets?.openaiKey);
+  const key = trim27(secrets?.openaiKey);
   if (!key) {
     return deps?.json?.({ error: "Server misconfigured: openaiKey is missing." }, 401, baseHeaders);
   }
@@ -111326,8 +111563,8 @@ init_resultsJobs();
 init_sessionConfigAuthority();
 var RESULTS_BUILD_WAIT_MS = 5 * 60 * 1e3;
 var RESULTS_ANALYSIS_WAIT_MS = 9 * 60 * 1e3;
-var trim27 = (value) => typeof value === "string" ? value.trim() : "";
-var lower14 = (value) => trim27(value).toLowerCase();
+var trim28 = (value) => typeof value === "string" ? value.trim() : "";
+var lower14 = (value) => trim28(value).toLowerCase();
 var jobCall = ({ env, slug, kind, deps }) => deps?.callResultsJob ? (operation, payload) => deps.callResultsJob(kind, operation, payload) : (operation, payload) => callSessionConfigCoordinator({ env, slug, path: `results-job/${operation}`, kind, ...payload });
 var waitFor = ({ env, slug, kind, input, waitMs, deps }) => awaitResultsJob({
   call: jobCall({ env, slug, kind, deps }),
@@ -111368,7 +111605,7 @@ var pressResultsBuild = async ({ env, slug, kindName, config, body = {}, builder
   return { ok: true, status: 200, build: read.body.build };
 };
 var pressResultsAnalysis = async ({ env, slug, config, body = {}, deps = {} } = {}) => {
-  const requestId = trim27(body.requestId || body.id) || `manual:${globalThis.crypto.randomUUID()}`;
+  const requestId = trim28(body.requestId || body.id) || `manual:${globalThis.crypto.randomUUID()}`;
   const jobBody = {
     requestId,
     refresh: body.refresh === true,
@@ -111419,8 +111656,8 @@ var LIMITS2 = Object.freeze({
   groups: 40
 });
 var isObj32 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-var trim28 = (value) => typeof value === "string" ? value.trim() : "";
-var lower15 = (value) => trim28(value).toLowerCase();
+var trim29 = (value) => typeof value === "string" ? value.trim() : "";
+var lower15 = (value) => trim29(value).toLowerCase();
 var refuse4 = (status, error, reason) => ({ ok: false, status, body: { error, reason } });
 var OPEN_RULE2 = Object.freeze({ match: "any", conditions: [] });
 var UNKNOWN_RULE = Object.freeze({ match: "all", conditions: [{ kind: "unknown" }] });
@@ -111439,7 +111676,7 @@ var signInConditionOf = (rule) => {
 var readConditionOf = (rule) => {
   const kind = lower15(rule.kind);
   if (kind === "worker_role") return { kind, role: lower15(rule.role || rule.name) || "admin" };
-  if (kind === "agent_grant_scope" && trim28(rule.scope || rule.value)) return { kind, scope: trim28(rule.scope || rule.value) };
+  if (kind === "agent_grant_scope" && trim29(rule.scope || rule.value)) return { kind, scope: trim29(rule.scope || rule.value) };
   if (kind === "worker_group") {
     const groupIds = groupsOf2(rule.groupIds || rule.groups || rule.groupId);
     return groupIds.length ? { kind, groupIds } : { ...UNKNOWN };
@@ -111497,7 +111734,7 @@ var membersOf = async ({ env, slug, sessionId, groupId, budget, deps }) => {
       if (address3) members.push(address3);
       else withoutAddress += 1;
     });
-    const next = trim28(page.nextCursor);
+    const next = trim29(page.nextCursor);
     if (!next) return { groupId, members, withoutAddress };
     if (next === cursor) return null;
     cursor = next;
@@ -111591,7 +111828,7 @@ var exportSessionAgent = async ({ env, slug, config, address: address3, deps = {
   }
   const bundle = await buildSessionAgentExport({
     slug,
-    title: trim28(config?.sessionName),
+    title: trim29(config?.sessionName),
     gate,
     setting,
     questions: tooMany ? [] : answers.questions,
@@ -111687,8 +111924,8 @@ var executeDirectSessionConfigMutation = async ({
   mutation,
   deps
 } = {}) => {
-  const coordinate3 = deps?.executeCoordinatedSessionConfigMutation || executeCoordinatedSessionConfigMutation;
-  return coordinate3({ env, slug, existingConfig, mutation, expectedAuthority });
+  const coordinate4 = deps?.executeCoordinatedSessionConfigMutation || executeCoordinatedSessionConfigMutation;
+  return coordinate4({ env, slug, existingConfig, mutation, expectedAuthority });
 };
 var dispatchAdminRequest = async ({
   request,
@@ -111905,6 +112142,10 @@ var dispatchAdminRequest = async ({
       mutation: { kind: "set-config", incomingConfig: incoming },
       deps
     });
+    const sent = body?.config && typeof body.config === "object" ? body.config : {};
+    if (mutationResult?.status === 200 && ["sessionContext", "sessionLinkReading"].some((key) => Object.hasOwn(sent, key))) {
+      deps?.readSessionLinks?.({ env, slug: targetSlug, afterSave: true });
+    }
     return deps?.json?.(
       mutationResult?.body || { error: "Session config mutation failed." },
       mutationResult?.status || 503,
@@ -112847,8 +113088,8 @@ var recordAbuseEventBestEffort = async ({
   now
 } = {}) => {
   try {
-    const record6 = deps?.recordAbuseEvent || recordAbuseEvent;
-    await record6({ env, type, now });
+    const record7 = deps?.recordAbuseEvent || recordAbuseEvent;
+    await record7({ env, type, now });
   } catch {
   }
 };
@@ -112864,8 +113105,8 @@ var buildNonce = (deps) => {
   return Array.from(bytes3, (byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 var issueNonce = async (env, slug, address3, nonce, ttlSeconds, deps = {}) => {
-  const coordinate3 = deps?.issueCoordinatedAuthNonce || issueCoordinatedAuthNonce;
-  const result = await coordinate3({
+  const coordinate4 = deps?.issueCoordinatedAuthNonce || issueCoordinatedAuthNonce;
+  const result = await coordinate4({
     env,
     slug,
     address: address3,
@@ -112886,8 +113127,8 @@ var issueNonce = async (env, slug, address3, nonce, ttlSeconds, deps = {}) => {
 };
 var consumeNonce = async (env, slug, address3, nonce, deps = {}) => {
   const usedNonceTtlSeconds = Number.isFinite(deps?.usedNonceTtlSeconds) ? deps.usedNonceTtlSeconds : DEFAULT_USED_NONCE_TTL_SECONDS;
-  const coordinate3 = deps?.consumeCoordinatedAuthNonce || consumeCoordinatedAuthNonce;
-  const result = await coordinate3({
+  const coordinate4 = deps?.consumeCoordinatedAuthNonce || consumeCoordinatedAuthNonce;
+  const result = await coordinate4({
     env,
     slug,
     address: address3,
@@ -112936,10 +113177,10 @@ var checkNonceRateLimit = async ({
   const networkIdentity = normalizedIdentity || "unknown-network";
   const sessionSlug = String(slug || "").trim();
   const expirationTtl = Number.isFinite(Number(ttlSeconds)) && Number(ttlSeconds) > 0 ? Number(ttlSeconds) : DEFAULT_NONCE_RATE_LIMIT_TTL_SECONDS;
-  const coordinate3 = checkCoordinatedAuthRateLimit2 || checkCoordinatedAuthRateLimit;
+  const coordinate4 = checkCoordinatedAuthRateLimit2 || checkCoordinatedAuthRateLimit;
   const runLimitCheck = async ({ route, rateIdentity, numericLimit }) => {
     if (!Number.isFinite(numericLimit) || numericLimit <= 0) return { ok: true, allowed: true };
-    const result = await coordinate3({
+    const result = await coordinate4({
       env,
       slug: sessionSlug,
       route,
@@ -113120,8 +113361,8 @@ init_deployHelperCore();
 init_sessionWriteCoordinator();
 var INVALID_GRANT_ERROR = "Invalid, expired, or already used sponsored bootstrap grant.";
 var toTrimmedString19 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-var isExpiredGrant = (record6 = {}, nowMs2 = Date.now()) => {
-  const expiresAt = toTrimmedString19(record6?.expiresAt);
+var isExpiredGrant = (record7 = {}, nowMs2 = Date.now()) => {
+  const expiresAt = toTrimmedString19(record7?.expiresAt);
   if (!expiresAt) return false;
   const expirationMs = Date.parse(expiresAt);
   if (!Number.isFinite(expirationMs)) return false;
@@ -113755,13 +113996,13 @@ var UNAVAILABLE4 = Object.freeze({
   reason: "catalog_ticket_unavailable",
   error: "Could not check this catalog link. Retry shortly."
 });
-var trim29 = (value) => String(value == null ? "" : value).trim();
+var trim30 = (value) => String(value == null ? "" : value).trim();
 var nowSeconds = (deps) => Math.floor((typeof deps?.now === "function" ? deps.now() : Date.now()) / 1e3);
 var signTicket = async ({ env, config, slug, sub, parent, exp, deps }) => {
   const key = base64UrlEncode(await signHmac(TICKET_KEY_LABEL, env?.TOKEN_HMAC_SECRET, deps), deps);
   const fields2 = [
     TICKET_VERSION,
-    trim29(slug).toLowerCase(),
+    trim30(slug).toLowerCase(),
     resolveCanonicalWorkerSessionIdHex(config) || "",
     readAuthorizationEpoch(config),
     sub,
@@ -113771,8 +114012,8 @@ var signTicket = async ({ env, config, slug, sub, parent, exp, deps }) => {
   return base64UrlEncode(await signHmac(fields2.join("\n"), key, deps), deps);
 };
 var issueInterviewCatalogTicket = async ({ env, config, slug, sub, parent, parentExp, deps } = {}) => {
-  const address3 = trim29(sub).toLowerCase();
-  const signIn = trim29(parent);
+  const address3 = trim30(sub).toLowerCase();
+  const signIn = trim30(parent);
   const now = nowSeconds(deps);
   const exp = Math.min(now + INTERVIEW_CATALOG_TICKET_TTL_SECONDS, Math.floor(Number(parentExp) || 0));
   if (!/^0x[0-9a-f]{40}$/.test(address3) || !/^[A-Za-z0-9_-]{8,64}$/.test(signIn)) {
@@ -113783,7 +114024,7 @@ var issueInterviewCatalogTicket = async ({ env, config, slug, sub, parent, paren
   return { ticket: [TICKET_VERSION, address3, signIn, exp, mac].join("."), expiresAt: exp };
 };
 var verifyInterviewCatalogTicket = async ({ env, ticket, config, slug, deps } = {}) => {
-  const match = trim29(ticket).match(TICKET_PATTERN);
+  const match = trim30(ticket).match(TICKET_PATTERN);
   if (!match || readAuthorizationEpoch(config) === null) return REFUSED;
   const [, sub, parent, expText, mac] = match;
   const exp = Number(expText);
@@ -113795,9 +114036,9 @@ var verifyInterviewCatalogTicket = async ({ env, ticket, config, slug, deps } = 
     return UNAVAILABLE4;
   }
   if (!timingSafeEqual(expected, mac)) return REFUSED;
-  let record6;
+  let record7;
   try {
-    record6 = await (deps?.validateAuthTokenRecord || validateAuthTokenRecord)({
+    record7 = await (deps?.validateAuthTokenRecord || validateAuthTokenRecord)({
       env,
       payload: { sub, jti: parent },
       slug
@@ -113805,7 +114046,7 @@ var verifyInterviewCatalogTicket = async ({ env, ticket, config, slug, deps } = 
   } catch {
     return UNAVAILABLE4;
   }
-  if (!record6?.ok) return REFUSED;
+  if (!record7?.ok) return REFUSED;
   let scopes = null;
   try {
     scopes = await deps?.computeScopesForLogin?.({ env, slug, address: sub, config, requestedScopes: READ_SCOPES });
@@ -113822,7 +114063,7 @@ var verifyInterviewCatalogTicket = async ({ env, ticket, config, slug, deps } = 
 init_workerGroups();
 init_interviewSettings();
 var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v6";
-var trim30 = (value) => String(value == null ? "" : value).trim();
+var trim31 = (value) => String(value == null ? "" : value).trim();
 var isObj33 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewEnabled = (config = {}) => {
   const interview = isObj33(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
@@ -113830,18 +114071,18 @@ var isInterviewEnabled = (config = {}) => {
 };
 var normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw]).map((entry2) => {
   try {
-    return new URL(trim30(entry2)).origin;
+    return new URL(trim31(entry2)).origin;
   } catch {
     return "";
   }
 }).filter(Boolean);
 var isLocalHttpHostname = (hostname = "") => ["localhost", "127.0.0.1", "[::1]", "::1"].includes(String(hostname));
 var normalizeRecruitmentSource = (value) => {
-  const normalized = trim30(value).replace(/\s+/g, "-").slice(0, 128);
+  const normalized = trim31(value).replace(/\s+/g, "-").slice(0, 128);
   return /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(normalized) ? normalized : "";
 };
 var normalizeJoinGroup = (value) => {
-  const normalized = trim30(value).toLowerCase();
+  const normalized = trim31(value).toLowerCase();
   return /^[a-z0-9][a-z0-9._-]{0,79}$/.test(normalized) ? normalized : "";
 };
 var copySafeReturnParams = (sourceUrl, targetUrl) => {
@@ -113852,7 +114093,7 @@ var copySafeReturnParams = (sourceUrl, targetUrl) => {
 };
 var safeServedWorkerOrigin = (value) => {
   try {
-    const url = new URL(trim30(value));
+    const url = new URL(trim31(value));
     if (url.protocol === "https:" || url.protocol === "http:" && isLocalHttpHostname(url.hostname)) {
       return url.origin;
     }
@@ -113862,10 +114103,10 @@ var safeServedWorkerOrigin = (value) => {
 };
 var safeSessionUrl = (value, { slug = "", allowOrigins } = {}) => {
   try {
-    const url = new URL(trim30(value));
+    const url = new URL(trim31(value));
     if (url.protocol !== "https:" && !(url.protocol === "http:" && isLocalHttpHostname(url.hostname))) return "";
     const parts = url.pathname.split("/").filter(Boolean).map((part) => decodeURIComponent(part));
-    if (parts.length < 2 || parts.at(-2) !== "session" || parts.at(-1)?.toLowerCase() !== trim30(slug).toLowerCase()) {
+    if (parts.length < 2 || parts.at(-2) !== "session" || parts.at(-1)?.toLowerCase() !== trim31(slug).toLowerCase()) {
       return "";
     }
     const allowedOrigins = normalizeAllowedOrigins(allowOrigins);
@@ -113883,7 +114124,7 @@ var sha2563 = async (value) => {
   return [...new Uint8Array(digest2)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 var canonicalizeQuestions = (questions = []) => [...questions].sort(
-  (left, right) => trim30(left?.id).localeCompare(trim30(right?.id)) || trim30(left?.prompt).localeCompare(trim30(right?.prompt)) || trim30(left?.type).localeCompare(trim30(right?.type))
+  (left, right) => trim31(left?.id).localeCompare(trim31(right?.id)) || trim31(left?.prompt).localeCompare(trim31(right?.prompt)) || trim31(left?.type).localeCompare(trim31(right?.type))
 );
 var buildReviewUrl = ({ sessionUrl, servedWorkerOrigin } = {}) => {
   const url = new URL(sessionUrl);
@@ -114734,6 +114975,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
             putSessionConfig: deps?.putSessionConfig,
             getSessionSecrets: deps?.getSessionSecrets,
             storageRoute: deps?.storageRoute,
+            readSessionLinks: deps?.readSessionLinks,
             readCoordinatedResultsAnalysisStatus: deps?.readCoordinatedResultsAnalysisStatus,
             reserveCoordinatedResultsAnalysis: deps?.reserveCoordinatedResultsAnalysis,
             finalizeCoordinatedResultsAnalysis: deps?.finalizeCoordinatedResultsAnalysis,
@@ -115032,6 +115274,8 @@ var createWorkerRouteShellWithWorkerDeps = ({
                   toRegistrySessionSlug: deps?.toRegistrySessionSlug,
                   resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
                   checkSbtGate: deps?.checkSbtGate,
+                  // A question reads the session's saved links that aren't sources yet, in the background.
+                  readSessionLinks: deps?.readSessionLinks,
                   json: deps?.json,
                   toStr: deps?.toStr,
                   now: deps?.now
@@ -115290,6 +115534,7 @@ var createWorkerRouteRuntimeWithWorkerDeps = ({
       getSessionSecrets: deps?.getSessionSecrets,
       arweaveUpload: executionServices.arweaveUpload,
       storageRoute: executionServices.storageRoute,
+      readSessionLinks: executionServices.readSessionLinks,
       authorizeCloudflareStorageResourceRead: deps?.authorizeCloudflareStorageResourceRead,
       readPublishedResultsAnalysisArtifact: deps?.readPublishedResultsAnalysisArtifact,
       evaluateResultsAnalysisViewerEligibility: deps?.evaluateResultsAnalysisViewerEligibility,
