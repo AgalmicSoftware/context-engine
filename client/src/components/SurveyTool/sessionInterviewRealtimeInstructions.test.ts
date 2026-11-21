@@ -214,6 +214,29 @@ it('keeps question ids and option lists out of the rows unless something needs t
   expect(single).not.toContain('Rows marked');
 });
 
+it('gives the rows their ids when only a prefill fact names a question', () => {
+  const questions = [
+    { ...question, id: 'q1', prompt: 'Which risk worries you most?' },
+    { ...question, id: 'q2', prompt: 'How ready is the town for floods?' },
+  ];
+  const withFact = (fact: Record<string, unknown>) =>
+    buildRealtimeInterviewInstructions({
+      questions,
+      prefillPacket: { responderContext: { facts: [fact] } } as Parameters<
+        typeof buildRealtimeInterviewInstructions
+      >[0]['prefillPacket'],
+    });
+  // The fact says which question it bears on by id, so the rows say which id is which.
+  const named = withFact({ fact: 'Lives by the river', relatedQuestionIds: ['q2'] });
+  expect(named).toContain('Lives by the river');
+  expect(named).toContain('1. [q1] (scale 0-100; 0=Not ready; 100=Ready) Which risk worries you most?');
+  expect(named).toContain('2. [q2] (scale 0-100; 0=Not ready; 100=Ready) How ready is the town for floods?');
+  // A fact naming no question leaves them out.
+  const unnamed = withFact({ fact: 'Lives by the river' });
+  expect(unnamed).toContain('Lives by the river');
+  expect(unnamed).not.toMatch(/\[q\d\]/);
+});
+
 describe('after an AI prefill', () => {
   const asked = { ...question, id: 'q1', prompt: 'Which risk worries you most?' };
   const drafted = { ...question, id: 'q2', prompt: 'How ready is the town for floods?' };
