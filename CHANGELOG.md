@@ -21,7 +21,7 @@ The Session Agent reads a session's saved links, a shorter voice brief with a qu
 
 - **Question order.** A session's interview settings offer "Question order", where the session's Worker supports it.
 - **Links read by the session.** Where a session reads its context links for the AI by itself, the link's help says so.
-- **Adding context.** Adding a file or link to a session is one compact box with a single "Visible to" choice, and a session's context links each take their own line.
+- **Adding context.** On a session's page, one box adds a note, a link or a file to its context: typed text is a note, a lone https address a link, and a file is attached or dropped. It has a single "Visible to" choice. A session's context links each take their own line, and on a phone an admin's list of the session's files and links keeps its text readable.
 - **Session box in a tool.** In a tool, the session box stays on the Back row and shortens a long session name instead of dropping to its own row.
 - **Welcome slides on a desktop.** The slides use the window's height, so the picture is as large as on a medium screen.
 - **Deploy helper.** It deploys the 0.9.26 Worker bundles. A Worker updated from the site gets this release's.
