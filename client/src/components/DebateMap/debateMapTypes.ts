@@ -28,7 +28,15 @@ export interface DebateQuestion {
   question?: string;
   prompt?: string;
   options?: unknown;
+  // A session atlas question: the AI's saved reading of its answers, where the build made one.
+  analysis?: DebateQuestionAnalysis;
   [key: string]: unknown;
+}
+
+export interface DebateQuestionAnalysis {
+  summary: string;
+  answered: number;
+  categories: Array<{ label: string; summary: string; participantCount: number }>;
 }
 
 export interface DebateComment {
@@ -39,6 +47,8 @@ export interface DebateComment {
   label?: string;
   participantCount?: number;
   participantTotal?: number;
+  // 'category' for a kind of answer to a question, listed as positions are.
+  kind?: string;
   [key: string]: unknown;
 }
 

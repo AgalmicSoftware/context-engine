@@ -1523,6 +1523,82 @@ describe('DebateMap', () => {
       expect(notify.success).not.toHaveBeenCalledWith('Copied to clipboard');
     });
 
+    it("opens a question circle to the AI's analysis with its card already shown", async () => {
+      const analysed = [
+        {
+          id: 'b1',
+          name: 'Organizing',
+          children: [
+            {
+              id: 't1',
+              name: 'Pilots',
+              depth: 1,
+              children: [
+                {
+                  id: 't1-q1',
+                  name: 'Should pilots start local?',
+                  depth: 2,
+                  isQuestion: true,
+                  questions: [{ id: '0xq1', question: 'Should pilots start local?', questionType: 'binary' }],
+                  comments: [
+                    { id: 'a', comment: 'Most would start locally.' },
+                    { id: 'c', kind: 'category', label: 'Start small', participantCount: 5, participantTotal: 7 },
+                  ],
+                },
+                { id: 't1-q2', name: 'Who decides?', depth: 2, isQuestion: true, questions: [{ id: '0xq2' }] },
+              ],
+            },
+          ],
+        },
+      ];
+      const { unmount } = renderSessionAtlas({ treeData: analysed, requestedModalNodeId: 't1-q1' });
+      expect(await screen.findByRole('region', { name: 'AI-generated summary' })).toHaveTextContent(
+        'Most would start locally.',
+      );
+      expect(within(screen.getByRole('region', { name: 'Categories' })).getByText('Start small')).toBeInTheDocument();
+      // The question's card is open without a press, as in a question circle that has no analysis.
+      expect(screen.getByText('Agree')).toBeInTheDocument();
+      unmount();
+      renderSessionAtlas({ treeData: analysed, requestedModalNodeId: 't1-q2' });
+      expect(await screen.findByText('Type your response...')).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: 'AI-generated summary' })).not.toBeInTheDocument();
+    });
+
+    it("notes the AI's analysis on a question's card in its topic, as the link's description", async () => {
+      const analysis = {
+        summary: 'Most would start locally.',
+        answered: 7,
+        categories: [{ label: 'Start small', summary: '', participantCount: 5 }],
+      };
+      const tree = [
+        {
+          id: 't1',
+          name: 'Pilots',
+          comments: [{ id: 's', comment: 'A topic summary.' }],
+          questions: [
+            { id: '0xq1', question: 'Should pilots start local?', questionType: 'binary', analysis },
+            { id: '0xq2', question: 'Who decides?', questionType: 'freeform' },
+          ],
+        },
+      ];
+      renderSessionAtlas({
+        treeData: tree,
+        requestedModalNodeId: 't1',
+        buildQuestionLink: (id: string) => `/q/${id}`,
+      });
+      // A topic with a summary but no chart still opens with its questions folded.
+      expect(await screen.findByRole('region', { name: 'AI-generated summary' })).toHaveTextContent('A topic summary.');
+      expect(screen.queryByTestId('ce-atlas-question-analysis')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByText('Questions').closest('[role="button"]') as HTMLElement);
+      const notes = screen.getAllByTestId('ce-atlas-question-analysis');
+      expect(notes).toHaveLength(1);
+      expect(notes[0]).toHaveTextContent('AI summary of 7 participants’ answers');
+      expect(notes[0]).toHaveTextContent('Start small5 of 7');
+      const [first, second] = screen.getAllByRole('link', { name: /^Answer:/ });
+      expect(first).toHaveAccessibleDescription(/Most would start locally\./);
+      expect(second).not.toHaveAttribute('aria-describedby');
+    });
+
     it('keeps the demo atlas four levels when none are named', () => {
       render(
         <MemoryRouter>

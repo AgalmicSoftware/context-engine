@@ -86,6 +86,7 @@ import DebateMapSplit from './DebateMapSplit';
 
 import { createTextMeasurer, fitPackedAtlasCirclesToBox, fitPackedAtlasLabel } from './packedAtlasFit';
 import { QuadraticQuestionPreview } from './QuadraticQuestionPreview';
+import { QuestionAnalysisNote } from './QuestionAnalysisNote';
 
 const StandalonePoliticalCompass = React.lazy(() =>
   import('../DemoViews/DebateHUD/PoliticalCompassView').then((module) => ({
@@ -1347,7 +1348,8 @@ const Modal = ({
   const [historicalCasesOpen, setHistoricalCasesOpen] = useState(false);
   const [expandedHistoricalCaseId, setExpandedHistoricalCaseId] = useState('');
   // A question's own window has nothing but its question, so that shows at once.
-  const onlyQuestions = readOnly && !content?.compass && !(Array.isArray(content?.comments) && content.comments.length);
+  const mapped = !!content?.compass || (!content?.isQuestion && !!content?.comments?.length);
+  const onlyQuestions = readOnly && !mapped;
   const [questionsOpen, setQuestionsOpen] = useState(onlyQuestions);
 
   useEffect(() => {
@@ -2162,6 +2164,7 @@ const Modal = ({
                             target: '_blank',
                             rel: 'noopener noreferrer',
                             'aria-label': `Answer: ${questionText} (opens in a new tab)`,
+                            'aria-describedby': q.analysis ? `ce-atlas-analysis-${i}` : undefined,
                           }
                         : {})}
                     >
@@ -2186,6 +2189,7 @@ const Modal = ({
                         </div>
                       </div>
                       <div className={styles.pileCardBody}>{renderQuestionPreview(q)}</div>
+                      <QuestionAnalysisNote analysis={q.analysis} id={`ce-atlas-analysis-${i}`} />
                       {questionHref && (
                         <span className={styles.pileCardAction} aria-hidden="true">
                           Answer <FontAwesomeIcon icon={faExternalLinkAlt} />
