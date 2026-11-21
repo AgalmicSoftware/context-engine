@@ -52,8 +52,9 @@ try {
     assert(prompt.includes('Already answered IDs, only for changes I request: ["opening"]'));
     assert(!prompt.includes('Private synthetic answer'));
     const brief = await page.evaluate(() => window.__voiceBrief);
-    assert(brief.indexOf('[room-newest]') < brief.indexOf('[room-first]'));
-    assert(!brief.includes('[opening]'));
+    // Rows carry their number and prompt, newest first, and leave the answered question out.
+    assert(brief.includes('1. (freeform) Newest breakout\n2. (freeform) First breakout'));
+    assert(!brief.includes('Opening question'));
     await page.getByRole('button', { name: 'Prompt', exact: true }).click();
     await page.getByRole('heading', { name: 'Let your AI draft your answers' }).waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
