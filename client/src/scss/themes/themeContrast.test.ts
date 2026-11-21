@@ -168,6 +168,10 @@ describe('bundled app-theme contrast', () => {
     assertContrast(values, 'focus-ring', 'surface', 3, 'canvas');
     // Next's highlight is an icon on the page beside the question card.
     assertContrast(values, 'pile-next-highlight', 'canvas', 3, 'canvas');
+    // The two-axis chart's bright quadrants carry the document's text colour: its axes, dots and name outlines.
+    ['top-left', 'top-right', 'bottom-left', 'bottom-right'].forEach((corner) =>
+      assertContrast(values, 'document-text', `chart-quadrant-${corner}`, 4.5, 'document-canvas'),
+    );
   });
 
   // Group Conversation stacks translucent layers on the dialog's sunken surface (SurveyTool.module.scss):

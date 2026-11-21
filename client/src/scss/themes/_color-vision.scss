@@ -55,6 +55,11 @@
     --ce-action-accent-text: #08121d;
     --ce-data-viz-point: #80ccff;
     --ce-data-viz-point-active: #ffc078;
+    // The two-axis chart's quadrants: four fills that stay apart without red against green.
+    --ce-chart-quadrant-top-left: #e69f00;
+    --ce-chart-quadrant-top-right: #56b4e9;
+    --ce-chart-quadrant-bottom-left: #33c4a0;
+    --ce-chart-quadrant-bottom-right: #f0e442;
     $series: (#4477aa, #ee7733, #aa3377, #009988, #ccbb44, #66ccee, #ee6677, #bbbbbb, #000000, #228833);
     @for $index from 1 through list.length($series) {
       --ce-chart-series-#{$index}: #{list.nth($series, $index)};

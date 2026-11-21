@@ -269,4 +269,16 @@ describe('PoliticalCompass tooltip hover behavior', () => {
     expect(lines.length).toBeGreaterThan(2);
     lines.forEach((line) => expect(line.length).toBeLessThanOrEqual(15));
   });
+
+  it("fills the quadrants with the theme's four chart colours, under a grid", () => {
+    const { container } = render(<StandalonePoliticalCompass compass={createCompass()} compact={false} />);
+    const fills = [...container.querySelectorAll('svg > rect')].map((rect) => rect.getAttribute('fill'));
+    expect(fills.slice(0, 4)).toEqual([
+      'var(--ce-chart-quadrant-top-left)',
+      'var(--ce-chart-quadrant-top-right)',
+      'var(--ce-chart-quadrant-bottom-left)',
+      'var(--ce-chart-quadrant-bottom-right)',
+    ]);
+    expect(screen.getByTestId('ce-political-compass-grid').querySelectorAll('line').length).toBeGreaterThan(20);
+  });
 });

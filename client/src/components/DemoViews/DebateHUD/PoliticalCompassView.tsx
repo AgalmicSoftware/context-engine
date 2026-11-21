@@ -252,15 +252,16 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
     setTooltipState(null);
   };
 
-  // The four quadrants in the arrangement people know from the familiar four-colour compass picture: red and
-  // blue above, green and purple below, each strong enough to be told apart at a glance. The hues are each
-  // theme's own chart colours.
+  // The four quadrants in the arrangement people know from the familiar four-colour picture: red and blue above,
+  // green and yellow below, bright, under a fine grid. The colours are each theme's own, chosen to carry the
+  // document's text colour: the axes, the dots and the names' outlines are drawn in it.
   const quadColors = {
-    topLeft: 'color-mix(in srgb, var(--ce-data-series-4) 55%, var(--ce-document-canvas))',
-    topRight: 'color-mix(in srgb, var(--ce-data-series-1) 55%, var(--ce-document-canvas))',
-    bottomLeft: 'color-mix(in srgb, var(--ce-data-series-6) 55%, var(--ce-document-canvas))',
-    bottomRight: 'color-mix(in srgb, var(--ce-data-series-2) 55%, var(--ce-document-canvas))',
+    topLeft: 'var(--ce-chart-quadrant-top-left)',
+    topRight: 'var(--ce-chart-quadrant-top-right)',
+    bottomLeft: 'var(--ce-chart-quadrant-bottom-left)',
+    bottomRight: 'var(--ce-chart-quadrant-bottom-right)',
   };
+  const gridLines = Array.from({ length: 19 }, (_, index) => (index + 1) / 20).filter((share) => share !== 0.5);
   const getAvatarBaseRadius = (point: CompassPoint) => {
     if (point?.type === 'historical') return 16;
     if (point?.type === 'debater') return 13;
@@ -666,6 +667,14 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
           <rect x={cx} y={padY} width={cW / 2} height={cH / 2} fill={quadColors.topRight} />
           <rect x={padX} y={cy} width={cW / 2} height={cH / 2} fill={quadColors.bottomLeft} />
           <rect x={cx} y={cy} width={cW / 2} height={cH / 2} fill={quadColors.bottomRight} />
+          <g stroke="var(--ce-document-canvas)" strokeWidth="1" opacity="0.55" data-testid="ce-political-compass-grid">
+            {gridLines.map((share) => (
+              <React.Fragment key={share}>
+                <line x1={padX + share * cW} y1={padY} x2={padX + share * cW} y2={padY + cH} />
+                <line x1={padX} y1={padY + share * cH} x2={padX + cW} y2={padY + share * cH} />
+              </React.Fragment>
+            ))}
+          </g>
 
           <line x1={padX} y1={cy} x2={padX + cW} y2={cy} stroke="var(--ce-document-text)" strokeWidth="2.5" />
           <line x1={cx} y1={padY} x2={cx} y2={padY + cH} stroke="var(--ce-document-text)" strokeWidth="2.5" />
