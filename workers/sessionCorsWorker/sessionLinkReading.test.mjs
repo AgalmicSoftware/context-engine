@@ -95,6 +95,21 @@ test('a source an admin removes stays removed while its link stays saved; a link
   assert.deepEqual(h.pageCalls, [ESSAY, ESSAY]);
 });
 
+test('a source an admin removes stays removed when the `links` setting is lowered and raised again', async () => {
+  const h = harness({ pages: { [ESSAY]: page('Commons essay'), [BRIEF]: page('Water brief') } });
+  withLinks(h, [{ label: 'Brief', url: BRIEF }, { label: 'The essay', url: ESSAY }]);
+  await read(h);
+  const essay = links(await h.list(ADMIN)).find((item) => item.url === ESSAY);
+  assert.equal((await h.context({ action: 'remove', id: essay.id })).status, 200);
+  const save = (sessionLinkReading) => {
+    h.state.config = { ...h.state.config, sessionLinkReading };
+    return readSessionLinks({ env: h.env, config: h.state.config, slug: 'salon', deps: h.deps, afterSave: true });
+  };
+  await save({ links: 1 });
+  assert.deepEqual((await save({ links: 2 })).read, []);
+  assert.deepEqual(h.pageCalls, [BRIEF, ESSAY]);
+});
+
 test('a link that fails is recorded and not tried again until its retry wait', async (t) => {
   let up = false;
   const h = harness({ pages: { [ESSAY]: () => (up ? page('Commons essay')() : new Response('down', { status: 503 })) } });
@@ -234,8 +249,16 @@ test('the coordinator’s record: claims, retry waits, forgetting, and a reset s
   state = settleSessionLinkRead({ state, sessionId: 's1', url: BRIEF, ok: false, error: 'down', nowMs: 3000 });
   assert.deepEqual(state.links[BRIEF], { at: 3000, ok: false, error: 'down' });
   assert.deepEqual(claimSessionLinkReads({ state, sessionId: 's1', urls, retryMs: 600_000, nowMs: 603_000 }).due, [BRIEF]);
-  // A link taken out is forgotten; a reset session starts afresh.
-  assert.deepEqual(Object.keys(claimSessionLinkReads({ state, sessionId: 's1', urls: [BRIEF], retryMs: 600_000, nowMs: 4000 }).state.links), [BRIEF]);
+  // Nothing due and nothing forgotten: nothing to store.
+  assert.equal(claimSessionLinkReads({ state, sessionId: 's1', urls: [ESSAY], retryMs: 600_000, nowMs: 4000 }).changed, false);
+  // Only a save forgets, and only links it took out; one the `links` setting leaves out is kept.
+  assert.deepEqual(Object.keys(claimSessionLinkReads({ state, sessionId: 's1', urls: [BRIEF], retryMs: 600_000, nowMs: 4000 }).state.links), [ESSAY, BRIEF]);
+  assert.deepEqual(Object.keys(claimSessionLinkReads({
+    state, sessionId: 's1', urls: [BRIEF], saved: [ESSAY, BRIEF], forget: true, retryMs: 600_000, nowMs: 4000,
+  }).state.links), [ESSAY, BRIEF]);
+  const forgot = claimSessionLinkReads({ state, sessionId: 's1', urls: [BRIEF], saved: [BRIEF], forget: true, retryMs: 600_000, nowMs: 4000 });
+  assert.deepEqual([Object.keys(forgot.state.links), forgot.changed], [[BRIEF], true]);
+  // A reset session starts afresh.
   assert.deepEqual(claimSessionLinkReads({ state, sessionId: 's2', urls, retryMs: 600_000, nowMs: 4000 }).due, urls);
   // A read that ends after its link was forgotten records nothing.
   assert.deepEqual(settleSessionLinkRead({ state: { sessionId: 's1', links: {} }, sessionId: 's1', url: ESSAY, ok: true, nowMs: 5000 }),

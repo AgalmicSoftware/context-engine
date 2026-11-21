@@ -17,13 +17,13 @@ const reply = (body, status = 200) => new Response(JSON.stringify(body), { statu
 // The links read: only those an admin saved in the session's own context,
 // in their order, each once. Nothing else (no address in a question, an
 // answer, a file or a link someone added) is ever read from here.
-const savedLinks = (config, count) => {
+const savedLinks = (config) => {
   const seen = new Map();
   for (const { label, url } of normalizeSessionContext(config?.sessionContext).links) {
     const address = canonicalUrl(url);
     if (address.startsWith('https://') && !seen.has(address)) seen.set(address, trim(label));
   }
-  return [...seen].slice(0, count).map(([url, label]) => ({ url, label }));
+  return [...seen].map(([url, label]) => ({ url, label }));
 };
 
 // An admin's link with the same address, open to everyone the session
@@ -46,12 +46,15 @@ const run = async ({ env, config, slug, deps, afterSave }) => {
   // Stored as the session's first admin, so it is the admins' item: first in the
   // reading order, removed only by an admin, and open to everyone the session admits.
   const admin = [...resolveSessionAdminAddresses(session)][0];
-  const links = savedLinks(session, settings.links);
+  const saved = savedLinks(session);
+  const links = saved.slice(0, settings.links);
   // A save with no links left still tells the coordinator, which forgets the ones taken out.
   if (!admin || (!links.length && !afterSave)) return { read: [] };
   const sessionId = trim(session.sessionId || session.sessionIdHex);
   const claimed = await coordinate(deps, {
     env, slug, operation: 'claim-links', sessionId, urls: links.map((link) => link.url), retryMs: settings.retryMinutes * 60_000,
+    // Only a save forgets links, those it took out; a question may hold a config a second old.
+    saved: saved.map((link) => link.url), forget: afterSave,
   });
   const due = new Set(claimed?.ok && Array.isArray(claimed.body?.due) ? claimed.body.due : []);
   if (!due.size) return { read: [] };

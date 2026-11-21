@@ -2855,10 +2855,14 @@ export class SessionWriteCoordinator {
             }) || {});
             return jsonResponse({ ok: true });
           }
-          const urls = Array.isArray(payload?.urls) ? [...new Set(payload.urls.map(toTrimmedString).filter(Boolean))].slice(0, LINK_READING.links.max) : [];
+          const listOf = (value) => (Array.isArray(value) ? [...new Set(value.map(toTrimmedString).filter(Boolean))].slice(0, LINK_READING.links.max) : []);
+          const urls = listOf(payload?.urls);
           const retryMs = Number.isSafeInteger(payload?.retryMs) && payload.retryMs > 0 ? payload.retryMs : LINK_READING.retryMinutes.default * 60_000;
-          const claimed = claimSessionLinkReads({ state, sessionId, urls, retryMs, nowMs });
-          await this.state.storage.put(SESSION_LINK_READS_KEY, claimed.state);
+          const claimed = claimSessionLinkReads({
+            state, sessionId, urls, saved: payload?.saved === undefined ? urls : listOf(payload.saved), forget: payload?.forget === true, retryMs, nowMs,
+          });
+          // Most questions find nothing due, and write nothing.
+          if (claimed.changed) await this.state.storage.put(SESSION_LINK_READS_KEY, claimed.state);
           return jsonResponse({ ok: true, due: claimed.due });
         }
         if (operation === 'set-card') {

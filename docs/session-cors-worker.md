@@ -924,21 +924,22 @@ Authenticated clients can use the worker as the session storage boundary:
   [Session context](session-context-sources.md).
 - Saved links read as sources: the Worker reads each link an admin saved in the session's own context
   (`sessionContext.links`) as an `add-link` would, in the background (`waitUntil`) so no reply waits on it. It runs
-  after a successful `set-config` that sends `sessionContext` or `sessionLinkReading`, and when the Session Agent is
-  asked a question, which catches up sessions saved before this release; that answer goes out without the pages and
-  a later one has them. Only `sessionContext.links` are read: never a link someone added, an address in a
+  after a successful `set-config` that sends `sessionContext` or `sessionLinkReading`, and once each Session Agent
+  answer is ready, which catches up sessions saved before this release; that answer went out without the pages and
+  a later one has them. Starting after the answer keeps the page fetches off the answer's own connections. Only `sessionContext.links` are read: never a link someone added, an address in a
   participant's file or answer, a link inside HTML context, or anything named in a question. Each page goes through
   the add-link path itself (https only, the public-artifact link policy with every redirect checked again, 2 MB per
   page, the secret check, the upload's access check and a card where cards are on), stored as the session's first
   admin's link, open to everyone the session admits, so only an admin removes it. A link already held as an admin's
   link for everyone with the same address is not fetched again. The session coordinator claims each link before
   it is read, so two questions at once read it once, and records how each read ended: a link read once is not read
-  again while it stays saved (a source an admin removes stays removed), a failed one waits `retryMinutes`, and a
-  link taken out of the context by a save is forgotten. Nothing is read once the session has ended, on storage
+  again while it stays saved (a source an admin removes stays removed, even if the `links` setting is lowered and
+  raised again), a failed one waits `retryMinutes`, and a link a save takes out of the context is forgotten. A
+  question that finds nothing due writes nothing. Nothing is read once the session has ended, on storage
   other than Cloudflare, or under Lit encryption. The admin-only setting `sessionLinkReading`
   (shared/sessionLinkReading.mjs), each key optional: `on` (default `true`), `links` (8, 0 to 8: how many of the
   saved links, in order), `fetchSeconds` (10, 3 to 20; the reads run after the reply, which Cloudflare allows 30
-  seconds), `pageChars` (100,000, 1,000 to 100,000) and `retryMinutes` (60, 10 to 1,440). `null` puts every key
+  seconds, less 10 for storing), `pageChars` (100,000, 1,000 to 100,000) and `retryMinutes` (60, 10 to 1,440). `null` puts every key
   back to its default; changing it signs no one out. Workers that read saved links advertise
   `session_link_reading_v1`; an older Worker refuses a save that sends `sessionLinkReading`, reads these sources
   as the ordinary context rows they are, and reads no new link itself.

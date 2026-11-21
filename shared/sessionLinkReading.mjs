@@ -5,12 +5,17 @@
 import { SESSION_CONTEXT_LIMITS } from './sessionContext.mjs';
 import { CONTEXT_SOURCE_LIMITS } from './sessionContextSources.mjs';
 
+// Cloudflare runs work after a reply for at most this long (platform limit).
+export const AFTER_REPLY_SECONDS = 30;
+// The most of a failed read's error the coordinator keeps (platform limit).
+export const LINK_READ_ERROR_CHARS = 300;
+
 export const SESSION_LINK_READING_SETTINGS = Object.freeze({
   // How many of the saved links are read, in their order; 0 reads none.
   links: Object.freeze({ default: SESSION_CONTEXT_LIMITS.links, min: 0, max: SESSION_CONTEXT_LIMITS.links }),
   // Each page's fetch, redirects and body together. The reads run after the
-  // reply, which Cloudflare lets run for 30 seconds, so at most 20.
-  fetchSeconds: Object.freeze({ default: 10, min: 3, max: 20 }),
+  // reply, so at most that time less 10 seconds for storing each page and its card.
+  fetchSeconds: Object.freeze({ default: 10, min: 3, max: AFTER_REPLY_SECONDS - 10 }),
   // A page's text kept, up to the snapshot cap every context link has.
   pageChars: Object.freeze({ default: CONTEXT_SOURCE_LIMITS.snapshotChars, min: 1000, max: CONTEXT_SOURCE_LIMITS.snapshotChars }),
   // A link that could not be read is not tried again sooner.
@@ -48,23 +53,32 @@ export const resolveSessionLinkReading = (config) => {
 // What the session coordinator keeps for one session: each saved link it has
 // tried, when, and whether that read stored a source. A link read once is
 // never read again while it stays saved, so a source an admin removes stays
-// removed; a link taken out of the context is forgotten. A session reset
-// under the same link starts afresh.
+// removed; a link a save takes out of the context is forgotten, while one the
+// `links` setting leaves out is kept. A session reset under the same link
+// starts afresh.
 const linksOf = (state, sessionId) => (record(state) && state.sessionId === sessionId && record(state.links) ? state.links : {});
 
-/** Claims the links due a read now: never tried, or failed (or left unfinished) at least `retryMs` ago. */
-export const claimSessionLinkReads = ({ state, sessionId, urls, retryMs, nowMs }) => {
+/**
+ * Claims the links due a read now (`urls`): never tried, or failed (or left
+ * unfinished) at least `retryMs` ago. With `forget` (after a save), links not
+ * among `saved`, every link the context holds, are forgotten. `changed` says
+ * whether the record needs storing.
+ */
+export const claimSessionLinkReads = ({ state, sessionId, urls, saved = urls, forget = false, retryMs, nowMs }) => {
   const kept = linksOf(state, sessionId);
-  const links = Object.fromEntries(urls.filter((url) => record(kept[url])).map((url) => [url, kept[url]]));
+  const links = forget
+    ? Object.fromEntries(saved.filter((url) => record(kept[url])).map((url) => [url, kept[url]]))
+    : { ...kept };
   const due = urls.filter((url) => !links[url] || (links[url].ok !== true && nowMs - Number(links[url].at || 0) >= retryMs));
   for (const url of due) links[url] = { at: nowMs, ok: false, pending: true };
-  return { state: { sessionId, links }, due };
+  const changed = due.length > 0 || state?.sessionId !== sessionId || Object.keys(links).length !== Object.keys(kept).length;
+  return { state: { sessionId, links }, due, changed };
 };
 
 /** Records how a claimed read ended; a link forgotten meanwhile stays forgotten. */
 export const settleSessionLinkRead = ({ state, sessionId, url, ok, error, nowMs }) => {
   const links = linksOf(state, sessionId);
   if (!record(links[url])) return state;
-  const entry = { at: nowMs, ok: ok === true, ...(ok !== true && error ? { error: String(error).slice(0, 300) } : {}) };
+  const entry = { at: nowMs, ok: ok === true, ...(ok !== true && error ? { error: String(error).slice(0, LINK_READ_ERROR_CHARS) } : {}) };
   return { sessionId, links: { ...links, [url]: entry } };
 };

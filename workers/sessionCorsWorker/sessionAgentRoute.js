@@ -502,9 +502,6 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   if (!optOuts.ok) return json({ error: OPT_OUTS_UNAVAILABLE }, 503);
   const refused = await countQuestion();
   if (refused) return refused;
-  // The session's saved links that aren't sources yet are read in the background:
-  // this answer goes ahead without them, and a later one has them.
-  deps.readSessionLinks?.({ env, config, slug });
   const optedOut = new Set(optOuts.body.addresses);
   const { material, answersUnavailable, contextLeftOut, lockedTo } = await gatherMaterial({
     env, slug, config, setting, address, scopes: currentScopes, asker, access, optedOut, contextLimits, deps,
@@ -522,6 +519,10 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
       adminOnly: asker.audience === 'admin' || isListedResultsBuilder(config, address),
     })
     : null;
+  // The session's saved links that aren't sources yet are read in the background,
+  // started once the answer is ready so its page fetches never hold up this one's
+  // own reads and provider call; a later answer has them.
+  deps.readSessionLinks?.({ env, config, slug });
   const notes = [
     answersUnavailable === 'too_many'
       ? `Members’ answers weren’t read: this session stores more than ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString('en-US')} question and answer versions, the most the Session Agent can read at once.`

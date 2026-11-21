@@ -140,9 +140,10 @@ export const forgetSessionConfig = (env, slug) => {
 
 // Calls that leave the config as it was: reads, backup marks and exports, the
 // per-answer and per-view journals, group joins and changes (the group object
-// keeps them), Session Agent opt-outs and people's names. Every other call drops this copy.
-// (backup/status can finish a restore, so it drops it.)
-const KEEPS_CONFIG = new Set(['current', 'backup/write-revision', 'backup/export', 'diagnostics', 'storage/publish', 'worker-groups/mutate']);
+// keeps them), Session Agent opt-outs, people's names and which saved links were read.
+// Every other call drops this copy. (backup/status can finish a restore, so it drops it.)
+const KEEPS_CONFIG = new Set(['current', 'backup/write-revision', 'backup/export', 'diagnostics', 'storage/publish', 'worker-groups/mutate',
+  'context-source/claim-links', 'context-source/settle-link']);
 const KEEPS_CONFIG_PREFIXES = ['agent-submit/', 'debate-atlas/', 'risk-matrix/', 'results-job/', 'session-feedback/', 'session-agent/', 'session-agent-history/', 'session-names/', 'agent-sign-in/'];
 const keepsConfig = (path) => KEEPS_CONFIG.has(path) || KEEPS_CONFIG_PREFIXES.some((prefix) => String(path).startsWith(prefix));
 
