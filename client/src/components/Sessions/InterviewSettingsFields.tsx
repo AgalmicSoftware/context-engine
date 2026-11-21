@@ -70,7 +70,7 @@ const DATA_NOTE_HELP =
   'Optional. A sentence or two shown to participants beside research sharing and hidden AI drafts, such as who funds the study and where the data goes. Plain text; https links open in a new tab. Up to 300 characters, saved in the session’s public settings.';
 const VOICE_MODEL_HELP = `The OpenAI model that holds voice interviews; each costs the same per minute. ${GPT_LIVE_1_1_MODEL} is the default: OpenAI says it pronounces, keeps its accent and transcribes better than ${PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL} in multilingual conversations. A session’s Worker that is too old for ${GPT_LIVE_1_1_MODEL} doesn’t list it and runs ${PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL} by default. The gpt-realtime models are older. The session’s OpenAI key must have access to the model.`;
 const VOICE_CONTEXT_HELP =
-  'Whether the voice interviewer is given the session’s notes, links and readable sources. Off by default: a long source slows every reply. Drafting answers after the interview is unaffected.';
+  'Whether the voice interviewer is given the session’s notes, links and readable sources. Off by default. Drafting answers after the interview is unaffected.';
 export const VOICE_CONTEXT_NEEDS_NEWER_WORKER =
   'This session’s Worker doesn’t take this setting and refuses every save while it is on. Turn it off, then save.';
 export const GPT_LIVE_1_1_NEEDS_NEWER_WORKER = `This session’s Worker doesn’t take ${GPT_LIVE_1_1_MODEL} and refuses every save while it is set. Choose ${PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL}, then save.`;
