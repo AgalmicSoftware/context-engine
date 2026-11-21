@@ -5,8 +5,8 @@ import { ThemeContext, darkTheme, soften, useTheme } from './debateHudTheme';
 import { getDemoAvatarByName } from '../../../utilities/ui/demoAvatars.js';
 import { generateBlockieDataUrl } from '../../../utilities/ui/blockieAvatars.js';
 import { buildPublicRoute } from '../../../utilities/ui/publicUrl.js';
-import { COMPASS_NARROW_BELOW_PX, NARROW_COMPASS_GEOMETRY, WIDE_COMPASS_GEOMETRY } from './compassNarrowLayout';
-import { NarrowCompassEdgeLabels, NarrowCompassPointLabel } from './CompassNarrowLabels';
+import { compassLayoutFor, layoutPointLabels } from './compassNarrowLayout';
+import { CompassEdgeLabels, CompassPointLabel } from './CompassNarrowLabels';
 
 type CompassPoint = {
   name: string;
@@ -143,22 +143,23 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
     return () => window.removeEventListener('keydown', handler);
   }, [isFullscreen]);
 
-  // Drawn narrow, as on a phone, the chart has its own geometry: scaled down, the wide one's text was a few
-  // pixels tall and its side labels ran off both edges.
-  const [narrow, setNarrow] = useState(false);
+  // The chart is laid out for the width it is drawn at: narrow, as on a phone, it has its own geometry, and at
+  // every width its text is sized to stay readable once the drawing is scaled. Full screen draws it anew.
+  const [drawnWidth, setDrawnWidth] = useState(0);
   useEffect(() => {
     const wrapper = wrapperRef.current;
     if (!wrapper || typeof ResizeObserver === 'undefined') return undefined;
     const read = () => {
-      const width = wrapper.getBoundingClientRect().width;
-      if (width > 0) setNarrow(width < COMPASS_NARROW_BELOW_PX);
+      const width = Math.round(wrapper.querySelector('svg')?.getBoundingClientRect().width || 0);
+      if (width > 0) setDrawnWidth(width);
     };
     read();
     const observer = new ResizeObserver(read);
     observer.observe(wrapper);
     return () => observer.disconnect();
-  }, []);
-  const { svgW, svgH, padX, padY, edgeFontPx } = narrow ? NARROW_COMPASS_GEOMETRY : WIDE_COMPASS_GEOMETRY;
+  }, [isFullscreen]);
+  const { narrow, geometry, pointFontPx } = compassLayoutFor(drawnWidth);
+  const { svgW, svgH, padX, padY, edgeFontPx } = geometry;
   const cW = svgW - 2 * padX;
   const cH = svgH - 2 * padY;
   const cx = padX + cW / 2;
@@ -251,46 +252,6 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
     setTooltipState(null);
   };
 
-  const splitEdgeLabel = (label: string) => {
-    const normalized = String(label || '')
-      .trim()
-      .replace(/\s+/g, ' ');
-    if (!normalized.includes(' ')) return [normalized];
-
-    const midpoint = normalized.length / 2;
-    const spaces = [...normalized.matchAll(/ /g)].map((match) => match.index).filter((index) => index !== undefined);
-    const splitAt = spaces.reduce(
-      (closest, index) => (Math.abs(index - midpoint) < Math.abs(closest - midpoint) ? index : closest),
-      spaces[0],
-    );
-
-    return [normalized.slice(0, splitAt).trim(), normalized.slice(splitAt + 1).trim()].filter(Boolean);
-  };
-
-  const renderSideLabel = (label: string, x: number, anchor: 'start' | 'middle' | 'end') => {
-    const lines = splitEdgeLabel(label);
-    if (lines.length === 1) {
-      return (
-        <text x={x} y={cy + 4} textAnchor={anchor} style={edgeLabelStyle}>
-          <title>{label}</title>
-          {lines[0]}
-        </text>
-      );
-    }
-
-    return (
-      <text x={x} textAnchor={anchor} style={edgeLabelStyle}>
-        <title>{label}</title>
-        <tspan x={x} y={cy - 6}>
-          {lines[0]}
-        </tspan>
-        <tspan x={x} y={cy + 14}>
-          {lines[1]}
-        </tspan>
-      </text>
-    );
-  };
-
   // The four quadrants in the arrangement people know from the familiar four-colour compass picture: red and
   // blue above, green and purple below, each strong enough to be told apart at a glance. The hues are each
   // theme's own chart colours.
@@ -342,6 +303,25 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
     ): layout is typeof layout & {
       avatarInfo: NonNullable<typeof layout.avatarInfo>;
     } => Boolean(layout.avatarInfo?.url),
+  );
+
+  // Names that always show are placed first, so one shown on hover never moves them.
+  const labelFontPx = (point: CompassPoint) => pointFontPx + (point.type === 'debater' ? 1 : 0);
+  const labelBoxes = layoutPointLabels(
+    pointLayouts
+      .filter((layout) => layout.showInlineLabel)
+      .sort((a, b) => Number(b.point.type === 'debater') - Number(a.point.type === 'debater'))
+      .map(({ point, px, py, size }) => ({
+        key: point.name,
+        name: point.name,
+        px,
+        py,
+        size,
+        fontPx: labelFontPx(point),
+      })),
+    pointLayouts,
+    { left: padX, top: padY, right: padX + cW, bottom: padY + cH },
+    narrow ? 0.55 : 0.45,
   );
 
   const getShape = (point: CompassPoint, px: number, py: number, size: number) => {
@@ -692,30 +672,17 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
 
           <rect x={padX} y={padY} width={cW} height={cH} fill="none" stroke="var(--ce-document-text)" strokeWidth="2" />
 
-          {narrow ? (
-            <NarrowCompassEdgeLabels
-              xAxis={compass.xAxis}
-              yAxis={compass.yAxis}
-              geometry={NARROW_COMPASS_GEOMETRY}
-              style={edgeLabelStyle}
-            />
-          ) : (
-            <>
-              <text x={cx} y={padY - 16} textAnchor="middle" style={edgeLabelStyle}>
-                <title>{compass.yAxis.top}</title>
-                {compass.yAxis.top}
-              </text>
-              <text x={cx} y={padY + cH + 28} textAnchor="middle" style={edgeLabelStyle}>
-                <title>{compass.yAxis.bottom}</title>
-                {compass.yAxis.bottom}
-              </text>
-              {renderSideLabel(compass.xAxis.left, padX - 12, 'end')}
-              {renderSideLabel(compass.xAxis.right, padX + cW + 12, 'start')}
-            </>
-          )}
+          <CompassEdgeLabels
+            xAxis={compass.xAxis}
+            yAxis={compass.yAxis}
+            geometry={geometry}
+            narrow={narrow}
+            style={edgeLabelStyle}
+          />
 
           {pointLayouts.map(
             ({ point, px, py, pointComment, isSelected, isActive, showInlineLabel, size, activeSize }) => {
+              const labelBox = labelBoxes.get(point.name);
               return (
                 <g
                   key={point.name}
@@ -737,44 +704,13 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
                     {getShape(point, px, py, isActive ? activeSize : size)}
                   </g>
 
-                  {showInlineLabel && narrow && (
-                    <NarrowCompassPointLabel
-                      name={point.name}
+                  {showInlineLabel && labelBox && (
+                    <CompassPointLabel
+                      box={labelBox}
                       color={point.color}
                       bold={point.type === 'debater'}
-                      px={px}
-                      py={py}
-                      size={size}
-                      bounds={{ left: padX, top: padY, right: padX + cW, bottom: padY + cH }}
-                      others={pointLayouts.filter((other) => other.point !== point)}
+                      fontPx={labelFontPx(point)}
                     />
-                  )}
-                  {showInlineLabel && !narrow && (
-                    <g>
-                      <rect
-                        x={px - point.name.length * 3.5 - 4}
-                        y={py - size - 22}
-                        width={point.name.length * 7 + 8}
-                        height={16}
-                        rx={3}
-                        fill="color-mix(in srgb, var(--ce-document-canvas) 92%, transparent)"
-                        stroke={point.color}
-                        strokeWidth={0.8}
-                      />
-                      <text
-                        x={px}
-                        y={py - size - 10}
-                        textAnchor="middle"
-                        style={{
-                          fontSize: point.type === 'debater' ? '11px' : '10px',
-                          fontWeight: point.type === 'debater' ? 700 : 600,
-                          fill: 'var(--ce-document-text)',
-                          pointerEvents: 'none',
-                        }}
-                      >
-                        {point.name}
-                      </text>
-                    </g>
                   )}
                 </g>
               );
