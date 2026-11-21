@@ -85,6 +85,7 @@ import DebateMapGeneratedSummary from './DebateMapGeneratedSummary';
 import DebateMapSplit from './DebateMapSplit';
 
 import { createTextMeasurer, fitPackedAtlasCirclesToBox, fitPackedAtlasLabel } from './packedAtlasFit';
+import { QuadraticQuestionPreview } from './QuadraticQuestionPreview';
 
 const StandalonePoliticalCompass = React.lazy(() =>
   import('../DemoViews/DebateHUD/PoliticalCompassView').then((module) => ({
@@ -1495,12 +1496,7 @@ const Modal = ({
     }
 
     if (questionType === 'quadratic')
-      return (
-        <div>
-          {String(question.voiceCredits ?? 99)} voice credits · signed votes cost their square.{' '}
-          {getQuestionOptions(question).join(' · ')}
-        </div>
-      );
+      return <QuadraticQuestionPreview credits={question.voiceCredits} options={getQuestionOptions(question)} />;
     if (questionType === 'multichoice') {
       const options = getQuestionOptions(question);
       if (options.length === 0) {
