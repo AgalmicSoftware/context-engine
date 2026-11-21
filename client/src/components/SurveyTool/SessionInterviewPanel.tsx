@@ -166,11 +166,13 @@ export default function SessionInterviewPanel({
   const draftingPicksRef = useRef<InterviewPrefillGroupPick[]>([]);
   const readiness = useInterviewReadiness(resolvedWorkerUrl, sessionSlug);
   // What the interviewer may know: the context this participant may read.
+  // Only where the session turns it on: a long source slowed every voice reply.
+  const voiceSessionContext = normalizeInterviewSettings(sessionConfig?.interviewMode).voiceSessionContext;
   const sessionContextPrompt = useSessionContextPrompt({
     sessionSlug,
     sessionConfig,
     account,
-    totalChars: SESSION_CONTEXT_LIMIT,
+    totalChars: voiceSessionContext ? SESSION_CONTEXT_LIMIT : 0,
   });
   const interviewOpening = useInterviewOpening({
     config: sessionConfig,

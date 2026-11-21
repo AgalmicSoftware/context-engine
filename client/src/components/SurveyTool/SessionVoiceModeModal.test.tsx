@@ -1590,6 +1590,27 @@ describe('SessionVoiceModeModal', () => {
     },
   );
 
+  it('gives the voice interviewer the session context only where the session turns it on', async () => {
+    const sessionContext = { title: 'Salon', paragraphs: ['Background notes on reverse alignment.'], links: [] };
+    for (const [interviewMode, given] of [
+      [{}, false],
+      [{ voiceSessionContext: true }, true],
+    ] as const) {
+      mockedStartSessionRealtimeInterview.mockClear();
+      const view = render(
+        <SessionVoiceModeModal {...baseProps} mode="interview" sessionConfig={{ interviewMode, sessionContext }} />,
+      );
+      // The context block is built from the notes after a render; let it settle before starting.
+      await act(async () => {});
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+      await waitFor(() => expect(mockedStartSessionRealtimeInterview).toHaveBeenCalled());
+      const { instructions } = mockedStartSessionRealtimeInterview.mock.calls[0][0];
+      expect(instructions.includes('Background notes on reverse alignment.')).toBe(given);
+      expect(instructions.includes('<session_context>')).toBe(given);
+      view.unmount();
+    }
+  });
+
   it('gives the voice interviewer only undrafted unanswered questions, or every question once all are answered', async () => {
     mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
       options.onRecordingState?.('recording');

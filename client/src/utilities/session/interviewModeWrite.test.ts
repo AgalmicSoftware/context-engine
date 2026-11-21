@@ -20,4 +20,9 @@ describe('withoutNewInterviewDefaults', () => {
     });
     expect(withoutNewInterviewDefaults({ dataNote: 'Funded study.' })).toEqual({ dataNote: 'Funded study.' });
   });
+
+  it('saves the voice context switch only when it is on, so older Workers still save', () => {
+    expect(withoutNewInterviewDefaults({ voiceSessionContext: false })).toEqual({});
+    expect(withoutNewInterviewDefaults({ voiceSessionContext: true })).toEqual({ voiceSessionContext: true });
+  });
 });

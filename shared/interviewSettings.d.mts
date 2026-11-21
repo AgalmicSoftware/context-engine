@@ -23,6 +23,7 @@ export type InterviewSettings = {
   recordingQuestionCount: number;
   recordingQuestionTiming: 'chunk' | 'end';
   dataNote: string;
+  voiceSessionContext: boolean;
 };
 export const MAX_RECORDING_QUESTION_COUNT: number;
 export const MAX_DATA_NOTE_CHARS: number;

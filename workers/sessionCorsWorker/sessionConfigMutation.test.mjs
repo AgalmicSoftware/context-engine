@@ -626,6 +626,24 @@ test('set-config keeps a note on where the data goes only as text of up to 300 c
   }
 });
 
+test('set-config takes the voice interview context switch only as a boolean', () => {
+  const apply = (voiceSessionContext) => applySessionConfigMutation({
+    existingConfig: cloneJson(profileBearingConfig),
+    mutation: { kind: 'set-config', incomingConfig: { interviewMode: { enabled: true, voiceSessionContext } } },
+    slug: 'session-a',
+  });
+  for (const voiceSessionContext of [true, false]) {
+    const result = apply(voiceSessionContext);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.config.interviewMode.voiceSessionContext, voiceSessionContext);
+  }
+  for (const voiceSessionContext of ['true', 1, null]) {
+    const result = apply(voiceSessionContext);
+    assert.equal(result.ok, false, JSON.stringify(voiceSessionContext));
+    assert.equal(result.status, 400);
+  }
+});
+
 test('set-config accepts the switch that shows fidelity results in Results only as a boolean', () => {
   const apply = (showFidelityResults) => applySessionConfigMutation({
     existingConfig: cloneJson(profileBearingConfig),

@@ -48,6 +48,7 @@ import {
   readWorkerSessionAgentOptions,
   readWorkerKeepsDraftText,
   readWorkerTakesDataNote,
+  readWorkerTakesVoiceContext,
   readWorkerTakesGptLive11,
   readWorkerReleaseLabel,
   readWorkerKeepsContextCards,
@@ -254,6 +255,8 @@ const SessionSettingsPage = ({
   // Whether it accepts the note on where research data goes; an older one would refuse the whole save.
   // On-chain sessions save to the registry, which takes it.
   const [workerTakesDataNote, setWorkerTakesDataNote] = useState(false);
+  // Whether it takes the voice interview's context setting; an older one would refuse the whole save.
+  const [workerTakesVoiceContext, setWorkerTakesVoiceContext] = useState(false);
   // Whether it takes gpt-live-1.1 for interviews; an older one would refuse the whole save, so it isn't listed there.
   // Null while unknown.
   const [workerTakesGptLive11, setWorkerTakesGptLive11] = useState<boolean | null>(null);
@@ -270,6 +273,7 @@ const SessionSettingsPage = ({
     setWorkerRunsWorkersAi(false);
     setWorkerHasAnalysisCard(false);
     setWorkerTakesDataNote(false);
+    setWorkerTakesVoiceContext(false);
     setWorkerTakesGptLive11(null);
     setWorkerAgentOptions({ recordChats: false, anyoneCanAsk: false });
     void readWorkerReleaseLabel(workerOrigin, sessionSlug, fetchImpl).then((release) => {
@@ -298,6 +302,9 @@ const SessionSettingsPage = ({
     });
     void readWorkerTakesDataNote(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
       if (!stale) setWorkerTakesDataNote(takes);
+    });
+    void readWorkerTakesVoiceContext(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
+      if (!stale) setWorkerTakesVoiceContext(takes);
     });
     void readWorkerTakesGptLive11(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
       if (!stale) setWorkerTakesGptLive11(takes);
@@ -659,6 +666,7 @@ const SessionSettingsPage = ({
           groupCeilingSupported={workerOffersGroupJoinChoices(saved)}
           draftTextSupported={workerKeepsDraftText !== false}
           dataNoteSupported={onChain || workerTakesDataNote}
+          voiceContextSupported={onChain || workerTakesVoiceContext}
           gptLive11Supported={onChain ? null : workerTakesGptLive11}
         />
         <SetupResultsSection
