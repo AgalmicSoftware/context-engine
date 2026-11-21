@@ -1235,7 +1235,15 @@ h1 {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+// The status stays on one line and drops under a long name: wrapped inside its rounded border it drew as a tall
+// oval.
+.supportedResourceHeader .aiSponsoredStatus {
+  flex: none;
+  white-space: nowrap;
 }
 
 .supportedResourceName {
@@ -1263,11 +1271,25 @@ h1 {
   color: var(--ce-settings-muted-text);
 }
 
+// The active session in a resource's card: its name over a line on what the status means, in a quiet block with
+// the card's own corners.
 .supportedResourcePrimarySession {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
   min-width: 0;
+  padding: 8px 10px;
+  border-left: 3px solid color-mix(in srgb, var(--ce-action-accent) 55%, transparent);
+  border-radius: var(--ce-radius-6);
+  background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
+}
+
+.supportedResourceActiveName {
+  color: var(--ce-settings-text);
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .supportedResourceOtherSessions {

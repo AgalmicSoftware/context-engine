@@ -927,7 +927,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       expect(screen.getByText('Connect wallet')).toBeInTheDocument();
       expect(screen.getAllByText('Sponsored').length).toBeGreaterThan(0);
       expect(screen.getByRole('link', { name: 'Open session Demo Session' })).toBeInTheDocument();
-      const sponsoredSessionDetail = screen.getAllByText(/A sponsor key is configured/i)[0];
+      const sponsoredSessionDetail = screen.getAllByText(/The session pays for this/i)[0];
       expect(sponsoredSessionDetail.parentElement).toHaveTextContent(/Demo Session/i);
       expect(screen.queryByText('configured here')).not.toBeInTheDocument();
     });
@@ -978,7 +978,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       );
       expect(await screen.findByText('Sponsored')).toBeInTheDocument();
       expect(screen.queryByText('Not sponsored')).not.toBeInTheDocument();
-      expect(screen.getByText(/Access follows the session permissions/)).toBeInTheDocument();
+      expect(screen.getByText(/Who may use it follows the session’s own rules/)).toBeInTheDocument();
       expect(ref.current.getDisplaySessionConfig(slug).sessionModeProfile).toEqual(config.sessionModeProfile);
       expect(global.fetch).toHaveBeenCalledWith(
         `${origin}/resource-presence`,
@@ -1502,7 +1502,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.queryByText(/Gate status is evaluated against the active session/i)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open session Demo Session' })).toBeInTheDocument();
     const sponsoredSessionDetail = screen.getAllByText(
-      /Sponsored key is available for the active session|A sponsor key is configured/i,
+      /Sponsored key is available for the active session|The session pays for this/i,
     )[0];
     expect(sponsoredSessionDetail.parentElement).toHaveTextContent(/Demo Session/i);
     expect(screen.queryByText('configured here')).not.toBeInTheDocument();

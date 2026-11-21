@@ -76,13 +76,13 @@ export const formatSponsoredStatusMeta = (
     };
   const status = entry?.status === 'unresolved' ? 'error' : entry?.status || 'no-gate';
   if (!hasActiveSponsor) {
-    return { label: 'Not sponsored', tone: 'muted', detail: 'No sponsor key is configured for the active session.' };
+    return { label: 'Not sponsored', tone: 'muted', detail: 'This session does not pay for this.' };
   }
   if (status === 'worker-managed') {
     return {
       label: 'Sponsored',
       tone: 'ok',
-      detail: 'A sponsor key is configured. Access follows the session permissions.',
+      detail: 'The session pays for this. Who may use it follows the session’s own rules.',
     };
   }
   if (status === 'granted') {
@@ -119,13 +119,11 @@ export const formatSponsoredStatusMeta = (
     return {
       label: 'Sponsored',
       tone: 'ok',
-      detail:
-        gateKind === 'sbt'
-          ? 'A sponsor key is configured and does not require an SBT gate.'
-          : 'A sponsor key is configured and does not require an additional session gate.',
+      // Says no more than is known: this status also shows before the access check has answered.
+      detail: 'The session pays for this.',
     };
   }
-  return { label: 'Not sponsored', tone: 'muted', detail: 'No sponsor key is configured for the active session.' };
+  return { label: 'Not sponsored', tone: 'muted', detail: 'This session does not pay for this.' };
 };
 
 export const buildLoginSettingsSponsorshipCard = ({

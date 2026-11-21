@@ -48,7 +48,14 @@ describe('LoginSettingsResourceSummary', () => {
     const card = screen.getByText('RPC').closest('div');
     expect(screen.getByText('Not sponsored')).toBeInTheDocument();
     const activeSessionDetail = screen.getByText('No active-session RPC sponsor.');
-    expect(activeSessionDetail.parentElement).toHaveTextContent('General No active-session RPC sponsor.');
+    // The active session is a plain block: its name, then the status line. Not a pill, which drew two lines of
+    // text as a stretched oval.
+    const active = screen.getByTestId('ce-settings-resource-rpc-active');
+    expect(active).toContainElement(activeSessionDetail);
+    expect(active.firstElementChild).toHaveTextContent('General');
+    expect(active.children).toHaveLength(2);
+    expect(active.className).toContain('supportedResourcePrimarySession');
+    expect(active.querySelector('[class*="sessionPill"]')).toBeNull();
     expect(screen.queryByText('not configured here')).not.toBeInTheDocument();
     expect(screen.queryByText('Edge')).not.toBeInTheDocument();
 
