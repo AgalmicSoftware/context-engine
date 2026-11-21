@@ -23,4 +23,18 @@ describe('Modals module styles', () => {
     expect(png[25]).toBe(6);
     expect(png.length).toBeLessThan(600 * 1024);
   });
+
+  it('lets a phone slide fill a fixed-height pane: the picture takes the room the copy leaves', () => {
+    const phone = stylesheet.slice(stylesheet.indexOf('// Phone slides give the copy the full pane width'));
+    const block = phone.slice(0, phone.indexOf('\n@container ce-theme style(--ce-layout-profile: minimal-app)'));
+    const [plain, fixed] = block.split('@container ce-theme style(--ce-welcome-slide-mode: fixed-window)');
+
+    expect(plain).toMatch(/@media \(max-width: 465px\)/);
+    // A size container needs the pane's set height, so it stays inside the fixed-height rules.
+    expect(plain).not.toMatch(/container-type|cqh/);
+    expect(fixed).toMatch(/\.welcomeSlideLayout\s*{[^}]*container-type:\s*size;/);
+    expect(fixed).toMatch(/flex:\s*1 1 clamp\([^;]*;\s*height:\s*auto !important;/);
+    // The copy never drops under the reader's own text size, and grows only as far as the pane's height allows.
+    expect(fixed).toMatch(/font-size:\s*clamp\(1rem, min\([\d.]+cqh, [^)]*\), 1\.5rem\);/);
+  });
 });

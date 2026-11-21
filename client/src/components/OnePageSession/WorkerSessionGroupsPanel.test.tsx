@@ -860,7 +860,7 @@ describe('WorkerSessionGroupsPanel', () => {
       />,
     );
 
-    expect(screen.getByText(/exact, validated Worker Groups profile/i)).toBeInTheDocument();
+    expect(screen.getByText(/session’s settings could not be read/i)).toBeInTheDocument();
     expect(mockGetWorkerSessionToken).not.toHaveBeenCalled();
     expect(mockMembershipPanel).not.toHaveBeenCalled();
     expect(mockPostSignedAdminWorkerRequest).not.toHaveBeenCalled();
@@ -888,7 +888,7 @@ describe('WorkerSessionGroupsPanel', () => {
       />,
     );
 
-    expect(screen.getByText(/exact, validated Worker Groups profile/i)).toBeInTheDocument();
+    expect(screen.getByText(/session’s settings could not be read/i)).toBeInTheDocument();
     expect(mockGetWorkerSessionToken).not.toHaveBeenCalled();
     expect(mockMembershipPanel).not.toHaveBeenCalled();
     expect(mockPostSignedAdminWorkerRequest).not.toHaveBeenCalled();

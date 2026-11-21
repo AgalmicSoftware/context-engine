@@ -734,6 +734,31 @@ input[type='radio']:checked:after {
     font-size: 1rem;
     line-height: 1.4;
   }
+
+  // A fixed-height pane is filled: the type grows with the room the pane has and the picture takes what the copy
+  // leaves, so no empty band sits above the arrows. Only here, where the pane's height is set: a size container
+  // without one would collapse.
+  @container ce-theme style(--ce-welcome-slide-mode: fixed-window) {
+    .welcomeSlideEmbed .welcomeSlideLayout {
+      // Lets the copy size itself from the pane's height (cqh), which differs by theme.
+      container-type: size;
+    }
+
+    .welcomeSlideEmbed .welcomeSlideLayout .welcomeSlideMediaButton:not([data-slide-key='intro']) {
+      flex: 1 1 clamp(88px, 25vw, 116px);
+      height: auto !important;
+      min-height: 48px;
+    }
+
+    .welcomeSlideLayout .welcomeSlideBulletItems {
+      gap: clamp(12px, 3.5cqh, 20px);
+    }
+
+    .welcomeSlideLayout .welcomeSlideBulletText {
+      // Never under the reader's own text size; larger where the pane is tall and wide enough to hold it.
+      font-size: clamp(1rem, min(5.6cqh, 3.4vw + 7px), 1.5rem);
+    }
+  }
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
