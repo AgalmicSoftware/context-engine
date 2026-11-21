@@ -99,7 +99,7 @@ export const normalizeInterviewSettings = (value = {}) => {
     recordingQuestionTiming: source.recordingQuestionTiming === 'chunk' ? 'chunk' : 'end',
     dataNote: typeof source.dataNote === 'string' ? source.dataNote.trim().slice(0, MAX_DATA_NOTE_CHARS) : '',
     // Whether the voice interviewer is given the session's context (notes, links, sources). Off until
-    // set: a long source slowed every reply, and summaries for the voice come later.
+    // set; summaries for the voice come later.
     voiceSessionContext: source.voiceSessionContext === true,
   };
 };
