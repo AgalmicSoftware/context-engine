@@ -3387,6 +3387,11 @@ Signed login/bootstrap requests:
   (`/agent/interview-brief` remains a compatibility alias)
   - Public, CORS-scoped, and disabled when `interviewModeEnabled=false` or
     `interviewMode.enabled=false`.
+  - It reads the questions' text a hundred at a time through the storage
+    route's batch read (one bulk storage read), and each question still
+    passes that route's own access check; a question the batch can't carry
+    is read on its own. It reads no further than the catalog's last
+    question.
   - Without `ticket`, it lists only questions a signed-out visitor may read.
     A session that lets no signed-out visitor list its questions answers 401
     with `reason: "sign_in_required"` instead of asking for a retry, and an
