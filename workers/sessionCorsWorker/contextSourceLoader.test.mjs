@@ -460,7 +460,7 @@ test('results analysis gives the AI the participants’ context, outside the sou
   assert.match(prompt, /never in this background/);
   assert.match(prompt, /The essay says institutions adapt\./);
   assert.doesNotMatch(prompt, /SECRET/);
-  const snapshot = prompt.slice(prompt.indexOf('Session input:'), prompt.indexOf('The session\'s hosts gave'));
+  const snapshot = prompt.slice(prompt.indexOf('Session input:'), prompt.indexOf('This is the session\'s background'));
   assert.doesNotMatch(snapshot, /institutions adapt/, 'context stays out of the analysed snapshot');
   assert.equal(result.draft.source.signature.startsWith('sha256:'), true);
   // The same responses with no context give the same source signature.
