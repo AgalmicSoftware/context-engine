@@ -390,6 +390,11 @@ export const dispatchAdminRequest = async ({
       mutation: { kind: 'set-config', incomingConfig: incoming },
       deps,
     });
+    // A save that may change the session's saved links reads the new ones, after this reply.
+    const sent = body?.config && typeof body.config === 'object' ? body.config : {};
+    if (mutationResult?.status === 200 && ['sessionContext', 'sessionLinkReading'].some((key) => Object.hasOwn(sent, key))) {
+      deps?.readSessionLinks?.({ env, slug: targetSlug, afterSave: true });
+    }
     return deps?.json?.(
       mutationResult?.body || { error: 'Session config mutation failed.' },
       mutationResult?.status || 503,

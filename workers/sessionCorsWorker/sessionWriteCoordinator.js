@@ -41,6 +41,7 @@ import { runQueuedAutomaticResultsAnalysisJob, valueLooksEncrypted } from './res
 import { publishCloudflareOwnedStorageMetadata, scanLegacyStorageOwnerIds, setCloudflareStorageResourceHidden } from './storageRouteExecution.js';
 import { storeContextCard } from './contextCard.js';
 import { finishContextPdfReading, removeContextSource } from './contextSourceRoute.js';
+import { SESSION_LINK_READING_SETTINGS as LINK_READING, claimSessionLinkReads, settleSessionLinkRead } from '../../shared/sessionLinkReading.mjs';
 import { dispatchResultsBuildStore } from './resultsBuildStore.js';
 import { nextResultsJobAt, readResultsJob, runResultsJobs, startResultsJob } from './resultsJobs.js';
 import { RESULTS_JOB_RUNNERS } from './resultsJobRunners.js';
@@ -121,6 +122,8 @@ const CONTEXT_PDF_READING_LEASE_MS = 5 * 60 * 1000;
 // Kept once a reading of a file is stored, until the file is removed: its adder's one
 // reading is refused here even while the file's KV row doesn't show that reading yet.
 const CONTEXT_PDF_HAS_READING_PREFIX = 'context-pdf-has-reading:';
+// Which of the session's saved links the Worker has tried to read (sessionLinkReading.js).
+const SESSION_LINK_READS_KEY = 'session-link-reads';
 const WORKER_GROUP_CAPACITY_META_KEY = 'worker-group-capacity-meta-v3';
 const WORKER_GROUP_CAPACITY_GROUP_PREFIX = 'worker-group-capacity-group-v3:';
 const WORKER_GROUP_CAPACITY_MEMBER_PREFIX = 'worker-group-capacity-member-v3:';
@@ -2840,6 +2843,23 @@ export class SessionWriteCoordinator {
           const result = await removeContextSource({ env: this.env, slug, id, readingIds: payload.readingIds, markWrite });
           if (result.status === 200) await this.state.storage.delete(readKey);
           return jsonResponse(result.body, result.status);
+        }
+        // One claim at a time, so two questions at once never read the same link twice.
+        if (operation === 'claim-links' || operation === 'settle-link') {
+          const nowMs = Number(this.now()) || Date.now();
+          const state = await this.state.storage.get(SESSION_LINK_READS_KEY);
+          const sessionId = toTrimmedString(payload?.sessionId);
+          if (operation === 'settle-link') {
+            await this.state.storage.put(SESSION_LINK_READS_KEY, settleSessionLinkRead({
+              state, sessionId, url: toTrimmedString(payload?.url), ok: payload?.ok === true, error: payload?.error, nowMs,
+            }) || {});
+            return jsonResponse({ ok: true });
+          }
+          const urls = Array.isArray(payload?.urls) ? [...new Set(payload.urls.map(toTrimmedString).filter(Boolean))].slice(0, LINK_READING.links.max) : [];
+          const retryMs = Number.isSafeInteger(payload?.retryMs) && payload.retryMs > 0 ? payload.retryMs : LINK_READING.retryMinutes.default * 60_000;
+          const claimed = claimSessionLinkReads({ state, sessionId, urls, retryMs, nowMs });
+          await this.state.storage.put(SESSION_LINK_READS_KEY, claimed.state);
+          return jsonResponse({ ok: true, due: claimed.due });
         }
         if (operation === 'set-card') {
           await assertNoActiveBackupImport(this);

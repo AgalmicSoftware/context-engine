@@ -502,6 +502,9 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   if (!optOuts.ok) return json({ error: OPT_OUTS_UNAVAILABLE }, 503);
   const refused = await countQuestion();
   if (refused) return refused;
+  // The session's saved links that aren't sources yet are read in the background:
+  // this answer goes ahead without them, and a later one has them.
+  deps.readSessionLinks?.({ env, config, slug });
   const optedOut = new Set(optOuts.body.addresses);
   const { material, answersUnavailable, contextLeftOut, lockedTo } = await gatherMaterial({
     env, slug, config, setting, address, scopes: currentScopes, asker, access, optedOut, contextLimits, deps,

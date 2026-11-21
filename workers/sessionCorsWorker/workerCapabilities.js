@@ -56,6 +56,9 @@ export const FEATURES = Object.freeze([
   'session_agent_signed_out',
   'session_backup_v1',
   'session_feedback',
+  // The Worker reads the links saved in sessionContext as context sources, in the background;
+  // sessionLinkReading sets how. An older Worker refuses the key on save and reads no links itself.
+  'session_link_reading_v1',
   // GET /names, GET /names/me, POST /names/set and POST /admin/names/clear; namesEnabled turns them off.
   'session_names_v1',
   'storage_read_batch_v1',

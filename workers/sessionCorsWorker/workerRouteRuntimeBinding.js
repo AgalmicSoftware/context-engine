@@ -247,6 +247,7 @@ export const createWorkerRouteRuntimeWithWorkerDeps = ({
       getSessionSecrets: deps?.getSessionSecrets,
       arweaveUpload: executionServices.arweaveUpload,
       storageRoute: executionServices.storageRoute,
+      readSessionLinks: executionServices.readSessionLinks,
       authorizeCloudflareStorageResourceRead: deps?.authorizeCloudflareStorageResourceRead,
       readPublishedResultsAnalysisArtifact: deps?.readPublishedResultsAnalysisArtifact,
       evaluateResultsAnalysisViewerEligibility: deps?.evaluateResultsAnalysisViewerEligibility,

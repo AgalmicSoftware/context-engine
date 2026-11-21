@@ -20,6 +20,15 @@ files advertise `participant_context_v1`, and those that let them add links too
 advertise `participant_context_links_v1`. Workers that lock a link to some groups,
 as a file is locked, advertise `context_link_groups_v1`.
 
+The page links an admin saves in `sessionContext.links` become sources on
+their own: after the save, and when the Session Agent is asked, the Worker
+reads each one not read yet, in the background, as if an admin had added it
+for everyone. Only those saved links are read this way; a link someone adds,
+or an address in a file, an answer or a question, never is. The session
+setting `sessionLinkReading` turns this off or bounds it, and Workers that do
+it advertise `session_link_reading_v1`
+([Session Worker](session-cors-worker.md#session-storage-routes)).
+
 ## Limits
 
 One shared module (`shared/sessionContext.mjs`) sets the limits for the session

@@ -91,7 +91,8 @@ const offline = async () => { throw new Error('Unexpected network call'); };
 // One session's stores, kept across redeploys (its KV and its coordinator's
 // storage), served by whichever Worker is deployed, and the clients of the
 // people signed in to it. `provider` answers this Worker's AI calls.
-const drill = async ({ provider = offline } = {}) => {
+// `background`, a list, holds the work each request leaves for after its reply, as the runtime does.
+const drill = async ({ provider = offline, background = null } = {}) => {
   const config = JSON.parse(await fs.readFile(path.join(repo, 'tests/fixtures/worker-compat/previous-minor.json'), 'utf8')).config;
   let clock = Date.now();
   const now = jest.spyOn(Date, 'now').mockImplementation(() => clock);
@@ -117,7 +118,8 @@ const drill = async ({ provider = offline } = {}) => {
     };
     return env;
   };
-  const runtime = (create, env, fetch = offline) => create(env, { now: () => clock, fetch, rpcFetch: offline });
+  const runtime = (create, env, fetch = offline) => create(env, { now: () => clock, fetch, rpcFetch: offline,
+    ...(background ? { waitUntil: (work) => background.push(work) } : {}) });
   const session = { kv, deployed: null, signIns: 0 };
   // The Worker serving the session now; a redeploy swaps it under the same clients.
   session.deploy = (create, Coordinator, fetch) => {
@@ -868,6 +870,87 @@ describe('an atlas with question summaries, back on a released bundle', () => {
         expect(await session.readConfig()).toMatchObject({ sessionName: 'Renamed on the way back', debateAtlasQuestionAnalysis: true });
       } finally {
         globalThis.fetch = realFetch;
+        session.end();
+      }
+    }, 120000);
+  });
+});
+
+
+// The session's saved links, read by this Worker as context sources after a
+// save. A released bundle reads those sources as the ordinary rows they are,
+// refuses the setting, and reads no new link itself; back here, the setting
+// and the reading stand.
+describe('saved links read as sources, back on a released bundle', () => {
+  let tempDir;
+  const bundles = {};
+  const testResponse = globalThis.Response;
+  const refs = [['the pinned bundle', pinned], ['the live bundle', live]];
+  beforeAll(async () => {
+    globalThis.Response = (await fetch('data:,')).constructor;
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-way-back-links-'));
+    for (const ref of new Set(refs.map(([, ref]) => ref).filter(Boolean))) bundles[ref] = await loadBundle(ref, tempDir);
+  }, 120000);
+  afterAll(async () => {
+    globalThis.Response = testResponse;
+    if (tempDir) await fs.rm(tempDir, { recursive: true, force: true });
+  });
+  const ESSAY = 'https://essays.example/commons';
+  const BRIEF = 'https://briefs.example/water';
+
+  describe.each(refs)('on %s', (_name, ref) => {
+    (ref ? it : it.skip)('reads the links after the save answers, keeps the sources there, and reads again here', async () => {
+      const background = [];
+      const settled = async () => { while (background.length) await background.shift(); };
+      let release;
+      const held = new Promise((resolve) => { release = resolve; });
+      const fetched = [];
+      // The pages, through the Worker's guarded fetch; nothing else is reachable.
+      const provider = async (url) => {
+        fetched.push(String(url));
+        if (String(url) === ESSAY) await held;
+        if (![ESSAY, BRIEF].includes(String(url))) throw new Error(`Unexpected network call: ${url}`);
+        return new Response(`<html><head><title>${url}</title></head><body><p>The page at ${url}.</p></body></html>`,
+          { headers: { 'content-type': 'text/html; charset=utf-8' } });
+      };
+      const session = await drill({ provider, background });
+      try {
+        await session.kv.put(`session:${slug}:config`, JSON.stringify(session.config));
+        const [admin, person] = [session.client(owner), session.client(member)];
+        const sources = async (client = admin) => (await client.request('/storage/list?resource=docsContext&role=context', { auth: true })).items
+          .map((item) => item.metadata.tags.find((tag) => tag.name === 'CE-ContextUrl')?.value).sort();
+        const context = (links) => ({ sessionContext: { title: 'Background', paragraphs: ['Read these.'], links } });
+
+        // The save answers while the page is still loading; the source follows.
+        const current = session.current();
+        expect(await session.signed(current, 'set-config', { config: context([{ label: 'Essay', url: ESSAY }]) })).toEqual({ status: 200, body: { ok: true } });
+        expect(await sources()).toEqual([]);
+        release();
+        await settled();
+        expect(fetched).toEqual([ESSAY]);
+        expect(await sources()).toEqual([ESSAY]);
+        expect(await sources(person)).toEqual([ESSAY]);
+
+        // Back on the released bundle: the source is read as it is; a new link is not read; the setting is refused.
+        const previous = session.released(bundles[ref]);
+        expect(await sources(person)).toEqual([ESSAY]);
+        expect(await session.signed(previous, 'set-config', { config: context([{ label: 'Essay', url: ESSAY }, { label: 'Brief', url: BRIEF }]) }))
+          .toEqual({ status: 200, body: { ok: true } });
+        await settled();
+        expect(fetched).toEqual([ESSAY]);
+        const refused = await session.signed(previous, 'set-config', { config: { sessionLinkReading: { links: 1 } } });
+        expect([refused.status, refused.body.error]).toEqual([400, 'Unsupported worker-canonical session config field: sessionLinkReading.']);
+
+        // This Worker again: the first link isn't read twice, the setting bounds the rest, and the next save reads them.
+        const back = session.current();
+        expect(await session.signed(back, 'set-config', { config: { sessionLinkReading: { links: 1 } } })).toEqual({ status: 200, body: { ok: true } });
+        await settled();
+        expect(fetched).toEqual([ESSAY]);
+        expect(await session.signed(back, 'set-config', { config: { sessionLinkReading: null } })).toEqual({ status: 200, body: { ok: true } });
+        await settled();
+        expect(fetched).toEqual([ESSAY, BRIEF]);
+        expect(await sources(person)).toEqual([BRIEF, ESSAY]);
+      } finally {
         session.end();
       }
     }, 120000);

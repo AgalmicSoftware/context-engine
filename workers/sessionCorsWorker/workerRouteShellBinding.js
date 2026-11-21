@@ -653,6 +653,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             putSessionConfig: deps?.putSessionConfig,
             getSessionSecrets: deps?.getSessionSecrets,
             storageRoute: deps?.storageRoute,
+            readSessionLinks: deps?.readSessionLinks,
             readCoordinatedResultsAnalysisStatus: deps?.readCoordinatedResultsAnalysisStatus,
             reserveCoordinatedResultsAnalysis: deps?.reserveCoordinatedResultsAnalysis,
             finalizeCoordinatedResultsAnalysis: deps?.finalizeCoordinatedResultsAnalysis,
@@ -940,6 +941,8 @@ export const createWorkerRouteShellWithWorkerDeps = ({
                     toRegistrySessionSlug: deps?.toRegistrySessionSlug,
                     resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
                     checkSbtGate: deps?.checkSbtGate,
+                    // A question reads the session's saved links that aren't sources yet, in the background.
+                    readSessionLinks: deps?.readSessionLinks,
                     json: deps?.json,
                     toStr: deps?.toStr,
                     now: deps?.now,

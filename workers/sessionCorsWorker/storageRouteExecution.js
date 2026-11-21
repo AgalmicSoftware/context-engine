@@ -1,6 +1,7 @@
 import { CONTEXT_ROLE, CONTEXT_SOURCE_LIMITS, CONTEXT_TEXT_ROLE, contextCardsOn, contextRoleOf, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
 import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
 import { markStorageBackupWrite } from './storageBackupRevision.js';
+import { readAuthorizationEpoch } from './authorizationScopeFreshness.js';
 import { normalizeResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
 import {
   STORAGE_BACKENDS,
@@ -3118,6 +3119,21 @@ export const listContextSourceRows = async ({ env, slug, budget } = {}) => {
     skipKey: (entry) => entry?.metadata?.contextSource === false });
   return rows.map((row) => row.metadata).filter((metadata) => metadata?.contextSource === true);
 };
+
+// The Worker stores a page it read from the session's saved links
+// (sessionLinkReading.js) as the add-link route stores one, as that admin.
+// Publishing checks the admin against the session's current sign-in epoch, as for any context row.
+export const storeSessionLinkSource = ({ env, config, slug, admin, payload, deps }) => handleCloudflareUpload({
+  env, config, slug, uploaderAddress: admin, authScopes: { storage: true }, baseHeaders: new Headers(),
+  expectedAuthority: { actor: admin, revision: 0, authzEpoch: readAuthorizationEpoch(config) },
+  deps: createStorageRouteGateDeps({ config, env, slug, deps }),
+  payload: { resource: 'docsContext', groupIds: [], uploadPolicy: null, payloadEncrypted: false, ...payload, contextOrigin: 'worker' },
+});
+
+// Sources the Worker can store as plain text: on Cloudflare storage, outside Lit encryption.
+export const sessionStoresPlainContext = (config) =>
+  resolveConfiguredStorageBackend({ config }) === STORAGE_BACKENDS.CLOUDFLARE &&
+  resolvePayloadAccessControl(config).encryption !== PAYLOAD_ENCRYPTION_MODES.LIT;
 
 // With `strict`, a storage error is thrown, so a caller can tell a row that
 // can't be read just now from one that isn't there.
