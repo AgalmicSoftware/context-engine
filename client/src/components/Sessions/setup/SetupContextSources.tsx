@@ -1,9 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Input } from 'reactstrap';
 
 import { contextCardsOn, contextFileIsReadByAi, resolveContextFileType } from '@ce-shared/sessionContextSources.mjs';
 import {
   addContextLink,
+  workerReadsSessionLinks,
   checkContextFile,
   contextFileAccept,
   readContextPdf,
@@ -212,6 +213,10 @@ type PublisherProps = Omit<FilesProps, 'sessionConfig'> & {
   account: string;
 };
 
+const WORKER_READS_LINKS = 'The session reads its linked pages for the AI by itself.';
+const LINKS_NOT_READ_HERE =
+  'The session could not be asked whether it reads its linked pages by itself, so they are not read from here. If they do not appear among its files, add them there.';
+
 // After Create: uploads the chosen files (reading PDFs when asked) and reads
 // the session's links for its AI, as the Context section on its page does.
 export const SetupContextPublisher = ({
@@ -223,7 +228,26 @@ export const SetupContextPublisher = ({
   account,
   groups = [],
 }: PublisherProps) => {
-  const [readLinks, setReadLinks] = useState(true);
+  const [askedToRead, setReadLinks] = useState(true);
+  // Whether the new session's Worker reads its links by itself (it then does so right after Create, and a second
+  // read from here could store a page twice): 'asking' until it answers, then yes, no, or 'unknown' where it
+  // could not be asked. Only a plain no reads links from here.
+  const [workerReads, setWorkerReads] = useState<'asking' | 'unknown' | boolean>('asking');
+  const created = !!sessionConfig;
+  useEffect(() => {
+    setWorkerReads('asking');
+    if (!created) return undefined;
+    let current = true;
+    void workerReadsSessionLinks({ sessionSlug, sessionConfig, context: { account }, asAdmin: true }).then(
+      (reads) => current && setWorkerReads(reads === null ? 'unknown' : reads),
+    );
+    return () => {
+      current = false;
+    };
+    // The Worker's capabilities change only with the session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [created, sessionSlug]);
+  const readLinks = askedToRead && workerReads === false;
   const [readUrls, setReadUrls] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
@@ -233,6 +257,14 @@ export const SetupContextPublisher = ({
     .map((link) => ({ label: text(asRecord(link).label).trim(), url: text(asRecord(link).url).trim() }))
     .filter((link) => link.url && !readUrls.includes(link.url));
   if (!entries.length && !(readLinks && links.length)) {
+    // With nothing left to add from here, a session that reads its own links says so once it exists.
+    if (!status && created && links.length && (workerReads === true || workerReads === 'unknown')) {
+      return (
+        <p className={styles.hint} data-testid="ce-setup-context-links-read-by-worker">
+          {workerReads === true ? WORKER_READS_LINKS : LINKS_NOT_READ_HERE}
+        </p>
+      );
+    }
     return status ? (
       <p className={styles.statusText} role="status" data-testid="ce-setup-context-status">
         {status}
@@ -300,20 +332,25 @@ export const SetupContextPublisher = ({
   };
   return (
     <div className={styles.listRowBody} data-testid="ce-setup-context-publisher">
-      {links.length ? (
+      {links.length && workerReads === false ? (
         <SetupCheck
           id="ce-setup-context-read-links"
           label="Read the linked pages for the AI"
           help="The Session Worker reads each link’s page and keeps its text for the session’s AI."
-          checked={readLinks}
+          checked={askedToRead}
           onChange={setReadLinks}
         />
+      ) : null}
+      {links.length && (workerReads === true || workerReads === 'unknown') ? (
+        <p className={styles.hint} data-testid="ce-setup-context-links-read-by-worker">
+          {workerReads === true ? WORKER_READS_LINKS : LINKS_NOT_READ_HERE}
+        </p>
       ) : null}
       <div className={styles.buttonRow}>
         <button
           type="button"
           className={`${styles.button} ${styles.primaryButton}`}
-          disabled={busy || (!entries.length && !readLinks)}
+          disabled={busy || (!entries.length && !readLinks) || (links.length > 0 && workerReads === 'asking')}
           data-testid="ce-setup-context-publish"
           onClick={() => void publish()}
         >

@@ -7,6 +7,8 @@ import {
   SetupParticipationSection,
   SetupQuestionsSection,
   describeContextProblem,
+  linkUrlHelpWhenRead,
+  sessionLinksReadChars,
 } from './SetupContentSections';
 import type { SetupDraft, SetupSectionProps } from './setupSectionTypes';
 import { readContextHtmlPage } from '../../OnePageSession/SessionContextHtml';
@@ -192,6 +194,48 @@ describe('setup content sections', () => {
     fireEvent.change(screen.getByTestId('ce-setup-context-html-file'), {
       target: { files: [new File([body], name, { type: 'text/html' })] },
     });
+
+  it('says a link’s page is read by itself only where the session’s Worker does that', () => {
+    const initial = { sessionContext: { links: [{ label: 'Plan', url: 'https://parks.example' }] } };
+    const describedBy = () =>
+      document.getElementById(screen.getByLabelText('URL 1').getAttribute('aria-describedby') || '')?.textContent;
+    // An older Worker, or a session not created yet: the page is read only if someone chooses that.
+    const { unmount } = render(<Harness Section={SetupContextSection} initial={initial} />);
+    expect(describedBy()).toContain('Its page is read for the AI only if you choose that after Create.');
+    unmount();
+    const Reading = (props: SetupSectionProps) => <SetupContextSection {...props} linksReadChars={60000} />;
+    render(<Harness Section={Reading} initial={initial} />);
+    expect(describedBy()).toBe(linkUrlHelpWhenRead(60000));
+    expect(describedBy()).toContain('After you save, the session reads the page for its AI by itself');
+    expect(describedBy()).toContain('keeping up to its first 60,000 characters');
+    expect(describedBy()).not.toContain('only if you choose');
+    expect(describedBy()).not.toContain('unless');
+    // Where the page cannot see the session's admin-only setting, it does not promise.
+    expect(linkUrlHelpWhenRead(100000, false)).toContain('by itself, unless its link reading is turned off, keeping');
+  });
+
+  it('on /new, where the session does not exist yet, says the page is read either way after Create', () => {
+    const initial = { sessionContext: { links: [{ label: 'Plan', url: 'https://parks.example' }] } };
+    const OnNew = (props: SetupSectionProps) => <SetupContextSection {...props} fileInputId="ce-files" />;
+    render(<Harness Section={OnNew} initial={initial} />);
+    const help = document.getElementById(screen.getByLabelText('URL 1').getAttribute('aria-describedby') || '');
+    expect(help?.textContent).toContain(
+      'by the session itself where it does that, and otherwise if you choose it there',
+    );
+  });
+
+  it('reads how much of a page is kept from the session’s settings, and nothing where reading is off', () => {
+    expect(sessionLinksReadChars({})).toBe(100000);
+    expect(sessionLinksReadChars(null)).toBe(100000);
+    expect(sessionLinksReadChars({ sessionLinkReading: { pageChars: 40000 } })).toBe(40000);
+    expect(sessionLinksReadChars({ sessionLinkReading: { pageChars: 900000 } })).toBe(100000);
+    // Outside what the Worker accepts, it uses its default, so the help does too.
+    expect(sessionLinksReadChars({ sessionLinkReading: { pageChars: 500 } })).toBe(100000);
+    expect(sessionLinksReadChars({ sessionLinkReading: { pageChars: 40000.5 } })).toBe(100000);
+    expect(sessionLinksReadChars({ sessionLinkReading: { pageChars: 'many' } })).toBe(100000);
+    expect(sessionLinksReadChars({ sessionLinkReading: { on: false } })).toBe(0);
+    expect(sessionLinksReadChars({ sessionLinkReading: { links: 0 } })).toBe(0);
+  });
 
   it('takes an HTML file instead of text, cleaned, with a preview that says what was removed', async () => {
     render(<Harness Section={SetupContextSection} initial={{}} />);

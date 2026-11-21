@@ -68,6 +68,20 @@ export const readWorkerKeepsContextCards = async (
   return found.features.includes('context_cards_v1');
 };
 
+/**
+ * Whether the Session Worker reads a session's context links for its AI by itself, after a save and when the
+ * Session Agent is asked; false when it can't be read. An older one reads a page only when someone adds it.
+ */
+export const readWorkerReadsSessionLinks = async (
+  workerOrigin: string,
+  sessionSlug: string,
+  fetchImpl?: typeof fetch,
+): Promise<boolean> => {
+  if (!workerOrigin) return false;
+  const found = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
+  return found.features.includes('session_link_reading_v1');
+};
+
 /** Whether the Session Worker accepts a note on where research data goes (0.9.11 on); false when it can't be read. */
 export const readWorkerTakesDataNote = async (
   workerOrigin: string,
