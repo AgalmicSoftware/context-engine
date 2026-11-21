@@ -443,7 +443,7 @@ describe('session interview protocol', () => {
       'ask what topics or questions the responder thinks should be asked more',
       'which session question they would most like to see other people answer',
     ];
-    const ending = 'Do not introduce an automatic timer or end the session without the responder’s cue.';
+    const ending = 'Don’t wrap up until the responder says they’re done.';
     const on = buildRealtimeInterviewInstructions({ questions, suggestQuestions: true });
     for (const line of closing) expect(on).toContain(line);
     // Off, as by default: nothing is made from the answers, so the interviewer doesn't spend time on them.
@@ -499,7 +499,9 @@ describe('session interview protocol', () => {
     });
     expect(instructions).toContain('bridging in a few words from their own words');
     expect(instructions).toContain('Never recap or list their answers');
-    expect(instructions).toContain('Use that order only when nothing the responder said points to a question.');
+    expect(instructions).toContain(
+      'When nothing the responder said points to a question, take the questions in the order listed.',
+    );
     expect(instructions).not.toContain('Start there');
   });
 

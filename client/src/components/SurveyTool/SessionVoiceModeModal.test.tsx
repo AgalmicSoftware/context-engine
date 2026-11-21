@@ -1347,7 +1347,7 @@ describe('SessionVoiceModeModal', () => {
       expect(instructions.includes('which session question they would most like to see other people answer')).toBe(
         asks,
       );
-      expect(instructions).toContain('end the session without the responder’s cue');
+      expect(instructions).toContain('Don’t wrap up until the responder says they’re done.');
     },
   );
 
@@ -1410,7 +1410,7 @@ describe('SessionVoiceModeModal', () => {
     expect(questionBank(instructions)).not.toContain('Second question?');
     // It knows what was answered, without the answers, so it does not ask again unless the person raises it.
     expect(instructions).toContain(
-      'Do not ask them again or ask about those answers unless the responder brings one up',
+      'Questions listed as already answered are done: don’t ask them, or about their answers, unless the responder brings one up.',
     );
     expect(instructions).toMatch(
       /Already answered \(reference only; not to ask again\):\n- What matters\?\n- Second question\?/,
