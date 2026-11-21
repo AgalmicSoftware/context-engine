@@ -4,12 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.26] - 2026-11-21
 
-Atlas question summaries in the Session Worker, MCP 0.9.1 (published at merge) and the site. Nothing a session already stores is changed: atlas builds made before this release read as before.
+Atlas question summaries and a faster question catalogue in the Session Worker, MCP 0.9.1 (published at merge) and the site. Nothing a session already stores is changed: atlas builds made before this release read as before.
 
 ### Session Worker — needs a Worker update
 
 - **Atlas question summaries.** An atlas build now gives each question under a topic a short AI summary of its answers and the kinds of answer found, with how many people hold each. Each question's call reads every answer to it that the build may read: no encrypted, restricted, withheld or hidden-question answers. The calls run after the map calls, in the same six at a time, and a question the build has no time left for keeps no summary; the build's four minutes are the only bound, so a build takes longer and costs more in AI calls. A build records how many questions it summarised and how many ran out of time.
 - **Summary sizes are a session setting.** `atlasQuestionSummaries` sets how long a call may run, how many answers and characters it reads, how long the summary and category texts are and how many categories it keeps. It is admin-only, saved with a signed `set-config`, and changing it signs no one out. Each value has a default and bounds. An older Worker leaves the setting stored and unread, and on a Worker-canonical session it refuses a save that sends it.
+- **Faster question catalogue.** The catalogue that interviews, agents and `contextengine.sh/questions/<slug>` read now loads question texts in batches instead of one at a time, with the same access check on each: a first read of about 40 questions should take about 1–2 s instead of 12–15 s.
+- **Voice context setting.** The Worker takes the new interview setting `interviewMode.voiceSessionContext` and lists it as `interview_voice_context_v1`; voice research records note `+context` in the brief revision when the interviewer had the session's context.
 
 ### MCP 0.9.1
 
@@ -20,6 +22,8 @@ Atlas question summaries in the Session Worker, MCP 0.9.1 (published at merge) a
 - **Question summaries in the atlas.** A question opens to the AI's summary of its answers and the kinds of answer found, in builds from a Worker that makes them. Someone who may build the atlas sees how many questions were summarised when a build did not reach them all.
 - **Quadratic questions in the atlas.** A quadratic question in an atlas node shows its budget and each option on its own row, as it is answered.
 - **Atlas chart.** The axis labels are never cut: they wrap, and the chart's text stays readable at every width. The four quadrants are bright red, blue, green and yellow under a grid, with their own set in the colour-blind setting.
+- **Voice interviews are lighter.** The voice interviewer is no longer given the session's context (notes, links and sources) unless the session turns on "Interviewer reads the session context" in its interview settings, because a long source slowed every reply. The setting is offered where the session's Worker supports it, and stays visible while on. The voice prompt is also shorter: question ids only where drafts need them, a shared option list named once, no empty omitted-rows line.
+- **Interview question check.** The interview's check for new questions may take 25 s instead of 10, and "Could not check for new questions" shows only after two failed checks in a row; it goes at the next answer.
 - **Interview languages.** The Interview window's language button and flags share one pill, with a language icon; on a wide screen it sits in the header row.
 - **Deploy helper.** It deploys the 0.9.25 Worker bundles. A Worker updated from the site gets this release's.
 

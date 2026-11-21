@@ -30450,7 +30450,8 @@ var init_interviewSettings = __esm({
       fidelityMinimumPeople: 5,
       recordingQuestionCount: 3,
       recordingQuestionTiming: "end",
-      dataNote: ""
+      dataNote: "",
+      voiceSessionContext: false
     });
     MAX_HIDDEN_DRAFT_SHARE = 0.5;
     MAX_FIDELITY_MINIMUM_PEOPLE = 50;
@@ -30495,7 +30496,10 @@ var init_interviewSettings = __esm({
         // The most questions a group recording drafts each time: once when the recording stops, or after every chunk.
         recordingQuestionCount: Number.isInteger(source.recordingQuestionCount) ? Math.max(1, Math.min(MAX_RECORDING_QUESTION_COUNT, source.recordingQuestionCount)) : DEFAULT_INTERVIEW_SETTINGS.recordingQuestionCount,
         recordingQuestionTiming: source.recordingQuestionTiming === "chunk" ? "chunk" : "end",
-        dataNote: typeof source.dataNote === "string" ? source.dataNote.trim().slice(0, MAX_DATA_NOTE_CHARS) : ""
+        dataNote: typeof source.dataNote === "string" ? source.dataNote.trim().slice(0, MAX_DATA_NOTE_CHARS) : "",
+        // Whether the voice interviewer is given the session's context (notes, links, sources). Off until
+        // set: a long source slowed every reply, and summaries for the voice come later.
+        voiceSessionContext: source.voiceSessionContext === true
       };
     };
     validInterviewSettings = (value = {}) => {
@@ -30530,7 +30534,8 @@ var init_interviewSettings = __esm({
         "showFidelityScore",
         "suggestGroups",
         "joinMatchingGroups",
-        "showFidelityResults"
+        "showFidelityResults",
+        "voiceSessionContext"
       ].every(
         (key) => value[key] === void 0 || typeof value[key] === "boolean"
       );
@@ -30558,13 +30563,14 @@ var init_siweMessage = __esm({
 });
 
 // shared/realtimeInterviewConfig.mjs
-var GPT_LIVE_1_1_MODEL, GPT_LIVE_1_1_FEATURE, DEFAULT_REALTIME_INTERVIEW_MODEL, PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL, liveModels, REALTIME_INTERVIEW_MODELS, models, isRealtimeInterviewModel, isLiveInterviewModel, normalizeRealtimeInterviewModel, resolveRealtimeInterviewModel;
+var GPT_LIVE_1_1_MODEL, GPT_LIVE_1_1_FEATURE, DEFAULT_REALTIME_INTERVIEW_MODEL, PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL, INTERVIEW_VOICE_CONTEXT_FEATURE, liveModels, REALTIME_INTERVIEW_MODELS, models, isRealtimeInterviewModel, isLiveInterviewModel, normalizeRealtimeInterviewModel, resolveRealtimeInterviewModel;
 var init_realtimeInterviewConfig = __esm({
   "shared/realtimeInterviewConfig.mjs"() {
     GPT_LIVE_1_1_MODEL = "gpt-live-1.1";
     GPT_LIVE_1_1_FEATURE = "interview_gpt_live_1_1_v1";
     DEFAULT_REALTIME_INTERVIEW_MODEL = GPT_LIVE_1_1_MODEL;
     PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL = "gpt-live-1";
+    INTERVIEW_VOICE_CONTEXT_FEATURE = "interview_voice_context_v1";
     liveModels = /* @__PURE__ */ new Set([GPT_LIVE_1_1_MODEL, PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL]);
     REALTIME_INTERVIEW_MODELS = Object.freeze([
       ...liveModels,
@@ -107518,6 +107524,7 @@ var normalizePublicInterviewQuestions = (input = [], limit = Infinity) => {
 init_storageResourceOwnership();
 init_blockedQuestionIds();
 init_workerGroupJoin();
+init_storageRefNormalization();
 var QUESTIONS_ADDED_TOPIC02 = "0x3b584fb360a325f39352e75bd13458807d8e31735ef4dadaeff99fc3e59b517a";
 var GET_QUESTION_HASH_SELECTOR = "0x24b9f713";
 var ZERO_BYTES322 = `0x${"00".repeat(32)}`;
@@ -107529,6 +107536,7 @@ var MAX_SCAN_BLOCKS = 2e6;
 var RPC_CHUNK_SIZE = 1e5;
 var MAX_LOG_CHUNKS = MAX_SCAN_BLOCKS / RPC_CHUNK_SIZE;
 var MAX_POINTER_READS = 200;
+var READ_BATCH_IDS = 100;
 var MAX_CANDIDATES = 2e3;
 var catalog = (questions = [], incomplete = false, refused2 = false) => ({ questions, incomplete, refused: refused2 });
 var retryableReadStatus = (status) => !status || status === 408 || status === 429 || status >= 500;
@@ -107581,10 +107589,10 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   if (typeof storageRoute2 !== "function") return catalog();
   const origin = trim24(readInvite) && trim24(workerOrigin2) ? trim24(workerOrigin2) : "https://session-worker.invalid";
   const inviteHeaders = trim24(readInvite) ? { [WORKER_GROUP_READ_INVITE_HEADER]: trim24(readInvite) } : void 0;
-  const callStorage = (path, query) => storageRoute2({
+  const callStorage = (path, query, body) => storageRoute2({
     path,
-    method: "GET",
-    request: new Request(`${origin}${path}?${query}`, inviteHeaders ? { headers: inviteHeaders } : void 0),
+    method: body ? "POST" : "GET",
+    request: new Request(`${origin}${path}${query ? `?${query}` : ""}`, body ? { method: "POST", headers: { "content-type": "application/json", ...inviteHeaders }, body: JSON.stringify(body) } : inviteHeaders ? { headers: inviteHeaders } : void 0),
     env,
     config,
     slug,
@@ -107599,13 +107607,50 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   const readPayload = async (storageRefId) => {
     try {
       const response3 = await callStorage("/storage/read", `id=${encodeURIComponent(storageRefId)}`);
-      if (retryableReadStatus(response3?.status)) incomplete = true;
       const payload = await readJsonResponse(response3);
-      return isObj30(payload) ? payload : null;
+      return { payload: isObj30(payload) ? payload : null, retryable: retryableReadStatus(response3?.status) };
     } catch {
-      incomplete = true;
-      return null;
+      return { payload: null, retryable: true };
     }
+  };
+  const readPayloads = async (storageRefIds) => {
+    const reads = /* @__PURE__ */ new Map();
+    const ids = [];
+    for (const id2 of new Set(storageRefIds)) {
+      if (isSafeCloudflareStorageRefId(id2)) ids.push(id2);
+      else reads.set(id2, await readPayload(id2));
+    }
+    for (let start = 0; start < ids.length; start += READ_BATCH_IDS) {
+      const group = ids.slice(start, start + READ_BATCH_IDS);
+      let items2 = null;
+      try {
+        items2 = (await readJsonResponse(await callStorage("/storage/read-batch", "", { ids: group })))?.items;
+      } catch {
+        items2 = null;
+      }
+      const byId = new Map(Array.isArray(items2) ? items2.filter(isObj30).map((item) => [item.id, item]) : []);
+      for (const id2 of group) {
+        const item = byId.get(id2);
+        if (!item || [413, 415].includes(item.status)) {
+          reads.set(id2, await readPayload(id2));
+        } else if (item.status !== 200) {
+          reads.set(id2, { payload: null, retryable: retryableReadStatus(item.status) });
+        } else {
+          let payload = null;
+          try {
+            payload = JSON.parse(item.text);
+          } catch {
+            payload = null;
+          }
+          reads.set(id2, { payload: isObj30(payload) ? payload : null, retryable: false });
+        }
+      }
+    }
+    return reads;
+  };
+  const use = (read) => {
+    if (read?.retryable) incomplete = true;
+    return read?.payload || null;
   };
   const versions = [];
   const legacyVersions = [];
@@ -107623,18 +107668,24 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   }
   legacyVersions.sort((left, right) => left.createdAtMs - right.createdAtMs);
   const legacyReads = legacyVersions.slice(0, MAX_PAYLOAD_READS - MAX_QUESTIONS);
+  const legacyPayloads = await readPayloads(legacyReads.map((version2) => version2.storageRefId));
   for (const version2 of legacyReads) {
-    const payload = await readPayload(version2.storageRefId);
+    const payload = use(legacyPayloads.get(version2.storageRefId));
     const resourceId = payloadQuestionId(payload);
     if (resourceId) versions.push({ ...version2, resourceId, payload });
   }
   const candidates = selectCanonicalStorageVersions(versions).filter((version2) => !hiddenIds.has(version2.resourceId));
   const chosen = candidates.slice(0, MAX_PAYLOAD_READS - legacyReads.length);
   const questions = [];
-  for (const version2 of chosen) {
-    if (questions.length >= MAX_QUESTIONS) break;
-    const payload = version2.payload || await readPayload(version2.storageRefId);
-    if (payloadQuestionId(payload) === version2.resourceId && normalizeQuestion(payload)) questions.push(payload);
+  for (let start = 0; start < chosen.length && questions.length < MAX_QUESTIONS; ) {
+    const group = chosen.slice(start, start + Math.min(READ_BATCH_IDS, MAX_QUESTIONS - questions.length));
+    start += group.length;
+    const payloads = await readPayloads(group.filter((version2) => !version2.payload).map((version2) => version2.storageRefId));
+    for (const version2 of group) {
+      if (questions.length >= MAX_QUESTIONS) break;
+      const payload = version2.payload || use(payloads.get(version2.storageRefId));
+      if (payloadQuestionId(payload) === version2.resourceId && normalizeQuestion(payload)) questions.push(payload);
+    }
   }
   return catalog(
     dedupeQuestions(questions),
@@ -108267,6 +108318,8 @@ var FEATURES = Object.freeze([
   "interview_data_note_v1",
   // interviewMode.realtimeModel may be gpt-live-1.1; older Workers refuse it on save.
   GPT_LIVE_1_1_FEATURE,
+  // interviewMode.voiceSessionContext gives the voice interviewer the session's context; older Workers reject the key.
+  INTERVIEW_VOICE_CONTEXT_FEATURE,
   "participant_context_links_v1",
   "participant_context_v1",
   "recovery_key_export",
