@@ -1724,6 +1724,58 @@ test('an unlisted group shows only to its members and admins, whatever its membe
 	assert.equal((await listFor('0x0000000000000000000000000000000000000bad')).quiet, true);
 });
 
+test('a list reads its groups side by side, each key once, and shows what it showed before', async () => {
+	const kv = createMockKv();
+	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: kv });
+	const mutate = (operation, input, extra = {}) =>
+		executeCoordinatedWorkerGroupMutation({ env, slug: 'session-a', operation, input, actorPrincipal: actor, ...extra });
+	const ids = Array.from({ length: 8 }, (_, index) => `group-${index}`);
+	for (const [index, groupId] of ids.entries()) {
+		const listed = index % 2 === 0;
+		await mutate('create', { groupId, label: `Group ${index}`, joinMode: 'admin_add', memberVisibility: 'session', listed });
+	}
+	await mutate('add-member', undefined, { groupId: 'group-3', principal: member });
+	// Each read yields, so reads made side by side overlap; a later group's
+	// reads finish first, so the order shown must come from the keys.
+	const reads = new Map();
+	let open = 0;
+	let mostOpen = 0;
+	const get = kv.get;
+	kv.get = async (key) => {
+		reads.set(key, (reads.get(key) || 0) + 1);
+		open += 1;
+		mostOpen = Math.max(mostOpen, open);
+		const later = Number(key.match(/:group-(\d+)$/)?.[1] ?? 0);
+		for (let tick = 0; tick < 2 * (ids.length - later); tick += 1) await new Promise((resolve) => setImmediate(resolve));
+		open -= 1;
+		return get(key);
+	};
+	const listFor = (address) => workerGroupsRoute({
+		path: '/groups/list',
+		method: 'GET',
+		request: new Request('https://worker.example/groups/list'),
+		env,
+		slug: 'session-a',
+		requesterAddress: address,
+		baseHeaders: {},
+		deps: { json },
+	});
+	const listed = await listFor(member.address);
+	assert.equal(listed.status, 200);
+	assert.deepEqual(listed.body.groups.map((group) => group.groupId), ['group-0', 'group-2', 'group-3', 'group-4', 'group-6']);
+	assert.ok(mostOpen > 2, `at most ${mostOpen} reads were open at once`);
+	const groupReads = [...reads].filter(([key]) => key.startsWith('ce-worker-group'));
+	assert.deepEqual(groupReads.filter(([, count]) => count > 1), []);
+	assert.equal(groupReads.length, ids.length * 2);
+	const stranger = await listFor('0x0000000000000000000000000000000000000bad');
+	assert.deepEqual(stranger.body.groups.map((group) => group.groupId), ['group-0', 'group-2', 'group-4', 'group-6']);
+	// An index row that names another group still fails the whole list, as before.
+	const indexKey = [...kv.store.keys()].find((key) => key.startsWith('ce-worker-group-index:session-a:') && key.endsWith(':group-5'));
+	kv.store.set(indexKey, 'group-1');
+	const broken = await listFor(member.address);
+	assert.equal(broken.status >= 500, true, JSON.stringify(broken.body));
+});
+
 test('member routes respect visibility and open join mode', async () => {
 	const kv = createMockKv();
 	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: kv });
