@@ -25421,6 +25421,10 @@ var init_sessionConfigEdits = __esm({
         result.agentHttp = without(result.agentHttp, /* @__PURE__ */ new Set(["invites"]));
         if (!Object.keys(result.agentHttp).length) delete result.agentHttp;
       }
+      if (record2(result.ai) && Object.hasOwn(result.ai, "serviceTier")) {
+        result.ai = without(result.ai, /* @__PURE__ */ new Set(["serviceTier"]));
+        if (!Object.keys(result.ai).length) delete result.ai;
+      }
       return result;
     };
     sessionConfigRequiresReauthorization = (before, after) => {
@@ -31477,6 +31481,226 @@ var init_atlasQuestionSummaries = __esm({
   }
 });
 
+// shared/aiDefaults.mjs
+var DEFAULT_AI_MODEL, DEFAULT_AI_MODELS, DEFAULT_ANTHROPIC_MODEL, TRANSCRIPTION_FALLBACK_MODEL, GROUP_TRANSCRIPTION_MODEL;
+var init_aiDefaults = __esm({
+  "shared/aiDefaults.mjs"() {
+    DEFAULT_AI_MODEL = "gpt-6.1-terra";
+    DEFAULT_AI_MODELS = Object.freeze({ fast: DEFAULT_AI_MODEL, thinking: "gpt-6.1-sol" });
+    DEFAULT_ANTHROPIC_MODEL = "claude-opus-5-5";
+    TRANSCRIPTION_FALLBACK_MODEL = "whisper-1";
+    GROUP_TRANSCRIPTION_MODEL = "gpt-4o-transcribe-diarize";
+  }
+});
+
+// shared/aiModelFamily.mjs
+var toModelLeaf, inferAiProviderFromModel, isGpt5Or6, isOSeries, isOpenAiReasoningModel, usesOpenAiResponsesApi, takesLongReply, interviewMapOutputTokens, LADDER, GPT_FULL, GPT_FROM_LOW, GPT_5, GPT_5_POINT, LOW_TO_HIGH, CLAUDE, reasoningEffortsOf, takesReasoningEffort, fitReasoningEffort;
+var init_aiModelFamily = __esm({
+  "shared/aiModelFamily.mjs"() {
+    toModelLeaf = (model) => String(model ?? "").trim().toLowerCase().split("/").pop() || "";
+    inferAiProviderFromModel = (model) => {
+      const name = String(model ?? "").trim().toLowerCase();
+      if (!name) return "";
+      if (name.startsWith("claude")) return "anthropic";
+      if (/^(?:gpt-|o[1-9]|chatgpt)/.test(name)) return "openai";
+      if (name.startsWith("@cf/")) return "workers-ai";
+      return name.includes("/") ? "openrouter" : "";
+    };
+    isGpt5Or6 = (leaf) => /^gpt-[56](?:$|[.-])/.test(leaf);
+    isOSeries = (leaf) => /^o[1-9](?:$|-)/.test(leaf);
+    isOpenAiReasoningModel = (model) => {
+      const leaf = toModelLeaf(model);
+      return isGpt5Or6(leaf) || isOSeries(leaf);
+    };
+    usesOpenAiResponsesApi = ({ provider = "", model = "", endpoint = "" } = {}) => {
+      if (String(provider || "").trim().toLowerCase() !== "openai") return false;
+      const route = String(endpoint || "").trim().toLowerCase();
+      return route === "responses" || route.includes("/responses") || isGpt5Or6(toModelLeaf(model));
+    };
+    takesLongReply = (model) => {
+      const leaf = toModelLeaf(model);
+      if (/-chat(?:$|-)/.test(leaf)) return false;
+      return isGpt5Or6(leaf) || isOSeries(leaf) || /^gpt-4\.1(?:$|-)/.test(leaf) || /^claude-(?:opus|sonnet|haiku|fable|mythos)-(?:[5-9]|4[.-][5-9])(?:$|[.-])/.test(leaf);
+    };
+    interviewMapOutputTokens = (model, provider = "") => String(provider || "").trim().toLowerCase() !== "custom" && takesLongReply(model) ? 32e3 : 8e3;
+    LADDER = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
+    GPT_FULL = Object.freeze(["none", "low", "medium", "high", "xhigh", "max"]);
+    GPT_FROM_LOW = Object.freeze(["low", "medium", "high", "xhigh", "max"]);
+    GPT_5 = Object.freeze(["minimal", "low", "medium", "high"]);
+    GPT_5_POINT = Object.freeze(["none", "low", "medium", "high"]);
+    LOW_TO_HIGH = Object.freeze(["low", "medium", "high"]);
+    CLAUDE = Object.freeze(["low", "medium", "high", "xhigh", "max"]);
+    reasoningEffortsOf = (model) => {
+      const leaf = toModelLeaf(model);
+      if (/^gpt-6(?:\.\d+)?-(?:sol|astra)(?:$|-)/.test(leaf)) return GPT_FROM_LOW;
+      if (/^gpt-(?:5\.6|6)(?:$|[.-])/.test(leaf)) return GPT_FULL;
+      if (/^gpt-5(?:-mini|-nano)?(?:-\d{4}-\d{2}-\d{2})?$/.test(leaf)) return GPT_5;
+      if (isGpt5Or6(leaf)) return GPT_5_POINT;
+      if (isOSeries(leaf)) return LOW_TO_HIGH;
+      if (/^claude-(?:opus|sonnet|haiku|fable|mythos)-[5-9]/.test(leaf)) return CLAUDE;
+      if (/^claude-(?:opus-4-[5-9]|sonnet-4-[6-9])/.test(leaf)) return LOW_TO_HIGH;
+      return null;
+    };
+    takesReasoningEffort = (model) => reasoningEffortsOf(model) !== null;
+    fitReasoningEffort = (model, effort) => {
+      const wanted = String(effort ?? "").trim().toLowerCase();
+      const accepted = reasoningEffortsOf(model);
+      if (!wanted || !accepted || accepted.includes(wanted)) return wanted;
+      const rank = LADDER.includes(wanted) ? LADDER.indexOf(wanted) : LADDER.indexOf("low");
+      return accepted.find((level) => LADDER.indexOf(level) >= rank) || accepted[accepted.length - 1];
+    };
+  }
+});
+
+// workers/sessionCorsWorker/aiModelParams.js
+var isChatReasoningModel, applyChatCompletionBudget, resolveResponsesOutputTokens;
+var init_aiModelParams = __esm({
+  "workers/sessionCorsWorker/aiModelParams.js"() {
+    init_aiModelFamily();
+    init_aiModelFamily();
+    isChatReasoningModel = ({ model = "", thinking = false } = {}) => thinking === true || isOpenAiReasoningModel(model);
+    applyChatCompletionBudget = ({
+      body,
+      model = "",
+      thinking = false,
+      max_tokens,
+      max_completion_tokens,
+      temperature,
+      defaultMaxCompletionTokens = 16e3,
+      defaultMaxTokens = 2048,
+      defaultTemperature = 0.7
+    } = {}) => {
+      const target = body && typeof body === "object" ? body : {};
+      if (isChatReasoningModel({ model, thinking })) {
+        target.max_completion_tokens = max_completion_tokens ?? max_tokens ?? defaultMaxCompletionTokens;
+        delete target.max_tokens;
+        delete target.temperature;
+        return target;
+      }
+      target.max_tokens = max_tokens ?? defaultMaxTokens;
+      target.temperature = temperature !== void 0 ? temperature : defaultTemperature;
+      delete target.max_completion_tokens;
+      return target;
+    };
+    resolveResponsesOutputTokens = ({
+      max_output_tokens,
+      max_completion_tokens,
+      max_tokens,
+      fallback = 16e3
+    } = {}) => max_output_tokens ?? max_completion_tokens ?? max_tokens ?? fallback;
+  }
+});
+
+// workers/sessionCorsWorker/aiRequestPolicy.js
+var trim2, record4, tasks, taskName, OPENAI_FAST_SERVICE_TIERS, SESSION_AI_SERVICE_TIERS, modelEntry, configuredModels, resolveSessionAiModel, AI_MODEL_NOT_ALLOWED, isSessionTranscriptionModelAllowed, operationCeilings, tokenFields, effortOrder, minimumTaskEffort, configuredFunctions, boundSessionAiRequest;
+var init_aiRequestPolicy = __esm({
+  "workers/sessionCorsWorker/aiRequestPolicy.js"() {
+    init_aiDefaults();
+    init_aiModelFamily();
+    init_aiModelParams();
+    trim2 = (value) => typeof value === "string" ? value.trim() : "";
+    record4 = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    tasks = /* @__PURE__ */ new Set(["generate", "rewrite", "summarize", "rank", "analysis", "compare", "categorize", "interview-map", "interview-opening", "context-read", "context-card", "session-agent"]);
+    taskName = (payload) => tasks.has(payload?.taskType) ? payload.taskType : "";
+    OPENAI_FAST_SERVICE_TIERS = Object.freeze(["priority", "fast"]);
+    SESSION_AI_SERVICE_TIERS = Object.freeze(["default", ...OPENAI_FAST_SERVICE_TIERS]);
+    modelEntry = (entry2, provider, fallback = DEFAULT_AI_MODEL) => {
+      const obj = record4(entry2);
+      return {
+        model: trim2(obj.model || obj.name || obj.value || entry2) || fallback,
+        provider: (trim2(obj.provider) || provider || "openai").toLowerCase()
+      };
+    };
+    configuredModels = (config, task) => {
+      const ai = record4(config?.ai);
+      const models2 = record4(ai.models);
+      const providers = record4(ai.modelProviders);
+      const provider = trim2(ai.mode || ai.provider).toLowerCase() || "openai";
+      const fallback = trim2(ai.model) || DEFAULT_AI_MODEL;
+      const fast = modelEntry(models2.fast || models2.default, trim2(providers.fast || providers.default) || provider, fallback);
+      const thinking = modelEntry(models2.thinking || models2.reasoning, trim2(providers.thinking || providers.reasoning) || provider, fallback);
+      const feature = task && models2[task] ? modelEntry(models2[task], trim2(providers[task]) || provider, fallback) : null;
+      return { fast, thinking, feature, ...trim2(ai.model) ? { default: modelEntry(ai.model, provider) } : {} };
+    };
+    resolveSessionAiModel = (config, { taskType = "", modelType = "fast" } = {}) => {
+      const models2 = configuredModels(config, tasks.has(taskType) ? taskType : "");
+      return models2.feature || models2[modelType === "thinking" ? "thinking" : "fast"];
+    };
+    AI_MODEL_NOT_ALLOWED = Object.freeze({
+      error: "This model is not allowed on the session's AI key. Use the session model or your own key.",
+      reason: "ai_model_not_allowed"
+    });
+    isSessionTranscriptionModelAllowed = ({ config, provider, model, groupSpeakerLabels = false }) => {
+      const ai = record4(config?.ai);
+      const entry2 = record4(ai.models?.transcription || ai.transcription);
+      if (groupSpeakerLabels && provider === "openai" && model === GROUP_TRANSCRIPTION_MODEL && (trim2(entry2.provider).toLowerCase() || "openai") === "openai") return true;
+      return provider === (trim2(entry2.provider).toLowerCase() || "openai") && model === (trim2(entry2.model) || TRANSCRIPTION_FALLBACK_MODEL);
+    };
+    operationCeilings = Object.freeze({
+      generate: 16e3,
+      rewrite: 16e3,
+      summarize: 16e3,
+      rank: 16e3,
+      compare: 16e3,
+      categorize: 16e3,
+      analysis: 7e3,
+      // One short question, but models that think spend part of the cap on thinking.
+      "interview-opening": 2e3,
+      // A context PDF's text, read once by an admin's request.
+      "context-read": 8e3,
+      // A context source's card: a summary, tags and names, thinking included.
+      "context-card": 1500,
+      // One Session Agent answer of at most 150 words, thinking included.
+      "session-agent": 3e3
+    });
+    tokenFields = ["max_tokens", "max_completion_tokens", "max_output_tokens", "max_tokens_to_sample", "maxTokens"];
+    effortOrder = ["none", "minimal", "low", "medium", "high"];
+    minimumTaskEffort = Object.freeze({ "interview-map": "medium" });
+    configuredFunctions = (config) => {
+      const value = config?.ai?.providers?.custom?.functions ?? config?.ai?.custom?.functions;
+      if (typeof value !== "string") return value;
+      try {
+        return JSON.parse(value);
+      } catch {
+        return value.trim() || void 0;
+      }
+    };
+    boundSessionAiRequest = ({ payload = {}, provider, config, requestKey = "" }) => {
+      if (requestKey) return { ok: true, payload };
+      const task = taskName(payload);
+      const models2 = configuredModels(config, task);
+      const allowed = Object.values(models2).filter((entry2) => entry2?.provider === provider);
+      const model = trim2(payload.model) || (models2.feature?.provider === provider ? models2.feature.model : allowed[0]?.model);
+      if (!model || !allowed.some((entry2) => entry2.model === model)) return { ok: false, ...AI_MODEL_NOT_ALLOWED };
+      const reasoning = isChatReasoningModel({ model }) || models2.thinking.provider === provider && models2.thinking.model === model;
+      const responses = usesOpenAiResponsesApi({ provider, model, endpoint: payload.endpoint });
+      const ceiling = task === "interview-map" ? interviewMapOutputTokens(model, provider) : operationCeilings[task] || (reasoning || responses ? 16e3 : 2048);
+      const requested = tokenFields.filter((key) => Object.hasOwn(payload, key)).map((key) => {
+        const value = payload[key];
+        return typeof value === "number" && Number.isFinite(value) && value >= 1 ? Math.floor(value) : ceiling;
+      });
+      const tokens = Math.min(ceiling, ...requested);
+      const ai = record4(config?.ai);
+      const savedEffort = ai.taskReasoningEffort?.[task] || task === "analysis" && ai.taskReasoningEffort?.generate || ai.reasoningEffort || ai.reasoning_effort || "low";
+      const sessionEffort = ["low", "medium", "high"].includes(savedEffort) ? savedEffort : "low";
+      const floor = ai.taskReasoningEffort?.[task] ? "" : minimumTaskEffort[task];
+      const maximumEffort = floor && effortOrder.indexOf(floor) > effortOrder.indexOf(sessionEffort) ? floor : sessionEffort;
+      const requestedEffort = trim2(payload.reasoning_effort || payload.reasoningEffort || payload.reasoning?.effort);
+      const effort = effortOrder.includes(requestedEffort) && effortOrder.indexOf(requestedEffort) < effortOrder.indexOf(maximumEffort) ? requestedEffort : maximumEffort;
+      const serviceTier = provider === "openai" && OPENAI_FAST_SERVICE_TIERS.includes(ai.serviceTier) ? ai.serviceTier : "default";
+      const bounded = { ...payload, model, service_tier: serviceTier, reasoning_effort: effort, thinking: reasoning };
+      for (const key of tokenFields) bounded[key] = tokens;
+      delete bounded.tools;
+      delete bounded.functions;
+      if (provider === "custom") {
+        const functions = configuredFunctions(config);
+        if (functions) bounded.functions = functions;
+      }
+      return { ok: true, payload: bounded };
+    };
+  }
+});
+
 // workers/sessionCorsWorker/aiRateLimitPolicy.js
 var isObj7, AI_DAILY_LIMIT_MAX, resolveAiDailyLimit, validAiDailyLimit;
 var init_aiRateLimitPolicy = __esm({
@@ -31513,6 +31737,7 @@ var init_sessionConfigMutation = __esm({
     init_sessionContext();
     init_sessionAgent();
     init_atlasQuestionSummaries();
+    init_aiRequestPolicy();
     init_aiRateLimitPolicy();
     init_sessionConfigNormalization();
     init_authorizationScopeFreshness();
@@ -31781,6 +32006,10 @@ var init_sessionConfigMutation = __esm({
           if (!summaries.ok) return { ok: false, status: 400, error: summaries.error };
           incomingConfig = { ...incomingConfig, atlasQuestionSummaries: summaries.value };
         }
+        const serviceTier = incomingConfig.ai && typeof incomingConfig.ai === "object" ? incomingConfig.ai.serviceTier : void 0;
+        if (serviceTier !== void 0 && serviceTier !== null && !SESSION_AI_SERVICE_TIERS.includes(serviceTier)) {
+          return { ok: false, status: 400, error: `ai.serviceTier must be one of ${SESSION_AI_SERVICE_TIERS.join(", ")}.` };
+        }
         if (hasOwn4(incomingConfig, "sessionAgent")) {
           const sessionAgent = validateSessionAgent(incomingConfig.sessionAgent);
           if (!sessionAgent.ok) return { ok: false, status: 400, error: `Invalid Session Agent setting: ${sessionAgent.errors[0].message}` };
@@ -31884,7 +32113,7 @@ var init_sessionConfigMutation = __esm({
 });
 
 // workers/sessionCorsWorker/workerGroups.js
-var trim2, isObj8, WORKER_GROUP_JOIN_MODES2, WORKER_GROUP_MEMBER_VISIBILITY, WORKER_GROUP_REMOVAL_AUTH, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, JOIN_MODE_SET, resolveWorkerGroupMemberCeiling, normalizeWorkerGroupId, resolveWorkerGroupListed, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeRemovalAuth, REMOVERS_BY_REMOVAL_AUTH, workerGroupRemovalRefusal, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, TRANSIENT_WORKER_GROUP_REASONS, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, checkWorkerGroupReadInvite, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, isSelfJoinableWorkerGroup, workerGroupHasRoom, listWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForMember, dispatchPublicWorkerGroupListRequest, WORKER_GROUP_SECRET_ACTIONS, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
+var trim3, isObj8, WORKER_GROUP_JOIN_MODES2, WORKER_GROUP_MEMBER_VISIBILITY, WORKER_GROUP_REMOVAL_AUTH, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, JOIN_MODE_SET, resolveWorkerGroupMemberCeiling, normalizeWorkerGroupId, resolveWorkerGroupListed, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeRemovalAuth, REMOVERS_BY_REMOVAL_AUTH, workerGroupRemovalRefusal, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, TRANSIENT_WORKER_GROUP_REASONS, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, checkWorkerGroupReadInvite, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, isSelfJoinableWorkerGroup, workerGroupHasRoom, listWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForMember, dispatchPublicWorkerGroupListRequest, WORKER_GROUP_SECRET_ACTIONS, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
 var init_workerGroups = __esm({
   "workers/sessionCorsWorker/workerGroups.js"() {
     init_sessionConfigAuthority();
@@ -31895,7 +32124,7 @@ var init_workerGroups = __esm({
     init_workerConfigModeValidation();
     init_stringCoercion();
     init_workerGroupJoin();
-    trim2 = (value) => toStr6(value).trim();
+    trim3 = (value) => toStr6(value).trim();
     isObj8 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     WORKER_GROUP_JOIN_MODES2 = Object.freeze({
       OPEN: "open",
@@ -31927,14 +32156,14 @@ var init_workerGroups = __esm({
     JOIN_MODE_SET = new Set(Object.values(WORKER_GROUP_JOIN_MODES2));
     resolveWorkerGroupMemberCeiling = (value) => Number.isSafeInteger(value) && value >= 1 && value <= WORKER_GROUP_MEMBER_CEILING_MAX ? value : WORKER_GROUP_MEMBER_CEILING_DEFAULT;
     normalizeWorkerGroupId = (value) => {
-      const normalized = trim2(value).toLowerCase();
+      const normalized = trim3(value).toLowerCase();
       if (!normalized || normalized.length > MAX_WORKER_GROUP_ID_LENGTH) return "";
       if (!/^[a-z0-9][a-z0-9._-]*$/.test(normalized)) return "";
       return normalized;
     };
     resolveWorkerGroupListed = ({ joinMode, memberVisibility, listed } = {}) => typeof listed === "boolean" ? listed || joinMode === WORKER_GROUP_JOIN_MODES2.OPEN : memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION;
-    isAddressShapedWorkerGroupId = (value) => /^0x[0-9a-f]{40}$/i.test(trim2(value));
-    encodedPrincipalKeyPart = (value) => btoa(trim2(value || "id")).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "") || "id";
+    isAddressShapedWorkerGroupId = (value) => /^0x[0-9a-f]{40}$/i.test(trim3(value));
+    encodedPrincipalKeyPart = (value) => btoa(trim3(value || "id")).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "") || "id";
     canonicalSessionIdKeyPart = (value) => {
       const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: value });
       if (!canonicalSessionId) return "";
@@ -31953,7 +32182,7 @@ var init_workerGroups = __esm({
     };
     nowIso = (deps = {}) => new Date(deps.now?.() || Date.now()).toISOString();
     parsePositiveInt = (value, fallback) => {
-      const parsed = Number.parseInt(trim2(value), 10);
+      const parsed = Number.parseInt(trim3(value), 10);
       return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
     };
     resolveWorkerGroupMemberPageRequest = ({ cursor, limit } = {}) => {
@@ -32010,7 +32239,7 @@ var init_workerGroups = __esm({
     workerGroupRecordMatchesIdentity = ({ row, slug, sessionId }) => {
       const canonicalSlug = canonicalWorkerGroupSessionSlug(slug);
       const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
-      return isObj8(row) && !!canonicalSlug && !!canonicalSessionId && trim2(row.sessionSlug) === canonicalSlug && resolveCanonicalWorkerSessionIdHex({ sessionId: row.sessionId }) === canonicalSessionId;
+      return isObj8(row) && !!canonicalSlug && !!canonicalSessionId && trim3(row.sessionSlug) === canonicalSlug && resolveCanonicalWorkerSessionIdHex({ sessionId: row.sessionId }) === canonicalSessionId;
     };
     groupKey = ({ slug, sessionId, groupId }) => `ce-worker-group:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${normalizeWorkerGroupId(groupId)}`;
     groupPrefix = ({ slug, sessionId }) => `ce-worker-group:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:`;
@@ -32025,17 +32254,17 @@ var init_workerGroups = __esm({
     legacyGroupIndexPrefix = ({ slug }) => `ce-worker-group-index:${sessionSlugStorageKey(slug)}:`;
     jsonResponse = (deps, body, status, headers2) => deps?.json?.(body, status, headers2) || new Response(JSON.stringify(body), { status, headers: headers2 });
     normalizeJoinMode = (value) => {
-      const mode = trim2(value || WORKER_GROUP_JOIN_MODES2.ADMIN_ADD).toLowerCase();
+      const mode = trim3(value || WORKER_GROUP_JOIN_MODES2.ADMIN_ADD).toLowerCase();
       if (Object.values(WORKER_GROUP_JOIN_MODES2).includes(mode)) return mode;
       return "";
     };
     normalizeMemberVisibility = (value) => {
-      const visibility = trim2(value || WORKER_GROUP_MEMBER_VISIBILITY.ADMIN_ONLY).toLowerCase();
+      const visibility = trim3(value || WORKER_GROUP_MEMBER_VISIBILITY.ADMIN_ONLY).toLowerCase();
       if (Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(visibility)) return visibility;
       return "";
     };
     normalizeRemovalAuth = (value) => {
-      const auth = trim2(value || WORKER_GROUP_REMOVAL_AUTH.BOTH).toLowerCase();
+      const auth = trim3(value || WORKER_GROUP_REMOVAL_AUTH.BOTH).toLowerCase();
       if (Object.values(WORKER_GROUP_REMOVAL_AUTH).includes(auth)) return auth;
       return "";
     };
@@ -32050,7 +32279,7 @@ var init_workerGroups = __esm({
       return remover === "member" ? "worker_group_leave_denied" : "worker_group_removal_denied";
     };
     normalizeImageUrl = (value) => {
-      const raw = trim2(value);
+      const raw = trim3(value);
       if (!raw) return { ok: true, value: "" };
       if (raw.length > MAX_WORKER_GROUP_IMAGE_URL_LENGTH) return { ok: false };
       const normalized = normalizeWorkerGroupUrl(raw);
@@ -32063,7 +32292,7 @@ var init_workerGroups = __esm({
       const seen = /* @__PURE__ */ new Set();
       for (const candidate of value) {
         if (typeof candidate !== "string") return { ok: false };
-        const tag2 = trim2(candidate);
+        const tag2 = trim3(candidate);
         if (!tag2 || tag2.length > MAX_WORKER_GROUP_TAG_LENGTH) return { ok: false };
         const key = tag2.toLowerCase();
         if (seen.has(key)) continue;
@@ -32096,7 +32325,7 @@ var init_workerGroups = __esm({
       return { ok: true, value: memberLimit };
     };
     normalizeGroupJoinEndsAt = (value, deps = {}, { allowPast = false } = {}) => {
-      const raw = trim2(value);
+      const raw = trim3(value);
       if (!raw) return { ok: true, value: "" };
       const timestamp = Date.parse(raw);
       const now = Number(deps.now?.() || Date.now());
@@ -32104,12 +32333,12 @@ var init_workerGroups = __esm({
       return { ok: true, value: new Date(timestamp).toISOString() };
     };
     normalizeEvmAddress = (value, deps = {}) => {
-      const address3 = trim2(value);
+      const address3 = trim3(value);
       if (typeof deps.isAddress === "function" && !deps.isAddress(address3)) return "";
       if (!/^0x[0-9a-fA-F]{40}$/.test(address3)) return "";
       if (typeof deps.getAddress === "function") {
         try {
-          const normalized = trim2(deps.getAddress(address3));
+          const normalized = trim3(deps.getAddress(address3));
           if (/^0x[0-9a-fA-F]{40}$/.test(normalized)) return normalized;
         } catch {
           return "";
@@ -32118,13 +32347,13 @@ var init_workerGroups = __esm({
       return address3.toLowerCase();
     };
     normalizePrincipalId = (value) => {
-      const id2 = trim2(value);
+      const id2 = trim3(value);
       if (!id2 || id2.length > 180) return "";
       if (!/^[A-Za-z0-9:_@./=-]+$/.test(id2)) return "";
       return id2;
     };
     principalKeyFor = (kind, value) => {
-      const normalizedValue = trim2(value);
+      const normalizedValue = trim3(value);
       const keyValue = kind === "evm_address" || kind === "passkey_account" ? normalizedValue.toLowerCase() : normalizedValue;
       return `${kind}:${keyValue}`;
     };
@@ -32139,7 +32368,7 @@ var init_workerGroups = __esm({
         };
       }
       if (!isObj8(input)) return { ok: false, reason: "invalid_principal" };
-      const kind = trim2(input.kind || input.type).toLowerCase();
+      const kind = trim3(input.kind || input.type).toLowerCase();
       if (kind === "passkey_account" || kind === "evm_address") {
         const address3 = normalizeEvmAddress(input.address || input.account || input.id, deps);
         if (!address3) return { ok: false, reason: "invalid_principal_address" };
@@ -32174,7 +32403,7 @@ var init_workerGroups = __esm({
       return { ok: false, reason: "missing_principal" };
     };
     createWorkerGroupId = (deps = {}) => {
-      const supplied = trim2(deps.randomUUID?.());
+      const supplied = trim3(deps.randomUUID?.());
       if (supplied) {
         const normalized = normalizeWorkerGroupId(supplied);
         if (normalized) return normalized;
@@ -32202,9 +32431,9 @@ var init_workerGroups = __esm({
       const listed = Object.prototype.hasOwnProperty.call(input, "listed") ? input.listed : existing ? existing.listed : memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION;
       const removalAuth = normalizeRemovalAuth(input.removalAuth || existing?.removalAuth);
       if (!removalAuth) return { ok: false, status: 400, reason: "invalid_removal_auth" };
-      const label = trim2(input.label || existing?.label);
+      const label = trim3(input.label || existing?.label);
       if (!label || label.length > 120) return { ok: false, status: 400, reason: "invalid_group_label" };
-      const description = trim2(input.description ?? existing?.description);
+      const description = trim3(input.description ?? existing?.description);
       if (description.length > 500) return { ok: false, status: 400, reason: "invalid_group_description" };
       const imageUrlResult = normalizeImageUrl(input.imageUrl ?? existing?.imageUrl);
       if (!imageUrlResult.ok) return { ok: false, status: 400, reason: "invalid_group_image_url" };
@@ -32216,9 +32445,9 @@ var init_workerGroups = __esm({
         Object.prototype.hasOwnProperty.call(input, "memberLimit") ? input.memberLimit : existing?.memberLimit
       );
       if (!memberLimitResult.ok) return { ok: false, status: 400, reason: "invalid_group_member_limit" };
-      const joinEndsAtResult = Object.prototype.hasOwnProperty.call(input, "joinEndsAt") ? normalizeGroupJoinEndsAt(input.joinEndsAt, deps, { allowPast: !!existing }) : { ok: true, value: trim2(existing?.joinEndsAt) };
+      const joinEndsAtResult = Object.prototype.hasOwnProperty.call(input, "joinEndsAt") ? normalizeGroupJoinEndsAt(input.joinEndsAt, deps, { allowPast: !!existing }) : { ok: true, value: trim3(existing?.joinEndsAt) };
       if (!joinEndsAtResult.ok) return { ok: false, status: 400, reason: "invalid_group_join_end" };
-      const requestedAdminAddress = Object.prototype.hasOwnProperty.call(input, "adminAddress") ? trim2(input.adminAddress) : trim2(existing?.adminAddress || actorPrincipal?.address);
+      const requestedAdminAddress = Object.prototype.hasOwnProperty.call(input, "adminAddress") ? trim3(input.adminAddress) : trim3(existing?.adminAddress || actorPrincipal?.address);
       const adminAddress = requestedAdminAddress ? normalizeEvmAddress(requestedAdminAddress, deps) : "";
       if (requestedAdminAddress && !adminAddress) {
         return { ok: false, status: 400, reason: "invalid_group_admin_address" };
@@ -32271,7 +32500,7 @@ var init_workerGroups = __esm({
       if (!canonicalSlug || !canonicalSessionId) {
         return { ok: false, status: 400, reason: "worker_group_session_identity_invalid" };
       }
-      const explicitBootstrapId = trim2(env?.CE_WORKER_GROUPS_BOOTSTRAP);
+      const explicitBootstrapId = trim3(env?.CE_WORKER_GROUPS_BOOTSTRAP);
       if (explicitBootstrapId === WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL) {
         const kv2 = resolveWorkerGroupsKv(env);
         if (requireExhaustiveEmptyScan && typeof kv2?.list !== "function") {
@@ -32331,7 +32560,7 @@ var init_workerGroups = __esm({
         const configIdentity = normalizeWorkerSessionSlug(config?.slug);
         const configSessionId = resolveCanonicalWorkerSessionIdHex(config);
         const expectedIdentity = normalizeWorkerSessionSlug(canonicalSlug);
-        const bootstrapId = trim2(bootstrap?.bootstrapId);
+        const bootstrapId = trim3(bootstrap?.bootstrapId);
         if (Number(bootstrap?.version) === 2 && bootstrap?.state === "fresh_empty" && /^[0-9a-f]{64}$/.test(bootstrapId) && configIdentity === expectedIdentity && configSessionId === canonicalSessionId) {
           const existingGroups = typeof kv.list === "function" ? await scanWorkerGroupRecordsForIdentity({
             store: { kind: "kv", store: kv },
@@ -32372,12 +32601,12 @@ var init_workerGroups = __esm({
         if (!listed || typeof listed !== "object" || !Array.isArray(listed.keys)) {
           throw new Error("Worker group KV listing returned an invalid page.");
         }
-        keys.push(...listed.keys.map((entry2) => trim2(entry2?.name || entry2)).filter(Boolean));
+        keys.push(...listed.keys.map((entry2) => trim3(entry2?.name || entry2)).filter(Boolean));
         if (listed.list_complete !== false) {
           hasMore = false;
           continue;
         }
-        const nextCursor = trim2(listed.cursor);
+        const nextCursor = trim3(listed.cursor);
         if (!nextCursor || seenCursors.has(nextCursor)) {
           throw new Error("Worker group KV listing did not provide a usable continuation cursor.");
         }
@@ -32398,7 +32627,7 @@ var init_workerGroups = __esm({
       if (listed.keys.length > limit) {
         throw new Error("Worker group KV listing exceeded the requested page size.");
       }
-      const keys = listed.keys.map((entry2) => trim2(entry2?.name || entry2)).filter(Boolean);
+      const keys = listed.keys.map((entry2) => trim3(entry2?.name || entry2)).filter(Boolean);
       if (listed.list_complete !== false) return { keys, nextCursor: "" };
       const nextCursor = typeof listed.cursor === "string" ? listed.cursor : "";
       if (!nextCursor || nextCursor.length > 1024 || nextCursor === cursor) {
@@ -32554,7 +32783,7 @@ var init_workerGroups = __esm({
         row: member,
         slug,
         sessionId: canonicalSessionId
-      }) || normalizeWorkerGroupId(member?.groupId) !== normalizedGroupId || !normalizedPrincipal.ok || trim2(member?.principalKey) !== normalizedPrincipal.key) {
+      }) || normalizeWorkerGroupId(member?.groupId) !== normalizedGroupId || !normalizedPrincipal.ok || trim3(member?.principalKey) !== normalizedPrincipal.key) {
         throw new Error("Worker group membership record identity is invalid.");
       }
       await store.store.put(
@@ -32677,7 +32906,7 @@ var init_workerGroups = __esm({
       if (!canonicalSlug || !canonicalSessionId) {
         return { ok: false, status: 400, reason: "worker_group_session_identity_invalid" };
       }
-      const requestedGroupId = trim2(input?.groupId);
+      const requestedGroupId = trim3(input?.groupId);
       if (requestedGroupId && isAddressShapedWorkerGroupId(requestedGroupId)) {
         return { ok: false, status: 400, reason: "invalid_worker_group_id" };
       }
@@ -32890,8 +33119,8 @@ var init_workerGroups = __esm({
       const authorityByGroupId = /* @__PURE__ */ new Map();
       for (const authority of catalog2.groups || []) {
         const groupId = normalizeWorkerGroupId(authority?.groupId);
-        const joinMode = trim2(authority?.joinMode).toLowerCase();
-        const memberVisibility = trim2(authority?.memberVisibility).toLowerCase();
+        const joinMode = trim3(authority?.joinMode).toLowerCase();
+        const memberVisibility = trim3(authority?.memberVisibility).toLowerCase();
         const memberCount = Number(authority?.memberCount);
         if (!groupId || authorityByGroupId.has(groupId) || !JOIN_MODE_SET.has(joinMode) || !Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(memberVisibility) || !Number.isSafeInteger(memberCount) || memberCount < 0) {
           return normalizeWorkerGroupMembershipFailure();
@@ -32976,7 +33205,7 @@ var init_workerGroups = __esm({
       groupId: normalizeWorkerGroupId(member?.groupId),
       sessionSlug: normalizeWorkerSessionSlug(member?.sessionSlug),
       principal: member?.principal,
-      addedAt: trim2(member?.addedAt)
+      addedAt: trim3(member?.addedAt)
     });
     listWorkerGroupMembersForPrincipal = async ({
       env,
@@ -33007,8 +33236,8 @@ var init_workerGroups = __esm({
       if (authority?.listed !== true && authority?.isMember !== true) {
         return { ok: false, status: 404, reason: "worker_group_not_found" };
       }
-      const memberVisibility = trim2(authority?.memberVisibility).toLowerCase();
-      const joinMode = trim2(authority?.joinMode).toLowerCase();
+      const memberVisibility = trim3(authority?.memberVisibility).toLowerCase();
+      const joinMode = trim3(authority?.joinMode).toLowerCase();
       const memberCount = Number(authority?.memberCount);
       if (!Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(memberVisibility) || !JOIN_MODE_SET.has(joinMode) || !Number.isSafeInteger(memberCount) || memberCount < 0) {
         return normalizeWorkerGroupMembershipFailure();
@@ -33055,8 +33284,8 @@ var init_workerGroups = __esm({
       const seenGroupIds = /* @__PURE__ */ new Set();
       for (const authoritativeGroup of authority.groups) {
         const authoritativeGroupId = normalizeWorkerGroupId(authoritativeGroup?.groupId);
-        const authoritativeJoinMode = trim2(authoritativeGroup?.joinMode).toLowerCase();
-        const authoritativeVisibility = trim2(authoritativeGroup?.memberVisibility).toLowerCase();
+        const authoritativeJoinMode = trim3(authoritativeGroup?.joinMode).toLowerCase();
+        const authoritativeVisibility = trim3(authoritativeGroup?.memberVisibility).toLowerCase();
         const authoritativeMemberCount = Number(authoritativeGroup?.memberCount);
         if (!authoritativeGroupId || seenGroupIds.has(authoritativeGroupId) || !JOIN_MODE_SET.has(authoritativeJoinMode) || !Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(authoritativeVisibility) || !Number.isSafeInteger(authoritativeMemberCount) || authoritativeMemberCount < 0) {
           return normalizeWorkerGroupMembershipFailure();
@@ -33173,7 +33402,7 @@ var init_workerGroups = __esm({
           if (group.joinMode !== WORKER_GROUP_JOIN_MODES2.OPEN) {
             return { ok: false, status: 403, reason: WORKER_GROUP_JOIN_REFUSED };
           }
-          const joinEndsAt = Date.parse(trim2(group.joinEndsAt));
+          const joinEndsAt = Date.parse(trim3(group.joinEndsAt));
           if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(deps.now?.() || Date.now())) {
             return { ok: false, status: 403, reason: "worker_group_join_ended" };
           }
@@ -33373,7 +33602,7 @@ var init_workerGroups = __esm({
     };
     participantGroupCreationAllowed = (config) => config?.groupCreationPolicy === "participants";
     isSelfJoinableWorkerGroup = (group, nowMs2) => {
-      const joinEndsAt = Date.parse(trim2(group?.joinEndsAt));
+      const joinEndsAt = Date.parse(trim3(group?.joinEndsAt));
       return group?.joinMode === WORKER_GROUP_JOIN_MODES2.OPEN && !(Number.isFinite(joinEndsAt) && joinEndsAt <= nowMs2);
     };
     workerGroupHasRoom = (group, config) => {
@@ -34012,14 +34241,14 @@ var init_workerGroups = __esm({
 });
 
 // workers/sessionCorsWorker/workerCanonicalAuthority.js
-var trim3, lower, isObj9, ALLOWED_WORKER_SCOPE_KEYS, normalizeScopeList, listAddresses, resolveRoleAddressSet, resolveAuthorityPolicy, resolveLoginConditions, evaluateLoginCondition, passesLoginGate, isWorkerCanonicalSessionConfig, resolveWorkerCanonicalLoginScopes, evaluateWorkerCanonicalAnonymousAccess;
+var trim4, lower, isObj9, ALLOWED_WORKER_SCOPE_KEYS, normalizeScopeList, listAddresses, resolveRoleAddressSet, resolveAuthorityPolicy, resolveLoginConditions, evaluateLoginCondition, passesLoginGate, isWorkerCanonicalSessionConfig, resolveWorkerCanonicalLoginScopes, evaluateWorkerCanonicalAnonymousAccess;
 var init_workerCanonicalAuthority = __esm({
   "workers/sessionCorsWorker/workerCanonicalAuthority.js"() {
     init_workerGroups();
     init_sessionConfigMutation();
     init_stringCoercion();
-    trim3 = (value) => toStr6(value).trim();
-    lower = (value) => trim3(value).toLowerCase();
+    trim4 = (value) => toStr6(value).trim();
+    lower = (value) => trim4(value).toLowerCase();
     isObj9 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     ALLOWED_WORKER_SCOPE_KEYS = /* @__PURE__ */ new Set([
       "ai",
@@ -34069,7 +34298,7 @@ var init_workerCanonicalAuthority = __esm({
         return resolveRoleAddressSet({ config, role }).has(lower(address3));
       }
       if (kind === "worker_group") {
-        const groupId = trim3(condition?.groupId);
+        const groupId = trim4(condition?.groupId);
         if (!groupId) return false;
         const checkMembership = typeof deps?.isWorkerGroupMember === "function" ? deps.isWorkerGroupMember : isWorkerGroupMember;
         const result = await checkMembership({
@@ -63055,10 +63284,10 @@ var init_transport = __esm({
 });
 
 // shared/questions/ratingScale.mjs
-var trim4, isObj10, RATING_SCALE_METADATA_KEYS, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, hasRatingScaleMetadata, toFiniteNumber, normalizeRatingLabel, normalizeRatingScale, DEFAULT_RATING_SCALE, ratingStepFor, decimalPlaces, normalizeRatingAnswer;
+var trim5, isObj10, RATING_SCALE_METADATA_KEYS, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, hasRatingScaleMetadata, toFiniteNumber, normalizeRatingLabel, normalizeRatingScale, DEFAULT_RATING_SCALE, ratingStepFor, decimalPlaces, normalizeRatingAnswer;
 var init_ratingScale = __esm({
   "shared/questions/ratingScale.mjs"() {
-    trim4 = (value) => String(value == null ? "" : value).trim();
+    trim5 = (value) => String(value == null ? "" : value).trim();
     isObj10 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     RATING_SCALE_METADATA_KEYS = [
       "min",
@@ -63070,7 +63299,7 @@ var init_ratingScale = __esm({
       "maxLabel",
       "highLabel"
     ];
-    hasMetadataValue = (value) => value !== void 0 && value !== null && trim4(value) !== "";
+    hasMetadataValue = (value) => value !== void 0 && value !== null && trim5(value) !== "";
     recordHasRatingScaleMetadata = (record6 = {}) => RATING_SCALE_METADATA_KEYS.some((key) => hasMetadataValue(record6[key]));
     pickRatingScaleRecord = (question = {}) => {
       const scale = isObj10(question.scale) ? question.scale : null;
@@ -63085,7 +63314,7 @@ var init_ratingScale = __esm({
       return Number.isFinite(number2) ? number2 : null;
     };
     normalizeRatingLabel = (value, fallback) => {
-      const label = trim4(value);
+      const label = trim5(value);
       return label || String(fallback);
     };
     normalizeRatingScale = (question = {}) => {
@@ -64583,7 +64812,7 @@ var init_answerDrafts = __esm({
 });
 
 // shared/questions/answerValue.mjs
-var QUESTION_TYPES2, BINARY_ANSWERS, MAX_FREEFORM_LENGTH, trim5, fail3, ratingScaleFor, optionsOf, isSingleSelect, matchOption, normalizeAnswerValue;
+var QUESTION_TYPES2, BINARY_ANSWERS, MAX_FREEFORM_LENGTH, trim6, fail3, ratingScaleFor, optionsOf, isSingleSelect, matchOption, normalizeAnswerValue;
 var init_answerValue = __esm({
   "shared/questions/answerValue.mjs"() {
     init_quadraticAllocation();
@@ -64591,19 +64820,19 @@ var init_answerValue = __esm({
     QUESTION_TYPES2 = Object.freeze(["binary", "rating", "multichoice", "quadratic", "freeform"]);
     BINARY_ANSWERS = Object.freeze(["Agree", "Unsure", "Disagree"]);
     MAX_FREEFORM_LENGTH = 8e3;
-    trim5 = (value) => typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "";
+    trim6 = (value) => typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "";
     fail3 = (error) => ({ ok: false, error });
     ratingScaleFor = (question = {}) => ({ ...normalizeRatingScale(question) || DEFAULT_RATING_SCALE, step: ratingStepFor(question) });
     optionsOf = (question) => Array.isArray(question.options) ? question.options.filter((option) => typeof option === "string") : [];
     isSingleSelect = (question) => question.singleSelect === true || question.oneSelectionOnly === true || question.singleChoice === true;
     matchOption = (options, value) => {
-      const wanted = trim5(value).toLowerCase();
+      const wanted = trim6(value).toLowerCase();
       return options.find((option) => option.trim().toLowerCase() === wanted);
     };
     normalizeAnswerValue = (question = {}, value, { maxFreeformLength = MAX_FREEFORM_LENGTH } = {}) => {
       switch (question.type) {
         case "binary": {
-          const match = BINARY_ANSWERS.find((answer) => answer.toLowerCase() === trim5(value).toLowerCase());
+          const match = BINARY_ANSWERS.find((answer) => answer.toLowerCase() === trim6(value).toLowerCase());
           return match ? { ok: true, value: match } : fail3('Binary answers must be "Agree", "Unsure", or "Disagree".');
         }
         case "rating": {
@@ -64620,7 +64849,7 @@ var init_answerValue = __esm({
           const chosen = [];
           for (const pick of picks) {
             const option = matchOption(options, pick);
-            if (!option) return fail3(`"${trim5(pick)}" is not one of this question's options: ${options.join(" | ")}`);
+            if (!option) return fail3(`"${trim6(pick)}" is not one of this question's options: ${options.join(" | ")}`);
             if (!chosen.includes(option)) chosen.push(option);
           }
           if (!chosen.length) return fail3("Choose at least one option.");
@@ -64630,7 +64859,7 @@ var init_answerValue = __esm({
           return { ok: true, value: chosen };
         }
         case "quadratic": {
-          const votes = Array.isArray(value) ? value.map((vote) => typeof vote === "string" && trim5(vote) !== "" ? Number(vote) : vote) : value;
+          const votes = Array.isArray(value) ? value.map((vote) => typeof vote === "string" && trim6(vote) !== "" ? Number(vote) : vote) : value;
           const error = validateQuadraticAllocation(votes, question);
           if (error) {
             return fail3(`${error} Options in order: ${optionsOf(question).join(" | ")}; budget ${getVoiceCredits(question)} credits (sum of squared votes).`);
@@ -64638,13 +64867,13 @@ var init_answerValue = __esm({
           return { ok: true, value: votes };
         }
         case "freeform": {
-          const text9 = trim5(value);
+          const text9 = trim6(value);
           if (!text9) return fail3("Freeform answers must be non-empty text.");
           if (text9.length > maxFreeformLength) return fail3(`Freeform answers must be ${maxFreeformLength} characters or fewer.`);
           return { ok: true, value: text9 };
         }
         default:
-          return fail3(`Unsupported question type "${trim5(question.type)}".`);
+          return fail3(`Unsupported question type "${trim6(question.type)}".`);
       }
     };
   }
@@ -65102,12 +65331,12 @@ var init_participantResults = __esm({
 });
 
 // shared/storage/canonicalStorageVersions.mjs
-var trim6, compareStorageIds, compareVersionAge, isAdminStorageVersion, isPreferredStorageVersion, selectCanonicalStorageVersions;
+var trim7, compareStorageIds, compareVersionAge, isAdminStorageVersion, isPreferredStorageVersion, selectCanonicalStorageVersions;
 var init_canonicalStorageVersions = __esm({
   "shared/storage/canonicalStorageVersions.mjs"() {
-    trim6 = (value) => (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
+    trim7 = (value) => (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
     compareStorageIds = (left, right) => left < right ? -1 : left > right ? 1 : 0;
-    compareVersionAge = (left, right) => (Number(left.createdAtMs) || 0) - (Number(right.createdAtMs) || 0) || compareStorageIds(trim6(left.storageRefId), trim6(right.storageRefId));
+    compareVersionAge = (left, right) => (Number(left.createdAtMs) || 0) - (Number(right.createdAtMs) || 0) || compareStorageIds(trim7(left.storageRefId), trim7(right.storageRefId));
     isAdminStorageVersion = (candidate) => candidate.uploadAuthority === "admin";
     isPreferredStorageVersion = (candidate, current) => {
       if (!current) return true;
@@ -65120,7 +65349,7 @@ var init_canonicalStorageVersions = __esm({
     selectCanonicalStorageVersions = (candidates = []) => {
       const chosen = /* @__PURE__ */ new Map();
       (Array.isArray(candidates) ? candidates : []).forEach((candidate) => {
-        const id2 = trim6(candidate?.resourceId).toLowerCase();
+        const id2 = trim7(candidate?.resourceId).toLowerCase();
         if (!id2) return;
         if (isPreferredStorageVersion(candidate, chosen.get(id2))) chosen.set(id2, candidate);
       });
@@ -69913,12 +70142,12 @@ var init_storageBackupRevision = __esm({
 });
 
 // workers/sessionCorsWorker/payloadAccessControl.js
-var trim7, lower4, isObj11, LEGACY_PAYLOAD_ACCESS_MODES, PAYLOAD_ACCESS_GATES3, PAYLOAD_ENCRYPTION_MODES3, normalizeGate, normalizeEncryption, normalizeLegacyPayloadAccessMode, normalizePayloadAccessControl2, deriveLegacyPayloadAccessMode2;
+var trim8, lower4, isObj11, LEGACY_PAYLOAD_ACCESS_MODES, PAYLOAD_ACCESS_GATES3, PAYLOAD_ENCRYPTION_MODES3, normalizeGate, normalizeEncryption, normalizeLegacyPayloadAccessMode, normalizePayloadAccessControl2, deriveLegacyPayloadAccessMode2;
 var init_payloadAccessControl = __esm({
   "workers/sessionCorsWorker/payloadAccessControl.js"() {
     init_stringCoercion();
-    trim7 = (value) => toStr6(value).trim();
-    lower4 = (value) => trim7(value).toLowerCase().replace(/-/g, "_");
+    trim8 = (value) => toStr6(value).trim();
+    lower4 = (value) => trim8(value).toLowerCase().replace(/-/g, "_");
     isObj11 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     LEGACY_PAYLOAD_ACCESS_MODES = Object.freeze({
       PUBLIC_READ: "public_read",
@@ -70028,7 +70257,7 @@ var init_storageKvBindings = __esm({
 });
 
 // workers/sessionCorsWorker/storageEnvelopeEncryption.js
-var textEncoder3, STORAGE_ENVELOPE_KEK_SECRET_NAME2, STORAGE_ENVELOPE_PREVIOUS_KEK_SECRET_NAME, ENVELOPE_VERSION, AES_GCM2, AES_256_GCM, trim8, isObj12, cloneJson, safeSlugPart, bytesToBase64url2, base64urlToBytes2, toUint8Array, getCryptoImpl2, randomBytes5, nowIso3, importAesKey, deriveDeploymentKeyBytes, readDeploymentSecret, importDeploymentKek, aesEncrypt, aesDecrypt, wrapBytesWithKey, unwrapBytesWithKey, wrapResponseFieldKey, unwrapResponseFieldKey, readSessionKeyRecord, isCoordinatorWrappedSessionKeyRecord, unwrapSessionKeyBytes, ensureStorageEnvelopeSessionKey, encryptPayloadWithStorageEnvelope, decryptPayloadWithStorageEnvelope, auditSuffix, writeStorageEnvelopeKeyReleaseAudit, writeStorageVisibilityAudit;
+var textEncoder3, STORAGE_ENVELOPE_KEK_SECRET_NAME2, STORAGE_ENVELOPE_PREVIOUS_KEK_SECRET_NAME, ENVELOPE_VERSION, AES_GCM2, AES_256_GCM, trim9, isObj12, cloneJson, safeSlugPart, bytesToBase64url2, base64urlToBytes2, toUint8Array, getCryptoImpl2, randomBytes5, nowIso3, importAesKey, deriveDeploymentKeyBytes, readDeploymentSecret, importDeploymentKek, aesEncrypt, aesDecrypt, wrapBytesWithKey, unwrapBytesWithKey, wrapResponseFieldKey, unwrapResponseFieldKey, readSessionKeyRecord, isCoordinatorWrappedSessionKeyRecord, unwrapSessionKeyBytes, ensureStorageEnvelopeSessionKey, encryptPayloadWithStorageEnvelope, decryptPayloadWithStorageEnvelope, auditSuffix, writeStorageEnvelopeKeyReleaseAudit, writeStorageVisibilityAudit;
 var init_storageEnvelopeEncryption = __esm({
   "workers/sessionCorsWorker/storageEnvelopeEncryption.js"() {
     init_sessionWriteCoordinator();
@@ -70040,10 +70269,10 @@ var init_storageEnvelopeEncryption = __esm({
     ENVELOPE_VERSION = 1;
     AES_GCM2 = "AES-GCM";
     AES_256_GCM = "AES-256-GCM";
-    trim8 = (value) => toStr6(value).trim();
+    trim9 = (value) => toStr6(value).trim();
     isObj12 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     cloneJson = (value) => JSON.parse(JSON.stringify(value || {}));
-    safeSlugPart = (value) => trim8(value || "general").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "") || "general";
+    safeSlugPart = (value) => trim9(value || "general").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "") || "general";
     bytesToBase64url2 = (bytes3) => {
       const source = bytes3 instanceof Uint8Array ? bytes3 : new Uint8Array(bytes3 || []);
       if (typeof Buffer !== "undefined") {
@@ -70056,7 +70285,7 @@ var init_storageEnvelopeEncryption = __esm({
       return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
     };
     base64urlToBytes2 = (value) => {
-      const text9 = trim8(value);
+      const text9 = trim9(value);
       if (!text9) return new Uint8Array();
       const base64 = text9.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(text9.length / 4) * 4, "=");
       if (typeof Buffer !== "undefined") return new Uint8Array(Buffer.from(base64, "base64"));
@@ -70090,7 +70319,7 @@ var init_storageEnvelopeEncryption = __esm({
     nowIso3 = (deps = {}) => new Date(deps.now?.() || Date.now()).toISOString();
     importAesKey = async (keyBytes, usages, deps = {}) => getCryptoImpl2(deps).subtle.importKey("raw", keyBytes, { name: AES_GCM2 }, false, usages);
     deriveDeploymentKeyBytes = async (secret, deps = {}) => {
-      const raw = trim8(secret);
+      const raw = trim9(secret);
       const material = /^[a-f0-9]{64}$/i.test(raw) ? raw.toLowerCase() : raw;
       if (!material) throw new Error(`${STORAGE_ENVELOPE_KEK_SECRET_NAME2} is missing.`);
       const digest2 = await getCryptoImpl2(deps).subtle.digest("SHA-256", textEncoder3.encode(material));
@@ -70142,7 +70371,7 @@ var init_storageEnvelopeEncryption = __esm({
       };
     };
     unwrapBytesWithKey = async ({ wrappingKey, wrapped, aad = "", deps = {} }) => {
-      if (!isObj12(wrapped) || !trim8(wrapped.iv) || !trim8(wrapped.wrappedKey)) {
+      if (!isObj12(wrapped) || !trim9(wrapped.iv) || !trim9(wrapped.wrappedKey)) {
         throw new Error("Invalid wrapped storage envelope key.");
       }
       const params = { name: AES_GCM2, iv: base64urlToBytes2(wrapped.iv) };
@@ -70171,9 +70400,9 @@ var init_storageEnvelopeEncryption = __esm({
     };
     isCoordinatorWrappedSessionKeyRecord = (record6, slug) => {
       if (!isObj12(record6)) return false;
-      const createdAt = trim8(record6.createdAt);
+      const createdAt = trim9(record6.createdAt);
       const createdAtMs2 = Date.parse(createdAt);
-      return record6.version === ENVELOPE_VERSION && record6.keyProvider === "worker_secret" && record6.alg === AES_256_GCM && record6.wrapAlg === "AES-GCM-KW-v1" && Number.isFinite(createdAtMs2) && new Date(createdAtMs2).toISOString() === createdAt && trim8(record6.keyId) === `session:${safeSlugPart(slug)}:${createdAt}` && /^[A-Za-z0-9_-]{16}$/.test(trim8(record6.iv)) && /^[A-Za-z0-9_-]{64}$/.test(trim8(record6.wrappedKey));
+      return record6.version === ENVELOPE_VERSION && record6.keyProvider === "worker_secret" && record6.alg === AES_256_GCM && record6.wrapAlg === "AES-GCM-KW-v1" && Number.isFinite(createdAtMs2) && new Date(createdAtMs2).toISOString() === createdAt && trim9(record6.keyId) === `session:${safeSlugPart(slug)}:${createdAt}` && /^[A-Za-z0-9_-]{16}$/.test(trim9(record6.iv)) && /^[A-Za-z0-9_-]{64}$/.test(trim9(record6.wrappedKey));
     };
     unwrapSessionKeyBytes = async ({ env, config, slug, deps = {} }) => {
       const record6 = readSessionKeyRecord(config);
@@ -70182,7 +70411,7 @@ var init_storageEnvelopeEncryption = __esm({
       const attempts = [false, true];
       let lastError = null;
       for (const previous of attempts) {
-        if (previous && !trim8(readDeploymentSecret({ env, previous, deps }))) continue;
+        if (previous && !trim9(readDeploymentSecret({ env, previous, deps }))) continue;
         try {
           const deploymentKey = await importDeploymentKek({ env, previous, deps });
           return await unwrapBytesWithKey({ wrappingKey: deploymentKey, wrapped: record6, aad, deps });
@@ -70285,7 +70514,7 @@ var init_storageEnvelopeEncryption = __esm({
           },
           conditionRef: conditionRef || "gate_fallback",
           ...isObj12(accessConditions) ? { accessConditions: cloneJson(accessConditions) } : {},
-          contentType: trim8(contentType) || "application/octet-stream",
+          contentType: trim9(contentType) || "application/octet-stream",
           encryptedAt: nowIso3(deps)
         }
       };
@@ -70320,11 +70549,11 @@ var init_storageEnvelopeEncryption = __esm({
       });
     };
     auditSuffix = (deps = {}) => {
-      if (typeof deps.randomUUID === "function") return trim8(deps.randomUUID());
+      if (typeof deps.randomUUID === "function") return trim9(deps.randomUUID());
       try {
         return bytesToBase64url2(randomBytes5(12, deps));
       } catch {
-        return trim8(Date.now());
+        return trim9(Date.now());
       }
     };
     writeStorageEnvelopeKeyReleaseAudit = async ({
@@ -70340,8 +70569,8 @@ var init_storageEnvelopeEncryption = __esm({
         version: ENVELOPE_VERSION,
         event: "storage_envelope_key_release",
         sessionSlug: safeSlugPart(slug),
-        payloadId: trim8(payloadId),
-        principal: trim8(principal).toLowerCase() || "anonymous",
+        payloadId: trim9(payloadId),
+        principal: trim9(principal).toLowerCase() || "anonymous",
         conditionMatched: isObj12(conditionMatched) ? cloneJson(conditionMatched) : conditionMatched || "gate_fallback",
         timestamp
       };
@@ -70369,9 +70598,9 @@ var init_storageEnvelopeEncryption = __esm({
         version: ENVELOPE_VERSION,
         event: hidden ? "storage_resource_hidden" : "storage_resource_unhidden",
         sessionSlug: safeSlugPart(slug),
-        resource: trim8(resource),
-        resourceId: trim8(resourceId),
-        principal: trim8(principal).toLowerCase(),
+        resource: trim9(resource),
+        resourceId: trim9(resourceId),
+        principal: trim9(principal).toLowerCase(),
         timestamp
       };
       const kv = getStorageAuditBinding(env);
@@ -70804,18 +71033,18 @@ var init_storageUploadValidation = __esm({
 });
 
 // workers/sessionCorsWorker/storageResourceOwnership.js
-var OWNED_STORAGE_RESOURCES, trim9, lower5, isObj15, isOwnedStorageResource, recordKey, readJsonRecord, LEGACY_STORAGE_OWNER, readStorageResourceOwner, writeStorageResourceOwner, isStorageResourceHidden, writeStorageResourceHidden, hiddenStorageResourcePrefix, listHiddenStorageResourceIds;
+var OWNED_STORAGE_RESOURCES, trim10, lower5, isObj15, isOwnedStorageResource, recordKey, readJsonRecord, LEGACY_STORAGE_OWNER, readStorageResourceOwner, writeStorageResourceOwner, isStorageResourceHidden, writeStorageResourceHidden, hiddenStorageResourcePrefix, listHiddenStorageResourceIds;
 var init_storageResourceOwnership = __esm({
   "workers/sessionCorsWorker/storageResourceOwnership.js"() {
     init_sessionSlugResolution();
     init_stringCoercion();
     init_canonicalStorageVersions();
     OWNED_STORAGE_RESOURCES = Object.freeze(["questions", "surveys"]);
-    trim9 = (value) => toStr6(value).trim();
-    lower5 = (value) => trim9(value).toLowerCase();
+    trim10 = (value) => toStr6(value).trim();
+    lower5 = (value) => trim10(value).toLowerCase();
     isObj15 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-    isOwnedStorageResource = (resource) => OWNED_STORAGE_RESOURCES.includes(trim9(resource));
-    recordKey = (kind, { slug, resource, resourceId = "" }) => `ce-storage-${kind}:${sessionSlugStorageKey(slug)}:${trim9(resource)}:${lower5(resourceId)}`;
+    isOwnedStorageResource = (resource) => OWNED_STORAGE_RESOURCES.includes(trim10(resource));
+    recordKey = (kind, { slug, resource, resourceId = "" }) => `ce-storage-${kind}:${sessionSlugStorageKey(slug)}:${trim10(resource)}:${lower5(resourceId)}`;
     readJsonRecord = async (index, key) => {
       const raw = await index.get(key);
       if (raw == null || raw === "") return null;
@@ -70830,11 +71059,11 @@ var init_storageResourceOwnership = __esm({
     readStorageResourceOwner = ({ index, slug, resource, resourceId }) => readJsonRecord(index, recordKey("owner", { slug, resource, resourceId }));
     writeStorageResourceOwner = ({ index, slug, resource, resourceId, uploader, storageRefId, createdAt }) => index.put(recordKey("owner", { slug, resource, resourceId }), JSON.stringify({
       version: 1,
-      resource: trim9(resource),
+      resource: trim10(resource),
       resourceId: lower5(resourceId),
       uploader: lower5(uploader),
-      storageRefId: trim9(storageRefId),
-      createdAt: trim9(createdAt)
+      storageRefId: trim10(storageRefId),
+      createdAt: trim10(createdAt)
     }));
     isStorageResourceHidden = async ({ index, slug, resource, resourceId }) => (await readJsonRecord(index, recordKey("hidden", { slug, resource, resourceId })))?.hidden === true;
     writeStorageResourceHidden = ({ index, slug, resource, resourceId, hidden, actor, updatedAt }) => {
@@ -70843,10 +71072,10 @@ var init_storageResourceOwnership = __esm({
       return index.put(key, JSON.stringify({
         version: 1,
         hidden: true,
-        resource: trim9(resource),
+        resource: trim10(resource),
         resourceId: lower5(resourceId),
         updatedBy: lower5(actor),
-        updatedAt: trim9(updatedAt)
+        updatedAt: trim10(updatedAt)
       }));
     };
     hiddenStorageResourcePrefix = ({ slug, resource }) => recordKey("hidden", { slug, resource });
@@ -70861,10 +71090,10 @@ var init_storageResourceOwnership = __esm({
         (Array.isArray(listed?.keys) ? listed.keys : []).forEach((entry2) => {
           budget?.rows();
           if (budget) budget.metadata(entry2);
-          const id2 = trim9(entry2?.name || entry2).slice(prefix.length);
+          const id2 = trim10(entry2?.name || entry2).slice(prefix.length);
           if (id2) ids.add(id2);
         });
-        cursor = listed?.list_complete === false ? trim9(listed?.cursor) : "";
+        cursor = listed?.list_complete === false ? trim10(listed?.cursor) : "";
         if (listed?.list_complete === false && (!cursor || seenCursors.has(cursor))) throw new Error("Cloudflare hidden-resource cursor is unavailable or did not advance.");
         if (cursor) seenCursors.add(cursor);
       } while (cursor);
@@ -71017,7 +71246,7 @@ var init_storageScanBudget = __esm({
 });
 
 // workers/sessionCorsWorker/responseAnswerValidation.js
-var decoder5, isObj16, trim10, lower6, parseJson, refusal, listUploadedAnswers, isBlank, isMaskedQuestion, readQuestionVersions, readQuestionPayloads, QUESTION_SET_TTL_MS, MAX_CACHED_SESSIONS, MAX_CACHED_PAYLOAD_BYTES, questionSets, forgetSessionQuestions, sessionQuestionSet, loadQuestionSet, questionPayloadsOf, agentKv, readProposedQuestion, countProposedQuestions, countSessionQuestions, findAnsweredQuestions, checkUploadedAnswers;
+var decoder5, isObj16, trim11, lower6, parseJson, refusal, listUploadedAnswers, isBlank, isMaskedQuestion, readQuestionVersions, readQuestionPayloads, QUESTION_SET_TTL_MS, MAX_CACHED_SESSIONS, MAX_CACHED_PAYLOAD_BYTES, questionSets, forgetSessionQuestions, sessionQuestionSet, loadQuestionSet, questionPayloadsOf, agentKv, readProposedQuestion, countProposedQuestions, countSessionQuestions, findAnsweredQuestions, checkUploadedAnswers;
 var init_responseAnswerValidation = __esm({
   "workers/sessionCorsWorker/responseAnswerValidation.js"() {
     init_answerValue();
@@ -71030,8 +71259,8 @@ var init_responseAnswerValidation = __esm({
     init_storage();
     decoder5 = new TextDecoder();
     isObj16 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-    trim10 = (value) => typeof value === "string" ? value.trim() : "";
-    lower6 = (value) => trim10(value).toLowerCase();
+    trim11 = (value) => typeof value === "string" ? value.trim() : "";
+    lower6 = (value) => trim11(value).toLowerCase();
     parseJson = (bytes3) => {
       try {
         return bytes3 ? JSON.parse(decoder5.decode(bytes3)) : null;
@@ -71043,7 +71272,7 @@ var init_responseAnswerValidation = __esm({
     listUploadedAnswers = (payload) => (Array.isArray(payload?.responses) ? payload.responses : [payload]).filter(isObj16).map((item) => {
       const field = item.answer;
       return {
-        rawQuestionId: trim10(item.questionID || item.questionId),
+        rawQuestionId: trim11(item.questionID || item.questionId),
         questionId: lower6(item.questionID || item.questionId),
         value: isObj16(field) ? field.value : field,
         encrypted: isObj16(field) && field.encrypted === true
@@ -71065,9 +71294,9 @@ var init_responseAnswerValidation = __esm({
         candidates.push({
           resourceId,
           metadata,
-          createdAtMs: Date.parse(trim10(metadata.createdAt)) || 0,
-          storageRefId: trim10(metadata.id),
-          uploader: trim10(metadata.uploader),
+          createdAtMs: Date.parse(trim11(metadata.createdAt)) || 0,
+          storageRefId: trim11(metadata.id),
+          uploader: trim11(metadata.uploader),
           uploadAuthority: metadata.uploadAuthority
         });
       }
@@ -71079,7 +71308,7 @@ var init_responseAnswerValidation = __esm({
       const bulk = await readStoredCloudflarePayloadsBulk({ env, index, slug, metadataList: readable, budget });
       const payloads = /* @__PURE__ */ new Map();
       for (const metadata of readable) {
-        const id2 = trim10(metadata.id);
+        const id2 = trim11(metadata.id);
         let bytes3 = bulk.has(id2) ? bulk.get(id2) : await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget });
         if (bytes3 && isObj16(metadata.envelope)) {
           try {
@@ -71120,7 +71349,7 @@ var init_responseAnswerValidation = __esm({
       let sets = questionSets.get(index);
       if (!sets) questionSets.set(index, sets = /* @__PURE__ */ new Map());
       const key = `${sessionSlugStorageKey(slug)}
-${trim10(config?.sessionId)}`;
+${trim11(config?.sessionId)}`;
       const state2 = sets.get(key) || { generation: 0, cached: null };
       sets.delete(key);
       sets.set(key, state2);
@@ -71137,7 +71366,7 @@ ${trim10(config?.sessionId)}`;
       const found = /* @__PURE__ */ new Map();
       const missing = [];
       for (const metadata of metadataList) {
-        const id2 = trim10(metadata.id);
+        const id2 = trim11(metadata.id);
         if (set.payloads.has(id2)) found.set(id2, set.payloads.get(id2));
         else missing.push(metadata);
       }
@@ -71155,7 +71384,7 @@ ${trim10(config?.sessionId)}`;
     };
     agentKv = ({ env, config }) => {
       try {
-        return createAgentStorage({ kv: env.GROUP_KV, sessionId: trim10(config?.sessionId) });
+        return createAgentStorage({ kv: env.GROUP_KV, sessionId: trim11(config?.sessionId) });
       } catch {
         return null;
       }
@@ -71178,7 +71407,7 @@ ${trim10(config?.sessionId)}`;
       const wantedPayloads = await questionPayloadsOf({ env, config, index, slug, set, metadataList: wanted, deps });
       for (const answer of answers) {
         const candidate = set.current.get(answer.questionId);
-        if (candidate) questions.set(answer.questionId, wantedPayloads.get(trim10(candidate.metadata.id)) || null);
+        if (candidate) questions.set(answer.questionId, wantedPayloads.get(trim11(candidate.metadata.id)) || null);
       }
       if (answers.some((answer) => !questions.has(answer.questionId)) && set.untrusted.length) {
         for (const [, question] of await questionPayloadsOf({ env, config, index, slug, set, metadataList: set.untrusted, deps })) {
@@ -71211,7 +71440,7 @@ ${trim10(config?.sessionId)}`;
           return refusal(422, "This answer is for a question this session does not have. Reload the session and try again.", "response_question_unknown");
         }
         const question = questions.get(answer.questionId);
-        const type = question && trim10(question.type || question.questionType);
+        const type = question && trim11(question.type || question.questionType);
         if (!QUESTION_TYPES2.includes(type) || answer.encrypted || isBlank(answer.value) || isMaskedQuestion(question)) continue;
         const checked = normalizeAnswerValue({ ...question, type }, answer.value, { maxFreeformLength: Infinity });
         if (!checked.ok) return refusal(422, `This answer can't be saved: ${checked.error}`, "response_answer_invalid");
@@ -71512,223 +71741,6 @@ var init_draftTextRoute = __esm({
   }
 });
 
-// shared/aiDefaults.mjs
-var DEFAULT_AI_MODEL, DEFAULT_AI_MODELS, DEFAULT_ANTHROPIC_MODEL, TRANSCRIPTION_FALLBACK_MODEL, GROUP_TRANSCRIPTION_MODEL;
-var init_aiDefaults = __esm({
-  "shared/aiDefaults.mjs"() {
-    DEFAULT_AI_MODEL = "gpt-6.1-terra";
-    DEFAULT_AI_MODELS = Object.freeze({ fast: DEFAULT_AI_MODEL, thinking: "gpt-6.1-sol" });
-    DEFAULT_ANTHROPIC_MODEL = "claude-opus-5-5";
-    TRANSCRIPTION_FALLBACK_MODEL = "whisper-1";
-    GROUP_TRANSCRIPTION_MODEL = "gpt-4o-transcribe-diarize";
-  }
-});
-
-// shared/aiModelFamily.mjs
-var toModelLeaf, inferAiProviderFromModel, isGpt5Or6, isOSeries, isOpenAiReasoningModel, usesOpenAiResponsesApi, takesLongReply, interviewMapOutputTokens, LADDER, GPT_FULL, GPT_FROM_LOW, GPT_5, GPT_5_POINT, LOW_TO_HIGH, CLAUDE, reasoningEffortsOf, takesReasoningEffort, fitReasoningEffort;
-var init_aiModelFamily = __esm({
-  "shared/aiModelFamily.mjs"() {
-    toModelLeaf = (model) => String(model ?? "").trim().toLowerCase().split("/").pop() || "";
-    inferAiProviderFromModel = (model) => {
-      const name = String(model ?? "").trim().toLowerCase();
-      if (!name) return "";
-      if (name.startsWith("claude")) return "anthropic";
-      if (/^(?:gpt-|o[1-9]|chatgpt)/.test(name)) return "openai";
-      if (name.startsWith("@cf/")) return "workers-ai";
-      return name.includes("/") ? "openrouter" : "";
-    };
-    isGpt5Or6 = (leaf) => /^gpt-[56](?:$|[.-])/.test(leaf);
-    isOSeries = (leaf) => /^o[1-9](?:$|-)/.test(leaf);
-    isOpenAiReasoningModel = (model) => {
-      const leaf = toModelLeaf(model);
-      return isGpt5Or6(leaf) || isOSeries(leaf);
-    };
-    usesOpenAiResponsesApi = ({ provider = "", model = "", endpoint = "" } = {}) => {
-      if (String(provider || "").trim().toLowerCase() !== "openai") return false;
-      const route = String(endpoint || "").trim().toLowerCase();
-      return route === "responses" || route.includes("/responses") || isGpt5Or6(toModelLeaf(model));
-    };
-    takesLongReply = (model) => {
-      const leaf = toModelLeaf(model);
-      if (/-chat(?:$|-)/.test(leaf)) return false;
-      return isGpt5Or6(leaf) || isOSeries(leaf) || /^gpt-4\.1(?:$|-)/.test(leaf) || /^claude-(?:opus|sonnet|haiku|fable|mythos)-(?:[5-9]|4[.-][5-9])(?:$|[.-])/.test(leaf);
-    };
-    interviewMapOutputTokens = (model, provider = "") => String(provider || "").trim().toLowerCase() !== "custom" && takesLongReply(model) ? 32e3 : 8e3;
-    LADDER = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
-    GPT_FULL = Object.freeze(["none", "low", "medium", "high", "xhigh", "max"]);
-    GPT_FROM_LOW = Object.freeze(["low", "medium", "high", "xhigh", "max"]);
-    GPT_5 = Object.freeze(["minimal", "low", "medium", "high"]);
-    GPT_5_POINT = Object.freeze(["none", "low", "medium", "high"]);
-    LOW_TO_HIGH = Object.freeze(["low", "medium", "high"]);
-    CLAUDE = Object.freeze(["low", "medium", "high", "xhigh", "max"]);
-    reasoningEffortsOf = (model) => {
-      const leaf = toModelLeaf(model);
-      if (/^gpt-6(?:\.\d+)?-(?:sol|astra)(?:$|-)/.test(leaf)) return GPT_FROM_LOW;
-      if (/^gpt-(?:5\.6|6)(?:$|[.-])/.test(leaf)) return GPT_FULL;
-      if (/^gpt-5(?:-mini|-nano)?(?:-\d{4}-\d{2}-\d{2})?$/.test(leaf)) return GPT_5;
-      if (isGpt5Or6(leaf)) return GPT_5_POINT;
-      if (isOSeries(leaf)) return LOW_TO_HIGH;
-      if (/^claude-(?:opus|sonnet|haiku|fable|mythos)-[5-9]/.test(leaf)) return CLAUDE;
-      if (/^claude-(?:opus-4-[5-9]|sonnet-4-[6-9])/.test(leaf)) return LOW_TO_HIGH;
-      return null;
-    };
-    takesReasoningEffort = (model) => reasoningEffortsOf(model) !== null;
-    fitReasoningEffort = (model, effort) => {
-      const wanted = String(effort ?? "").trim().toLowerCase();
-      const accepted = reasoningEffortsOf(model);
-      if (!wanted || !accepted || accepted.includes(wanted)) return wanted;
-      const rank = LADDER.includes(wanted) ? LADDER.indexOf(wanted) : LADDER.indexOf("low");
-      return accepted.find((level) => LADDER.indexOf(level) >= rank) || accepted[accepted.length - 1];
-    };
-  }
-});
-
-// workers/sessionCorsWorker/aiModelParams.js
-var isChatReasoningModel, applyChatCompletionBudget, resolveResponsesOutputTokens;
-var init_aiModelParams = __esm({
-  "workers/sessionCorsWorker/aiModelParams.js"() {
-    init_aiModelFamily();
-    init_aiModelFamily();
-    isChatReasoningModel = ({ model = "", thinking = false } = {}) => thinking === true || isOpenAiReasoningModel(model);
-    applyChatCompletionBudget = ({
-      body,
-      model = "",
-      thinking = false,
-      max_tokens,
-      max_completion_tokens,
-      temperature,
-      defaultMaxCompletionTokens = 16e3,
-      defaultMaxTokens = 2048,
-      defaultTemperature = 0.7
-    } = {}) => {
-      const target = body && typeof body === "object" ? body : {};
-      if (isChatReasoningModel({ model, thinking })) {
-        target.max_completion_tokens = max_completion_tokens ?? max_tokens ?? defaultMaxCompletionTokens;
-        delete target.max_tokens;
-        delete target.temperature;
-        return target;
-      }
-      target.max_tokens = max_tokens ?? defaultMaxTokens;
-      target.temperature = temperature !== void 0 ? temperature : defaultTemperature;
-      delete target.max_completion_tokens;
-      return target;
-    };
-    resolveResponsesOutputTokens = ({
-      max_output_tokens,
-      max_completion_tokens,
-      max_tokens,
-      fallback = 16e3
-    } = {}) => max_output_tokens ?? max_completion_tokens ?? max_tokens ?? fallback;
-  }
-});
-
-// workers/sessionCorsWorker/aiRequestPolicy.js
-var trim11, record4, tasks, taskName, modelEntry, configuredModels, resolveSessionAiModel, AI_MODEL_NOT_ALLOWED, isSessionTranscriptionModelAllowed, operationCeilings, tokenFields, effortOrder, minimumTaskEffort, configuredFunctions, boundSessionAiRequest;
-var init_aiRequestPolicy = __esm({
-  "workers/sessionCorsWorker/aiRequestPolicy.js"() {
-    init_aiDefaults();
-    init_aiModelFamily();
-    init_aiModelParams();
-    trim11 = (value) => typeof value === "string" ? value.trim() : "";
-    record4 = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
-    tasks = /* @__PURE__ */ new Set(["generate", "rewrite", "summarize", "rank", "analysis", "compare", "categorize", "interview-map", "interview-opening", "context-read", "context-card", "session-agent"]);
-    taskName = (payload) => tasks.has(payload?.taskType) ? payload.taskType : "";
-    modelEntry = (entry2, provider, fallback = DEFAULT_AI_MODEL) => {
-      const obj = record4(entry2);
-      return {
-        model: trim11(obj.model || obj.name || obj.value || entry2) || fallback,
-        provider: (trim11(obj.provider) || provider || "openai").toLowerCase()
-      };
-    };
-    configuredModels = (config, task) => {
-      const ai = record4(config?.ai);
-      const models2 = record4(ai.models);
-      const providers = record4(ai.modelProviders);
-      const provider = trim11(ai.mode || ai.provider).toLowerCase() || "openai";
-      const fallback = trim11(ai.model) || DEFAULT_AI_MODEL;
-      const fast = modelEntry(models2.fast || models2.default, trim11(providers.fast || providers.default) || provider, fallback);
-      const thinking = modelEntry(models2.thinking || models2.reasoning, trim11(providers.thinking || providers.reasoning) || provider, fallback);
-      const feature = task && models2[task] ? modelEntry(models2[task], trim11(providers[task]) || provider, fallback) : null;
-      return { fast, thinking, feature, ...trim11(ai.model) ? { default: modelEntry(ai.model, provider) } : {} };
-    };
-    resolveSessionAiModel = (config, { taskType = "", modelType = "fast" } = {}) => {
-      const models2 = configuredModels(config, tasks.has(taskType) ? taskType : "");
-      return models2.feature || models2[modelType === "thinking" ? "thinking" : "fast"];
-    };
-    AI_MODEL_NOT_ALLOWED = Object.freeze({
-      error: "This model is not allowed on the session's AI key. Use the session model or your own key.",
-      reason: "ai_model_not_allowed"
-    });
-    isSessionTranscriptionModelAllowed = ({ config, provider, model, groupSpeakerLabels = false }) => {
-      const ai = record4(config?.ai);
-      const entry2 = record4(ai.models?.transcription || ai.transcription);
-      if (groupSpeakerLabels && provider === "openai" && model === GROUP_TRANSCRIPTION_MODEL && (trim11(entry2.provider).toLowerCase() || "openai") === "openai") return true;
-      return provider === (trim11(entry2.provider).toLowerCase() || "openai") && model === (trim11(entry2.model) || TRANSCRIPTION_FALLBACK_MODEL);
-    };
-    operationCeilings = Object.freeze({
-      generate: 16e3,
-      rewrite: 16e3,
-      summarize: 16e3,
-      rank: 16e3,
-      compare: 16e3,
-      categorize: 16e3,
-      analysis: 7e3,
-      // One short question, but models that think spend part of the cap on thinking.
-      "interview-opening": 2e3,
-      // A context PDF's text, read once by an admin's request.
-      "context-read": 8e3,
-      // A context source's card: a summary, tags and names, thinking included.
-      "context-card": 1500,
-      // One Session Agent answer of at most 150 words, thinking included.
-      "session-agent": 3e3
-    });
-    tokenFields = ["max_tokens", "max_completion_tokens", "max_output_tokens", "max_tokens_to_sample", "maxTokens"];
-    effortOrder = ["none", "minimal", "low", "medium", "high"];
-    minimumTaskEffort = Object.freeze({ "interview-map": "medium" });
-    configuredFunctions = (config) => {
-      const value = config?.ai?.providers?.custom?.functions ?? config?.ai?.custom?.functions;
-      if (typeof value !== "string") return value;
-      try {
-        return JSON.parse(value);
-      } catch {
-        return value.trim() || void 0;
-      }
-    };
-    boundSessionAiRequest = ({ payload = {}, provider, config, requestKey = "" }) => {
-      if (requestKey) return { ok: true, payload };
-      const task = taskName(payload);
-      const models2 = configuredModels(config, task);
-      const allowed = Object.values(models2).filter((entry2) => entry2?.provider === provider);
-      const model = trim11(payload.model) || (models2.feature?.provider === provider ? models2.feature.model : allowed[0]?.model);
-      if (!model || !allowed.some((entry2) => entry2.model === model)) return { ok: false, ...AI_MODEL_NOT_ALLOWED };
-      const reasoning = isChatReasoningModel({ model }) || models2.thinking.provider === provider && models2.thinking.model === model;
-      const responses = usesOpenAiResponsesApi({ provider, model, endpoint: payload.endpoint });
-      const ceiling = task === "interview-map" ? interviewMapOutputTokens(model, provider) : operationCeilings[task] || (reasoning || responses ? 16e3 : 2048);
-      const requested = tokenFields.filter((key) => Object.hasOwn(payload, key)).map((key) => {
-        const value = payload[key];
-        return typeof value === "number" && Number.isFinite(value) && value >= 1 ? Math.floor(value) : ceiling;
-      });
-      const tokens = Math.min(ceiling, ...requested);
-      const ai = record4(config?.ai);
-      const savedEffort = ai.taskReasoningEffort?.[task] || task === "analysis" && ai.taskReasoningEffort?.generate || ai.reasoningEffort || ai.reasoning_effort || "low";
-      const sessionEffort = ["low", "medium", "high"].includes(savedEffort) ? savedEffort : "low";
-      const floor = ai.taskReasoningEffort?.[task] ? "" : minimumTaskEffort[task];
-      const maximumEffort = floor && effortOrder.indexOf(floor) > effortOrder.indexOf(sessionEffort) ? floor : sessionEffort;
-      const requestedEffort = trim11(payload.reasoning_effort || payload.reasoningEffort || payload.reasoning?.effort);
-      const effort = effortOrder.includes(requestedEffort) && effortOrder.indexOf(requestedEffort) < effortOrder.indexOf(maximumEffort) ? requestedEffort : maximumEffort;
-      const bounded = { ...payload, model, service_tier: "default", reasoning_effort: effort, thinking: reasoning };
-      for (const key of tokenFields) bounded[key] = tokens;
-      delete bounded.tools;
-      delete bounded.functions;
-      if (provider === "custom") {
-        const functions = configuredFunctions(config);
-        if (functions) bounded.functions = functions;
-      }
-      return { ok: true, payload: bounded };
-    };
-  }
-});
-
 // workers/sessionCorsWorker/aiProviderExecution.js
 var ANTHROPIC_URL, OPENAI_CHAT_URL, OPENAI_RESPONSES_URL, OPENROUTER_CHAT_URL, CUSTOM_RPC_URL_OVERRIDE_REQUIRES_REQUEST_KEY_ERROR, extractOpenAiCompletion, normalizeComparableRpcUrl, resolveJson, jsonSchemaOf, toResponsesTextFormat, claudeOutputConfig, proxyAnthropic, proxyOpenAI, proxyOpenRouter, answerText, workersAiReply, workersAiAnswer, WORKERS_AI_BUSY, proxyWorkersAi, proxyCustomRPC;
 var init_aiProviderExecution = __esm({
@@ -71952,7 +71964,7 @@ var init_aiProviderExecution = __esm({
           temperature
         });
       }
-      const response3 = await fetchImpl(
+      const send = () => fetchImpl(
         useResponses ? constants?.openAiResponsesUrl || OPENAI_RESPONSES_URL : constants?.openAiChatUrl || OPENAI_CHAT_URL,
         {
           method: "POST",
@@ -71960,7 +71972,13 @@ var init_aiProviderExecution = __esm({
           body: JSON.stringify(body)
         }
       );
-      const data = await response3.json().catch(() => ({}));
+      let response3 = await send();
+      let data = await response3.json().catch(() => ({}));
+      if (response3.status === 400 && body.service_tier !== "default" && body.service_tier !== "auto" && (data?.error?.param === "service_tier" || /service[_ ]tier/i.test(String(data?.error?.message || "")))) {
+        body.service_tier = "default";
+        response3 = await send();
+        data = await response3.json().catch(() => ({}));
+      }
       if (!response3.ok) {
         const retryAfter = response3.headers?.get?.("retry-after");
         const responseHeaders = new Headers(baseHeaders);
