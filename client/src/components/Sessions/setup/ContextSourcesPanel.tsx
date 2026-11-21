@@ -117,11 +117,16 @@ type Props = {
   onSourcesChange?: (sources: ContextSource[]) => void;
   /** A list the page already reads; the panel then reads none of its own. */
   list?: SessionContextSourcesState;
+  /**
+   * The page's own box for adding, shown in place of the panel's: it sits behind the same checks, so nothing
+   * is offered where the session's Worker cannot take it.
+   */
+  addBox?: React.ReactNode;
 };
 
 // The session's context files and links: admins add, refresh, read with
 // the session's AI and remove them. Changes apply at once, not on Save.
-const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, onSourcesChange, list }: Props) => {
+const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, onSourcesChange, list, addBox = null }: Props) => {
   const own = useSessionContextSources({ sessionSlug, sessionConfig, account, enabled: !list });
   const { sources, loading, error, supported, cardsSupported, reload } = list || own;
   const [workerReady, setWorkerReady] = useState<boolean | null>(null);
@@ -230,6 +235,8 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, onSourcesCha
 
   return (
     <div className={styles.listRowBody} data-testid="ce-context-sources">
+      {/* The page's own box leads, since Add is what opened this; the panel's own follows its list. */}
+      {addBox}
       {loading ? <p className={styles.hint}>Loading files and links…</p> : null}
       {error ? <p className={styles.errorText}>{error}</p> : null}
       {sources.length ? (
@@ -341,144 +348,146 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, onSourcesCha
         </div>
       ) : null}
       {/* The question tools' add row in its own box: one row to add a link or pick a file, then who may read it. */}
-      <div className={styles.contextAddBox} data-testid="ce-context-add-box">
-        <div className={styles.fieldLabelRow}>
-          <span className={styles.fieldLabel}>Add a link or a file</span>
-          <SetupHelp id="ce-context-add" label="adding a link or a file" help={ADD_HELP} />
-        </div>
-        <div className={styles.addSourceControls}>
-          <div className={styles.urlInputContainer}>
-            <Input
-              id="ce-context-link-url"
-              type="url"
-              value={linkUrl}
-              maxLength={CONTEXT_SOURCE_LIMITS.urlChars}
-              placeholder="Add URL"
-              aria-label="Add a link"
-              aria-describedby={setupHelpId('ce-context-add')}
-              className={styles.urlInputField}
-              data-testid="ce-context-link-url"
-              onChange={(event) => setLinkUrl(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key !== 'Enter') return;
-                event.preventDefault();
-                addLink();
-              }}
-            />
-            <CompactImageChooser
-              className={styles.inlineImageChooser}
-              showUrlModeButton={false}
-              isUploadMode
-              showUrlInput={false}
-              key={fileKey}
-              fileInputTestId="ce-context-file"
-              accept={contextFileAccept({ images: cardsSupported })}
-              uploadAriaLabel="Upload a file to add"
-              fileInputRef={fileInput}
-              disabled={busy}
-              onPaste={() => void pasteLink()}
-              onUploadClick={() => fileInput.current?.click()}
-              onFileChange={(event) => setFile(event.target.files?.[0] || null)}
-            />
-            <button
-              type="button"
-              className={styles.internalUrlAddBtn}
-              disabled={busy || !linkUrl.trim() || linkNeedsOtherAudience}
-              title={`Add link for ${audience}`}
-              aria-label={`Add link for ${audience}`}
-              data-testid="ce-context-add-link"
-              onClick={addLink}
-            >
-              <FontAwesomeIcon icon={faPlus} />
-            </button>
+      {addBox ? null : (
+        <div className={styles.contextAddBox} data-testid="ce-context-add-box">
+          <div className={styles.fieldLabelRow}>
+            <span className={styles.fieldLabel}>Add a link or a file</span>
+            <SetupHelp id="ce-context-add" label="adding a link or a file" help={ADD_HELP} />
           </div>
-        </div>
-        {linkUrl.trim() ? (
-          <Input
-            id="ce-context-link-title"
-            value={linkTitle}
-            maxLength={CONTEXT_SOURCE_LIMITS.titleChars}
-            placeholder="Link title (optional): the page’s own title if left empty"
-            aria-label="Link title"
-            className={styles.contextAddTitle}
-            onChange={(event) => setLinkTitle(event.target.value)}
-          />
-        ) : null}
-        {linkUrl.trim() && !linkNeedsOtherAudience ? (
-          <p className={styles.hint} data-testid="ce-context-link-audience">
-            This link will be for {audience}.
-          </p>
-        ) : null}
-        {linkUrl.trim() && linkNeedsOtherAudience ? (
-          <p className={styles.hint} data-testid="ce-context-link-audience-hint">
-            A link can be for everyone or for admins only. Change “Visible to” to add it.
-          </p>
-        ) : null}
-        {file ? (
-          <div className={styles.contextAddFile} data-testid="ce-context-chosen-file">
-            <span className={styles.readOnlyValue}>{file.name}</span>
-            {fileIsAiRead ? (
-              <SetupCheck
-                id="ce-context-file-analyze"
-                label="Analyze with the session’s AI"
-                help={CONTEXT_ANALYZE_HELP}
-                checked={analyze}
-                onChange={setAnalyze}
-                testId="ce-context-file-analyze"
-              />
-            ) : null}
-            <div className={styles.buttonRow}>
-              <button
-                type="button"
-                className={`${styles.button} ${styles.primaryButton}`}
-                disabled={busy || !!fileProblem}
-                data-testid="ce-context-add-file"
-                onClick={() =>
-                  void run('Adding the file…', async () => {
-                    const id = await uploadContextFile({ file, ...access }, options);
-                    setFile(null);
-                    setFileKey((key) => key + 1);
-                    if (!(analyze && fileIsAiRead)) return 'File added.';
-                    setStatus('File added. The session’s AI is reading it…');
-                    try {
-                      await readContextPdf(id, options);
-                      return 'File added and read by the session’s AI.';
-                    } catch (failure) {
-                      return `File added, but the session’s AI could not read it: ${failure instanceof Error ? failure.message : 'try Read with AI.'}`;
-                    }
-                  })
-                }
-              >
-                Add file for {audience}
-              </button>
-              <button
-                type="button"
-                className={styles.button}
-                disabled={busy}
-                onClick={() => {
-                  setFile(null);
-                  setFileKey((key) => key + 1);
-                  // The row goes with its buttons, so focus goes back to the box.
-                  document.getElementById('ce-context-link-url')?.focus();
+          <div className={styles.addSourceControls}>
+            <div className={styles.urlInputContainer}>
+              <Input
+                id="ce-context-link-url"
+                type="url"
+                value={linkUrl}
+                maxLength={CONTEXT_SOURCE_LIMITS.urlChars}
+                placeholder="Add URL"
+                aria-label="Add a link"
+                aria-describedby={setupHelpId('ce-context-add')}
+                className={styles.urlInputField}
+                data-testid="ce-context-link-url"
+                onChange={(event) => setLinkUrl(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return;
+                  event.preventDefault();
+                  addLink();
                 }}
+              />
+              <CompactImageChooser
+                className={styles.inlineImageChooser}
+                showUrlModeButton={false}
+                isUploadMode
+                showUrlInput={false}
+                key={fileKey}
+                fileInputTestId="ce-context-file"
+                accept={contextFileAccept({ images: cardsSupported })}
+                uploadAriaLabel="Upload a file to add"
+                fileInputRef={fileInput}
+                disabled={busy}
+                onPaste={() => void pasteLink()}
+                onUploadClick={() => fileInput.current?.click()}
+                onFileChange={(event) => setFile(event.target.files?.[0] || null)}
+              />
+              <button
+                type="button"
+                className={styles.internalUrlAddBtn}
+                disabled={busy || !linkUrl.trim() || linkNeedsOtherAudience}
+                title={`Add link for ${audience}`}
+                aria-label={`Add link for ${audience}`}
+                data-testid="ce-context-add-link"
+                onClick={addLink}
               >
-                Cancel
+                <FontAwesomeIcon icon={faPlus} />
               </button>
             </div>
           </div>
-        ) : null}
-        {fileProblem ? <p className={styles.errorText}>{fileProblem}</p> : null}
-        <SetupField id="ce-context-file-access" label="Visible to" help={ACCESS_HELP}>
-          <ContextAccessPicker
-            id="ce-context-file-access"
-            value={access}
-            groups={groups}
-            allowAdminsOnly
-            data-testid="ce-context-file-access"
-            onChange={setAccess}
-          />
-        </SetupField>
-      </div>
+          {linkUrl.trim() ? (
+            <Input
+              id="ce-context-link-title"
+              value={linkTitle}
+              maxLength={CONTEXT_SOURCE_LIMITS.titleChars}
+              placeholder="Link title (optional): the page’s own title if left empty"
+              aria-label="Link title"
+              className={styles.contextAddTitle}
+              onChange={(event) => setLinkTitle(event.target.value)}
+            />
+          ) : null}
+          {linkUrl.trim() && !linkNeedsOtherAudience ? (
+            <p className={styles.hint} data-testid="ce-context-link-audience">
+              This link will be for {audience}.
+            </p>
+          ) : null}
+          {linkUrl.trim() && linkNeedsOtherAudience ? (
+            <p className={styles.hint} data-testid="ce-context-link-audience-hint">
+              A link can be for everyone or for admins only. Change “Visible to” to add it.
+            </p>
+          ) : null}
+          {file ? (
+            <div className={styles.contextAddFile} data-testid="ce-context-chosen-file">
+              <span className={styles.readOnlyValue}>{file.name}</span>
+              {fileIsAiRead ? (
+                <SetupCheck
+                  id="ce-context-file-analyze"
+                  label="Analyze with the session’s AI"
+                  help={CONTEXT_ANALYZE_HELP}
+                  checked={analyze}
+                  onChange={setAnalyze}
+                  testId="ce-context-file-analyze"
+                />
+              ) : null}
+              <div className={styles.buttonRow}>
+                <button
+                  type="button"
+                  className={`${styles.button} ${styles.primaryButton}`}
+                  disabled={busy || !!fileProblem}
+                  data-testid="ce-context-add-file"
+                  onClick={() =>
+                    void run('Adding the file…', async () => {
+                      const id = await uploadContextFile({ file, ...access }, options);
+                      setFile(null);
+                      setFileKey((key) => key + 1);
+                      if (!(analyze && fileIsAiRead)) return 'File added.';
+                      setStatus('File added. The session’s AI is reading it…');
+                      try {
+                        await readContextPdf(id, options);
+                        return 'File added and read by the session’s AI.';
+                      } catch (failure) {
+                        return `File added, but the session’s AI could not read it: ${failure instanceof Error ? failure.message : 'try Read with AI.'}`;
+                      }
+                    })
+                  }
+                >
+                  Add file for {audience}
+                </button>
+                <button
+                  type="button"
+                  className={styles.button}
+                  disabled={busy}
+                  onClick={() => {
+                    setFile(null);
+                    setFileKey((key) => key + 1);
+                    // The row goes with its buttons, so focus goes back to the box.
+                    document.getElementById('ce-context-link-url')?.focus();
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {fileProblem ? <p className={styles.errorText}>{fileProblem}</p> : null}
+          <SetupField id="ce-context-file-access" label="Visible to" help={ACCESS_HELP}>
+            <ContextAccessPicker
+              id="ce-context-file-access"
+              value={access}
+              groups={groups}
+              allowAdminsOnly
+              data-testid="ce-context-file-access"
+              onChange={setAccess}
+            />
+          </SetupField>
+        </div>
+      )}
       {status ? (
         <p className={styles.statusText} role="status" data-testid="ce-context-sources-status">
           {status}

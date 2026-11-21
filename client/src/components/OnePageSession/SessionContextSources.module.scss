@@ -183,3 +183,151 @@
   font-weight: 600;
   text-decoration: underline;
 }
+
+// The one box that adds a note, a link or a file. It sits on the add panel's own surface, so it takes the
+// authoring colours that read there in every theme.
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  // Room before an admin's list of files below it.
+  margin-bottom: 14px;
+}
+
+.composerBox {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 6px 6px 6px 10px;
+  border: 1px solid var(--ce-authoring-input-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-authoring-input-bg);
+  color: var(--ce-authoring-input-text);
+
+  &:focus-within {
+    border-color: var(--ce-focus-ring);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-focus-ring) 25%, transparent);
+  }
+}
+
+// A file held over the box: it can be let go here.
+.composerBoxDragging {
+  border-style: dashed;
+  border-color: var(--ce-focus-ring);
+}
+
+// Named with the box and the element, so the add panel's own rule for text areas does not paint a second fill
+// inside the box.
+.composerBox textarea.composerText {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 4.5rem;
+  padding: 6px 4px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  resize: vertical;
+
+  // The box around it shows the focus, so the text area draws no second ring inside it.
+  &:focus,
+  &:focus-visible {
+    outline: none !important;
+  }
+
+  &::placeholder {
+    color: var(--ce-authoring-input-placeholder);
+  }
+}
+
+.composerFile {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 4.5rem;
+  padding: 6px 4px;
+  font-weight: 600;
+
+  > span:first-of-type {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ce-radius-6);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: 1px;
+    }
+  }
+}
+
+.composerFileSize {
+  flex: none;
+  font-size: 0.85rem;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.composerAttach {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ce-radius-6);
+  background: transparent;
+  color: var(--ce-authoring-control-text);
+  font-size: 1.1rem;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--ce-authoring-control-bg);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 1px;
+  }
+}
+
+.composerHint {
+  flex: 1 0 100%;
+  margin: 2px 4px 2px;
+  color: var(--ce-authoring-input-placeholder);
+  font-size: 0.82rem;
+}
+
+// "Visible to" and Add on one line where there is room, Add at the end.
+.composerFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 10px 12px;
+
+  > :first-child {
+    flex: 1 1 220px;
+    min-width: 0;
+  }
+}

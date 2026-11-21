@@ -92,10 +92,13 @@ may have the AI read it once (see [PDFs and images](#pdfs-and-images)).
   **Analyze with the session's AI**, and, unless unticked, reads each link's
   page for the AI. After a reload only the file names remain, to attach again.
 - **The session page's Context section**, when open, has **Add** and **View** in
-  its header, as the Tool Explorer does. **Add** opens a form to add a file, with
-  who can read it, and a link where the Worker takes participants' links, for
-  someone signed in, or **Manage files and links** for an admin; **Remove** sits
-  beside their own items. Its first list asks someone
+  its header, as the Tool Explorer does. **Add** opens one box for someone
+  signed in: what is typed is added as a note, or as a link when it is a lone
+  https:// address and the Worker takes their links; a file is attached or
+  dropped onto it. **Visible to** beside **Add** says who can read it, and a
+  line under the box says what will be added and for whom. An admin gets the
+  same box, with admins only as a choice, above **Manage files and links**;
+  **Remove** sits beside their own items. Its first list asks someone
   signed in to sign in to the session if their browser holds no Worker token
   yet, as in a new tab. Declined, it shows what a signed-out visitor sees.
   Where visitors can see the session's groups, **View** then signs them in to
@@ -105,7 +108,9 @@ may have the AI read it once (see [PDFs and images](#pdfs-and-images)).
   questions**, uploads the transcript as a text file when the questions submit.
 - **Settings (`/session/<slug>/settings`)** and **the session page's Context
   section** (for admins) list the sources with their privacy and what the AI
-  has of each. One box adds: a link's address, then **+** (or Enter), or
+  has of each. On the session page an admin adds with the same one box
+  participants have (below), with admins only as a choice. In Settings one row
+  adds: a link's address, then **+** (or Enter), or
   **Upload** to choose a file and **Add file** to add it; its **Visible to**
   choice applies to whichever is added next, and each Add names who it is for
   (a link takes everyone or admins only). Adding, **Refresh** (a link),

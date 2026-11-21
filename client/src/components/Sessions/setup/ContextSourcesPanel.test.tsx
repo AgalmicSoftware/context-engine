@@ -302,6 +302,24 @@ describe('context sources panel', () => {
     expect(uploadContextFile).not.toHaveBeenCalled();
   });
 
+  it('shows the page’s own box first and not its own, where the page gives one', async () => {
+    render(
+      <ContextSourcesPanel
+        sessionSlug="salon"
+        sessionConfig={{ slug: 'salon' }}
+        account="0xadmin"
+        list={list()}
+        addBox={<p data-testid="page-box">The page’s box</p>}
+      />,
+    );
+    const rows = await screen.findAllByTestId('ce-context-source');
+    expect(screen.queryByTestId('ce-context-add-box')).not.toBeInTheDocument();
+    const pageBox = screen.getByTestId('page-box');
+    expect(pageBox.compareDocumentPosition(rows[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The list is still managed here.
+    expect(within(rows[0]).getByRole('button', { name: /^Remove/ })).toBeInTheDocument();
+  });
+
   it('offers no button to read the session page’s links, and explains when sources cannot be added', async () => {
     // The page's links are read without a press where the session's Worker does that; here they are added by hand.
     const { unmount } = renderPanel(list({ sources: [essay] }));
