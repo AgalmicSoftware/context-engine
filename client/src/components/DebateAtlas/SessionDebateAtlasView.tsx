@@ -8,7 +8,7 @@ import {
   buildSessionQuestionLink,
   debateAtlasBuildIdOf,
 } from './debateAtlasTree';
-import type { DebateAtlasBuild } from '../../domains/debateAtlas/debateAtlasTypes';
+import type { DebateAtlasBuild, DebateAtlasQuestionSummaries } from '../../domains/debateAtlas/debateAtlasTypes';
 import type { ResultsBuildSummary } from '../../domains/resultsBuilds/resultsBuildWorkerClient';
 import styles from './SessionDebateAtlasView.module.scss';
 
@@ -21,6 +21,24 @@ type Props = {
   /** A node a link asked for; its build is shown and the node opened. */
   requestedNodeId?: string | null;
   onRequestedNodeClose?: (() => void) | null;
+  /** Whether this viewer may build: only they are told how far the questions' AI summaries got. */
+  canBuild?: boolean;
+};
+
+// For someone who may build again: how many questions got an AI summary and why the rest did not. Nothing for a
+// build that summarised every question, or one from before builds made summaries.
+export const questionSummariesNote = (counts: DebateAtlasQuestionSummaries | undefined): string => {
+  const whole = (value: unknown) => Math.max(0, Math.floor(Number(value) || 0));
+  const listed = whole(counts?.listed);
+  const summarised = Math.min(listed, whole(counts?.summarised));
+  if (!counts || listed === 0 || summarised === listed) return '';
+  const outOfTime = whole(counts.outOfTime);
+  const other = Math.max(0, listed - summarised - outOfTime);
+  const reasons = [
+    outOfTime ? `${outOfTime} ran out of time` : '',
+    other ? `${other} failed or gave nothing usable` : '',
+  ].filter(Boolean);
+  return `AI summaries for ${summarised} of ${listed} questions${reasons.length ? `: ${reasons.join(', ')}` : ''}.`;
 };
 
 // A built atlas has topics, under each its subtopics, and under each of those its questions.
@@ -36,10 +54,12 @@ export default function SessionDebateAtlasView({
   workerUrl = '',
   requestedNodeId = null,
   onRequestedNodeClose = null,
+  canBuild = false,
 }: Props) {
   const treeData = useMemo(() => buildDebateAtlasTree(build, { sessionSlug }), [build, sessionSlug]);
   const title = build.title || 'Atlas';
   const missing = build.missingTopics || [];
+  const summariesNote = canBuild ? questionSummariesNote(build.questionSummaries) : '';
   const requestedBuildId = requestedNodeId ? debateAtlasBuildIdOf(requestedNodeId) : '';
   const requestedBuildKept = builds.some((entry) => entry.id === requestedBuildId);
 
@@ -77,6 +97,11 @@ export default function SessionDebateAtlasView({
       {missing.length > 0 && (
         <p className={styles.notice} role="status">
           Not mapped this time: {missing.join(', ')}.
+        </p>
+      )}
+      {summariesNote && (
+        <p className={styles.notice} role="status" data-testid="ce-atlas-question-summaries-note">
+          {summariesNote}
         </p>
       )}
       <div className={styles.canvas}>

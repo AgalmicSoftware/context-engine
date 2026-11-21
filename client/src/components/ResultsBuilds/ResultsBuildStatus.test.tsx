@@ -35,6 +35,15 @@ it('shows the prompts only when asked', () => {
   expect(screen.getByRole('button', { name: /Hide AI prompt/ })).toHaveAttribute('aria-expanded', 'true');
   expect(screen.getByRole('region', { name: 'Planning prompt' })).toHaveTextContent('You are planning <Questions>');
   expect(screen.getByRole('region', { name: 'Mapping prompt' })).toHaveTextContent('You are mapping <Responses>');
+  // A Worker that does not summarise questions sends no prompt for it.
+  expect(screen.queryByRole('region', { name: 'Question prompt' })).not.toBeInTheDocument();
+});
+
+it("shows the question prompt of a Worker that summarises each question's answers", () => {
+  const withQuestion = { ...nextBuild, prompts: { ...nextBuild.prompts, question: 'You are summarising <Answers>' } };
+  render(<ResultsBuildStatus kind="debate-atlas" busy nextBuild={withQuestion} startedAtMs={Date.now()} />);
+  fireEvent.click(screen.getByRole('button', { name: /Show AI prompt/ }));
+  expect(screen.getByRole('region', { name: 'Question prompt' })).toHaveTextContent('You are summarising <Answers>');
 });
 
 it('still times a build when the Worker gave no model or prompts', () => {

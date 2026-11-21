@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import SessionDebateAtlasView from './SessionDebateAtlasView';
+import SessionDebateAtlasView, { questionSummariesNote } from './SessionDebateAtlasView';
 import type { DebateAtlasBuild } from '../../domains/debateAtlas/debateAtlasTypes';
 
 const mockDebateMap = jest.fn();
@@ -90,4 +90,30 @@ it('opens the node a link asked for, first showing the build it belongs to', () 
   fireEvent.change(screen.getByRole('combobox', { name: 'Version' }), { target: { value: 'atlas_k1_00000001' } });
   expect(onRequestedNodeClose).toHaveBeenCalledTimes(1);
   expect(onSelectBuild).toHaveBeenLastCalledWith('atlas_k1_00000001');
+});
+
+it('tells only someone who may build how far the question summaries got', () => {
+  expect(questionSummariesNote(undefined)).toBe('');
+  expect(questionSummariesNote({ listed: 12, summarised: 12 })).toBe('');
+  expect(questionSummariesNote({ listed: 0, summarised: 0 })).toBe('');
+  expect(questionSummariesNote({ listed: 50, summarised: 31, outOfTime: 16 })).toBe(
+    'AI summaries for 31 of 50 questions: 16 ran out of time, 3 failed or gave nothing usable.',
+  );
+  expect(questionSummariesNote({ listed: 5, summarised: 4, outOfTime: 1 })).toBe(
+    'AI summaries for 4 of 5 questions: 1 ran out of time.',
+  );
+  const partial = { ...build, missingTopics: [], questionSummaries: { listed: 5, summarised: 4, outOfTime: 1 } };
+  const view = (canBuild: boolean) => (
+    <SessionDebateAtlasView
+      build={partial}
+      builds={[partial]}
+      onSelectBuild={jest.fn()}
+      sessionSlug="salon"
+      canBuild={canBuild}
+    />
+  );
+  const { rerender } = render(view(false));
+  expect(screen.queryByTestId('ce-atlas-question-summaries-note')).not.toBeInTheDocument();
+  rerender(view(true));
+  expect(screen.getByTestId('ce-atlas-question-summaries-note')).toHaveTextContent('AI summaries for 4 of 5 questions');
 });

@@ -33,4 +33,11 @@ export type DebateAtlasQuestion = {
 };
 export type DebateAtlasTopic = DebateAtlasMapping & { id: string; label: string; questions?: DebateAtlasQuestion[] };
 export type DebateAtlasBranch = DebateAtlasMapping & { id: string; label: string; topics: DebateAtlasTopic[] };
-export type DebateAtlasBuild = ResultsBuildSummary & { missingTopics?: string[]; branches: DebateAtlasBranch[] };
+// How far a build got with its questions' analyses, in builds that make them: `listed` questions in all,
+// `summarised` with an analysis, `outOfTime` not reached or cut off. The rest failed or kept nothing.
+export type DebateAtlasQuestionSummaries = { listed?: number; summarised?: number; outOfTime?: number };
+export type DebateAtlasBuild = ResultsBuildSummary & {
+  missingTopics?: string[];
+  questionSummaries?: DebateAtlasQuestionSummaries;
+  branches: DebateAtlasBranch[];
+};
