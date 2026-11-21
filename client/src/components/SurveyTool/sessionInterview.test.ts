@@ -847,7 +847,7 @@ it('maps a numeric reply using the session thinking model and keeps the rating v
     expect.objectContaining({
       thinking: true,
       preferLocal: false,
-      reasoningEffort: 'medium',
+      reasoningEffort: 'low',
       service_tier: 'default',
     }),
   );
