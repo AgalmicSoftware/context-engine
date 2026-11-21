@@ -82,13 +82,18 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute, reader
   // A catalog ticket's reader sees what that person sees; otherwise this is a signed-out view. A
   // private session's read invite rides on each read, so the storage route checks it per item as
   // it does for the page: the catalog shows an invite holder what the group's link shows, no more.
-  const inviteHeaders = trim(readInvite) ? { [WORKER_GROUP_READ_INVITE_HEADER]: trim(readInvite) } : undefined;
+  const requestHeaders = (json) => {
+    const headers = new Headers();
+    if (json) headers.set('content-type', 'application/json');
+    if (trim(readInvite)) headers.set(WORKER_GROUP_READ_INVITE_HEADER, trim(readInvite));
+    return headers;
+  };
   const callStorage = (path, query, body) => storageRoute({
     path,
     method: body ? 'POST' : 'GET',
     request: new Request(`${origin}${path}${query ? `?${query}` : ''}`, body
-      ? { method: 'POST', headers: { 'content-type': 'application/json', ...inviteHeaders }, body: JSON.stringify(body) }
-      : inviteHeaders ? { headers: inviteHeaders } : undefined),
+      ? { method: 'POST', headers: requestHeaders(true), body: JSON.stringify(body) }
+      : { headers: requestHeaders(false) }),
     env,
     config,
     slug,
