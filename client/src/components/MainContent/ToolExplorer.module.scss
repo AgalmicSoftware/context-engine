@@ -382,11 +382,20 @@
     flex: 0 0 auto;
   }
 
+  // The session box stays on Back's row while there is room for a useful part of it: it takes what the row
+  // has left and shrinks there, its name ending in "…", and drops to its own row only below 200px. Sized from
+  // its content it wrapped as soon as a long session name did not fit whole.
   .expandedHeaderSession {
-    flex: 0 1 auto;
-    width: fit-content;
+    display: flex;
+    flex: 1 1 0;
+    justify-content: flex-end;
+    width: auto;
+    min-width: min(100%, 200px);
     max-width: 100%;
-    margin-left: auto;
+
+    .activeSessionControl {
+      min-width: 0;
+    }
   }
 }
 
@@ -420,12 +429,7 @@
     justify-content: flex-start;
   }
 
-  .expandedHeaderSession {
-    flex: 0 1 auto;
-    width: fit-content;
-    max-width: 100%;
-    margin-left: auto;
-  }
+  // The session box keeps the shrinking rule above here too (Questions and Groups use this header).
 }
 
 .expandedHeaderQuestions {
