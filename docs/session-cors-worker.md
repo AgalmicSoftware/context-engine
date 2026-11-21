@@ -2916,6 +2916,21 @@ Never return secrets in responses.
   `ai.taskReasoningEffort`, and every read carries `setConfigMergesAi: true`,
   set by the Worker and never stored. Older Workers replace
   `ai` whole and lack the field, so editors leave `ai` alone on them.
+- `ai.serviceTier` picks OpenAI's processing tier for the session's own OpenAI
+  text calls: `"default"` (or no setting) as before, or `"priority"` /
+  `"fast"`, OpenAI's faster tier at about twice the price. It covers every
+  call made with the session's key through the Worker's AI policy: interview
+  drafting (`interview-map`), the interview's opening and start, generate,
+  rewrite, summarise, rank, compare and categorise, AI analysis and atlas
+  builds, the Session Agent, and context cards and reads. It does not cover
+  voice (Realtime), transcription, other providers, or a request that brings
+  its own key. If OpenAI refuses the tier for a model with a 400 naming
+  `service_tier`, the Worker asks once more at the default tier. An admin sets
+  it with a signed `set-config`, for example
+  `{"ai": {"serviceTier": "priority"}}`, and `{"ai": {"serviceTier": null}}`
+  turns it off; any other value is refused with `400`. It is not in the
+  public config and signs no one out. Older Workers keep the stored value and
+  send the default tier.
 - The curated lists `HIGHLIGHTED_QUESTION_IDS`, `BLOCKED_QUESTION_IDS`,
   `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS` are accepted as lists of at
   most 500 IDs of 1-128 letters, digits or `._:-`; anything else returns `400`.

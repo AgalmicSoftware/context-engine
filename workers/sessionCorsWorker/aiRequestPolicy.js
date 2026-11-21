@@ -6,6 +6,10 @@ const trim = (value) => typeof value === 'string' ? value.trim() : '';
 const record = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 const tasks = new Set(['generate', 'rewrite', 'summarize', 'rank', 'analysis', 'compare', 'categorize', 'interview-map', 'interview-opening', 'context-read', 'context-card', 'session-agent']);
 const taskName = (payload) => tasks.has(payload?.taskType) ? payload.taskType : '';
+// OpenAI's faster processing tiers, at about twice the price; `ai.serviceTier`
+// picks one for a session's OpenAI text calls, and anything else is 'default'.
+export const OPENAI_FAST_SERVICE_TIERS = Object.freeze(['priority', 'fast']);
+export const SESSION_AI_SERVICE_TIERS = Object.freeze(['default', ...OPENAI_FAST_SERVICE_TIERS]);
 const modelEntry = (entry, provider, fallback = DEFAULT_AI_MODEL) => {
   const obj = record(entry);
   return {
@@ -103,7 +107,8 @@ export const boundSessionAiRequest = ({ payload = {}, provider, config, requestK
   const requestedEffort = trim(payload.reasoning_effort || payload.reasoningEffort || payload.reasoning?.effort);
   const effort = effortOrder.includes(requestedEffort) && effortOrder.indexOf(requestedEffort) < effortOrder.indexOf(maximumEffort)
     ? requestedEffort : maximumEffort;
-  const bounded = { ...payload, model, service_tier: 'default', reasoning_effort: effort, thinking: reasoning };
+  const serviceTier = provider === 'openai' && OPENAI_FAST_SERVICE_TIERS.includes(ai.serviceTier) ? ai.serviceTier : 'default';
+  const bounded = { ...payload, model, service_tier: serviceTier, reasoning_effort: effort, thinking: reasoning };
   // Normalize every alias together, including aliases an individual adapter
   // ignores, so conflicting names cannot bypass a smaller requested bound.
   for (const key of tokenFields) bounded[key] = tokens;

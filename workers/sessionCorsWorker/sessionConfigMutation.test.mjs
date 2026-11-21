@@ -332,6 +332,24 @@ test('set-config keeps atlas question summary settings within their bounds, sign
   assert.deepEqual(canonical.config.atlasQuestionSummaries, { answers: 50 });
 });
 
+test('set-config keeps ai.serviceTier to the known tiers and signs no one out', () => {
+  const initialized = applySessionConfigMutation({ existingConfig: {}, mutation: { kind: 'set-config', incomingConfig: baseConfig }, slug: 'session-a' });
+  const save = (serviceTier, existingConfig = initialized.config) => applySessionConfigMutation({
+    existingConfig, mutation: { kind: 'set-config', incomingConfig: { ai: { serviceTier } } }, slug: 'session-a',
+  });
+  for (const tier of ['priority', 'fast', 'default', null]) {
+    const saved = save(tier);
+    assert.equal(saved.ok, true, saved.error);
+    assert.equal(saved.config.ai.serviceTier, tier);
+    assert.equal(saved.config.authzEpoch, initialized.config.authzEpoch, String(tier));
+  }
+  // The rest of the session's AI settings stay as they were.
+  assert.deepEqual({ ...save('priority').config.ai, serviceTier: undefined }, { ...initialized.config.ai, serviceTier: undefined });
+  for (const tier of ['turbo', 'Priority', 2, true]) {
+    assert.deepEqual(save(tier), { ok: false, status: 400, error: 'ai.serviceTier must be one of default, priority, fast.' });
+  }
+});
+
 test('set-config accepts only the two context addition policies', () => {
   for (const contextAdditionPolicy of ['admin_only', 'participants']) {
     const result = applySessionConfigMutation({

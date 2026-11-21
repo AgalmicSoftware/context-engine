@@ -191,6 +191,11 @@ const authorityView = (config, additiveInvites) => {
     result.agentHttp = without(result.agentHttp, new Set(['invites']));
     if (!Object.keys(result.agentHttp).length) delete result.agentHttp;
   }
+  // The AI provider's processing tier changes speed and price, not who may do what.
+  if (record(result.ai) && Object.hasOwn(result.ai, 'serviceTier')) {
+    result.ai = without(result.ai, new Set(['serviceTier']));
+    if (!Object.keys(result.ai).length) delete result.ai;
+  }
   return result;
 };
 

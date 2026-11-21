@@ -26,6 +26,7 @@ import { WORKER_GROUP_MEMBER_CEILING_MAX } from '../../shared/workerGroupJoin.mj
 import { validateSessionContext } from '../../shared/sessionContext.mjs';
 import { validateSessionAgent } from '../../shared/sessionAgent.mjs';
 import { validateAtlasQuestionSummaries } from '../../shared/atlasQuestionSummaries.mjs';
+import { SESSION_AI_SERVICE_TIERS } from './aiRequestPolicy.js';
 import { AI_DAILY_LIMIT_MAX, validAiDailyLimit } from './aiRateLimitPolicy.js';
 import {
   mergeWorkerConfigRecords,
@@ -392,6 +393,11 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
       const summaries = validateAtlasQuestionSummaries(incomingConfig.atlasQuestionSummaries);
       if (!summaries.ok) return { ok: false, status: 400, error: summaries.error };
       incomingConfig = { ...incomingConfig, atlasQuestionSummaries: summaries.value };
+    }
+    // OpenAI's processing tier for the session's text calls; null is the default.
+    const serviceTier = incomingConfig.ai && typeof incomingConfig.ai === 'object' ? incomingConfig.ai.serviceTier : undefined;
+    if (serviceTier !== undefined && serviceTier !== null && !SESSION_AI_SERVICE_TIERS.includes(serviceTier)) {
+      return { ok: false, status: 400, error: `ai.serviceTier must be one of ${SESSION_AI_SERVICE_TIERS.join(', ')}.` };
     }
     if (hasOwn(incomingConfig, 'sessionAgent')) {
       const sessionAgent = validateSessionAgent(incomingConfig.sessionAgent);

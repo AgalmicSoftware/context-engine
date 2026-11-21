@@ -221,3 +221,77 @@ test('only explicit group labeling adds the curated diarization model', () => {
   assert.equal(isSessionTranscriptionModelAllowed({ ...request, model: 'unbounded-model', groupSpeakerLabels: true }), false);
   assert.equal(isSessionTranscriptionModelAllowed({ ...request, config: { ai: { transcription: { provider: 'custom' } } }, groupSpeakerLabels: true }), false);
 });
+
+test('a session set to a faster OpenAI tier sends it on its text calls, and only to OpenAI', async () => {
+  const fastConfig = (provider, model) => {
+    const config = configFor(provider, model);
+    config.ai.serviceTier = 'priority';
+    return config;
+  };
+  // With no setting, or the default one, the request is exactly as before.
+  for (const adapter of adapters) {
+    const [provider, , model] = adapter;
+    const today = await invoke(adapter, { taskType: 'interview-map', service_tier: 'priority' });
+    const explicit = configFor(provider, model);
+    explicit.ai.serviceTier = 'default';
+    const same = await invoke(adapter, { taskType: 'interview-map', service_tier: 'priority' }, explicit);
+    assert.deepEqual(same.calls, today.calls, provider);
+    const fast = await invoke(adapter, { taskType: 'interview-map' }, fastConfig(provider, model));
+    if (provider === 'openai') {
+      assert.equal(today.calls[0].body.service_tier, 'default');
+      assert.equal(fast.calls[0].body.service_tier, 'priority');
+      // Nothing but the tier changes.
+      assert.deepEqual({ ...fast.calls[0].body, service_tier: 'default' }, (await invoke(adapter, { taskType: 'interview-map' })).calls[0].body);
+    } else {
+      assert.deepEqual(fast.calls, (await invoke(adapter, { taskType: 'interview-map' })).calls, provider);
+    }
+  }
+  // Every session task through the policy, drafting first; an unknown value is the default.
+  for (const taskType of ['interview-map', 'interview-opening', 'analysis', 'generate', 'session-agent', '']) {
+    assert.equal(boundSessionAiRequest({ provider: 'openai', config: fastConfig('openai', 'gpt-6.1-sol'), payload: { taskType, model: 'gpt-6.1-sol' } }).payload.service_tier, 'priority', taskType);
+  }
+  const odd = configFor('openai', 'gpt-6.1-sol');
+  odd.ai.serviceTier = 'turbo';
+  assert.equal(boundSessionAiRequest({ provider: 'openai', config: odd, payload: { model: 'gpt-6.1-sol' } }).payload.service_tier, 'default');
+});
+
+test('a faster tier OpenAI refuses is asked again, once, at the default tier', async () => {
+  const config = configFor('openai', 'gpt-6.1-sol');
+  config.ai.serviceTier = 'priority';
+  const run = async (first) => {
+    const bodies = [];
+    const fetch = async (url, init) => {
+      bodies.push(JSON.parse(init.body));
+      return bodies.length === 1 ? first() : Response.json({ output_text: 'answer' });
+    };
+    const response = await proxyOpenAI({ payload: { model: 'gpt-6.1-sol', taskType: 'interview-map', messages: [{ role: 'user', content: 'Synthetic request' }] },
+      config, secrets: { openaiKey: 'synthetic-session-key' }, auth: { address: '0xabc', scopes: { ai: true } },
+      deps: { fetch, json: (body, status, headers) => Response.json(body, { status, headers }), log: () => {} },
+    });
+    return { response, tiers: bodies.map((body) => body.service_tier) };
+  };
+  const refused = (error) => () => Response.json({ error }, { status: 400 });
+  for (const error of [
+    { message: 'Unsupported value for service_tier.', param: 'service_tier' },
+    { message: 'The priority service tier is not available for this model.' },
+  ]) {
+    const { response, tiers } = await run(refused(error));
+    assert.equal(response.status, 200);
+    assert.deepEqual(tiers, ['priority', 'default']);
+  }
+  // Any other refusal or failure is not retried.
+  for (const first of [refused({ message: 'Invalid input.', param: 'input' }), () => Response.json({ error: { message: 'busy' } }, { status: 429 })]) {
+    const { response, tiers } = await run(first);
+    assert.notEqual(response.status, 200);
+    assert.deepEqual(tiers, ['priority']);
+  }
+  // A refusal at the default tier is the provider's answer, as before.
+  const plain = configFor('openai', 'gpt-6.1-sol');
+  const bodies = [];
+  const response = await proxyOpenAI({ payload: { model: 'gpt-6.1-sol', messages: [{ role: 'user', content: 'Synthetic request' }] },
+    config: plain, secrets: { openaiKey: 'synthetic-session-key' }, auth: { address: '0xabc', scopes: { ai: true } },
+    deps: { fetch: async (url, init) => { bodies.push(JSON.parse(init.body)); return refused({ message: 'Unsupported value for service_tier.', param: 'service_tier' })(); }, json: (body, status, headers) => Response.json(body, { status, headers }), log: () => {} },
+  });
+  assert.equal(response.status, 400);
+  assert.equal(bodies.length, 1);
+});
