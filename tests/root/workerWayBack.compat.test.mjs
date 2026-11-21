@@ -733,3 +733,85 @@ describe('the agents release, back on the bundle before it', () => {
   }, 120000);
 });
 
+
+// Atlas question summaries: a build made here gives each topic question an
+// `analysis`. A released bundle reads the stored build as it is, and its own
+// public config says nothing of them, so the site waits for this Worker.
+describe('an atlas with question summaries, back on a released bundle', () => {
+  let tempDir;
+  const bundles = {};
+  const testResponse = globalThis.Response;
+  const refs = [['the pinned bundle', pinned], ['the live bundle', live]];
+  beforeAll(async () => {
+    globalThis.Response = (await fetch('data:,')).constructor;
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-way-back-atlas-'));
+    for (const ref of new Set(refs.map(([, ref]) => ref).filter(Boolean))) bundles[ref] = await loadBundle(ref, tempDir);
+  }, 120000);
+  afterAll(async () => {
+    globalThis.Response = testResponse;
+    if (tempDir) await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  // This Worker's AI: a plan of one topic, its map, and each question's summary.
+  const provider = async (_url, init) => {
+    const prompt = JSON.parse(typeof init.body === 'string' ? init.body : new TextDecoder().decode(init.body)).messages[0].content;
+    const said = JSON.stringify(prompt);
+    const ids = [...new Set([...said.matchAll(/\\"id\\":\\"(0x[0-9a-f]{64})\\"/g)].map((match) => match[1]))];
+    const reply = said.includes('You are planning')
+      ? { title: 'Atlas', branches: [{ label: 'Towns', summary: 'Local rule.', topics: [{ label: 'Water', questionIds: ids }] }] }
+      : said.includes('You are summarising')
+        ? { summary: 'Both want local care.', categories: [{ label: 'Local care', participantIds: ['participant_001', 'participant_002'] }] }
+        : { summary: 'They agree.', positions: [{ label: 'Local care', participantIds: ['participant_001', 'participant_002'] }] };
+    return new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(reply) }], stop_reason: 'end_turn' }),
+      { headers: { 'content-type': 'application/json' } });
+  };
+
+  describe.each(refs)('on %s', (_name, ref) => {
+    (ref ? it : it.skip)('reads the build as stored, saves settings, and has the summaries again here', async () => {
+      const session = await drill();
+      // Results builds call Anthropic with the platform's fetch: the stand-in answers here, and nothing leaves.
+      const realFetch = globalThis.fetch;
+      globalThis.fetch = async (url, init) => {
+        if (new URL(String(url)).protocol === 'data:') return realFetch(url, init);
+        if (!String(url).startsWith('https://api.anthropic.com/')) throw new Error(`Unexpected network call: ${url}`);
+        return provider(url, init);
+      };
+      try {
+        const config = { ...session.config, workerAuthority: { version: 1, participantScopes: ['storage', 'ai'] },
+          ai: { mode: 'anthropic', models: { fast: { provider: 'anthropic', model: 'claude-sonnet-5-5' }, thinking: { provider: 'anthropic', model: 'claude-sonnet-5-5' } } } };
+        await session.kv.put(`session:${slug}:config`, JSON.stringify(config));
+        const current = session.current();
+        expect(await session.signed(current, 'set-secrets', { secrets: { anthropicKey: 'synthetic-anthropic-key' } })).toMatchObject({ status: 200 });
+        const [admin, person] = [session.client(owner), session.client(member)];
+        for (const digit of ['7', '8']) {
+          const id = `0x${digit.repeat(64)}`;
+          await admin.upload({ resource: 'questions', data: JSON.stringify({ id, type: 'text', prompt: `Should towns run their own water (${digit})?`, sessionId, sessionSlug: slug }) });
+          for (const client of [admin, person]) await client.upload({ resource: 'responses', data: JSON.stringify({ questionId: id, sessionSlug: slug, sessionId, answer: { value: 'Yes, locally.' } }) });
+        }
+        const built = await session.signed(current, 'debate-atlas/build');
+        expect([built.status, built.body.error]).toEqual([200, undefined]);
+        const questions = built.body.build.branches[0].topics[0].questions;
+        expect(questions.map((question) => question.analysis)).toEqual(Array(2).fill({
+          summary: 'Both want local care.', categories: [{ label: 'Local care', participantCount: 2 }], answered: 2,
+        }));
+        const atlas = async () => (await admin.request(`/debate-atlas?sessionSlug=${slug}`, { auth: true })).build;
+        expect(await atlas()).toEqual(built.body.build);
+        expect((await session.readConfig()).debateAtlasQuestionAnalysis).toBe(true);
+
+        // Back on the released bundle: the same build, its summaries kept; no flag; saves go through.
+        const previous = session.released(bundles[ref]);
+        expect(await atlas()).toEqual(built.body.build);
+        expect((await session.readConfig()).debateAtlasQuestionAnalysis).toBeUndefined();
+        expect(await session.signed(previous, 'set-config', { config: { sessionName: 'Renamed on the way back' } })).toEqual({ status: 200, body: { ok: true } });
+
+        // This Worker again: the build and the edit stand.
+        session.current();
+        expect(await atlas()).toEqual(built.body.build);
+        expect(await session.readConfig()).toMatchObject({ sessionName: 'Renamed on the way back', debateAtlasQuestionAnalysis: true });
+      } finally {
+        globalThis.fetch = realFetch;
+        session.end();
+      }
+    }, 120000);
+  });
+});

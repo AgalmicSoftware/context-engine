@@ -11,14 +11,25 @@ import {
 // moment: a planning call groups the questions into branches and topics, then
 // one call per topic, and one per branch of several topics, at most
 // CONCURRENCY at once, maps positions and a political compass. Each response
-// reaches its topic's call and its branch's, so a build reads about twice what
-// one AI Views run does.
+// reaches its topic's call and its branch's, so the map calls read about twice
+// what one AI Views run does. Last, one shorter call per topic question, up to
+// analysedQuestions, summarises and sorts that question's responses: queued
+// after every topic and branch call, so those start and run as before, and a
+// build short of time loses a question's summary first. Map calls read the AI
+// sample (at most 420 answers across all questions); a question's call reads
+// every answer to it the build may read, up to questionResponses answers and
+// questionChars of answer text, so its summary and count match Results.
 export const DEBATE_ATLAS_BUILD_ACTION = 'debate-atlas/build';
 export const DEBATE_ATLAS_LIMITS = Object.freeze({
   branches: 5,
   topics: 12,
   positions: 6,
   placedParticipants: 40,
+  analysedQuestions: 40,
+  questionResponses: 200,
+  questionChars: 60_000,
+  categories: 5,
+  questionCallMs: 60 * 1000,
   concurrency: 6,
   ...RESULTS_BUILD_LIMITS,
   textChars: 600,
@@ -71,6 +82,25 @@ ${[
 ${topic ? 'Topic' : 'Branch'} input:
 ${JSON.stringify({ questions, responses, placeParticipants })}`;
 
+// Summarises and sorts the responses to one question of a topic.
+export const buildDebateAtlasQuestionPrompt = ({ topic = '', question = {}, responses = [] } = {}) => `You are summarising the responses to one question of a Context Engine debate atlas.
+Topic: ${JSON.stringify(text(topic, 120))}.
+Return one JSON object with no Markdown fences and no tool calls, in this shape:
+{
+  "summary": "two or three neutral sentences, under 400 characters in all, on what the responses say and where they agree or split",
+  "categories": [{ "label": "2-6 word category", "summary": "one sentence on what these responses share", "participantIds": ["participant_001"] }]
+}
+
+Rules:
+${[
+  ...RESULTS_BUILD_RULES,
+  `Sort the responses into 1 to ${DEBATE_ATLAS_LIMITS.categories} distinct categories by what they say, keeping a minority view even when one participant holds it. Each category cites every participant whose response belongs to it, and only participants in the responses.`,
+  'Write every text field as plain text, with no Markdown or HTML.',
+].map((rule) => `- ${rule}`).join('\n')}
+
+Question input:
+${JSON.stringify({ question, responses })}`;
+
 // What a build would send now, with the session's data left as placeholders,
 // so a builder sees the model and the prompts before and while one runs.
 export const describeNextDebateAtlasBuild = (config) => {
@@ -89,6 +119,11 @@ export const describeNextDebateAtlasBuild = (config) => {
         questions: '<Questions>',
         responses: '<Responses>',
         placeParticipants: '<Participants>',
+      })),
+      question: unquote(buildDebateAtlasQuestionPrompt({
+        topic: '<Topic>',
+        question: '<Question>',
+        responses: '<Responses>',
       })),
     },
   };
@@ -173,6 +208,23 @@ export const normalizeDebateAtlasTopic = ({ value, answeredBy, placeParticipants
   return positions.length ? { summary: text(value?.summary, 600), compass, positions, participants, answered: answeredBy.size } : null;
 };
 
+// A question's summary and categories, each category counted among those who
+// answered it, the most held first; one person may sit in several. Kept only
+// with a summary, which leads it on the site.
+export const normalizeDebateAtlasQuestion = ({ value, answeredBy }) => {
+  const summary = text(value?.summary, 400);
+  const categories = toArray(value?.categories).map((category) => {
+    const label = text(category?.label, 80);
+    const holders = new Set(toArray(category?.participantIds).map(trim).filter((id) => answeredBy.has(id)));
+    if (!label || !holders.size) return null;
+    const categorySummary = text(category?.summary, 200);
+    return { label, ...(categorySummary ? { summary: categorySummary } : {}), participantCount: holders.size };
+  }).filter(Boolean)
+    .sort((a, b) => b.participantCount - a.participantCount)
+    .slice(0, DEBATE_ATLAS_LIMITS.categories);
+  return summary ? { summary, categories, answered: answeredBy.size } : null;
+};
+
 // Runs `task` over `items` with at most `limit` in flight, keeping order.
 export const runWithConcurrency = async (items, limit, task) => {
   const results = new Array(items.length);
@@ -195,7 +247,17 @@ export const buildDebateAtlas = (args = {}) => runResultsBuild({
   kindName: 'debate-atlas',
   limits: DEBATE_ATLAS_LIMITS,
   compose: async ({ source, callAi, contextText }) => {
-    const { questions, responses } = source.aiSnapshot;
+    const { questions, responses, inputLimits = {} } = source.aiSnapshot;
+    // The same sanitized rows the AI sample is drawn from, cut as the sample's are.
+    const allResponsesByQuestion = new Map();
+    toArray(source.snapshot?.responses).forEach(({ questionId, participantId, answer, additional }) => {
+      const kept = {
+        participantId,
+        answer: (Array.isArray(answer) ? answer.join('; ') : String(answer ?? '')).slice(0, inputLimits.maxResponseAnswerChars || 1400),
+        ...(additional ? { additional: String(additional).slice(0, inputLimits.maxResponseAdditionalChars || 900) } : {}),
+      };
+      allResponsesByQuestion.set(questionId, [...(allResponsesByQuestion.get(questionId) || []), kept]);
+    });
     const responsesByQuestion = new Map();
     responses.forEach((response) => {
       responsesByQuestion.set(response.questionId, [...(responsesByQuestion.get(response.questionId) || []), response]);
@@ -216,7 +278,32 @@ export const buildDebateAtlas = (args = {}) => runResultsBuild({
     // Branches go last, so a build short of time drops a branch's compass before a topic.
     const branchJobs = plan.branches.filter((branch) => branch.topics.length > 1)
       .map((branch) => ({ branch, topic: null, questionIds: branch.topics.flatMap((topic) => topic.questionIds) }));
-    const mapped = await runWithConcurrency([...topics, ...branchJobs], DEBATE_ATLAS_LIMITS.concurrency, async ({ branch, topic, questionIds }) => {
+    const aiQuestion = (id) => {
+      const { id: questionId, prompt, type, options, scale, voiceCredits } = questionsById.get(id);
+      return { id: questionId, prompt, type, ...(options?.length ? { options } : {}), ...(scale ? { scale } : {}), ...(voiceCredits ? { voiceCredits } : {}) };
+    };
+    // A question's call reads only that question's answers, all those the
+    // build may read (its topic's call reads a sample of them).
+    // Out of time: a call the build had no time left to start (504), or one
+    // that hit its own limit (the provider's "timed out" error).
+    const analyseQuestion = async ({ topic, questionId }) => {
+      let chars = 0;
+      const questionResponses = (allResponsesByQuestion.get(questionId) || responsesByQuestion.get(questionId))
+        .slice(0, DEBATE_ATLAS_LIMITS.questionResponses)
+        .map(({ participantId, answer, additional }) => ({ participantId, answer, ...(additional ? { additional } : {}) }))
+        .filter(({ answer, additional = '' }) => (chars += answer.length + additional.length) <= DEBATE_ATLAS_LIMITS.questionChars);
+      const result = await callAi(buildDebateAtlasQuestionPrompt({
+        topic: topic.label,
+        question: aiQuestion(questionId),
+        responses: questionResponses,
+      }), { callMs: DEBATE_ATLAS_LIMITS.questionCallMs });
+      return result.ok
+        ? { analysis: normalizeDebateAtlasQuestion({ value: result.value, answeredBy: new Set(questionResponses.map((response) => response.participantId)) }) }
+        : { outOfTime: result.status === 504 || /timed out/i.test(result.error || '') };
+    };
+    const questionJobs = topics.flatMap(({ topic }) => topic.questionIds.map((questionId) => ({ topic, questionId })))
+      .slice(0, DEBATE_ATLAS_LIMITS.analysedQuestions);
+    const mapJob = async ({ branch, topic, questionIds }) => {
       const topicResponses = questionIds.flatMap((id) => responsesByQuestion.get(id));
       const answeredBy = new Map();
       topicResponses.forEach((response) => answeredBy.set(response.participantId, (answeredBy.get(response.participantId) || 0) + 1));
@@ -228,18 +315,24 @@ export const buildDebateAtlas = (args = {}) => runResultsBuild({
       const result = await callAi(buildDebateAtlasTopicPrompt({
         branch: branch.label,
         topic: topic?.label || '',
-        questions: questionIds.map((id) => {
-          const { id: questionId, prompt, type, options, scale, voiceCredits } = questionsById.get(id);
-          return { id: questionId, prompt, type, ...(options?.length ? { options } : {}), ...(scale ? { scale } : {}), ...(voiceCredits ? { voiceCredits } : {}) };
-        }),
+        questions: questionIds.map(aiQuestion),
         responses: topicResponses.map(({ participantId, questionId, answer, additional }) => ({ participantId, questionId, answer, ...(additional ? { additional } : {}) })),
         placeParticipants,
       }));
       return result.ok
         ? normalizeDebateAtlasTopic({ value: result.value, answeredBy, placeParticipants, participantAddresses: source.participantAddresses })
         : null;
-    });
+    };
+    // Topics, then branches, then questions: a question call never delays a map call's start.
+    const mapJobs = [...topics, ...branchJobs];
+    const done = await runWithConcurrency([...mapJobs, ...questionJobs], DEBATE_ATLAS_LIMITS.concurrency, async (job, index) => (
+      index < mapJobs.length ? mapJob(job) : analyseQuestion(job)
+    ));
+    const mapped = done.slice(0, mapJobs.length);
+    const analysisByQuestion = new Map(questionJobs.map(({ questionId }, index) => [questionId, done[mapJobs.length + index]]));
 
+    // How the shown questions fared, so a builder can tell a partial build from a whole one.
+    const questionSummaries = { listed: 0, summarised: 0, outOfTime: 0, overLimit: 0 };
     let topicIndex = 0;
     const missingTopics = [];
     const branchMaps = new Map(branchJobs.map(({ branch }, index) => [branch.id, mapped[topics.length + index]]));
@@ -255,10 +348,23 @@ export const buildDebateAtlas = (args = {}) => runResultsBuild({
           id: topic.id,
           label: topic.label,
           ...result,
-          // What the atlas shows of each question: its words, and the choices it offers.
+          // What the atlas shows of each question: its words, the choices it offers, and its summary when it has one.
           questions: topic.questionIds.map((id) => {
             const { prompt, type, options, voiceCredits } = questionsById.get(id);
-            return { id, prompt: text(prompt, 400), type, ...(options?.length ? { options } : {}), ...(voiceCredits ? { voiceCredits } : {}) };
+            const job = analysisByQuestion.get(id);
+            const analysis = job?.analysis;
+            questionSummaries.listed += 1;
+            if (analysis) questionSummaries.summarised += 1;
+            else if (!job) questionSummaries.overLimit += 1;
+            else if (job.outOfTime) questionSummaries.outOfTime += 1;
+            return {
+              id,
+              prompt: text(prompt, 400),
+              type,
+              ...(options?.length ? { options } : {}),
+              ...(voiceCredits ? { voiceCredits } : {}),
+              ...(analysis ? { analysis } : {}),
+            };
           }),
         };
       }).filter(Boolean);
@@ -274,7 +380,7 @@ export const buildDebateAtlas = (args = {}) => runResultsBuild({
       };
     }).filter((branch) => branch.topics.length);
     if (!branches.length) return failure(502, 'No topic of the atlas could be mapped; try again.');
-    return { ok: true, build: { title: plan.title, missingTopics, branches } };
+    return { ok: true, build: { title: plan.title, missingTopics, questionSummaries, branches } };
   },
 });
 

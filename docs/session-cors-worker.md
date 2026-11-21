@@ -610,7 +610,23 @@ Admin test panel:
   participants' answers its call read, as the whole they are part of. A branch
   of one topic shares that topic's compass. Branch calls start after every
   topic call, so a build short of time loses a branch's compass before a topic.
-  Each response reaches its topic's call and its branch's. The AI sees
+  Last, one call per topic question, for at most 40 questions in topic order
+  and each within 1 minute, stores the question's `analysis`: a summary under
+  400 characters, up to 5 categories of its responses, each with a label, an
+  optional one-sentence summary and `participantCount` (one person may sit in
+  several), most held first, and `answered`; it is kept only with a summary.
+  These calls start after every topic and branch call, so they never delay
+  one, and a build short of time leaves a question without an `analysis`
+  first. Topic and branch calls read the AI sample, at most 420 responses
+  across all questions; a question's call reads every response to that
+  question the build may read (the same sanitizer), up to 200 and 60,000
+  characters, so `answered` matches Results for most sessions. The build's
+  `questionSummaries` counts the questions it shows (`listed`), those with an
+  `analysis` (`summarised`), those whose call had no time or ran out of it
+  (`outOfTime`) and those past the 40 (`overLimit`); the rest failed or kept
+  nothing. Builds from before these calls have neither field.
+  Each sampled response reaches its topic's call and its branch's, and each
+  response its question's call. The AI sees
   synthetic participant IDs only; the Worker maps them back to addresses
   afterwards and drops any citation of a participant who did not answer that
   topic or branch. The coordinator lets one build run at a time per session and
@@ -619,10 +635,13 @@ Admin test panel:
   `GET /debate-atlas?sessionSlug=<slug>&id=` returns the build list and the
   newest build (or the one named by `id`) to viewers under the artifact rule
   above, and to signed-in builders on any session, with `canBuild`. Builders
-  also get `nextBuild`: the model a build would call and its two prompt
-  templates, with the session's data as placeholders, which the site shows
-  while a build runs. The public config sets `debateAtlas: true` so the site
-  knows the Worker builds atlases.
+  also get `nextBuild`: the model a build would call and its prompt templates
+  (`plan`, `map` and `question`), with the session's data as placeholders,
+  which the site shows while a build runs. The public config sets
+  `debateAtlas: true` so the site knows the Worker builds atlases, and
+  `debateAtlasQuestionAnalysis: true` so it knows new builds may give
+  questions an `analysis`. A build is kept as built: a question hidden
+  afterwards keeps its prompt and `analysis` there until the next build.
 - Risk matrices are built the same way, apart from the generated Results views'
   Risk Matrix. `POST /admin/risk-matrix/build` (signed admin action
   `risk-matrix/build`) accepts the same builders and reads the same stored

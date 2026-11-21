@@ -13,5 +13,7 @@ export const MEMBER_RESULTS_FIELD: 'memberResults';
 export const SESSION_AGENT_READY_FIELD: 'sessionAgentReady';
 /** The public config field a Worker sets when it takes group codes and passwords and honours groupMemberCeiling. */
 export const GROUP_JOIN_CHOICES_FIELD: 'groupJoinChoices';
+/** The public config field a Worker sets when its atlas builds may summarise each topic question. */
+export const DEBATE_ATLAS_QUESTION_ANALYSIS_FIELD: 'debateAtlasQuestionAnalysis';
 /** Every "this Worker supports X" field: set on each public config read. */
 export const WORKER_SUPPORT_FIELDS: readonly string[];

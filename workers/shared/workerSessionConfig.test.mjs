@@ -148,6 +148,7 @@ test('public config shows the AI models and effort, hides the rest of ai, and sa
     memberResults: true,
     sessionAgentReady: true,
     groupJoinChoices: true,
+    debateAtlasQuestionAnalysis: true,
   });
 });
 
@@ -155,7 +156,7 @@ test('public config shows the AI models and effort, hides the rest of ai, and sa
 // readback skips them, so a new one is added to the shared list alone.
 test('a public config read sets every "this Worker supports X" field, and no other is true', () => {
   assert.deepEqual([...WORKER_SUPPORT_FIELDS],
-    ['setConfigMergesAi', 'debateAtlas', 'riskMatrix', 'memberResults', 'sessionAgentReady', 'groupJoinChoices']);
+    ['setConfigMergesAi', 'debateAtlas', 'riskMatrix', 'memberResults', 'sessionAgentReady', 'groupJoinChoices', 'debateAtlasQuestionAnalysis']);
   const projected = projectPublicWorkerSessionConfig({ slug: 'session-a' });
   assert.deepEqual(Object.keys(projected).filter((key) => projected[key] === true).sort(), [...WORKER_SUPPORT_FIELDS].sort());
 });
