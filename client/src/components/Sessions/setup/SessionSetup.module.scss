@@ -635,3 +635,15 @@ a.button {
     font-weight: 600;
   }
 }
+
+// A listed file or link on a phone: its buttons under its name and details, so the text keeps the row's width.
+// Beside it, the buttons left the text a column one letter wide wherever the list is not on the setup page.
+@media (max-width: 480px) {
+  .contextSourceRow {
+    flex-wrap: wrap;
+
+    > .listRowBody {
+      flex-basis: 100%;
+    }
+  }
+}

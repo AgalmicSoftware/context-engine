@@ -242,7 +242,11 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, onSourcesCha
       {sources.length ? (
         <ul className={styles.listRowBody} aria-label="Context files and links">
           {sources.map((source) => (
-            <li key={source.id} className={styles.listRow} data-testid="ce-context-source">
+            <li
+              key={source.id}
+              className={`${styles.listRow} ${styles.contextSourceRow}`}
+              data-testid="ce-context-source"
+            >
               <div className={styles.listRowBody}>
                 <span className={styles.fieldLabel}>{source.title || source.url || 'Untitled'}</span>
                 {source.kind === 'link' && source.url ? (
