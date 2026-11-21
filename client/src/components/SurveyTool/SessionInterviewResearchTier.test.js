@@ -91,6 +91,12 @@ it('records the voice model the session names, and neither on a prefill draft', 
   ];
   await recordInterviewProvenance(engine, voiceDrafts, null, null, true, true, '', []);
   expect(engine.state.surveysResponseState[0].interviewProvenance.q1.voiceModel).toBe('gpt-live-1');
+  // A session that gives the voice its context says so in the revision.
+  const withContext = fakeEngine({ slug: 'demo', interviewMode: { voiceSessionContext: true } });
+  await recordInterviewProvenance(withContext, voiceDrafts, null, null, true, true, '', []);
+  expect(withContext.state.surveysResponseState[0].interviewProvenance.q1.voiceBriefRevision).toBe(
+    'ce-voice-brief-4+context',
+  );
   const prefill = fakeEngine({ slug: 'demo' });
   await recordInterviewProvenance(prefill, drafts, SOURCE, PACKET, true, true, '', review);
   const record = prefill.state.surveysResponseState[0].interviewProvenance.q1;
