@@ -107606,11 +107606,16 @@ var listQuestionRows = async (callStorage) => {
 var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageRoute2, reader, readInvite, workerOrigin: workerOrigin2 }) => {
   if (typeof storageRoute2 !== "function") return catalog();
   const origin = trim24(readInvite) && trim24(workerOrigin2) ? trim24(workerOrigin2) : "https://session-worker.invalid";
-  const inviteHeaders = trim24(readInvite) ? { [WORKER_GROUP_READ_INVITE_HEADER]: trim24(readInvite) } : void 0;
+  const requestHeaders = (json12) => {
+    const headers2 = new Headers();
+    if (json12) headers2.set("content-type", "application/json");
+    if (trim24(readInvite)) headers2.set(WORKER_GROUP_READ_INVITE_HEADER, trim24(readInvite));
+    return headers2;
+  };
   const callStorage = (path, query, body) => storageRoute2({
     path,
     method: body ? "POST" : "GET",
-    request: new Request(`${origin}${path}${query ? `?${query}` : ""}`, body ? { method: "POST", headers: { "content-type": "application/json", ...inviteHeaders }, body: JSON.stringify(body) } : inviteHeaders ? { headers: inviteHeaders } : void 0),
+    request: new Request(`${origin}${path}${query ? `?${query}` : ""}`, body ? { method: "POST", headers: requestHeaders(true), body: JSON.stringify(body) } : { headers: requestHeaders(false) }),
     env,
     config,
     slug,
