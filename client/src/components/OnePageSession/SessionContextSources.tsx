@@ -20,9 +20,7 @@ import { contextGroupsLabel } from '../Sessions/setup/ContextAccessPicker';
 import ContextSourcesPanel from '../Sessions/setup/ContextSourcesPanel';
 import ContextCardChips from './ContextCardChips';
 import ContextCardEditor from './ContextCardEditor';
-import SessionContextAddFile from './SessionContextAddFile';
-import SessionContextAddLink from './SessionContextAddLink';
-import SessionContextAddNote from './SessionContextAddNote';
+import SessionContextComposer from './SessionContextComposer';
 import setupStyles from '../Sessions/setup/SessionSetup.module.scss';
 import {
   contextAdderLabel,
@@ -100,7 +98,7 @@ const SessionContextSources = ({
     sessionSlug,
     sessionConfig,
     account,
-    enabled: canAddFile || list.groupFilesHidden || list.sources.length > 0,
+    enabled: canAddFile || isAdmin || list.groupFilesHidden || list.sources.length > 0,
   });
   const [removeError, setRemoveError] = useState('');
   const [adding, setAdding] = useState(false);
@@ -348,34 +346,16 @@ const SessionContextSources = ({
           hidden={!adding}
           data-testid="ce-session-context-participant"
         >
-          <h3 className={setupStyles.fieldLabel}>Add a file</h3>
-          <SessionContextAddFile
+          <h3 className={setupStyles.fieldLabel}>Add to this session’s context</h3>
+          <SessionContextComposer
             sessionSlug={sessionSlug}
             sessionConfig={sessionConfig}
             account={account}
             groups={groups}
+            linksAllowed={list.participantsCanAddLinks}
             cardsOn={list.cardsSupported}
             onAdded={list.reload}
           />
-          <h3 className={setupStyles.fieldLabel}>Add a note</h3>
-          <SessionContextAddNote
-            sessionSlug={sessionSlug}
-            sessionConfig={sessionConfig}
-            account={account}
-            groups={groups}
-            onAdded={list.reload}
-          />
-          {list.participantsCanAddLinks ? (
-            <>
-              <h3 className={setupStyles.fieldLabel}>Add a link</h3>
-              <SessionContextAddLink
-                sessionSlug={sessionSlug}
-                sessionConfig={sessionConfig}
-                account={account}
-                onAdded={list.reload}
-              />
-            </>
-          ) : null}
         </div>
       ) : null}
       {isAdmin ? (
@@ -390,8 +370,22 @@ const SessionContextSources = ({
             sessionSlug={sessionSlug}
             sessionConfig={sessionConfig}
             account={account}
-            pageLinks={pageLinks}
             list={list}
+            addBox={
+              <>
+                <h3 className={setupStyles.fieldLabel}>Add to this session’s context</h3>
+                <SessionContextComposer
+                  sessionSlug={sessionSlug}
+                  sessionConfig={sessionConfig}
+                  account={account}
+                  groups={groups}
+                  asAdmin
+                  linksAllowed
+                  cardsOn={list.cardsSupported}
+                  onAdded={list.reload}
+                />
+              </>
+            }
           />
         </div>
       ) : null}

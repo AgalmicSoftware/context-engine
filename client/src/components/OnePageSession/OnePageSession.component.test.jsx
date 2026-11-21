@@ -741,6 +741,18 @@ describe('OnePageSession view gating', () => {
     }
   });
 
+  it('puts each context link on a line of its own, and lets a long title wrap beside its icon', () => {
+    const links = extractMediaBlock(
+      fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8'),
+      '.sessionContextLinks {',
+    );
+    expect(links).toContain('flex-direction: column;');
+    expect(links).toContain('align-items: flex-start;');
+    expect(links).not.toContain('flex-wrap: wrap;');
+    expect(links).toMatch(/a\s*{[\s\S]*?max-width:\s*100%;[\s\S]*?overflow-wrap:\s*anywhere;/);
+    expect(links).toMatch(/svg\s*{[\s\S]*?flex:\s*none;/);
+  });
+
   it('renders only the session title text at half opacity', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const titleTextBlock = extractMediaBlock(scss, '.brandingSectionTitle {');

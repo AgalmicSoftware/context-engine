@@ -2505,3 +2505,37 @@ test('provisioning without a management key does not begin an attempt', async ()
   assert.equal(began, 0);
   assert.match(result.body.error, /account API key not configured/);
 });
+
+test('a saved change to the session context or link reading starts the background read; other saves and refused ones do not', async () => {
+  const existingConfig = {
+    slug: 'session-a',
+    sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    corsWorkerUrl: 'https://session-a.workers.dev',
+    sessionModeProfile: createWorkerSessionModeProfile(),
+    storageProfile: createWorkerStorageProfile(),
+    sessionName: 'Canonical Session',
+  };
+  const save = async (config, readSessionLinks) => dispatchAdminRequest({
+    request: { json: async () => createSignedBody({ config }) },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-config',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({ ok: true, existingConfig, headers: {}, targetSlug: 'session-a' }),
+      mergeWorkerConfigRecords,
+      putSessionConfig: async () => {},
+      readSessionLinks,
+    }),
+  });
+  const started = [];
+  // A read that never finishes: the save answers anyway.
+  const reader = (value) => { started.push(Object.keys(value).sort()); return new Promise(() => {}); };
+  const links = { title: 'Background', paragraphs: [], links: [{ label: 'Essay', url: 'https://essays.example/commons' }] };
+  assert.equal((await save({ sessionContext: links }, reader)).status, 200);
+  assert.equal((await save({ sessionLinkReading: { links: 2 } }, reader)).status, 200);
+  assert.deepEqual(started, [['afterSave', 'env', 'slug'], ['afterSave', 'env', 'slug']]);
+  assert.equal((await save({ sessionName: 'Renamed' }, reader)).status, 200);
+  assert.equal((await save({ sessionLinkReading: { links: 99 } }, reader)).status, 400);
+  assert.equal(started.length, 2);
+});

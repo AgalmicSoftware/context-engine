@@ -4,6 +4,7 @@ export const PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL: 'gpt-live-1';
 export const GPT_LIVE_1_1_MODEL: 'gpt-live-1.1';
 export const GPT_LIVE_1_1_FEATURE: 'interview_gpt_live_1_1_v1';
 export const INTERVIEW_VOICE_CONTEXT_FEATURE: 'interview_voice_context_v1';
+export const INTERVIEW_QUESTION_ORDER_FEATURE: 'interview_question_order_v1';
 export const REALTIME_INTERVIEW_MODELS: readonly string[];
 export function isRealtimeInterviewModel(value: unknown): boolean;
 export function isLiveInterviewModel(value: unknown): boolean;

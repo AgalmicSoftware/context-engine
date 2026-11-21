@@ -40,7 +40,7 @@ describe('SiteLoadOptions', () => {
   it('keeps the intro slide bound to the greeting-image layout hooks', () => {
     renderSiteLoadOptions(0);
 
-    const greetingImage = screen.getByAltText('Context Engine welcome slide');
+    const greetingImage = screen.getByAltText('A person made of dots wondering: What is Context Engine?');
     const greetingButton = screen.getByTestId('ce-welcome-slide-media');
     const greetingFooter = greetingButton.closest('.welcomeSlideFooter');
 
@@ -57,19 +57,19 @@ describe('SiteLoadOptions', () => {
   it('centers bullet content for titleless slides and dims only the trailing copy', () => {
     renderSiteLoadOptions(1);
 
-    const robotImage = screen.getByAltText('Context Engine toolkit slide');
+    const toolkitImage = screen.getByAltText('Three people made of dots whose thoughts join one shared thought bubble');
     const robotButton = screen.getByTestId('ce-welcome-slide-media');
     const bulletListContainer = screen.getByTestId('ce-welcome-slide-bullet-list');
     const bulletList = screen.getByTestId('ce-welcome-slide-bullet-items');
     const firstBoldText = screen.getByText('A toolkit', { selector: 'strong' });
     const firstTrailingText = screen.getByText('for large-group discourse and coordination', { selector: 'span' });
 
-    expect(robotImage).toBeInTheDocument();
-    expect(robotImage).toHaveClass('welcomeSlideImageToolkit');
+    expect(toolkitImage).toBeInTheDocument();
+    expect(toolkitImage).toHaveClass('welcomeSlideImageToolkit');
     expect(robotButton).toHaveClass('welcomeSlideMediaButtonCentered');
     expect(robotButton).toHaveAttribute('data-ce-control-appearance', 'frameless');
     expect(robotButton).toHaveAttribute('data-slide-layout', 'centered');
-    expect(robotImage).toHaveAttribute('data-slide-layout', 'centered');
+    expect(toolkitImage).toHaveAttribute('data-slide-layout', 'centered');
     expect(bulletListContainer).toHaveClass('isTitlelessBulletList');
     expect(firstBoldText).toBeInTheDocument();
     expect(firstTrailingText).toHaveClass('welcomeSlideBulletTrailingText');

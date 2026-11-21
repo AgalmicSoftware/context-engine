@@ -713,10 +713,15 @@ const writeGroupRecord = async ({ store, slug, sessionId, group }) => {
 const listGroupRecords = async ({ store, slug, sessionId, includeDeleted = false }) => {
 	const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
 	if (!canonicalSessionId) throw new Error('Worker group session identity is invalid.');
-	const canonicalKeys = await kvListKeys(store.store, groupIndexPrefix({ slug, sessionId: canonicalSessionId }));
-	const legacyKeys = await kvListKeys(store.store, legacyGroupIndexPrefix({ slug }));
-	const groups = new Map();
-	for (const key of canonicalKeys) {
+	const legacyPrefix = legacyGroupIndexPrefix({ slug });
+	const [canonicalKeys, legacyKeys] = await Promise.all([
+		kvListKeys(store.store, groupIndexPrefix({ slug, sessionId: canonicalSessionId })),
+		// The legacy prefix also lists every canonical key; a group id holds no ':', so those are never legacy keys.
+		kvListKeys(store.store, legacyPrefix).then((keys) => keys.filter((key) => !key.slice(legacyPrefix.length).includes(':'))),
+	]);
+	// Each group's reads run side by side: one after another, a session with
+	// many groups made cold lists wait seconds. Results keep the key order.
+	const canonical = await Promise.all(canonicalKeys.map(async (key) => {
 		const groupId = await store.store.get(key);
 		const normalizedGroupId = normalizeWorkerGroupId(groupId);
 		if (
@@ -737,28 +742,28 @@ const listGroupRecords = async ({ store, slug, sessionId, includeDeleted = false
 			groupId: normalizedGroupId,
 		});
 		if (!group) throw new Error('Worker group index points to a missing group.');
-		if (includeDeleted || !group.deletedAt) groups.set(normalizedGroupId, group);
-	}
-	for (const key of legacyKeys) {
+		return [normalizedGroupId, group];
+	}));
+	const legacy = await Promise.all(legacyKeys.map(async (key) => {
 		let groupId;
 		try {
 			groupId = await store.store.get(key);
 		} catch {
-			continue;
+			return null;
 		}
 		const normalizedGroupId = normalizeWorkerGroupId(groupId);
-		if (!normalizedGroupId || key !== legacyGroupIndexKey({ slug, groupId: normalizedGroupId })) {
-			continue;
-		}
+		if (!normalizedGroupId || key !== legacyGroupIndexKey({ slug, groupId: normalizedGroupId })) return null;
 		const group = await readGroupRecord({
 			store,
 			slug,
 			sessionId: canonicalSessionId,
 			groupId: normalizedGroupId,
 		});
-		if (group && (includeDeleted || !group.deletedAt)) {
-			groups.set(normalizedGroupId, group);
-		}
+		return group ? [normalizedGroupId, group] : null;
+	}));
+	const groups = new Map();
+	for (const [groupId, group] of [...canonical, ...legacy.filter(Boolean)]) {
+		if (includeDeleted || !group.deletedAt) groups.set(groupId, group);
 	}
 	return [...groups.values()];
 };

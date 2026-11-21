@@ -103,8 +103,9 @@ const linkAccessOf = (body, replaces) => {
 // A link: the Worker fetches the page under the strict link policy and stores
 // its text with the link. With `replaces`, a refresh of that link: the same
 // page read again, whose snapshot keeps the link's title, privacy and adder,
-// then the old record goes.
-const addLink = async ({ body, env, config, slug, deps, store, json, now }) => {
+// then the old record goes. The Worker's own reading of the session's saved
+// links (sessionLinkReading.js) comes here too, with its own page size.
+const addLink = async ({ body, env, config, slug, deps, store, json, now, snapshotChars = LIMITS.snapshotChars }) => {
   const url = trim(body.url);
   let parsed = null;
   try { parsed = url.length <= LIMITS.urlChars ? new URL(url) : null; } catch { parsed = null; }
@@ -138,7 +139,7 @@ const addLink = async ({ body, env, config, slug, deps, store, json, now }) => {
     return json({ error: `The link could not be read: ${fetched.error || 'no response'}.`, reason: 'context_link_unreadable' },
       fetched.status >= 500 ? 502 : 422);
   }
-  const text = fetched.text.slice(0, LIMITS.snapshotChars);
+  const text = fetched.text.slice(0, Math.min(snapshotChars, LIMITS.snapshotChars));
   if (!text.trim()) return json({ error: 'The page has no text to read.', reason: 'context_link_empty' }, 422);
   const title = clip((replaces ? contextTagValue(replaces.tags, TAGS.name) : trim(body.title)) || fetched.title || parsed.hostname,
     LIMITS.titleChars);
@@ -190,6 +191,8 @@ const addLink = async ({ body, env, config, slug, deps, store, json, now }) => {
     },
   });
 };
+
+export const addContextLink = addLink;
 
 // Context changes to a file's readings run in the session coordinator.
 const coordinate = (deps, args) => (deps?.executeCoordinatedContextSourceOperation || executeCoordinatedContextSourceOperation)(args);

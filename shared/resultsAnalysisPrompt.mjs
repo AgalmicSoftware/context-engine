@@ -34,7 +34,7 @@ const SECTIONS = {
 };
 
 // `exposure` is the session's group-summary policy; `contextText` is background
-// the hosts gave, which never counts as evidence.
+// from the hosts and, where allowed, participants, which never counts as evidence.
 export const buildResultsAnalysisPrompt = ({
   sections = RESULTS_ANALYSIS_SECTION_KEYS,
   input = {},
@@ -72,6 +72,6 @@ JSON shape:
 Session input:
 ${JSON.stringify(input, null, 2)}${contextText ? `
 
-The session's hosts gave this background. Use it only to understand the topic; ground every claim, citation and group in the responses above, never in this background.
+This is the session's background, from its hosts and, where the session allows, its participants. Use it only to understand the topic; ground every claim, citation and group in the responses above, never in this background.
 ${contextText}` : ''}`;
 };

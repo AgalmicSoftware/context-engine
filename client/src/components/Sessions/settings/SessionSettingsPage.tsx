@@ -6,13 +6,13 @@ import styles from '../setup/SessionSetup.module.scss';
 import ContextSourcesPanel from '../setup/ContextSourcesPanel';
 import SetupSessionAgent from '../setup/SetupSessionAgent';
 import { useContextGroups } from '../../../utilities/docLibrary/useContextGroups';
-import { normalizeSessionContext } from '@ce-shared/sessionContext.mjs';
 import { templateContextFiles, type ContextSource } from '../../../utilities/docLibrary/contextSources';
 import { SessionTemplateActions, SetupQuestionsPublisher } from '../setup/SessionTemplateTools';
 import { sessionTemplateFromDraft } from '@ce-shared/sessionTemplate.mjs';
 import {
   SetupBasicsSection,
   SetupContextSection,
+  sessionLinksReadChars,
   SetupParticipationSection,
   SetupQuestionsSection,
   readSetupQuestions,
@@ -49,9 +49,11 @@ import {
   readWorkerKeepsDraftText,
   readWorkerTakesDataNote,
   readWorkerTakesVoiceContext,
+  readWorkerTakesQuestionOrder,
   readWorkerTakesGptLive11,
   readWorkerReleaseLabel,
   readWorkerKeepsContextCards,
+  readWorkerReadsSessionLinks,
   readWorkerHasAgentSignIn,
   readWorkerTakesFeedback,
 } from '../../../domains/worker/workerRelease';
@@ -247,6 +249,8 @@ const SessionSettingsPage = ({
   const [workerHasAgentSwitch, setWorkerHasAgentSwitch] = useState(false);
   // Whether it keeps context cards; an older one would refuse the setting, so it isn't offered there.
   const [workerKeepsCards, setWorkerKeepsCards] = useState(false);
+  // Whether it reads the session's context links for its AI by itself; an older one reads only what is added.
+  const [workerReadsLinks, setWorkerReadsLinks] = useState(false);
   // Whether it counts a separate AI daily limit; an older one would store the field and ignore it.
   const [workerCountsAiLimit, setWorkerCountsAiLimit] = useState(false);
   const [workerRunsWorkersAi, setWorkerRunsWorkersAi] = useState(false);
@@ -258,6 +262,9 @@ const SessionSettingsPage = ({
   // Whether it takes the voice interview's context setting; an older one would refuse the whole save.
   // Null while unknown.
   const [workerTakesVoiceContext, setWorkerTakesVoiceContext] = useState<boolean | null>(null);
+  // Whether it takes the interview's question order setting; an older one would refuse the whole save.
+  // Null while unknown.
+  const [workerTakesQuestionOrder, setWorkerTakesQuestionOrder] = useState<boolean | null>(null);
   // Whether it takes gpt-live-1.1 for interviews; an older one would refuse the whole save, so it isn't listed there.
   // Null while unknown.
   const [workerTakesGptLive11, setWorkerTakesGptLive11] = useState<boolean | null>(null);
@@ -270,11 +277,13 @@ const SessionSettingsPage = ({
     setWorkerTakesFeedback(false);
     setWorkerHasAgentSwitch(false);
     setWorkerKeepsCards(false);
+    setWorkerReadsLinks(false);
     setWorkerCountsAiLimit(false);
     setWorkerRunsWorkersAi(false);
     setWorkerHasAnalysisCard(false);
     setWorkerTakesDataNote(false);
     setWorkerTakesVoiceContext(null);
+    setWorkerTakesQuestionOrder(null);
     setWorkerTakesGptLive11(null);
     setWorkerAgentOptions({ recordChats: false, anyoneCanAsk: false });
     void readWorkerReleaseLabel(workerOrigin, sessionSlug, fetchImpl).then((release) => {
@@ -288,6 +297,9 @@ const SessionSettingsPage = ({
     });
     void readWorkerKeepsContextCards(workerOrigin, sessionSlug, fetchImpl).then((keeps) => {
       if (!stale) setWorkerKeepsCards(keeps);
+    });
+    void readWorkerReadsSessionLinks(workerOrigin, sessionSlug, fetchImpl).then((reads) => {
+      if (!stale) setWorkerReadsLinks(reads);
     });
     void readWorkerHasAgentSignIn(workerOrigin, sessionSlug, fetchImpl).then((has) => {
       if (!stale) setWorkerHasAgentSwitch(has);
@@ -306,6 +318,9 @@ const SessionSettingsPage = ({
     });
     void readWorkerTakesVoiceContext(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
       if (!stale) setWorkerTakesVoiceContext(takes);
+    });
+    void readWorkerTakesQuestionOrder(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
+      if (!stale) setWorkerTakesQuestionOrder(takes);
     });
     void readWorkerTakesGptLive11(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
       if (!stale) setWorkerTakesGptLive11(takes);
@@ -594,6 +609,8 @@ const SessionSettingsPage = ({
         />
         <SetupContextSection
           {...section('context')}
+          linksReadChars={workerReadsLinks && !onChain ? sessionLinksReadChars(saved) : 0}
+          linkReadingSettingSeen={!!saved && Object.hasOwn(saved, 'sessionLinkReading')}
           sources={
             <>
               <SetupField
@@ -617,7 +634,6 @@ const SessionSettingsPage = ({
                 sessionSlug={sessionSlug}
                 sessionConfig={saved}
                 account={account}
-                pageLinks={normalizeSessionContext(saved?.sessionContext).links}
                 onSourcesChange={setContextSources}
               />
             </>
@@ -669,6 +685,7 @@ const SessionSettingsPage = ({
           dataNoteSupported={onChain || workerTakesDataNote}
           // An on-chain session also sends its settings to its Worker, if it has one, which must take the key.
           voiceContextSupported={onChain && !workerOrigin ? true : workerTakesVoiceContext}
+          questionOrderSupported={onChain && !workerOrigin ? true : workerTakesQuestionOrder}
           gptLive11Supported={onChain ? null : workerTakesGptLive11}
         />
         <SetupResultsSection

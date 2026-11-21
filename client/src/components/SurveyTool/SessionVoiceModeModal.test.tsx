@@ -1347,7 +1347,7 @@ describe('SessionVoiceModeModal', () => {
       expect(instructions.includes('which session question they would most like to see other people answer')).toBe(
         asks,
       );
-      expect(instructions).toContain('end the session without the responder’s cue');
+      expect(instructions).toContain('Don’t wrap up until the responder says they’re done.');
     },
   );
 
@@ -1410,7 +1410,7 @@ describe('SessionVoiceModeModal', () => {
     expect(questionBank(instructions)).not.toContain('Second question?');
     // It knows what was answered, without the answers, so it does not ask again unless the person raises it.
     expect(instructions).toContain(
-      'Do not ask them again or ask about those answers unless the responder brings one up',
+      'Questions listed as already answered are done: don’t ask them, or about their answers, unless the responder brings one up.',
     );
     expect(instructions).toMatch(
       /Already answered \(reference only; not to ask again\):\n- What matters\?\n- Second question\?/,
@@ -3722,6 +3722,8 @@ describe('SessionVoiceModeModal', () => {
 describe('Interview cancellation and recovery', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // A review an earlier test kept would come back with its prefill, whose drafts put ids in the brief.
+    window.localStorage.clear();
     jest
       .mocked(useInterviewReadiness)
       .mockReturnValue({ state: 'ready', detail: 'Voice setup ready.', retry: jest.fn() });
@@ -4064,5 +4066,45 @@ describe('Interview cancellation and recovery', () => {
     expect(prompt).toContain('Unanswered question IDs, newest first: ["q3","q2"]');
     expect(prompt).toContain('Already answered IDs, only for changes I request: ["q1"]');
     expect(prompt).not.toContain('Private prior answer');
+  });
+
+  it('takes the questions, and gives the personal AI prompt, in the order the session lists them when its question order says so', async () => {
+    const props = {
+      ...baseProps,
+      sessionConfig: { interviewMode: { questionOrder: 'arranged' } },
+      questionPool: [
+        { id: 'q1', prompt: 'General question', type: 'freeform', storageRef: { createdAt: '2026-10-28T10:00:00Z' } },
+        { id: 'q2', prompt: 'Newer detail', type: 'freeform', storageRef: { createdAt: '2026-10-29T10:00:00Z' } },
+      ],
+    };
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          type: 'context-engine.interview-question-catalog',
+          version: 1,
+          sessionSlug: 'demo',
+          prefillPromptVersion: 'ce-interview-brief-v6',
+        }),
+      ),
+    );
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: jest.fn(async () => undefined) },
+    });
+    require('./useInterviewOpening').useInterviewOpening.mockReturnValue({ opening: '', notice: '', loading: false });
+    mockVoiceRound('');
+    const voice = render(<SessionVoiceModeModal {...props} mode="interview" />);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    const brief = mockedStartSessionRealtimeInterview.mock.lastCall?.[0].instructions || '';
+    expect(questionBank(brief)).toContain('1. (freeform) General question\n2. (freeform) Newer detail');
+    voice.unmount();
+    render(<SessionVoiceModeModal {...props} mode={null} />);
+    const copy = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
+    await waitFor(() => expect(copy).toHaveAttribute('aria-disabled', 'false'));
+    fireEvent.click(copy);
+    const prompt = jest.mocked(navigator.clipboard.writeText).mock.lastCall?.[0] || '';
+    expect(prompt).toContain('Unanswered question IDs, in the session’s order: ["q1","q2"]');
+    expect(prompt).toContain('"promptRevision":"ce-prefill-prompt-2+arranged",');
   });
 });

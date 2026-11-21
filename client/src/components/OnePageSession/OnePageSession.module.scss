@@ -379,21 +379,30 @@
   }
 }
 
+// Each link on a line of its own, at every width: a row of them ran together and was hard to tell apart.
 .sessionContextLinks {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
   margin-top: 0.85rem;
 
   // The chrome's text colour reads on the chrome in every theme; the app's accent
-  // falls to about 3:1 in Classic 95.
+  // falls to about 3:1 in Classic 95. A long title wraps beside its icon, which stays on the first line.
   a {
     display: inline-flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.4rem;
+    max-width: 100%;
+    overflow-wrap: anywhere;
     color: var(--ce-session-chrome-contrast);
     font-weight: 700;
     text-decoration: none;
+
+    svg {
+      flex: none;
+      margin-top: 0.25em;
+    }
 
     &:hover,
     &:focus-visible {

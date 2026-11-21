@@ -218,10 +218,6 @@ $theme: (
   recognition-logo-backing: var(--ce-status-info-text),
   recognition-logo-border: var(--ce-status-info),
   welcome-artwork-blend-soft: lighten,
-  welcome-artwork-blend-intense: color-dodge,
-  welcome-artwork-blend-cutout: screen,
-  welcome-artwork-detail-opacity-scale: 1,
-  welcome-artwork-detail-filter: grayscale(0) contrast(1),
   welcome-artwork-backdrop: linear-gradient(
       90deg,
       #5b8cff,

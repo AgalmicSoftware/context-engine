@@ -145,46 +145,21 @@
   opacity: 0.75;
 }
 
-.mediaImageToolkit {
-  max-height: 100%;
-  max-width: 116%;
-  mix-blend-mode: var(--ce-welcome-artwork-blend-intense) !important;
-  align-self: center;
-  object-position: center center;
-  filter: opacity(0.5);
-}
-
-.mediaImageGoals {
-  max-height: 100%;
-  max-width: 100%;
-  mix-blend-mode: var(--ce-welcome-artwork-blend-cutout) !important;
-  align-self: flex-end;
-  opacity: 0.86;
-}
-
-.mediaImageBuiltToHelp {
-  max-height: 140%;
-  max-width: 100%;
-  mix-blend-mode: var(--ce-welcome-artwork-blend-cutout) !important;
-  align-self: flex-end;
-  opacity: 1;
-  filter: brightness(1.08) saturate(1.18) contrast(1.08);
-}
-
-.mediaImageBecause {
-  max-height: 110%;
-  max-width: 130%;
-  align-self: flex-end;
-  mix-blend-mode: var(--ce-welcome-artwork-blend-intense) !important;
-  opacity: 0.8;
-}
-
+// The five slide pictures share the intro's white dot artwork, so they share its treatment.
+.mediaImageToolkit,
+.mediaImageGoals,
+.mediaImageBuiltToHelp,
+.mediaImageBecause,
 .mediaImageLookingFor {
-  max-height: 40vh;
-  max-width: 35vw;
+  max-height: 100%;
+  max-width: 100%;
   align-self: flex-end;
   mix-blend-mode: var(--ce-welcome-artwork-blend-soft) !important;
   opacity: 0.75;
+}
+
+.mediaImageToolkit {
+  object-position: center center;
 }
 
 .bulletListContainer {
@@ -494,11 +469,6 @@
 
   .mediaImageIntro {
     transform: translateY(2%);
-  }
-
-  .mediaImageLookingFor {
-    max-height: 35vh;
-    max-width: 42vw;
   }
 
   .mediaImageToolkit {

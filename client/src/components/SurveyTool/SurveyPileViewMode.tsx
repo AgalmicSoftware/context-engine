@@ -1935,6 +1935,7 @@ export const recordInterviewProvenance = (
     researchDetail: sessionResearchDetail,
     keepDraftTextForAdmins,
     voiceSessionContext,
+    questionOrder,
   } = normalizeInterviewSettings(
     (engine.props?.sessionConfig as { interviewMode?: unknown } | undefined)?.interviewMode,
   );
@@ -1943,8 +1944,11 @@ export const recordInterviewProvenance = (
     sessionResearchDetail === 'full' && consentOverrides?.researchDetail !== 'minimal' ? 'full' : 'minimal';
   // The voice model the session's settings name, which its Worker runs for the interview.
   const voiceModel = resolveRealtimeInterviewModel(engine.props?.sessionConfig || {});
-  // The voice's instructions, marked where the session's settings give it the session's context.
-  const voiceBriefRevision = `${VOICE_BRIEF_REVISION}${voiceSessionContext ? '+context' : ''}`;
+  // The voice's instructions, marked where the session's settings give it the session's context, or take
+  // its questions in the order the session lists them.
+  const voiceBriefRevision = `${VOICE_BRIEF_REVISION}${voiceSessionContext ? '+context' : ''}${
+    questionOrder === 'arranged' ? '+arranged' : ''
+  }`;
   const pendingQuestionIds = engine.getChangedQidsAndFields?.(0)?.changedQids;
   const researchAnchor = drafts.find((draft) => pendingQuestionIds?.has(draft.questionId)) || drafts[0];
   const normalizedResponderName = String(responderName || '')

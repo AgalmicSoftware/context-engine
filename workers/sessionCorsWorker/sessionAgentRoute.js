@@ -519,6 +519,10 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
       adminOnly: asker.audience === 'admin' || isListedResultsBuilder(config, address),
     })
     : null;
+  // The session's saved links that aren't sources yet are read in the background,
+  // started once the answer is ready so its page fetches never hold up this one's
+  // own reads and provider call; a later answer has them.
+  deps.readSessionLinks?.({ env, config, slug });
   const notes = [
     answersUnavailable === 'too_many'
       ? `Members’ answers weren’t read: this session stores more than ${RESULTS_ANALYSIS_SCAN_LIMITS.rows.toLocaleString('en-US')} question and answer versions, the most the Session Agent can read at once.`

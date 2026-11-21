@@ -235,6 +235,7 @@ test('createWorkerRouteRuntimeWithWorkerDeps preserves route runtime assembly bu
           fetchUrl: 'fetchUrl',
           arweaveUpload: 'arweaveUpload',
           storageRoute: 'storageRoute',
+          readSessionLinks: 'readSessionLinks',
           verifyAdminSignature: 'verifyAdminSignature',
         };
       },
@@ -278,6 +279,7 @@ test('createWorkerRouteRuntimeWithWorkerDeps preserves route runtime assembly bu
           getSessionSecrets: 'getSessionSecrets',
           arweaveUpload: 'arweaveUpload',
           storageRoute: 'storageRoute',
+          readSessionLinks: 'readSessionLinks',
           authorizeCloudflareStorageResourceRead: undefined,
           readPublishedResultsAnalysisArtifact: undefined,
           evaluateResultsAnalysisViewerEligibility: undefined,

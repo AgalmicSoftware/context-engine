@@ -196,6 +196,13 @@ type ContextProps = SetupSectionProps & {
   publisher?: React.ReactNode;
   /** /new: the id of the file input in `sources`, which "Add file" opens. */
   fileInputId?: string;
+  /**
+   * How much of each linked page the session's Worker keeps when it reads the links by itself; 0 where it does
+   * not (an older Worker, the setting off, or a session not created yet), which keeps the older help.
+   */
+  linksReadChars?: number;
+  /** Whether the session's own link-reading setting was there to read (it is admin-only). */
+  linkReadingSettingSeen?: boolean;
 };
 
 const ADD_TEXT_HELP =
@@ -213,6 +220,28 @@ const PARAGRAPH_HELP = `Plain text, up to ${SESSION_CONTEXT_LIMITS.paragraphChar
 const LINK_LABEL_HELP = `The words the session page shows for this link, up to ${SESSION_CONTEXT_LIMITS.labelChars} characters.`;
 const LINK_URL_HELP =
   'An https:// address, for everyone who can open the session. Its page is read for the AI only if you choose that after Create.';
+/**
+ * How much of each linked page the session keeps when its Worker reads the links by itself, from the session's
+ * saved settings: the default, the session's own smaller figure, or 0 where an admin has turned the reading off.
+ */
+export const sessionLinksReadChars = (config: unknown): number => {
+  const setting = asRecord(asRecord(config).sessionLinkReading);
+  if (setting.on === false || setting.links === 0) return 0;
+  // As the Worker reads it: a whole number from 1,000 to 100,000, and the default for anything else.
+  const chars = setting.pageChars;
+  return typeof chars === 'number' && Number.isInteger(chars) && chars >= 1000 && chars <= 100_000 ? chars : 100_000;
+};
+
+/**
+ * The link's help where the session's Worker reads its links by itself, keeping `pageChars` of each page.
+ * `settingSeen` is false where this page cannot see the session's admin-only setting, which may turn the
+ * reading off or shorten it: the text then says so instead of promising.
+ */
+export const linkUrlHelpWhenRead = (pageChars: number, settingSeen = true) =>
+  `An https:// address, for everyone who can open the session. After you save, the session reads the page for its AI by itself${settingSeen ? '' : ', unless its link reading is turned off'}, keeping up to its first ${pageChars.toLocaleString('en-US')} characters. A page that couldn’t be read is tried again later. Each page is read once; refresh it from the files list to read it again.`;
+// /new: the session does not exist yet, so which of the two it will be is not known.
+const NEW_LINK_URL_HELP =
+  'An https:// address, for everyone who can open the session. After Create its page is read for the AI: by the session itself where it does that, and otherwise if you choose it there.';
 const LEAVE_TEXT = 'Use an HTML file instead? The paragraphs and links will be removed.';
 const LEAVE_HTML = 'Use typed text instead? The HTML file will be removed.';
 
@@ -227,7 +256,15 @@ export const SetupContextSection = ({
   sources = null,
   publisher = null,
   fileInputId = '',
+  linksReadChars = 0,
+  linkReadingSettingSeen = true,
 }: ContextProps) => {
+  const linkUrlHelp =
+    linksReadChars > 0
+      ? linkUrlHelpWhenRead(linksReadChars, linkReadingSettingSeen)
+      : fileInputId
+        ? NEW_LINK_URL_HELP
+        : LINK_URL_HELP;
   const context = readContext(draft);
   const hasText =
     context.paragraphs.some((paragraph) => paragraph.trim()) || context.links.some((link) => link.url.trim());
@@ -371,7 +408,7 @@ export const SetupContextSection = ({
         context.links.map((link, index) => (
           <div key={`link-${index}`} className={styles.listRow} data-testid="ce-setup-context-entry">
             <div className={styles.listRowBody}>
-              <SetupField id={`ce-setup-context-link-url-${index}`} label={`URL ${index + 1}`} help={LINK_URL_HELP}>
+              <SetupField id={`ce-setup-context-link-url-${index}`} label={`URL ${index + 1}`} help={linkUrlHelp}>
                 <Input
                   id={`ce-setup-context-link-url-${index}`}
                   type="url"
@@ -628,6 +665,8 @@ type ParticipationProps = SetupSectionProps & {
   gptLive11Supported?: boolean | null;
   /** True when the session's Worker takes the voice context setting; /new leaves it at its default, off. */
   voiceContextSupported?: boolean | null;
+  /** True when the session's Worker takes the question order setting; /new leaves it at its default, newest. */
+  questionOrderSupported?: boolean | null;
 };
 
 export const SetupParticipationSection = ({
@@ -641,6 +680,7 @@ export const SetupParticipationSection = ({
   dataNoteSupported = true,
   gptLive11Supported = true,
   voiceContextSupported = null,
+  questionOrderSupported = null,
 }: ParticipationProps) => (
   <SetupSection
     sectionKey="participation"
@@ -668,6 +708,7 @@ export const SetupParticipationSection = ({
         dataNoteSupported={dataNoteSupported}
         gptLive11Supported={gptLive11Supported}
         voiceContextSupported={voiceContextSupported}
+        questionOrderSupported={questionOrderSupported}
       />
     ) : null}
     <SetupField id="ce-setup-group-creation" label="Who can create groups" help={GROUP_CREATION_HELP}>

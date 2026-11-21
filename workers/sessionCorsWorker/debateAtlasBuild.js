@@ -56,7 +56,7 @@ Session: ${JSON.stringify(text(sessionName, 200))}
 Questions (responses is how many answers each has):
 ${JSON.stringify(questions)}${contextText ? `
 
-The session's hosts gave this background. Use it only to understand the subject; group and name only what the questions ask.
+This is the session's background, from its hosts and, where the session allows, its participants. Use it only to understand the subject; group and name only what the questions ask.
 ${contextText}` : ''}`;
 
 // Maps one topic, or with no topic one branch across all its topics' questions.
@@ -114,7 +114,7 @@ export const describeNextDebateAtlasBuild = (config) => {
       plan: unquote(buildDebateAtlasPlanPrompt({
         sessionName: config?.sessionName,
         questions: '<Questions>',
-        contextText: '<Background, when the hosts gave some>',
+        contextText: '<Background, when the session has some>',
       })),
       map: unquote(buildDebateAtlasTopicPrompt({
         branch: '<Branch>',

@@ -51,4 +51,22 @@ describe('ToolExplorer sparse card layout', () => {
       /@media \(max-width:\s*640px\)\s*{\s*@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.explorerCol \.square,[\s\S]*?\.explorerColSparse \.square\s*{[\s\S]*?height:\s*232px;[\s\S]*?min-height:\s*232px;[\s\S]*?\.backgroundImage\s*{[\s\S]*?flex-basis:\s*128px;[\s\S]*?height:\s*128px;/,
     );
   });
+
+  it("keeps the session box on Back's row by letting it shrink before it wraps", () => {
+    const controls = scss.slice(scss.indexOf('\n.expandedHeaderPrimaryControls {'));
+    const session = controls.match(/\.expandedHeaderSession\s*{([\s\S]*?)\n {2}}/)?.[1] || '';
+    // It takes what the row has left, not its content's width, so a long session name no longer forces a wrap.
+    expect(session).toMatch(/flex:\s*1 1 0;/);
+    expect(session).not.toMatch(/width:\s*fit-content/);
+    // It drops to its own row only when less than a useful width is left.
+    expect(session).toMatch(/min-width:\s*min\(100%,\s*200px\);/);
+    expect(session).toMatch(/justify-content:\s*flex-end;/);
+    expect(session).toMatch(/\.activeSessionControl\s*{\s*min-width:\s*0;/);
+    // Questions and Groups use the compact header, which must not put the content-sized box back.
+    const compact = scss.slice(
+      scss.indexOf('\n.expandedHeaderCompact {'),
+      scss.indexOf('\n.expandedHeaderQuestions {'),
+    );
+    expect(compact).not.toMatch(/\.expandedHeaderSession\s*{/);
+  });
 });

@@ -662,6 +662,24 @@ test('set-config takes the voice interview context switch only as a boolean', ()
   }
 });
 
+test('set-config takes the interview question order only as newest or arranged', () => {
+  const apply = (questionOrder) => applySessionConfigMutation({
+    existingConfig: cloneJson(profileBearingConfig),
+    mutation: { kind: 'set-config', incomingConfig: { interviewMode: { enabled: true, questionOrder } } },
+    slug: 'session-a',
+  });
+  for (const questionOrder of ['newest', 'arranged']) {
+    const result = apply(questionOrder);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.config.interviewMode.questionOrder, questionOrder);
+  }
+  for (const questionOrder of ['oldest', 'Arranged', 1, null, ['arranged']]) {
+    const result = apply(questionOrder);
+    assert.equal(result.ok, false, JSON.stringify(questionOrder));
+    assert.equal(result.status, 400);
+  }
+});
+
 test('set-config accepts the switch that shows fidelity results in Results only as a boolean', () => {
   const apply = (showFidelityResults) => applySessionConfigMutation({
     existingConfig: cloneJson(profileBearingConfig),

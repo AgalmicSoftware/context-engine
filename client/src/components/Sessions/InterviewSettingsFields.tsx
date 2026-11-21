@@ -73,6 +73,10 @@ const VOICE_CONTEXT_HELP =
   'Whether the voice interviewer is given the session’s notes, links and readable sources. Off by default. Drafting answers after the interview is unaffected.';
 export const VOICE_CONTEXT_NEEDS_NEWER_WORKER =
   'This session’s Worker doesn’t take this setting and refuses every save while it is on. Turn it off, then save.';
+const QUESTION_ORDER_HELP =
+  'Which question the voice interviewer and the AI prefill turn to when nothing the person said points to one: the newest first, or the order the question pile shows them in, highlighted questions first and then the most answered, so it changes as answers come in.';
+export const QUESTION_ORDER_NEEDS_NEWER_WORKER =
+  'This session’s Worker doesn’t take this setting and refuses every save while it is set. Choose Newest first, then save.';
 export const GPT_LIVE_1_1_NEEDS_NEWER_WORKER = `This session’s Worker doesn’t take ${GPT_LIVE_1_1_MODEL} and refuses every save while it is set. Choose ${PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL}, then save.`;
 const OPENING_HELP =
   'How each voice interview starts. Generate: the AI writes an opening from the session’s information and questions once there are questions it can use, and reuses it until it is regenerated. Owner-written: every interview opens with your question.';
@@ -144,6 +148,8 @@ type Props = {
   // True where the session's Worker takes the voice context setting, false where it is known not to: it would
   // refuse the whole save. Null while that is unknown. Where it isn't true the field shows only while it is on.
   voiceContextSupported?: boolean | null;
+  // The same for the question order setting: shown where it is true, or while it isn't the default.
+  questionOrderSupported?: boolean | null;
 };
 export const DRAFT_TEXT_NEEDS_WORKER = 'Needs a session hosted on a Session Worker.';
 export const DRAFT_TEXT_NEEDS_NEWER_WORKER = 'Needs a newer Session Worker (0.9.6 or later).';
@@ -156,6 +162,7 @@ export default function InterviewSettingsFields({
   dataNoteSupported = true,
   gptLive11Supported = true,
   voiceContextSupported = null,
+  questionOrderSupported = null,
 }: Props) {
   const id = useId();
   const tooltipsEnabled = useSessionWizardTooltipPreference(useContext(ReactReduxContext)?.store ?? null);
@@ -171,6 +178,7 @@ export default function InterviewSettingsFields({
   const modelRefused = storedModel === GPT_LIVE_1_1_MODEL && gptLive11Supported === false;
   // Shown while it is on, even where the Worker doesn't take it, so it can be turned off and the session saved.
   const voiceContextRefused = settings.voiceSessionContext && voiceContextSupported === false;
+  const questionOrderRefused = settings.questionOrder !== 'newest' && questionOrderSupported === false;
   // A model already set stays listed, so the field shows the truth.
   const models = REALTIME_INTERVIEW_MODELS.filter(
     (option) => option !== GPT_LIVE_1_1_MODEL || gptLive11Supported === true || option === model,
@@ -335,6 +343,31 @@ export default function InterviewSettingsFields({
           {voiceContextRefused ? (
             <p id={`${id}-voice-context-refused`} role="alert">
               {VOICE_CONTEXT_NEEDS_NEWER_WORKER}
+            </p>
+          ) : null}
+        </HelpField>
+      ) : null}
+      {questionOrderSupported === true || settings.questionOrder !== 'newest' ? (
+        <HelpField htmlFor={`${id}-question-order`} label="Question order" help={QUESTION_ORDER_HELP}>
+          <Input
+            id={`${id}-question-order`}
+            type="select"
+            value={settings.questionOrder}
+            invalid={questionOrderRefused}
+            onChange={(e) => change('questionOrder', e.target.value)}
+            aria-describedby={[
+              setupHelpId(`${id}-question-order`),
+              questionOrderRefused ? `${id}-question-order-refused` : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            <option value="newest">Newest first</option>
+            <option value="arranged">As the session lists them</option>
+          </Input>
+          {questionOrderRefused ? (
+            <p id={`${id}-question-order-refused`} role="alert">
+              {QUESTION_ORDER_NEEDS_NEWER_WORKER}
             </p>
           ) : null}
         </HelpField>

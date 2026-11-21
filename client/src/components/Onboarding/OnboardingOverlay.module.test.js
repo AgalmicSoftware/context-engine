@@ -93,21 +93,19 @@ describe('Onboarding overlay welcome slide styles', () => {
     );
   });
 
-  it('centers the toolkit artwork instead of clipping it against the left edge', () => {
+  it('gives every slide picture the intro white dot treatment, centred toolkit included', () => {
     expect(scss).toMatch(
-      /\.mediaImageToolkit\s*\{[\s\S]*?max-width:\s*116%;[\s\S]*?align-self:\s*center;[\s\S]*?object-position:\s*center center;/,
+      /\.mediaImageToolkit,\s*\.mediaImageGoals,\s*\.mediaImageBuiltToHelp,\s*\.mediaImageBecause,\s*\.mediaImageLookingFor\s*\{[^}]*max-width:\s*100%;[^}]*mix-blend-mode:\s*var\(--ce-welcome-artwork-blend-soft\)\s*!important;[^}]*opacity:\s*0\.75;/,
     );
+    expect(scss).toMatch(/\.mediaImageToolkit\s*\{\s*object-position:\s*center center;/);
     expect(scss).not.toMatch(/\.mediaImageToolkit\s*\{[\s\S]*?transform:\s*translateX\(8%\);/);
     expect(scss).toMatch(
       /@media \(max-width:\s*640px\)\s*\{[\s\S]*?\.mediaImageToolkit\s*\{[\s\S]*?max-width:\s*100%;[\s\S]*?transform:\s*none;/,
     );
-  });
-
-  it('uses the transparent goals artwork without reintroducing an inverted image rectangle', () => {
-    expect(scss).toMatch(
-      /\.mediaImageGoals\s*\{[\s\S]*?mix-blend-mode:\s*var\(--ce-welcome-artwork-blend-cutout\)\s*!important;[\s\S]*?opacity:\s*0\.86;/,
-    );
-    expect(scss).not.toMatch(/\.mediaImageGoals\s*\{[\s\S]*?filter:\s*invert\(1\);/);
+    // The artwork blends against the panel, so the walkthrough must not open its own stacking context.
+    expect(scss).toMatch(/\.onboardingWalkthrough\s*\{[\s\S]*?position:\s*relative;[\s\S]*?z-index:\s*auto;/);
+    // The old photo treatments (cutout blends, colour boosts, inverted rectangles) are gone.
+    expect(scss).not.toMatch(/blend-cutout|blend-intense|saturate\(1\.18\)|invert\(1\)/);
   });
 
   it('contains tall slide artwork inside the phone media slot', () => {
@@ -117,14 +115,6 @@ describe('Onboarding overlay welcome slide styles', () => {
     expect(scss).toMatch(
       /@media \(max-width:\s*640px\)\s*\{[\s\S]*?\.mediaImage\s*\{[\s\S]*?width:\s*100%;[\s\S]*?height:\s*100%;[\s\S]*?object-fit:\s*contain;/,
     );
-  });
-
-  it('blends the audience slide jpeg with scss only so its source background falls away', () => {
-    expect(scss).toMatch(/\.onboardingWalkthrough\s*\{[\s\S]*?position:\s*relative;[\s\S]*?z-index:\s*auto;/);
-    expect(scss).toMatch(
-      /\.mediaImageBuiltToHelp\s*\{[\s\S]*?mix-blend-mode:\s*var\(--ce-welcome-artwork-blend-cutout\)\s*!important;[\s\S]*?opacity:\s*1;[\s\S]*?filter:\s*brightness\(1\.08\) saturate\(1\.18\) contrast\(1\.08\);/,
-    );
-    expect(scss).not.toMatch(/\.mediaImageBuiltToHelp\s*\{[\s\S]*?mask-image:/);
   });
 
   it('keeps the skip button subdued until hovered', () => {

@@ -8,6 +8,7 @@ import { groupLockedAccess } from '../../shared/sessionContextSources.mjs';
 import { ADMIN, PARTICIPANT, harness, idOf, json } from './contextSourceTestFixture.mjs';
 import { dispatchSessionAgentHistoryStore, listSessionAgentHistory } from './sessionAgentHistory.js';
 import { SESSION_AGENT_SIGNED_OUT, dispatchSessionAgentRoute, resultsQuestions } from './sessionAgentRoute.js';
+import { readSessionLinks as readSessionLinksBoundary } from './sessionLinkReading.js';
 import { getStorageIndexBinding } from './storageKvBindings.js';
 import { hiddenStorageResourcePrefix } from './storageResourceOwnership.js';
 import { createDurableStorage } from './workerGroupTestFixture.mjs';
@@ -980,4 +981,35 @@ test('a Detailed answer counts every member’s choice, leaving out anyone who t
   assert.deepEqual(without[0], { question: 'Meet less?', answered: 5, counts: { Agree: 3, Disagree: 2 } });
   assert.deepEqual(without[1].counts, { Monday: 5, Friday: 2 });
   assert.equal(without[2].written.includes('WRITTEN 0'), false);
+});
+
+test('a question reads the session’s saved links in the background, never an address it names, and never waits on them', async () => {
+  const h = await seeded();
+  const ESSAY = 'https://essays.example/commons';
+  h.state.config.sessionContext = { title: 'Context', paragraphs: [], links: [{ label: 'The essay', url: ESSAY }] };
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  const calls = [];
+  // The reader the runtime binds, with a page that doesn't answer until released.
+  const readSessionLinks = (value) => {
+    calls.push(Object.keys(value).sort());
+    return readSessionLinksBoundary({ ...value, deps: { ...h.deps, safeFetch: async (url) => {
+      h.pageCalls.push(String(url));
+      await held;
+      return new Response('<p>The commons essay.</p>', { headers: { 'content-type': 'text/html' } });
+    } } });
+  };
+  const answer = await ask(h, { body: { question: 'What does https://elsewhere.example/page say?' }, deps: { readSessionLinks } });
+  assert.equal(answer.status, 200);
+  // Given only the session, never the question; the answer went out while the page was still loading.
+  assert.deepEqual(calls, [['config', 'env', 'slug']]);
+  release();
+  await h.settled();
+  assert.deepEqual(h.pageCalls, [ESSAY]);
+  const listed = (await h.list(PARTICIPANT)).filter((item) => item.metadata.tags.some((tag) => tag.value === ESSAY));
+  assert.equal(listed.length, 1);
+  // A refused question reads nothing.
+  calls.length = 0;
+  await ask(h, { body: { question: '' }, deps: { readSessionLinks } });
+  assert.deepEqual(calls, []);
 });

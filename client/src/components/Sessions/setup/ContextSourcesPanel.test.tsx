@@ -74,16 +74,8 @@ const list = (overrides: Partial<SessionContextSourcesState> = {}): SessionConte
   reload: jest.fn(),
   ...overrides,
 });
-const renderPanel = (state = list(), pageLinks: Array<{ label: string; url: string }> = []) =>
-  render(
-    <ContextSourcesPanel
-      sessionSlug="salon"
-      sessionConfig={{ slug: 'salon' }}
-      account="0xadmin"
-      list={state}
-      pageLinks={pageLinks}
-    />,
-  );
+const renderPanel = (state = list()) =>
+  render(<ContextSourcesPanel sessionSlug="salon" sessionConfig={{ slug: 'salon' }} account="0xadmin" list={state} />);
 const options = expect.objectContaining({ sessionSlug: 'salon', asAdmin: true });
 
 beforeEach(() => {
@@ -131,7 +123,9 @@ describe('context sources panel', () => {
     await screen.findAllByTestId('ce-context-source');
     fireEvent.change(screen.getByTestId('ce-context-link-url'), { target: { value: ' https://example.org/post ' } });
     fireEvent.change(screen.getByLabelText('Link title'), { target: { value: 'RxC post' } });
-    fireEvent.click(screen.getAllByLabelText('Admins only')[0]);
+    // One audience choice serves links and files; a link takes everyone or admins only.
+    fireEvent.click(screen.getByTestId('ce-context-file-access'));
+    fireEvent.click(screen.getByRole('button', { name: 'Admins only' }));
     await act(async () => fireEvent.click(screen.getByTestId('ce-context-add-link')));
     expect(addContextLink).toHaveBeenCalledWith(
       { url: 'https://example.org/post', title: 'RxC post', adminsOnly: true },
@@ -177,6 +171,89 @@ describe('context sources panel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Admins only' }));
     await act(async () => fireEvent.click(screen.getByTestId('ce-context-add-file')));
     expect(uploadContextFile).toHaveBeenLastCalledWith({ file: notes, adminsOnly: true }, options);
+  });
+
+  it('adds a link from one row: typed or pasted, by + or Enter, for everyone unless Visible to says admins', async () => {
+    mockGroups = [
+      { groupId: 'hosts', label: 'Hosts' },
+      { groupId: 'salon', label: 'Salon' },
+    ];
+    const clipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    renderPanel(list({ sources: [] }));
+    const url = await screen.findByTestId('ce-context-link-url');
+    // The title is asked for only once there is a link to name.
+    expect(screen.queryByLabelText('Link title')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-context-add-link')).toBeDisabled();
+    expect(screen.queryByTestId('ce-context-add-file')).not.toBeInTheDocument();
+    fireEvent.change(url, { target: { value: 'https://example.org/a' } });
+    expect(screen.getByLabelText('Link title')).toBeInTheDocument();
+    await act(async () => fireEvent.keyDown(url, { key: 'Enter' }));
+    expect(addContextLink).toHaveBeenLastCalledWith(
+      { url: 'https://example.org/a', title: '', adminsOnly: false },
+      options,
+    );
+    expect(url).toHaveValue('');
+
+    // Paste puts the clipboard's text in the box; it adds nothing by itself.
+    const readText = jest.fn(async () => ' https://example.org/pasted ');
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { readText } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Paste' })));
+    expect(url).toHaveValue('https://example.org/pasted');
+    expect(addContextLink).toHaveBeenCalledTimes(1);
+    readText.mockRejectedValueOnce(new Error('denied'));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Paste' })));
+    expect(screen.getByTestId('ce-context-sources-status')).toHaveTextContent('Pasting isn’t allowed here.');
+
+    // Groups are for files: a link waits until Visible to is everyone or admins only.
+    fireEvent.click(screen.getByTestId('ce-context-file-access'));
+    fireEvent.click(screen.getByRole('button', { name: 'Hosts' }));
+    expect(screen.getByTestId('ce-context-link-audience-hint')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-context-add-link')).toBeDisabled();
+    await act(async () => fireEvent.keyDown(url, { key: 'Enter' }));
+    expect(addContextLink).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Hosts' }));
+    expect(screen.queryByTestId('ce-context-link-audience-hint')).not.toBeInTheDocument();
+    await act(async () => fireEvent.click(screen.getByTestId('ce-context-add-link')));
+    expect(addContextLink).toHaveBeenLastCalledWith(
+      { url: 'https://example.org/pasted', title: '', adminsOnly: false },
+      options,
+    );
+    // A browser without a clipboard says so instead of failing.
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Paste' })));
+    expect(screen.getByTestId('ce-context-sources-status')).toHaveTextContent('Pasting isn’t allowed here.');
+    if (clipboard) Object.defineProperty(navigator, 'clipboard', clipboard);
+    else Reflect.deleteProperty(navigator, 'clipboard');
+  });
+
+  it('says on each Add who it is for, since one Visible to choice serves links and files', async () => {
+    mockGroups = [{ groupId: 'hosts', label: 'Hosts' }];
+    renderPanel(list({ sources: [] }));
+    const notes = new File(['notes'], 'notes.txt', { type: 'text/plain' });
+    fireEvent.change(await screen.findByTestId('ce-context-file'), { target: { files: [notes] } });
+    expect(screen.getByTestId('ce-context-add-file')).toHaveTextContent('Add file for everyone in the session');
+    fireEvent.click(screen.getByTestId('ce-context-file-access'));
+    fireEvent.click(screen.getByRole('button', { name: 'Hosts' }));
+    expect(screen.getByTestId('ce-context-add-file')).toHaveTextContent('Add file for Hosts');
+    // A choice changed to add a link shows on the waiting file's button before it is pressed.
+    fireEvent.change(screen.getByTestId('ce-context-link-url'), { target: { value: 'https://example.org/a' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Admins only' }));
+    expect(screen.getByTestId('ce-context-link-audience')).toHaveTextContent('This link will be for admins only.');
+    expect(screen.getByTestId('ce-context-add-link')).toHaveAccessibleName('Add link for admins only');
+    expect(screen.getByTestId('ce-context-add-file')).toHaveTextContent('Add file for admins only');
+    await act(async () => fireEvent.click(screen.getByTestId('ce-context-add-file')));
+    expect(uploadContextFile).toHaveBeenLastCalledWith({ file: notes, adminsOnly: true }, options);
+  });
+
+  it('shows a chosen file with Add file and Cancel, and adds nothing until Add file is pressed', async () => {
+    renderPanel(list({ sources: [] }));
+    const notes = new File(['notes'], 'notes.txt', { type: 'text/plain' });
+    fireEvent.change(await screen.findByTestId('ce-context-file'), { target: { files: [notes] } });
+    expect(screen.getByTestId('ce-context-chosen-file')).toHaveTextContent('notes.txt');
+    expect(uploadContextFile).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByTestId('ce-context-chosen-file')).not.toBeInTheDocument();
+    expect(uploadContextFile).not.toHaveBeenCalled();
   });
 
   it('uploads a file and has the session’s AI read a PDF only when Analyze is ticked', async () => {
@@ -225,16 +302,30 @@ describe('context sources panel', () => {
     expect(uploadContextFile).not.toHaveBeenCalled();
   });
 
-  it('reads the session’s unread page links, and explains when sources cannot be added', async () => {
-    const { unmount } = renderPanel(list({ sources: [essay] }), [
-      { label: 'Essay', url: 'https://example.org/essay' },
-      { label: 'Site', url: 'https://coalition.example.org/' },
-    ]);
-    const read = await screen.findByTestId('ce-context-read-page-links');
-    expect(read).toHaveTextContent('Read the session’s link for the AI');
-    await act(async () => fireEvent.click(read));
-    expect(addContextLink).toHaveBeenCalledTimes(1);
-    expect(addContextLink).toHaveBeenCalledWith({ url: 'https://coalition.example.org/', title: 'Site' }, options);
+  it('shows the page’s own box first and not its own, where the page gives one', async () => {
+    render(
+      <ContextSourcesPanel
+        sessionSlug="salon"
+        sessionConfig={{ slug: 'salon' }}
+        account="0xadmin"
+        list={list()}
+        addBox={<p data-testid="page-box">The page’s box</p>}
+      />,
+    );
+    const rows = await screen.findAllByTestId('ce-context-source');
+    expect(screen.queryByTestId('ce-context-add-box')).not.toBeInTheDocument();
+    const pageBox = screen.getByTestId('page-box');
+    expect(pageBox.compareDocumentPosition(rows[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The list is still managed here.
+    expect(within(rows[0]).getByRole('button', { name: /^Remove/ })).toBeInTheDocument();
+  });
+
+  it('offers no button to read the session page’s links, and explains when sources cannot be added', async () => {
+    // The page's links are read without a press where the session's Worker does that; here they are added by hand.
+    const { unmount } = renderPanel(list({ sources: [essay] }));
+    await screen.findAllByTestId('ce-context-source');
+    expect(screen.queryByTestId('ce-context-read-page-links')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Read the session’s/)).not.toBeInTheDocument();
     unmount();
 
     renderPanel(list({ supported: false }));

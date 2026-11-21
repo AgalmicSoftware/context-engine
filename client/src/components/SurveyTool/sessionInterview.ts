@@ -47,7 +47,8 @@ export const INTERVIEW_PROMPT_VERSION = 'ce-interview-brief-v6';
 // The copied prompt's own wording, apart from the catalog version the Worker sets, so research can tell drafts
 // made under each apart. A packet without one came from the wording before revision 2.
 export const PREFILL_PROMPT_REVISION = 'ce-prefill-prompt-2';
-const PROMPT_REVISION_PATTERN = /^ce-prefill-prompt-\d{1,4}$/;
+// `+arranged`: the copied prompt listed the questions in the session's pile order, not newest first.
+const PROMPT_REVISION_PATTERN = /^ce-prefill-prompt-\d{1,4}(?:\+arranged)?$/;
 const SUPPORTED_INTERVIEW_PROMPT_VERSIONS = new Set([
   'ce-interview-brief-v1',
   'ce-interview-brief-v2',
@@ -627,7 +628,7 @@ export const buildExternalInterviewKickoff = ({
     ...(questionPriority
       ? [
           'Use this browser-provided order only for question IDs present in the fetched catalog. It describes my own progress; do not fetch anyone else’s answers or send this progress to the catalog endpoint. Keep catalog versions and fingerprints unchanged.',
-          `Unanswered question IDs, newest first: ${JSON.stringify(questionPriority.unansweredQuestionIds)}`,
+          `Unanswered question IDs, ${questionPriority.order === 'arranged' ? 'in the session’s order' : 'newest first'}: ${JSON.stringify(questionPriority.unansweredQuestionIds)}`,
           `Already answered IDs, only for changes I request: ${JSON.stringify(questionPriority.answeredQuestionIds)}`,
           'Lead with unanswered questions in that order. Questions newly added to the fetched catalog and absent from both lists are also unanswered; cover them before already-answered questions. Do not invent a creation date when it is unavailable. Omit already-answered drafts unless I ask to change them.',
           '',
@@ -642,7 +643,7 @@ export const buildExternalInterviewKickoff = ({
     'Return only: one research-coverage line, the review link, and the exact packet as single-line JSON in a code block. No table.',
     '',
     'Use catalog values in this compact shape:',
-    `{"version":1,"sessionSlug":"...","questionSetHash":"...","promptVersion":"...","promptRevision":"${PREFILL_PROMPT_REVISION}","source":{"platform":"chatgpt|claude|other","modelId":"ID or unknown","verification":"self_reported","researchCoverage":{"historyChatsSearched":null,"historyChatsUsed":0,"memoryItemsSearched":null,"memoryItemsUsed":0,"connectedSourcesSearched":null,"connectedSourcesUsed":0,"userStatementsUsed":0,"searchScopeNote":""}},"responderContext":{"summary":"relevant background/views/uncertainties","facts":[{"fact":"stated or inferred context","evidence":"stated|inferred plus short basis","relatedQuestionIds":["..."]}]},"responses":[{"questionId":"...","answer":"...","confidence":0.35,"evidence":"one short clause"}]}`,
+    `{"version":1,"sessionSlug":"...","questionSetHash":"...","promptVersion":"...","promptRevision":"${PREFILL_PROMPT_REVISION}${questionPriority?.order === 'arranged' ? '+arranged' : ''}","source":{"platform":"chatgpt|claude|other","modelId":"ID or unknown","verification":"self_reported","researchCoverage":{"historyChatsSearched":null,"historyChatsUsed":0,"memoryItemsSearched":null,"memoryItemsUsed":0,"connectedSourcesSearched":null,"connectedSourcesUsed":0,"userStatementsUsed":0,"searchScopeNote":""}},"responderContext":{"summary":"relevant background/views/uncertainties","facts":[{"fact":"stated or inferred context","evidence":"stated|inferred plus short basis","relatedQuestionIds":["..."]}]},"responses":[{"questionId":"...","answer":"...","confidence":0.35,"evidence":"one short clause"}]}`,
     '',
     'Every response needs confidence (0-1) and evidence. v6 confidence: the chance I keep that answer unchanged on review; v4/v5: strength of support. Anchors: 0-.39 weak, .40-.69 moderate, .70-1 direct/repeated. Optional additionalComments: only what I said that bears on the question, never a note that I said nothing; importance/conviction range 0-100. Evidence omits quotes, source names, URLs, timestamps, account IDs, and hidden reasoning. Coverage: count distinct prior chats/memories/sources searched and actually used, and user statements used; do not count your own prior output. Use null when the platform does not reveal a searched count; 0 means none used. searchScopeNote: count limitations only. Platform/model are self-reported fidelity metadata; use "unknown" if unavailable.',
     '',

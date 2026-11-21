@@ -1,4 +1,6 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import { Input } from 'reactstrap';
 
 import { CONTEXT_CARD_COST_USD } from '@ce-shared/contextCards.mjs';
@@ -9,6 +11,7 @@ import {
 } from '@ce-shared/sessionContextSources.mjs';
 import ContextAccessPicker, { contextGroupsLabel } from './ContextAccessPicker';
 import AgentMark from '../../Shared/AgentMark';
+import CompactImageChooser from '../../Shared/CompactImageChooser';
 import ContextCardChips from '../../OnePageSession/ContextCardChips';
 import ContextCardEditor, { CONTEXT_CARD_HELP } from '../../OnePageSession/ContextCardEditor';
 import {
@@ -45,6 +48,8 @@ export const CONTEXT_ANALYZE_HELP =
   'Sends the PDF or image to the session’s own AI provider with the session’s key. The text it returns is saved with the file. Unticked, the file is kept but gives the AI no text.';
 const LINK_HELP =
   'The Session Worker reads the page now and keeps its text for the session’s AI. Refresh reads it again. Use https:// links to public pages.';
+const ADD_HELP = `A link: type or paste its address, then press +. ${LINK_HELP} A file: Upload picks a PDF, a text or data file, or an image where Context cards are on; Add file then adds it.`;
+const ACCESS_HELP = `Who may read what you add next. ${FILE_ACCESS_HELP} A link can be for everyone or for admins only: ${CONTEXT_PRIVACY_HELP}`;
 
 const formatDate = (value: string): string => {
   const time = Date.parse(value);
@@ -108,17 +113,20 @@ type Props = {
   sessionSlug: string;
   sessionConfig: Record<string, unknown> | null;
   account: string;
-  /** The session's page links; "Read the links" adds the unread ones as sources. */
-  pageLinks?: Array<{ label: string; url: string }>;
   /** The listed sources, for whoever exports a template. */
   onSourcesChange?: (sources: ContextSource[]) => void;
   /** A list the page already reads; the panel then reads none of its own. */
   list?: SessionContextSourcesState;
+  /**
+   * The page's own box for adding, shown in place of the panel's: it sits behind the same checks, so nothing
+   * is offered where the session's Worker cannot take it.
+   */
+  addBox?: React.ReactNode;
 };
 
 // The session's context files and links: admins add, refresh, read with
 // the session's AI and remove them. Changes apply at once, not on Save.
-const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = [], onSourcesChange, list }: Props) => {
+const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, onSourcesChange, list, addBox = null }: Props) => {
   const own = useSessionContextSources({ sessionSlug, sessionConfig, account, enabled: !list });
   const { sources, loading, error, supported, cardsSupported, reload } = list || own;
   const [workerReady, setWorkerReady] = useState<boolean | null>(null);
@@ -126,9 +134,10 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
   const [status, setStatus] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const [linkTitle, setLinkTitle] = useState('');
-  const [linkPrivate, setLinkPrivate] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [fileAccess, setFileAccess] = useState<ContextFileAccess>({});
+  // One choice of audience for whatever is added next, a link or a file.
+  const [access, setAccess] = useState<ContextFileAccess>({});
+  const fileInput = useRef<HTMLInputElement>(null);
   const groups = useContextGroups({ sessionSlug, sessionConfig, account });
   const [analyze, setAnalyze] = useState(true);
   const [fileKey, setFileKey] = useState(0);
@@ -175,9 +184,6 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
       setBusy(false);
     }
   };
-  const unreadLinks = pageLinks.filter(
-    (link) => link.url && !sources.some((source) => source.kind === 'link' && source.url === link.url),
-  );
   const withoutCards = cardsSupported ? contextSourcesWithoutCards(sources) : [];
   // The count and the cost come first; nothing is spent without a yes.
   const makeMissingCards = () => {
@@ -197,17 +203,50 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
       return problem ? `${wrote} ${withoutCards.length - made} could not be written: ${problem}` : wrote;
     });
   };
+  // One choice serves the link and the file, so each Add says who it is for: a choice changed for one is then
+  // seen before the other is added.
+  const audience = access.adminsOnly
+    ? 'admins only'
+    : access.groupIds?.length
+      ? contextGroupsLabel(access.groupIds, groups)
+      : 'everyone in the session';
+  // The Worker keeps a link for everyone or for admins only; groups are for files.
+  const linkNeedsOtherAudience = !access.adminsOnly && !!access.groupIds?.length;
+  const addLink = () => {
+    if (!linkUrl.trim() || linkNeedsOtherAudience) return;
+    void run('Reading the page…', async () => {
+      await addContextLink({ url: linkUrl.trim(), title: linkTitle.trim(), adminsOnly: !!access.adminsOnly }, options);
+      setLinkUrl('');
+      setLinkTitle('');
+      return 'Link added.';
+    });
+  };
+  const pasteLink = async () => {
+    try {
+      const text = (await navigator.clipboard.readText()).trim();
+      if (text) setLinkUrl(text.slice(0, CONTEXT_SOURCE_LIMITS.urlChars));
+      setStatus(text ? '' : 'Nothing to paste: copy a link first.');
+    } catch {
+      setStatus('Pasting isn’t allowed here. Click the box and paste into it.');
+    }
+  };
   const fileProblem = file ? checkContextFile(file, { images: cardsSupported }) : '';
   const fileIsAiRead = !!file && contextFileIsReadByAi(resolveContextFileType(file));
 
   return (
     <div className={styles.listRowBody} data-testid="ce-context-sources">
+      {/* The page's own box leads, since Add is what opened this; the panel's own follows its list. */}
+      {addBox}
       {loading ? <p className={styles.hint}>Loading files and links…</p> : null}
       {error ? <p className={styles.errorText}>{error}</p> : null}
       {sources.length ? (
         <ul className={styles.listRowBody} aria-label="Context files and links">
           {sources.map((source) => (
-            <li key={source.id} className={styles.listRow} data-testid="ce-context-source">
+            <li
+              key={source.id}
+              className={`${styles.listRow} ${styles.contextSourceRow}`}
+              data-testid="ce-context-source"
+            >
               <div className={styles.listRowBody}>
                 <span className={styles.fieldLabel}>{source.title || source.url || 'Untitled'}</span>
                 {source.kind === 'link' && source.url ? (
@@ -312,129 +351,147 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
           <SetupHelp id="ce-context-make-cards" label="cards" help={CONTEXT_CARD_HELP} />
         </div>
       ) : null}
-      {unreadLinks.length ? (
-        <div className={styles.buttonRow}>
-          <button
-            type="button"
-            className={styles.button}
-            disabled={busy}
-            data-testid="ce-context-read-page-links"
-            onClick={() =>
-              void run('Reading the session’s links…', async () => {
-                for (const link of unreadLinks) await addContextLink({ url: link.url, title: link.label }, options);
-                return unreadLinks.length === 1 ? 'Read 1 link.' : `Read ${unreadLinks.length} links.`;
-              })
-            }
-          >
-            {unreadLinks.length === 1
-              ? 'Read the session’s link for the AI'
-              : `Read the session’s ${unreadLinks.length} links for the AI`}
-          </button>
+      {/* The question tools' add row in its own box: one row to add a link or pick a file, then who may read it. */}
+      {addBox ? null : (
+        <div className={styles.contextAddBox} data-testid="ce-context-add-box">
+          <div className={styles.fieldLabelRow}>
+            <span className={styles.fieldLabel}>Add a link or a file</span>
+            <SetupHelp id="ce-context-add" label="adding a link or a file" help={ADD_HELP} />
+          </div>
+          <div className={styles.addSourceControls}>
+            <div className={styles.urlInputContainer}>
+              <Input
+                id="ce-context-link-url"
+                type="url"
+                value={linkUrl}
+                maxLength={CONTEXT_SOURCE_LIMITS.urlChars}
+                placeholder="Add URL"
+                aria-label="Add a link"
+                aria-describedby={setupHelpId('ce-context-add')}
+                className={styles.urlInputField}
+                data-testid="ce-context-link-url"
+                onChange={(event) => setLinkUrl(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return;
+                  event.preventDefault();
+                  addLink();
+                }}
+              />
+              <CompactImageChooser
+                className={styles.inlineImageChooser}
+                showUrlModeButton={false}
+                isUploadMode
+                showUrlInput={false}
+                key={fileKey}
+                fileInputTestId="ce-context-file"
+                accept={contextFileAccept({ images: cardsSupported })}
+                uploadAriaLabel="Upload a file to add"
+                fileInputRef={fileInput}
+                disabled={busy}
+                onPaste={() => void pasteLink()}
+                onUploadClick={() => fileInput.current?.click()}
+                onFileChange={(event) => setFile(event.target.files?.[0] || null)}
+              />
+              <button
+                type="button"
+                className={styles.internalUrlAddBtn}
+                disabled={busy || !linkUrl.trim() || linkNeedsOtherAudience}
+                title={`Add link for ${audience}`}
+                aria-label={`Add link for ${audience}`}
+                data-testid="ce-context-add-link"
+                onClick={addLink}
+              >
+                <FontAwesomeIcon icon={faPlus} />
+              </button>
+            </div>
+          </div>
+          {linkUrl.trim() ? (
+            <Input
+              id="ce-context-link-title"
+              value={linkTitle}
+              maxLength={CONTEXT_SOURCE_LIMITS.titleChars}
+              placeholder="Link title (optional): the page’s own title if left empty"
+              aria-label="Link title"
+              className={styles.contextAddTitle}
+              onChange={(event) => setLinkTitle(event.target.value)}
+            />
+          ) : null}
+          {linkUrl.trim() && !linkNeedsOtherAudience ? (
+            <p className={styles.hint} data-testid="ce-context-link-audience">
+              This link will be for {audience}.
+            </p>
+          ) : null}
+          {linkUrl.trim() && linkNeedsOtherAudience ? (
+            <p className={styles.hint} data-testid="ce-context-link-audience-hint">
+              A link can be for everyone or for admins only. Change “Visible to” to add it.
+            </p>
+          ) : null}
+          {file ? (
+            <div className={styles.contextAddFile} data-testid="ce-context-chosen-file">
+              <span className={styles.readOnlyValue}>{file.name}</span>
+              {fileIsAiRead ? (
+                <SetupCheck
+                  id="ce-context-file-analyze"
+                  label="Analyze with the session’s AI"
+                  help={CONTEXT_ANALYZE_HELP}
+                  checked={analyze}
+                  onChange={setAnalyze}
+                  testId="ce-context-file-analyze"
+                />
+              ) : null}
+              <div className={styles.buttonRow}>
+                <button
+                  type="button"
+                  className={`${styles.button} ${styles.primaryButton}`}
+                  disabled={busy || !!fileProblem}
+                  data-testid="ce-context-add-file"
+                  onClick={() =>
+                    void run('Adding the file…', async () => {
+                      const id = await uploadContextFile({ file, ...access }, options);
+                      setFile(null);
+                      setFileKey((key) => key + 1);
+                      if (!(analyze && fileIsAiRead)) return 'File added.';
+                      setStatus('File added. The session’s AI is reading it…');
+                      try {
+                        await readContextPdf(id, options);
+                        return 'File added and read by the session’s AI.';
+                      } catch (failure) {
+                        return `File added, but the session’s AI could not read it: ${failure instanceof Error ? failure.message : 'try Read with AI.'}`;
+                      }
+                    })
+                  }
+                >
+                  Add file for {audience}
+                </button>
+                <button
+                  type="button"
+                  className={styles.button}
+                  disabled={busy}
+                  onClick={() => {
+                    setFile(null);
+                    setFileKey((key) => key + 1);
+                    // The row goes with its buttons, so focus goes back to the box.
+                    document.getElementById('ce-context-link-url')?.focus();
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {fileProblem ? <p className={styles.errorText}>{fileProblem}</p> : null}
+          <SetupField id="ce-context-file-access" label="Visible to" help={ACCESS_HELP}>
+            <ContextAccessPicker
+              id="ce-context-file-access"
+              value={access}
+              groups={groups}
+              allowAdminsOnly
+              data-testid="ce-context-file-access"
+              onChange={setAccess}
+            />
+          </SetupField>
         </div>
-      ) : null}
-      <SetupField id="ce-context-link-url" label="Add a link" help={LINK_HELP}>
-        <Input
-          id="ce-context-link-url"
-          type="url"
-          value={linkUrl}
-          maxLength={CONTEXT_SOURCE_LIMITS.urlChars}
-          placeholder="https://"
-          aria-describedby={setupHelpId('ce-context-link-url')}
-          data-testid="ce-context-link-url"
-          onChange={(event) => setLinkUrl(event.target.value)}
-        />
-      </SetupField>
-      <SetupField id="ce-context-link-title" label="Link title">
-        <Input
-          id="ce-context-link-title"
-          value={linkTitle}
-          maxLength={CONTEXT_SOURCE_LIMITS.titleChars}
-          placeholder="The page’s own title"
-          onChange={(event) => setLinkTitle(event.target.value)}
-        />
-      </SetupField>
-      <SetupCheck
-        id="ce-context-link-private"
-        label="Admins only"
-        help={CONTEXT_PRIVACY_HELP}
-        checked={linkPrivate}
-        onChange={setLinkPrivate}
-      />
-      <div className={styles.buttonRow}>
-        <button
-          type="button"
-          className={styles.button}
-          disabled={busy || !linkUrl.trim()}
-          data-testid="ce-context-add-link"
-          onClick={() =>
-            void run('Reading the page…', async () => {
-              await addContextLink({ url: linkUrl.trim(), title: linkTitle.trim(), adminsOnly: linkPrivate }, options);
-              setLinkUrl('');
-              setLinkTitle('');
-              return 'Link added.';
-            })
-          }
-        >
-          Add link
-        </button>
-      </div>
-      <SetupField id="ce-context-file" label="Add a file">
-        <Input
-          key={fileKey}
-          id="ce-context-file"
-          type="file"
-          accept={contextFileAccept({ images: cardsSupported })}
-          data-testid="ce-context-file"
-          onChange={(event) => setFile((event.target as HTMLInputElement).files?.[0] || null)}
-        />
-      </SetupField>
-      {fileProblem ? <p className={styles.errorText}>{fileProblem}</p> : null}
-      <SetupField id="ce-context-file-access" label="Visible to" help={FILE_ACCESS_HELP}>
-        <ContextAccessPicker
-          id="ce-context-file-access"
-          value={fileAccess}
-          groups={groups}
-          allowAdminsOnly
-          data-testid="ce-context-file-access"
-          onChange={setFileAccess}
-        />
-      </SetupField>
-      {fileIsAiRead ? (
-        <SetupCheck
-          id="ce-context-file-analyze"
-          label="Analyze with the session’s AI"
-          help={CONTEXT_ANALYZE_HELP}
-          checked={analyze}
-          onChange={setAnalyze}
-          testId="ce-context-file-analyze"
-        />
-      ) : null}
-      <div className={styles.buttonRow}>
-        <button
-          type="button"
-          className={styles.button}
-          disabled={busy || !file || !!fileProblem}
-          data-testid="ce-context-add-file"
-          onClick={() =>
-            void run('Adding the file…', async () => {
-              if (!file) return '';
-              const id = await uploadContextFile({ file, ...fileAccess }, options);
-              setFile(null);
-              setFileKey((key) => key + 1);
-              if (!(analyze && fileIsAiRead)) return 'File added.';
-              setStatus('File added. The session’s AI is reading it…');
-              try {
-                await readContextPdf(id, options);
-                return 'File added and read by the session’s AI.';
-              } catch (failure) {
-                return `File added, but the session’s AI could not read it: ${failure instanceof Error ? failure.message : 'try Read with AI.'}`;
-              }
-            })
-          }
-        >
-          Add file
-        </button>
-      </div>
+      )}
       {status ? (
         <p className={styles.statusText} role="status" data-testid="ce-context-sources-status">
           {status}

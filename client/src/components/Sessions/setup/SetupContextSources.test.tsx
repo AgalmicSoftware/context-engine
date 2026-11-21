@@ -7,7 +7,12 @@ import {
   usePendingContextFiles,
   type SetupGroupOption,
 } from './SetupContextSources';
-import { addContextLink, readContextPdf, uploadContextFile } from '../../../utilities/docLibrary/contextSources';
+import {
+  addContextLink,
+  readContextPdf,
+  uploadContextFile,
+  workerReadsSessionLinks,
+} from '../../../utilities/docLibrary/contextSources';
 import { sessionTemplateFromDraft } from '@ce-shared/sessionTemplate.mjs';
 import type { SetupDraft } from './setupSectionTypes';
 
@@ -16,6 +21,8 @@ jest.mock('../../../utilities/docLibrary/contextSources', () => ({
     '../../../utilities/docLibrary/contextSources',
   ),
   addContextLink: jest.fn(async () => ({})),
+  // An older Worker unless a test says otherwise: it reads a link only when asked.
+  workerReadsSessionLinks: jest.fn(async () => false),
   readContextPdf: jest.fn(async () => ({})),
   uploadContextFile: jest.fn(async ({ file }: { file: File }) => `id-${file.name}`),
 }));
@@ -157,7 +164,9 @@ describe('setup context files', () => {
     fireEvent.change(screen.getByTestId('ce-setup-context-file-input'), { target: { files: [notes] } });
     choose(0, 'Admins only');
     rerender(<Harness initial={{}} created />);
-    // A re-render keeps the same harness state, now with a created session.
+    // A re-render keeps the same harness state, now with a created session. The tick shows once the Worker has
+    // said it does not read links by itself.
+    expect(await screen.findByLabelText('Read the linked pages for the AI')).toBeChecked();
     await act(async () => fireEvent.click(screen.getByTestId('ce-setup-context-publish')));
     expect(uploadContextFile).toHaveBeenCalledWith(
       { file: deck, adminsOnly: true },
@@ -173,6 +182,57 @@ describe('setup context files', () => {
     expect(latest.contextFiles).toEqual([]);
     expect(screen.getByTestId('ce-setup-context-status')).toHaveTextContent('Context added to the session.');
     expect(screen.queryByTestId('ce-setup-context-publish')).not.toBeInTheDocument();
+  });
+
+  it('leaves the links to a Worker that reads them by itself: no tick, and no second read from here', async () => {
+    jest.mocked(workerReadsSessionLinks).mockResolvedValue(true);
+    const initial = {
+      contextFiles: [],
+      sessionContext: { links: [{ label: 'Essay', url: 'https://example.org/essay' }] },
+    };
+    const { rerender, unmount } = render(<Harness initial={initial} />);
+    const notes = new File(['# Notes'], 'notes.md', { type: 'text/markdown' });
+    fireEvent.change(screen.getByTestId('ce-setup-context-file-input'), { target: { files: [notes] } });
+    rerender(<Harness initial={{}} created />);
+    // Until the Worker has answered, nothing is added: the links' fate is not known yet.
+    expect(screen.getByTestId('ce-setup-context-publish')).toBeDisabled();
+    expect(await screen.findByTestId('ce-setup-context-links-read-by-worker')).toHaveTextContent(
+      'The session reads its linked pages for the AI by itself.',
+    );
+    expect(screen.queryByLabelText('Read the linked pages for the AI')).not.toBeInTheDocument();
+    await act(async () => fireEvent.click(screen.getByTestId('ce-setup-context-publish')));
+    expect(uploadContextFile).toHaveBeenCalledTimes(1);
+    expect(addContextLink).not.toHaveBeenCalled();
+    unmount();
+
+    // With only links, nothing is left to do from here, and the page says who reads them.
+    render(<Harness initial={initial} created />);
+    expect(await screen.findByTestId('ce-setup-context-links-read-by-worker')).toHaveTextContent(
+      'The session reads its linked pages for the AI by itself.',
+    );
+    expect(screen.queryByTestId('ce-setup-context-publish')).not.toBeInTheDocument();
+    expect(addContextLink).not.toHaveBeenCalled();
+    jest.mocked(workerReadsSessionLinks).mockResolvedValue(false);
+  });
+
+  it('reads no link from here when the Worker could not be asked, and says so', async () => {
+    // Not a "no": on a Worker that does read them, a second read from here could store a page twice.
+    jest.mocked(workerReadsSessionLinks).mockResolvedValue(null);
+    render(
+      <Harness
+        initial={{
+          contextFiles: [],
+          sessionContext: { links: [{ label: 'Essay', url: 'https://example.org/essay' }] },
+        }}
+        created
+      />,
+    );
+    expect(await screen.findByTestId('ce-setup-context-links-read-by-worker')).toHaveTextContent(
+      'could not be asked whether it reads its linked pages by itself',
+    );
+    expect(screen.queryByLabelText('Read the linked pages for the AI')).not.toBeInTheDocument();
+    expect(addContextLink).not.toHaveBeenCalled();
+    jest.mocked(workerReadsSessionLinks).mockResolvedValue(false);
   });
 
   it('locks a file to groups set up before Create, and keeps it with admins once none of them is', () => {

@@ -9,6 +9,8 @@ export const DEFAULT_REALTIME_INTERVIEW_MODEL = GPT_LIVE_1_1_MODEL;
 export const PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL = 'gpt-live-1';
 // Workers that report it take interviewMode.voiceSessionContext on save; older ones refuse the key.
 export const INTERVIEW_VOICE_CONTEXT_FEATURE = 'interview_voice_context_v1';
+// Workers that report it take interviewMode.questionOrder on save; older ones refuse the key.
+export const INTERVIEW_QUESTION_ORDER_FEATURE = 'interview_question_order_v1';
 
 // Keep only documented, supported aliases; a matching prefix is not a model contract.
 // The Live API models, in the order the site lists them, then the Realtime API ones.

@@ -108,6 +108,20 @@ export const workerAcceptsParticipantContext = (options: ContextSourceOptions): 
 export const workerSupportsContextCards = (options: ContextSourceOptions): Promise<boolean> =>
   workerHasFeature(options, 'context_cards_v1');
 
+/**
+ * Whether this session's Worker reads the session's context links for its AI by itself: true, false for an
+ * older Worker, and null where it could not be asked. Null is not "no": reading the links from the browser as
+ * well as on a Worker that does it could store a page twice.
+ */
+export const workerReadsSessionLinks = async (options: ContextSourceOptions): Promise<boolean | null> => {
+  try {
+    const capabilities = await readWorkerCapabilities(await workerBaseUrl(options), options.sessionSlug);
+    return capabilities.unavailable ? null : capabilities.features.includes('session_link_reading_v1');
+  } catch {
+    return null;
+  }
+};
+
 /** True when this session's Worker lets participants add links too (Session Workers from 0.9.2). */
 export const workerAcceptsParticipantLinks = (options: ContextSourceOptions): Promise<boolean> =>
   workerHasFeature(options, 'participant_context_links_v1');

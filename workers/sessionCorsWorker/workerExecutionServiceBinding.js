@@ -23,6 +23,7 @@ import {
 import {
   storageRoute as storageRouteBoundary,
 } from './storageRouteExecution.js';
+import { readSessionLinks as readSessionLinksBoundary } from './sessionLinkReading.js';
 import {
   maybeTriggerAutomaticResultsAnalysis as maybeTriggerAutomaticResultsAnalysisBoundary,
 } from './resultsAnalysisGeneration.js';
@@ -154,42 +155,42 @@ export const createWorkerExecutionServicesWithWorkerDeps = ({
     },
   });
 
-  const storageRoute = async (value = {}) => storageRouteBoundary({
-    ...value,
-    deps: {
-      json: deps?.json,
-      getSessionSecrets: deps?.getSessionSecrets,
-      // Context links and PDFs: the guarded page fetch and the provider call.
-      fetch: deps?.fetch,
-      safeFetch: deps?.safeFetch,
-      isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
-      arweaveUpload,
-      randomUUID: deps?.randomUUID,
-      now: deps?.now,
-      log: workerLog,
-      isAddress: deps?.isAddress,
-      getAddress: deps?.getAddress,
-      putSessionConfig: deps?.putSessionConfig,
-      // Draft text export: only whoever may change the session config.
-      validateAdmin: deps?.validateAdmin,
-      readResourceGateOnChain: deps?.readResourceGateOnChain,
-      resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
-      toRegistrySessionSlug: deps?.toRegistrySessionSlug,
-      resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
-      checkSbtGate: deps?.checkSbtGate,
-      proxyAnthropic: aiProxies.proxyAnthropic,
-      proxyOpenAI: aiProxies.proxyOpenAI,
-      proxyOpenRouter: aiProxies.proxyOpenRouter,
-      proxyCustomRPC: aiProxies.proxyCustomRPC,
-      reserveCoordinatedResultsAnalysis: deps?.reserveCoordinatedResultsAnalysis,
-      finalizeCoordinatedResultsAnalysis: deps?.finalizeCoordinatedResultsAnalysis,
-      readCoordinatedResultsAnalysisStatus: deps?.readCoordinatedResultsAnalysisStatus,
-      generateAnalysisArtifact: deps?.generateAnalysisArtifact,
-      maybeTriggerAutomaticResultsAnalysis: deps?.maybeTriggerAutomaticResultsAnalysis || maybeTriggerAutomaticResultsAnalysisBoundary,
-      enqueueResultsAnalysisAutoJob: deps?.enqueueResultsAnalysisAutoJob || enqueueCoordinatedResultsAnalysisAutoJobBoundary,
-      waitUntil: deps?.waitUntil,
-    },
-  });
+  const storageDeps = {
+    json: deps?.json,
+    getSessionSecrets: deps?.getSessionSecrets,
+    // Context links and PDFs: the guarded page fetch and the provider call.
+    fetch: deps?.fetch,
+    safeFetch: deps?.safeFetch,
+    isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
+    arweaveUpload,
+    randomUUID: deps?.randomUUID,
+    now: deps?.now,
+    log: workerLog,
+    isAddress: deps?.isAddress,
+    getAddress: deps?.getAddress,
+    putSessionConfig: deps?.putSessionConfig,
+    // Draft text export: only whoever may change the session config.
+    validateAdmin: deps?.validateAdmin,
+    readResourceGateOnChain: deps?.readResourceGateOnChain,
+    resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
+    toRegistrySessionSlug: deps?.toRegistrySessionSlug,
+    resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
+    checkSbtGate: deps?.checkSbtGate,
+    proxyAnthropic: aiProxies.proxyAnthropic,
+    proxyOpenAI: aiProxies.proxyOpenAI,
+    proxyOpenRouter: aiProxies.proxyOpenRouter,
+    proxyCustomRPC: aiProxies.proxyCustomRPC,
+    reserveCoordinatedResultsAnalysis: deps?.reserveCoordinatedResultsAnalysis,
+    finalizeCoordinatedResultsAnalysis: deps?.finalizeCoordinatedResultsAnalysis,
+    readCoordinatedResultsAnalysisStatus: deps?.readCoordinatedResultsAnalysisStatus,
+    generateAnalysisArtifact: deps?.generateAnalysisArtifact,
+    maybeTriggerAutomaticResultsAnalysis: deps?.maybeTriggerAutomaticResultsAnalysis || maybeTriggerAutomaticResultsAnalysisBoundary,
+    enqueueResultsAnalysisAutoJob: deps?.enqueueResultsAnalysisAutoJob || enqueueCoordinatedResultsAnalysisAutoJobBoundary,
+    waitUntil: deps?.waitUntil,
+  };
+  const storageRoute = async (value = {}) => storageRouteBoundary({ ...value, deps: storageDeps });
+  // The session's saved links, read in the background as the add-link route reads one.
+  const readSessionLinks = (value = {}) => readSessionLinksBoundary({ ...value, deps: storageDeps });
 
   const verifyAdminSignatureExecution = deps?.verifyAdminSignature || verifyAdminSignatureBoundary;
   const verifyAdminSignature = async ({
@@ -243,6 +244,7 @@ export const createWorkerExecutionServicesWithWorkerDeps = ({
     fetchUrl: fetchHelpers.fetchUrl,
     arweaveUpload,
     storageRoute,
+    readSessionLinks,
     verifyAdminSignature,
   };
 };

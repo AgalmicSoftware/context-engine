@@ -37,6 +37,7 @@ const createBaseDeps = () => ({
   getSessionSecrets: 'getSessionSecrets',
   arweaveUpload: 'arweaveUpload',
   storageRoute: 'storageRoute',
+  readSessionLinks: 'readSessionLinks',
   validateBootstrapAdmin: 'validateBootstrapAdmin',
   validateAdmin: 'validateAdmin',
   mergeWorkerConfigRecords: 'mergeWorkerConfigRecords',
@@ -648,6 +649,7 @@ test('createWorkerRouteShellWithWorkerDeps preserves admin and anonymous branch 
           assert.equal(value.deps.mergeWorkerLimitRecords, 'mergeWorkerLimitRecords');
           assert.equal(value.deps.putSessionConfig, 'putSessionConfig');
           assert.equal(value.deps.getSessionSecrets, 'getSessionSecrets');
+          assert.equal(value.deps.readSessionLinks, 'readSessionLinks');
           assert.equal(value.deps.normalizeSecretValue, 'normalizeSecretValue');
           assert.equal(value.deps.putSessionSecrets, 'putSessionSecrets');
           assert.equal(value.deps.MISSING_SLUG_ERROR, 'Missing sessionSlug.');
@@ -835,6 +837,7 @@ test('createWorkerRouteShellWithWorkerDeps preserves authenticated fallback afte
         assert.equal(value.deps.toRegistrySessionSlug, 'toRegistrySessionSlug');
         assert.equal(value.deps.resolveRpcUrlListForGate, 'resolveRpcUrlListForGate');
         assert.equal(value.deps.checkSbtGate, 'checkSbtGate');
+        assert.equal(value.deps.readSessionLinks, 'readSessionLinks');
         assert.equal(value.deps.json, 'json');
         assert.equal(value.deps.toStr, 'toStr');
         assert.equal(value.deps.now, 'now');

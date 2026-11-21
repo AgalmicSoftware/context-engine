@@ -26,6 +26,7 @@ import { WORKER_GROUP_MEMBER_CEILING_MAX } from '../../shared/workerGroupJoin.mj
 import { validateSessionContext } from '../../shared/sessionContext.mjs';
 import { validateSessionAgent } from '../../shared/sessionAgent.mjs';
 import { validateAtlasQuestionSummaries } from '../../shared/atlasQuestionSummaries.mjs';
+import { validateSessionLinkReading } from '../../shared/sessionLinkReading.mjs';
 import { SESSION_AI_SERVICE_TIERS } from './aiRequestPolicy.js';
 import { AI_DAILY_LIMIT_MAX, validAiDailyLimit } from './aiRateLimitPolicy.js';
 import {
@@ -394,6 +395,12 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
       if (!summaries.ok) return { ok: false, status: 400, error: summaries.error };
       incomingConfig = { ...incomingConfig, atlasQuestionSummaries: summaries.value };
     }
+    // null puts every link reading setting back to its default.
+    if (hasOwn(incomingConfig, 'sessionLinkReading') && incomingConfig.sessionLinkReading !== null) {
+      const reading = validateSessionLinkReading(incomingConfig.sessionLinkReading);
+      if (!reading.ok) return { ok: false, status: 400, error: reading.error };
+      incomingConfig = { ...incomingConfig, sessionLinkReading: reading.value };
+    }
     // OpenAI's processing tier for the session's text calls; null is the default.
     const serviceTier = incomingConfig.ai && typeof incomingConfig.ai === 'object' ? incomingConfig.ai.serviceTier : undefined;
     if (serviceTier !== undefined && serviceTier !== null && !SESSION_AI_SERVICE_TIERS.includes(serviceTier)) {
@@ -426,6 +433,7 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     // The Session Agent is off when there is no setting, so null removes it.
     if (mergedConfig.sessionAgent === null) delete mergedConfig.sessionAgent;
     if (mergedConfig.atlasQuestionSummaries === null) delete mergedConfig.atlasQuestionSummaries;
+    if (mergedConfig.sessionLinkReading === null) delete mergedConfig.sessionLinkReading;
   } else if (kind === 'set-limits') {
     const incomingLimits = mutation?.incomingLimits && typeof mutation.incomingLimits === 'object'
       ? mutation.incomingLimits

@@ -4,6 +4,7 @@ import SessionContextSources from './SessionContextSources';
 import { AGENT_MARK_LABEL } from '../Shared/AgentMark';
 import {
   addContextLink,
+  workerSupportsContextSources,
   readContextSourceBlob,
   readContextSourceText,
   removeContextSource,
@@ -29,6 +30,8 @@ jest.mock('../../utilities/docLibrary/contextSources', () => ({
   readContextSourceText: jest.fn(async () => '# Reading list\n\nSortition'),
   removeContextSource: jest.fn(async () => undefined),
   uploadContextFile: jest.fn(async () => 'stored'),
+  // The admin's list asks the Worker whether it stores sources before it offers anything.
+  workerSupportsContextSources: jest.fn(async () => true),
 }));
 
 const ME = '0xaaaa000000000000000000000000000000000001';
@@ -140,30 +143,34 @@ describe('the Context section for participants', () => {
     expect(screen.queryByText(/\(agent\)/)).toBeNull();
   });
 
-  it('adds a link beside the file form where the Worker takes participants’ links', async () => {
+  it('adds a link from the one box where the Worker takes participants’ links', async () => {
     const list = state({ participantsCanAddLinks: true });
     renderList(list);
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-    fireEvent.change(screen.getByLabelText('Link'), { target: { value: ' https://example.org/essay ' } });
+    fireEvent.change(screen.getByTestId('ce-session-context-compose'), {
+      target: { value: ' https://example.org/essay ' },
+    });
     fireEvent.change(screen.getByLabelText('Link title'), { target: { value: 'Essay' } });
-    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Add link' })));
+    await act(async () => fireEvent.click(screen.getByTestId('ce-session-context-compose-add')));
     expect(addContextLink).toHaveBeenCalledWith(
       { url: 'https://example.org/essay', title: 'Essay' },
       expect.objectContaining({ sessionSlug: 'salon', context: { account: ME } }),
     );
     expect(list.reload).toHaveBeenCalled();
-    expect(within(screen.getByTestId('ce-session-context-add-link')).getByRole('status')).toHaveTextContent(
+    expect(within(screen.getByTestId('ce-session-context-composer')).getByRole('status')).toHaveTextContent(
       'Link added.',
     );
   });
 
-  it('offers files alone where the Worker takes no links from participants', () => {
+  it('takes notes and files alone where the Worker takes no links from participants', () => {
     renderList(state());
-    expect(screen.getByTestId('ce-session-context-add-file')).toBeInTheDocument();
-    expect(screen.queryByTestId('ce-session-context-add-link')).toBeNull();
+    expect(screen.getByTestId('ce-session-context-compose')).toHaveAttribute(
+      'placeholder',
+      'Write a note, or drop a file',
+    );
   });
 
-  it('adds a file, locked to the groups chosen, from a form that Add opens and closes', async () => {
+  it('adds a file, locked to the groups chosen, from a box that Add opens and closes', async () => {
     const list = state();
     renderList(list);
     const add = screen.getByRole('button', { name: 'Add' });
@@ -173,19 +180,19 @@ describe('the Context section for participants', () => {
     expect(add).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId('ce-session-context-participant')).toBeVisible();
     const notes = new File(['notes'], 'notes.txt', { type: 'text/plain' });
-    fireEvent.change(screen.getByLabelText('File'), { target: { files: [notes] } });
-    fireEvent.click(screen.getByLabelText('Visible to', { selector: '#ce-session-context-access' }));
+    fireEvent.change(screen.getByTestId('ce-session-context-file-input'), { target: { files: [notes] } });
+    fireEvent.click(screen.getByTestId('ce-session-context-access'));
     fireEvent.click(screen.getByRole('button', { name: 'Salon' }));
     fireEvent.click(screen.getByRole('button', { name: 'Hosts' }));
     expect(screen.queryByRole('button', { name: 'Admins only' })).toBeNull();
-    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Add file' })));
+    await act(async () => fireEvent.click(screen.getByTestId('ce-session-context-compose-add')));
     expect(uploadContextFile).toHaveBeenCalledWith(
       { file: notes, groupIds: ['salon', 'hosts'] },
       expect.objectContaining({ sessionSlug: 'salon' }),
     );
     expect(list.reload).toHaveBeenCalled();
     expect(screen.getByRole('status')).toHaveTextContent('File added.');
-    // Closing keeps what the form says, as a closed disclosure did.
+    // Closing keeps what the box says, as a closed disclosure did.
     fireEvent.click(add);
     expect(screen.getByTestId('ce-session-context-participant')).not.toBeVisible();
     fireEvent.click(add);
@@ -232,7 +239,7 @@ describe('the Context section for participants', () => {
 
   it('offers no form where the session limits adding to admins', () => {
     renderList(state({ participantsCanAdd: false }));
-    expect(screen.queryByTestId('ce-session-context-add-file')).toBeNull();
+    expect(screen.queryByTestId('ce-session-context-composer')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Add' })).toBeNull();
   });
 
@@ -352,12 +359,14 @@ describe('the Context section for participants', () => {
     const list = state();
     renderList(list);
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-    const add = screen.getByRole('button', { name: 'Add note' });
+    const add = screen.getByTestId('ce-session-context-compose-add');
     expect(add).toBeDisabled();
+    fireEvent.change(screen.getByTestId('ce-session-context-compose'), {
+      target: { value: '  Residents asked for them.  ' },
+    });
     fireEvent.change(screen.getByLabelText('Note title'), { target: { value: 'Evening sessions' } });
-    fireEvent.change(screen.getByLabelText('Note'), { target: { value: '  Residents asked for them.  ' } });
-    fireEvent.click(screen.getByLabelText('Visible to', { selector: '#ce-session-context-note-access' }));
-    fireEvent.click(within(screen.getByTestId('ce-session-context-add-note')).getByRole('button', { name: 'Salon' }));
+    fireEvent.click(screen.getByTestId('ce-session-context-access'));
+    fireEvent.click(within(screen.getByTestId('ce-session-context-composer')).getByRole('button', { name: 'Salon' }));
     await act(async () => fireEvent.click(add));
     const [[{ file: note, groupIds }, options]] = jest.mocked(uploadContextFile).mock.calls;
     expect(note.name).toBe('Evening sessions.md');
@@ -371,10 +380,39 @@ describe('the Context section for participants', () => {
     expect(groupIds).toEqual(['salon']);
     expect(options).toEqual(expect.objectContaining({ sessionSlug: 'salon', context: { account: ME } }));
     expect(list.reload).toHaveBeenCalled();
-    expect(within(screen.getByTestId('ce-session-context-add-note')).getByRole('status')).toHaveTextContent(
+    expect(within(screen.getByTestId('ce-session-context-composer')).getByRole('status')).toHaveTextContent(
       'Note added.',
     );
-    expect(screen.getByLabelText('Note')).toHaveValue('');
+    expect(screen.getByTestId('ce-session-context-compose')).toHaveValue('');
+  });
+
+  it('gives an admin the one box inside the list they manage, behind the same checks', async () => {
+    const list = state({ isAdmin: true, participantsCanAdd: false });
+    renderList(list);
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    const manage = screen.getByTestId('ce-session-context-manage');
+    const composer = await within(manage).findByTestId('ce-session-context-composer');
+    // The panel's own add box gives way to it.
+    expect(screen.queryByTestId('ce-context-add-box')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-context-participant')).not.toBeInTheDocument();
+    fireEvent.change(within(composer).getByTestId('ce-session-context-compose'), {
+      target: { value: 'https://example.org/private' },
+    });
+    fireEvent.click(within(composer).getByTestId('ce-session-context-access'));
+    fireEvent.click(screen.getByRole('button', { name: 'Admins only' }));
+    await act(async () => fireEvent.click(within(composer).getByTestId('ce-session-context-compose-add')));
+    expect(addContextLink).toHaveBeenCalledWith(
+      { url: 'https://example.org/private', title: '', adminsOnly: true },
+      expect.objectContaining({ sessionSlug: 'salon', asAdmin: true }),
+    );
+  });
+
+  it('offers an admin no box where the session’s Worker cannot store sources', async () => {
+    jest.mocked(workerSupportsContextSources).mockResolvedValueOnce(false);
+    renderList(state({ isAdmin: true, participantsCanAdd: false }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(await screen.findByTestId('ce-context-sources-update-worker')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-context-composer')).not.toBeInTheDocument();
   });
 
   it('asks someone signed out to log in where they could add, and offers no form', () => {
