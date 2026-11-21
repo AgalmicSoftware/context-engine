@@ -314,6 +314,11 @@
 @media (min-width: 769px) and (max-width: 1366px) {
   .onboardingWalkthrough {
     --ce-main-welcome-frame-height: max(0px, min(600px, calc(100dvh - 400px)));
+    // The slide takes the window's height under the page header and tabs, so the picture is as large here as
+    // on a medium screen. Never under 440px: a short window scrolls a little instead of shrinking the picture
+    // to a thumbnail, which the compact height above, with no floor, did. Classic 95 keeps the compact height:
+    // its whole page fits one window without scrolling.
+    --ce-welcome-fill-frame-height: clamp(440px, calc(100dvh - 300px), 680px);
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
@@ -391,6 +396,8 @@
     // A bottom control strip leaves the complete slide visible on wide, short
     // screens instead of reserving a third of the frame for a vertical rail.
     --ce-main-welcome-frame-height: max(0px, min(max(380px, 30vw), calc(100dvh - 452px)));
+    // As on narrower desktops: the window's height, never under 440px (not Classic 95, as there).
+    --ce-welcome-fill-frame-height: clamp(440px, calc(100dvh - 300px), 680px);
     display: flex;
     flex-direction: column;
     padding-right: 0px;
@@ -494,7 +501,7 @@
 .onboardingWalkthrough {
   display: flex;
   align-content: center;
-  height: var(--ce-main-welcome-frame-height, 100%);
+  height: var(--ce-welcome-fill-frame-height, var(--ce-main-welcome-frame-height, 100%));
   background: color-mix(in srgb, var(--ce-compat-dark) 49%, transparent);
 
   .onboardingTitleArea {
@@ -686,7 +693,12 @@
  * while the artwork and copy resize inside the remaining pane. */
 @container ce-theme style(--ce-welcome-slide-mode: fixed-window) {
   .onboardingWalkthrough {
-    --ce-welcome-frame-height: var(--ce-main-welcome-frame-height, clamp(525px, 118vw, 600px));
+    // The filling height where a desktop band gives one; else that band's compact height; else, up to 768px,
+    // the fixed tall frame.
+    --ce-welcome-frame-height: var(
+      --ce-welcome-fill-frame-height,
+      var(--ce-main-welcome-frame-height, clamp(525px, 118vw, 600px))
+    );
     --ce-welcome-controls-height: clamp(56px, 9dvh, 75px);
     box-sizing: border-box;
     height: var(--ce-welcome-frame-height);
@@ -763,6 +775,8 @@
   @container ce-theme style(--ce-layout-profile: standard-app) {
     .onboardingWalkthrough {
       --ce-main-welcome-frame-height: max(540px, calc(100dvh - 330px));
+      // This theme's wide frame is already tall; it keeps its own height.
+      --ce-welcome-fill-frame-height: max(540px, calc(100dvh - 330px));
       --ce-welcome-controls-height: clamp(108px, 12dvh, 140px);
     }
 
