@@ -1118,8 +1118,8 @@ describe('interview choice selection contract', () => {
   it('retains the underlying selection mode in catalogs and voice/mapping prompts', () => {
     expect(questions.map(({ singleSelect }) => singleSelect)).toEqual([false, true, true, true]);
     const instructions = buildRealtimeInterviewInstructions({ questions });
-    expect(instructions).toContain('(multichoice; choose one or more options) Choose topics');
-    expect(instructions).toContain('(multichoice; choose one option) Choose a priority');
+    expect(instructions).toContain('(choose one or more) Choose topics');
+    expect(instructions).toContain('(choose one) Choose a priority');
     expect(buildInterviewResponseMappingPrompt({ questions })).toContain(
       'Never collapse a multiple-selection answer to one choice',
     );

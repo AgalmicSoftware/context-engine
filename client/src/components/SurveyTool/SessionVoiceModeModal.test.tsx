@@ -91,6 +91,9 @@ jest.mock('../../utilities/audio/realtimeInterviewClient', () => ({
   startSessionRealtimeInterview: jest.fn(),
 }));
 
+// The voice brief's question rows: from "Questions:" to the blank line before the answered and drafted lists.
+const questionBank = (instructions: string) =>
+  instructions.slice(instructions.indexOf('\nQuestions:')).split('\n\n')[0];
 const baseProps = {
   isOpen: true,
   mode: null,
@@ -1402,9 +1405,9 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
     await screen.findByLabelText('Pause interview');
     // The interviewer spends the conversation on the question still open.
-    expect(instructions).toContain('[q3]');
-    expect(instructions).not.toContain('[q1]');
-    expect(instructions).not.toContain('[q2]');
+    expect(questionBank(instructions)).toContain('Third question?');
+    expect(questionBank(instructions)).not.toContain('What matters?');
+    expect(questionBank(instructions)).not.toContain('Second question?');
     // It knows what was answered, without the answers, so it does not ask again unless the person raises it.
     expect(instructions).toContain(
       'Do not ask them again or ask about those answers unless the responder brings one up',
@@ -1644,9 +1647,8 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
     await waitFor(() => expect(mockedStartSessionRealtimeInterview).toHaveBeenCalledTimes(2));
     const answered = mockedStartSessionRealtimeInterview.mock.calls[1][0].instructions;
-    expect(answered).toContain('[q1]');
-    expect(answered).toContain('[q2]');
-    expect(answered).toContain('[q3]');
+    for (const prompt of ['What matters?', 'Second question?', 'Third question?'])
+      expect(questionBank(answered)).toContain(prompt);
     expect(answered).toContain('Ask which earlier answer, if any, the responder wants to change');
     expect(answered).not.toContain('Already answered (reference only');
     expect(answered).not.toContain('EVIDENCE-q1');
@@ -4026,8 +4028,10 @@ describe('Interview cancellation and recovery', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
     await screen.findByLabelText('Pause interview');
     const brief = mockedStartSessionRealtimeInterview.mock.lastCall?.[0].instructions || '';
-    expect(brief.indexOf('[q3]')).toBeLessThan(brief.indexOf('[q2]'));
-    expect(brief).not.toContain('[q1]');
+    expect(questionBank(brief)).toContain(
+      '1. (freeform) Newest breakout question\n2. (freeform) First breakout question',
+    );
+    expect(questionBank(brief)).not.toContain('Opening question');
     expect(brief).not.toContain('Already covered opening');
     openingHook.mockReturnValue({ opening: '', notice: '', loading: false });
     voice.unmount();

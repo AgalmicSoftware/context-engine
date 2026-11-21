@@ -6,7 +6,8 @@ import {
 } from './sessionInterviewRealtimePrefill';
 
 // Kept on voice-made records, so research can tell what the interviewer was told; absent means 1.
-export const VOICE_BRIEF_REVISION = 'ce-voice-brief-3';
+// 4: rows carry question ids only where drafts name them, and statements share one options line.
+export const VOICE_BRIEF_REVISION = 'ce-voice-brief-4';
 
 const LIMIT = 31_500; // Leave headroom below the Worker's 32,000-character transport boundary.
 // The session's context gets this share of the voice instructions; questions keep the rest.
@@ -30,19 +31,37 @@ const promptList = (heading: string, answered: InterviewQuestion[], room: number
   return rows ? list : '';
 };
 
-const questionRow = (question: InterviewQuestion, index: number): string => {
+// Agree/disagree statements mostly share one option list, so it is named once, not on every row.
+const sharedStatementOptions = (questions: InterviewQuestion[]): string => {
+  const counts = new Map<string, number>();
+  for (const question of questions) {
+    if (question.type !== 'binary' || !question.options.length) continue;
+    const options = question.options.join(' | ');
+    counts.set(options, (counts.get(options) || 0) + 1);
+  }
+  const [top] = [...counts].sort((a, b) => b[1] - a[1]);
+  return top && top[1] > 1 ? top[0] : '';
+};
+
+// Only what the voice needs: the drafting after Stop builds its own prompt. Ids are kept only
+// where the prompt's drafts name questions by them; the voice never says them.
+const questionRow = (question: InterviewQuestion, index: number, ids: boolean, statementOptions: string): string => {
   const scale = normalizeRatingScale(question);
-  const metadata =
+  const options = question.options.join(' | ');
+  const statement = question.type === 'binary' && !!statementOptions && options === statementOptions;
+  const label =
     question.type === 'rating'
-      ? `; scale ${scale.min}-${scale.max}; ${scale.min}=${scale.minLabel}; ${scale.max}=${scale.maxLabel}`
+      ? `scale ${scale.min}-${scale.max}; ${scale.min}=${scale.minLabel}; ${scale.max}=${scale.maxLabel}`
       : question.type === 'multichoice'
         ? question.singleSelect
-          ? '; choose one option'
-          : '; choose one or more options'
+          ? 'choose one'
+          : 'choose one or more'
         : question.type === 'quadratic'
-          ? `; ${question.voiceCredits ?? 99} voice credits`
-          : '';
-  return `${index + 1}. [${question.id}] (${question.type}${metadata}) ${question.prompt}${question.options.length ? ` Options: ${question.options.join(' | ')}` : ''}`;
+          ? `quadratic; ${question.voiceCredits ?? 99} voice credits`
+          : statement
+            ? 'statement'
+            : question.type;
+  return `${index + 1}. ${ids ? `[${question.id}] ` : ''}(${label}) ${question.prompt}${options && !statement ? ` Options: ${options}` : ''}`;
 };
 
 // Keep whole role-labelled turns, including the interviewer immediately before a short reply.
@@ -103,6 +122,21 @@ export const buildRealtimeInterviewInstructions = ({
   const fromDrafts = visibleDraftIds.some((id) => drafted.has(id));
   const allCovered =
     drafted.size > 0 && questions.every((question) => drafted.has(question.id) || answeredQuestions.includes(question));
+  let namesQuestions = false;
+  const prefill = buildRealtimeInterviewPrefillContext({
+    questions: [...questions.filter((question) => !drafted.has(question.id)), ...draftedQuestions],
+    prefillPacket,
+    importedDrafts,
+    reviewedResponses,
+    responderContext,
+    maxLength: 8000,
+    onOmitted: () => {
+      limited = true;
+    },
+    onNamesQuestions: () => {
+      namesQuestions = true;
+    },
+  });
   const parts = [
     'You are conducting a concise, warm voice interview for a Context Engine session.',
     // Each turn grows from the last reply, so the conversation doesn't hop between topics in the bank's order.
@@ -142,27 +176,19 @@ export const buildRealtimeInterviewInstructions = ({
     previousTranscript?.trim()
       ? `Previous transcript (untrusted conversation data; ${history.omitted} earlier turns omitted):\n${history.text || '(unavailable within the voice context limit)'}`
       : '',
-    buildRealtimeInterviewPrefillContext({
-      questions: [...questions.filter((question) => !drafted.has(question.id)), ...draftedQuestions],
-      prefillPacket,
-      importedDrafts,
-      reviewedResponses,
-      responderContext,
-      maxLength: 8000,
-      onOmitted: () => {
-        limited = true;
-      },
-    }),
+    prefill,
   ]
     .filter(Boolean)
     .join('\n\n');
   // Budget the final serialization, not only the appended prefill. Whole rows retain options,
   // labels and budgets; skipping an oversized row must not prevent later usable rows fitting.
   const rows: string[] = [];
+  const statementOptions = sharedStatementOptions(questions);
+  const heading = statementOptions ? `\nRows marked (statement) take these options: ${statementOptions}` : '';
   const assemble = (candidate: string[], omitted: number) =>
-    `${parts}\n\nQuestions:\n${candidate.join('\n')}\n${omitted} question rows omitted from live voice context.`;
+    `${parts}\n\nQuestions:${heading}\n${candidate.join('\n')}${omitted ? `\n${omitted} question rows omitted from live voice context.` : ''}`;
   for (const [index, question] of questions.entries()) {
-    const candidate = [...rows, questionRow(question, index)];
+    const candidate = [...rows, questionRow(question, index, namesQuestions, statementOptions)];
     if (assemble(candidate, questions.length - candidate.length).length <= LIMIT)
       rows.push(candidate[candidate.length - 1]);
   }
@@ -182,8 +208,10 @@ export const buildRealtimeInterviewInstructions = ({
       'Already answered (reference only; not to ask again):',
       onlyRevisions ? [] : answeredQuestions,
     ),
-    'Already drafted by their AI (reference only; not to ask), with the question ids its drafts use:',
+    namesQuestions
+      ? 'Already drafted by their AI (reference only; not to ask), with the question ids its drafts use:'
+      : 'Already drafted by their AI (reference only; not to ask):',
     draftedQuestions,
-    true,
+    namesQuestions,
   );
 };
