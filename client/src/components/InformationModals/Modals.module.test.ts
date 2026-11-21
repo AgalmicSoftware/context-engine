@@ -8,20 +8,18 @@ describe('Modals module styles', () => {
     const minimalBlocks = stylesheet.match(/@container ce-theme style\(--ce-layout-profile: minimal-app\)/g) || [];
 
     expect(minimalBlocks).toHaveLength(1);
-    expect(stylesheet).toMatch(
-      /@container ce-theme style\(--ce-layout-profile: minimal-app\)\s*{[\s\S]*?\.welcomeSlideFooter\s*{[\s\S]*?\.welcomeSlideImageAudience\s*{\s*content:\s*url\('\.\.\/\.\.\/assets\/img\/seedsman_civic\.png'\);/,
-    );
   });
 
-  it('ships the Civic welcome artwork at about twice its displayed size', () => {
-    // The slide shows it about 260-310 CSS px wide on common screens.
-    const png = fs.readFileSync(path.join(__dirname, '..', '..', 'assets', 'img', 'seedsman_civic.png'));
-
-    expect(png.readUInt32BE(16)).toBeLessThanOrEqual(640);
-    expect(png.readUInt32BE(20)).toBeLessThanOrEqual(800);
-    // Color type 6 is RGBA, which keeps the transparent background.
-    expect(png[25]).toBe(6);
-    expect(png.length).toBeLessThan(600 * 1024);
+  it('draws every slide picture as the same white dot art, inverted on the light canvas', () => {
+    expect(stylesheet).toMatch(
+      /\.welcomeSlideImageToolkit,\s*\.welcomeSlideImageGoals,\s*\.welcomeSlideImageAudience,\s*\.welcomeSlideImageMotivation,\s*\.welcomeSlideImageCollaborators\s*\{[^}]*max-width:\s*100%;[^}]*mix-blend-mode:\s*var\(--ce-welcome-artwork-blend-soft\)\s*!important;[^}]*opacity:\s*0\.75;/,
+    );
+    const minimal = stylesheet.slice(stylesheet.indexOf('@container ce-theme style(--ce-layout-profile: minimal-app)'));
+    expect(minimal).toMatch(
+      /\.welcomeSlideEmbed \.welcomeSlideLayout \.welcomeSlideImage\s*\{[^}]*opacity:\s*1;[^}]*filter:\s*invert\(1\) contrast\(1\.2\);[^}]*mix-blend-mode:\s*multiply\s*!important;/,
+    );
+    // No per-slide swaps or photo treatments: one file per slide serves every theme.
+    expect(stylesheet).not.toMatch(/content:\s*url\(|blend-cutout|blend-intense|saturate\(/);
   });
 
   it('lets a phone slide fill a fixed-height pane: the picture takes the room the copy leaves', () => {

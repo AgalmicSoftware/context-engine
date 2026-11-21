@@ -269,11 +269,10 @@ slide headings stay horizontally centered in both. At standard full-screen
 desktop widths, the opening artwork fills and centers within a taller shared
 frame. Its navigation strip restores the larger pre-theme arrow scale, remains
 visible in the initial viewport, and places the site footer below the fold.
-The desktop-window profile retains its compact controls. Non-intro artwork consumes the
-`--ce-welcome-artwork-detail-*` tokens: Context Engine retains the original
-presentation while Classic 95 uses normal image blending, restrained partial
-grayscale, and moderate opacity so the illustrations stay visible without
-competing with the accessible HTML heading and bullet copy. The final Classic
+The desktop-window profile retains its compact controls. Every slide picture is
+white dot art on a transparent ground and shares one treatment: themes blend it
+with `--ce-welcome-artwork-blend-soft` at 0.75 opacity, and the minimal-app
+(Civic) profile inverts it to black on its light canvas. The final Classic
 95 action uses the theme's native control-face and control-text colors.
 `--ce-welcome-artwork-backdrop` fills `background-image`, so every theme gives
 an image (a gradient), never a plain color. Civic uses a navy gradient so the

@@ -47,7 +47,7 @@ describe('OnboardingOverlay', () => {
       </Provider>,
     );
 
-    const greetingImage = screen.getByAltText('Context Engine welcome slide');
+    const greetingImage = screen.getByAltText('A person made of dots wondering: What is Context Engine?');
     const mediaButton = screen.getByTestId('ce-onboarding-media');
     const deck = screen.getByTestId('ce-onboarding-deck');
     const controls = screen.getByTestId('ce-onboarding-controls');
@@ -86,7 +86,7 @@ describe('OnboardingOverlay', () => {
     expect(screen.getByTestId('ce-onboarding-step-2')).toBeInTheDocument();
     expect(screen.queryByTestId('ce-onboarding-title')).not.toBeInTheDocument();
 
-    const robotImage = screen.getByAltText('Context Engine toolkit slide');
+    const toolkitImage = screen.getByAltText('Three people made of dots whose thoughts join one shared thought bubble');
     const mediaButton = screen.getByTestId('ce-onboarding-media');
     const bulletList = screen.getByTestId('ce-onboarding-bullets');
     const bulletContainer = screen.getByTestId('ce-onboarding-bullet-container');
@@ -96,8 +96,8 @@ describe('OnboardingOverlay', () => {
 
     expect(mediaButton).toHaveAttribute('data-slide-key', 'toolkit');
     expect(mediaButton).toHaveAttribute('data-slide-layout', 'centered');
-    expect(robotImage).toHaveAttribute('data-slide-layout', 'centered');
-    expect(robotImage.className).toContain(styles.mediaImageToolkit);
+    expect(toolkitImage).toHaveAttribute('data-slide-layout', 'centered');
+    expect(toolkitImage.className).toContain(styles.mediaImageToolkit);
     expect(bulletList.tagName).toBe('UL');
     expect(bulletContainer.className).toMatch(/titlelessBulletListContainer/);
     expect(controls.className).toContain(styles.onboardingControlsDualArrow);
@@ -111,17 +111,24 @@ describe('OnboardingOverlay', () => {
     expect(screen.getByTestId('ce-onboarding-step-3')).toBeInTheDocument();
     expect(screen.getByTestId('ce-onboarding-title')).toHaveTextContent('Goals');
     expect(screen.getByText(/Open-source templates/i)).toBeInTheDocument();
-    expect(screen.getByAltText('Context Engine goals slide').className).toContain(styles.mediaImageGoals);
+    expect(
+      screen.getByAltText('A person made of dots placing the last dot on top of a pyramid of dots').className,
+    ).toContain(styles.mediaImageGoals);
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
 
     expect(screen.getByTestId('ce-onboarding-step-4')).toBeInTheDocument();
-    expect(screen.getByAltText('Context Engine people helped slide').className).toContain(styles.mediaImageBuiltToHelp);
+    expect(
+      screen.getByAltText('A person made of dots looking closely at a cluster of dots through a magnifying glass')
+        .className,
+    ).toContain(styles.mediaImageBuiltToHelp);
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
 
     expect(screen.getByTestId('ce-onboarding-step-5')).toBeInTheDocument();
-    expect(screen.getByAltText('Context Engine motivation slide').className).toContain(styles.mediaImageBecause);
+    expect(screen.getByAltText('A person made of dots under a storm of thought bubbles').className).toContain(
+      styles.mediaImageBecause,
+    );
   });
 
   it('lets the user skip the shared overlay deck from any step', async () => {

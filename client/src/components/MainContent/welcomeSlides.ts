@@ -1,9 +1,9 @@
 import modalPicture0 from '../../assets/img/explainer_first.png';
-import modalPicture1 from '../../assets/img/beta_tab_robot.png';
-import modalPicture2 from '../../assets/img/jump_transparent.png';
-import modalPicture3 from '../../assets/img/seedsman_slim.jpg';
-import modalPicture4 from '../../assets/img/frontliner.png';
-import modalPicture5 from '../../assets/img/explainer_final.png';
+import modalPicture1 from '../../assets/img/welcome_toolkit.png';
+import modalPicture2 from '../../assets/img/welcome_goals.png';
+import modalPicture3 from '../../assets/img/welcome_built_to_help.png';
+import modalPicture4 from '../../assets/img/welcome_because.png';
+import modalPicture5 from '../../assets/img/welcome_looking_for.png';
 
 export type WelcomeSlideMediaButtonVariant = 'standard' | 'centered';
 export type WelcomeSlideImageVariant = 'intro' | 'toolkit' | 'goals' | 'audience' | 'motivation' | 'collaborators';
@@ -34,7 +34,7 @@ export const WELCOME_SLIDES: WelcomeSlide[] = [
     mediaButtonVariant: 'standard',
     imageVariant: 'intro',
     image: modalPicture0,
-    imageAlt: 'Context Engine welcome slide',
+    imageAlt: 'A person made of dots wondering: What is Context Engine?',
     bulletPoints: [
       { bold: '', text: '' },
       { bold: '', text: '' },
@@ -49,7 +49,7 @@ export const WELCOME_SLIDES: WelcomeSlide[] = [
     mediaButtonVariant: 'centered',
     imageVariant: 'toolkit',
     image: modalPicture1,
-    imageAlt: 'Context Engine toolkit slide',
+    imageAlt: 'Three people made of dots whose thoughts join one shared thought bubble',
     bulletPoints: [
       { bold: 'A toolkit', text: 'for large-group discourse and coordination' },
       { bold: 'A place', text: 'for social voting games and experiments' },
@@ -64,7 +64,7 @@ export const WELCOME_SLIDES: WelcomeSlide[] = [
     mediaButtonVariant: 'standard',
     imageVariant: 'goals',
     image: modalPicture2,
-    imageAlt: 'Context Engine goals slide',
+    imageAlt: 'A person made of dots placing the last dot on top of a pyramid of dots',
     bulletPoints: [
       { bold: 'Open-source templates', text: 'for digital deliberation processes' },
       { bold: 'Finding top 1%', text: 'of AI policies and predictions' },
@@ -79,7 +79,7 @@ export const WELCOME_SLIDES: WelcomeSlide[] = [
     mediaButtonVariant: 'standard',
     imageVariant: 'audience',
     image: modalPicture3,
-    imageAlt: 'Context Engine people helped slide',
+    imageAlt: 'A person made of dots looking closely at a cluster of dots through a magnifying glass',
     bulletPoints: [
       { bold: 'The Public', text: 'access and shape AI policy discourse' },
       { bold: 'Researchers', text: 'navigate and contribute concepts' },
@@ -94,7 +94,7 @@ export const WELCOME_SLIDES: WelcomeSlide[] = [
     mediaButtonVariant: 'centered',
     imageVariant: 'motivation',
     image: modalPicture4,
-    imageAlt: 'Context Engine motivation slide',
+    imageAlt: 'A person made of dots under a storm of thought bubbles',
     bulletPoints: [
       { bold: 'Info Overwhelm', text: 'multiplies other shared risks' },
       { bold: 'Preference Data', text: 'is valuable and can influence AI outcomes' },
@@ -109,7 +109,7 @@ export const WELCOME_SLIDES: WelcomeSlide[] = [
     mediaButtonVariant: 'standard',
     imageVariant: 'collaborators',
     image: modalPicture5,
-    imageAlt: 'Context Engine collaborators slide',
+    imageAlt: 'A person made of dots planting a tree whose leaves are dots',
     bulletPoints: [
       { bold: 'Ideas', text: 'for further tools' },
       { bold: 'Cryptography Experts', text: 'for (ZK, FHE, TEE, AI, ...) features' },

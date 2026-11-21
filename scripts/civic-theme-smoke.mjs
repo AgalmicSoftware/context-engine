@@ -123,15 +123,11 @@ export async function inspectCivicWelcome(page) {
     await artworkImage.waitFor({ state: 'visible' });
     const artwork = await artworkImage.evaluate((element) => {
       const style = getComputedStyle(element);
-      return { opacity: style.opacity, filter: style.filter, content: style.content, width: element.getBoundingClientRect().width };
+      return { opacity: style.opacity, filter: style.filter, width: element.getBoundingClientRect().width };
     });
-    const softenedArtwork = [3, 4].includes(index);
-    assert.equal(artwork.opacity, softenedArtwork ? '0.82' : '1', 'Welcome artwork keeps its intended light-theme treatment');
+    assert.equal(artwork.opacity, '1', 'Welcome artwork keeps its intended light-theme treatment');
     assert(artwork.width > 0, 'Welcome artwork has visible dimensions');
-    if (index === 3) assert(artwork.content.includes('seedsman_civic'), 'Civic uses the transparent robot artwork');
-    if ([0, 2, 5].includes(index)) assert(artwork.filter.includes('invert(1)'), 'White artwork is adapted to the light canvas');
-    else if (softenedArtwork) assert.equal(artwork.filter, 'saturate(0.55) brightness(1.05) contrast(0.9)', 'Audience and motivation artwork retain their softened treatment');
-    else assert.equal(artwork.filter, 'none', 'Toolkit artwork retains its original colors');
+    assert(artwork.filter.includes('invert(1)'), 'White dot artwork is adapted to the light canvas');
     const result = await pane.evaluate(auditPanelContrast);
     assert.equal(result.failures.length, 0, `Welcome slide ${index}: ${JSON.stringify(result.failures)}`);
     if (index < 5) await page.locator('[class*="onboardingControls_"] > button').click();
