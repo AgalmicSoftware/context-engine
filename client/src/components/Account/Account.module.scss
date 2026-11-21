@@ -504,28 +504,6 @@ h1 {
   color: var(--ce-settings-muted-text);
 }
 
-.preLoginSettingsActions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.preLoginSettingsActions :global(.btn-outline-secondary) {
-  background: var(--ce-settings-control-bg);
-  border-color: var(--ce-settings-control-border);
-  border-width: var(--ce-settings-control-border-width);
-  color: var(--ce-settings-control-text);
-  opacity: 1;
-
-  &:hover,
-  &:focus-visible,
-  &:active {
-    background: var(--ce-settings-control-bg);
-    border-color: var(--ce-action-accent);
-    color: var(--ce-settings-control-text);
-  }
-}
-
 .networkSwitchButton {
   background: var(--ce-settings-control-bg);
   font-weight: 600;

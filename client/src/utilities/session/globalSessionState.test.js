@@ -151,6 +151,23 @@ describe('globalSessionState helpers', () => {
     });
   });
 
+  it('keeps a worked-out primary when a caller hands it back on the way out of list scope', () => {
+    // Settings does this when "Selected session" is chosen again: without the primary the store would land on General.
+    writeGlobalSessionSelection({ selectedSessionScope: 'list', selectedSessionSlugs: ['edge'] });
+    const listed = readStoredGlobalSessionSelection();
+    expect(listed).toMatchObject({ primarySessionSlug: 'edge', primarySessionExplicit: false });
+
+    expect(
+      writeGlobalSessionSelection({
+        primarySessionSlug: listed.primarySessionSlug,
+        primarySessionExplicit: listed.primarySessionExplicit,
+        selectedSessionScope: 'active',
+        selectedSessionSlugs: ['edge'],
+      }),
+    ).toMatchObject({ primarySessionSlug: 'edge', primarySessionExplicit: false, selectedSessionScope: 'active' });
+    expect(writeGlobalSessionSelection({ selectedSessionScope: 'active' })).toMatchObject({ primarySessionSlug: '' });
+  });
+
   it('mirrors the saved selection into legacy runtime scan globals', () => {
     globalThis.CE_SESSION_SCAN_SCOPE = 'active';
     globalThis.CE_SESSION_SCAN_SLUGS = ['edge'];

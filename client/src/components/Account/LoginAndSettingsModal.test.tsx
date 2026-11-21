@@ -1582,35 +1582,30 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(treeHasPropValue(subject.getSettingsDisplay(), 'testId', 'ce-web3modal-session-select')).toBe(true);
   });
 
-  it('persists the selected-session scope and list from the settings panel', () => {
+  const scanSubject = (overrides: Record<string, unknown>, slugs: string[], activeSlug = 'edge') => {
     const props = buildProps({
       account: WAGMI_ADDRESS,
       loginComplete: true,
       provider: 'wagmi',
-      activeSessionSlug: 'edge',
-      selectedSessionScope: 'list',
-      selectedSessionSlugs: ['edge', 'rxc'],
+      activeSessionSlug: activeSlug,
+      primarySessionSlug: activeSlug,
       updateGlobalSessionSelection: jest.fn(),
+      ...overrides,
     });
     const subject = mountClassSubject(new LoginAndSettingsModalSubject(props));
-    subject.state = {
-      ...subject.state,
-      sessionScanScope: 'list',
-      sessionScanSlugs: ['edge', 'rxc'],
-    };
-    subject.getConfiguredSessionScanSlugs = jest.fn(() => ['edge', 'rxc']);
-    subject.getActiveSessionSlug = jest.fn(() => 'edge');
+    subject.getConfiguredSessionScanSlugs = jest.fn(() => slugs);
+    subject.getActiveSessionSlug = jest.fn(() => activeSlug);
+    return { props, subject };
+  };
 
-    subject.handleSaveSessionScanSettings();
+  it('applies a ticked session at once, without touching the primary session', () => {
+    const { props, subject } = scanSubject({ selectedSessionScope: 'list', selectedSessionSlugs: ['edge'] }, ['edge']);
 
-    const savedSelection = props.updateGlobalSessionSelection.mock.calls[0]?.[0] || {};
-    expect(savedSelection).toEqual(
-      expect.objectContaining({
-        selectedSessionSlugs: ['edge', 'rxc'],
-      }),
-    );
-    expect(savedSelection).not.toHaveProperty('primarySessionSlug');
-    expect(subject.state.sessionScanStatus).toBe('Saved.');
+    subject.handleSessionScanSlugToggle('rxc');
+
+    const saved = props.updateGlobalSessionSelection.mock.calls[0]?.[0] || {};
+    expect(saved).toEqual({ selectedSessionScope: 'list', selectedSessionSlugs: ['edge', 'rxc'] });
+    expect(saved).not.toHaveProperty('primarySessionSlug');
   });
 
   it('preserves an explicit general primary session while list scope is active', () => {
@@ -1631,44 +1626,52 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(subject.getActiveSessionSlug()).toBe('');
   });
 
-  it('allows saving an empty selected-session list from the local draft', () => {
-    mockedSessionScanScope.normalizeSessionScanScope.mockImplementation((value: any) => value || 'all');
-    const props = buildProps({
-      account: WAGMI_ADDRESS,
-      loginComplete: true,
-      provider: 'wagmi',
-      activeSessionSlug: 'edge',
-      selectedSessionScope: 'list',
-      selectedSessionSlugs: ['edge'],
-      updateGlobalSessionSelection: jest.fn(),
+  it('falls back to the selected session when the last listed session is unticked', () => {
+    const { props, subject } = scanSubject({ selectedSessionScope: 'list', selectedSessionSlugs: ['edge'] }, ['edge']);
+
+    subject.handleSessionScanSlugToggle('edge');
+
+    // The primary goes back as it stood, so the store does not work a new one out and land on General.
+    expect(props.updateGlobalSessionSelection).toHaveBeenCalledWith({
+      primarySessionSlug: 'edge',
+      primarySessionExplicit: false,
+      selectedSessionScope: 'active',
+      selectedSessionSlugs: [],
     });
-    const subject = mountClassSubject(new LoginAndSettingsModalSubject(props));
-    subject.state = {
-      ...subject.state,
-      sessionScanScope: 'list',
-      sessionScanSlugs: [],
-      sessionScanSlugsInput: '',
-    };
-    expect(
-      subject.getConfiguredSessionScanSlugs({
-        sessionScanSlugs: [],
-        sessionScanSlugsInput: '',
-      }),
-    ).toEqual([]);
-    subject.getConfiguredSessionScanSlugs = jest.fn(() => []);
-    subject.getActiveSessionSlug = jest.fn(() => 'edge');
+  });
 
-    subject.handleSaveSessionScanSettings();
+  it('waits for a ticked session before applying an empty list, and applies a saved list at once', () => {
+    const empty = scanSubject({ selectedSessionScope: 'active', selectedSessionSlugs: [] }, []);
+    empty.subject.handleSessionScanScopeChange({ target: { value: 'list' } });
+    expect(empty.props.updateGlobalSessionSelection).not.toHaveBeenCalled();
+    expect(empty.subject.state.sessionScanScope).toBe('list');
 
-    const savedSelection = props.updateGlobalSessionSelection.mock.calls[0]?.[0] || {};
-    expect(savedSelection).toEqual(
-      expect.objectContaining({
-        selectedSessionSlugs: [],
-      }),
-    );
-    expect(savedSelection).not.toHaveProperty('primarySessionSlug');
-    expect(subject.state.sessionScanScope).toBe('general');
-    expect(subject.state.sessionScanStatus).toBe('No sessions selected; saved as general mode.');
+    const kept = scanSubject({ selectedSessionScope: 'active', selectedSessionSlugs: ['rxc'] }, ['rxc']);
+    kept.subject.handleSessionScanScopeChange({ target: { value: 'list' } });
+    expect(kept.props.updateGlobalSessionSelection).toHaveBeenCalledWith({
+      selectedSessionScope: 'list',
+      selectedSessionSlugs: ['rxc'],
+    });
+  });
+
+  it('writes what Home writes when Selected session is chosen: general when no session is picked', () => {
+    const picked = scanSubject({ selectedSessionScope: 'list', selectedSessionSlugs: ['rxc'] }, ['rxc']);
+    picked.subject.handleSessionScanScopeChange({ target: { value: 'active' } });
+    expect(picked.props.updateGlobalSessionSelection).toHaveBeenCalledWith({
+      primarySessionSlug: 'edge',
+      primarySessionExplicit: false,
+      selectedSessionScope: 'active',
+      selectedSessionSlugs: ['rxc'],
+    });
+
+    const none = scanSubject({ selectedSessionScope: 'list', selectedSessionSlugs: ['rxc'] }, ['rxc'], '');
+    none.subject.handleSessionScanScopeChange({ target: { value: 'all' } });
+    expect(none.props.updateGlobalSessionSelection).toHaveBeenCalledWith({
+      primarySessionSlug: '',
+      primarySessionExplicit: false,
+      selectedSessionScope: 'general',
+      selectedSessionSlugs: ['rxc'],
+    });
   });
 
   it('derives the list-mode primary session from the first selected session slug', () => {

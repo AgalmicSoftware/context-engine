@@ -355,7 +355,7 @@ describe('CommunityTab helpers', () => {
       fireEvent.change(screen.getByTestId('settings-scope-mode'), { target: { value: 'list' } });
       fireEvent.change(statsSelector, { target: { value: 'alpha' } });
       await waitFor(() => expect(screen.getByTestId('settings-scope-mode')).toHaveValue('active'));
-      fireEvent.click(screen.getByRole('button', { name: 'Save session settings' }));
+      expect(screen.queryByRole('button', { name: 'Save session settings' })).not.toBeInTheDocument();
       expect(store.getState().sessionState).toMatchObject({
         primarySessionSlug: 'alpha',
         selectedSessionScope: 'active',

@@ -90,13 +90,17 @@ Runtime override:
 
 Settings -> Config -> `Session` holds the scan-scope controls:
 
-- `Selected-session scope`, with the modes `All sessions`, `Primary session`,
-  `General only`, and `Session list`
-- `Selected sessions`: multi-select session chips used by `Session list`
-- `Save session settings` and `Reset to general`
+- `Show content from`, with two choices: `Selected session` (the session picked
+  on Home) and `List of sessions`
+- `Sessions in the list`: session chips, shown only for `List of sessions`
+
+Each change applies at once; there is no Save button. An empty list applies
+nothing: the selected session stays in force until a session is ticked.
+`All sessions` and `General only` are no longer offered here. Home's session
+picker still sets them, and Settings then says so under `Selected session`.
 
 The primary session comes from the Session dropdown at the top of Settings.
-Saving scan-scope settings does not change it.
+Changing these controls does not change it.
 
 ## Block-window behavior
 

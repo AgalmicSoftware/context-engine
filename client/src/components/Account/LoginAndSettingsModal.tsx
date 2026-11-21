@@ -200,7 +200,6 @@ interface LoginAndSettingsModalState {
   sessionScanScope: string;
   sessionScanSlugs: string[];
   sessionScanSlugsInput: string;
-  sessionScanStatus: string;
   preLoginSettingsOpen: boolean;
   preLoginConfigOpen: boolean;
   agentTokenLoginOpen: boolean;
@@ -370,7 +369,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       sessionScanSlugsInput: (Array.isArray(initialSessionScanSlugs) ? initialSessionScanSlugs : [])
         .map((slug: string) => (slug ? slug : 'general'))
         .join(', '),
-      sessionScanStatus: '',
       preLoginSettingsOpen: false,
       preLoginConfigOpen: false,
       agentTokenLoginOpen: false,
@@ -1266,7 +1264,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       sessionScanScope: scope,
       sessionScanSlugs: selectedSessionSlugs,
       sessionScanSlugsInput: this.formatSessionScanSlugsInput(selectedSessionSlugs),
-      sessionScanStatus: '',
     });
   };
 
@@ -1797,7 +1794,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       sessionScanScope: next.selectedSessionScope,
       sessionScanSlugs: next.selectedSessionSlugs,
       sessionScanSlugsInput: this.formatSessionScanSlugsInput(next.selectedSessionSlugs),
-      sessionScanStatus: '',
     });
   };
 
@@ -1956,71 +1952,42 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
   };
 
-  handleSessionScanScopeChange = (event: any) => {
-    const nextScope = normalizeSessionScanScope(event?.target?.value || '');
-    this.setState({
-      sessionScanScope: nextScope,
-      sessionScanStatus: '',
+  // The two choices Settings offers: the session picked on Home, or a ticked list. Each change applies at once.
+  // Home's own picker writes 'general' when no session is picked, so "Selected session" writes the same.
+  applySessionScan = (choice: 'active' | 'list', slugs: string[]) => {
+    const selected = this.getActiveSessionSlug() ? 'active' : 'general';
+    // Regression guard: scan-scope changes should not silently rewrite the
+    // primary/default session. Only the dedicated session selector owns that.
+    // The store works a primary out afresh on a scope write unless the visitor picked it, which would drop a new
+    // visitor to General on the way back from a list. So that way back hands the primary over as it stands.
+    const keepPrimary =
+      choice === 'list' && slugs.length
+        ? {}
+        : {
+            primarySessionSlug: normalizeSettingsSessionSlug(this.props.primarySessionSlug),
+            primarySessionExplicit: this.props.primarySessionExplicit === true,
+          };
+    this.props.updateGlobalSessionSelection?.({
+      ...keepPrimary,
+      selectedSessionScope: choice === 'list' && slugs.length ? 'list' : selected,
+      selectedSessionSlugs: slugs,
     });
+  };
+
+  handleSessionScanScopeChange = (event: any) => {
+    const choice = event?.target?.value === 'list' ? 'list' : 'active';
+    const slugs = this.getConfiguredSessionScanSlugs();
+    this.setState({ sessionScanScope: choice });
+    // An empty list has nothing to apply yet: the selected session stays in force until a session is ticked.
+    if (choice === 'active' || slugs.length) this.applySessionScan(choice, slugs);
   };
 
   handleSessionScanSlugToggle = (slugIn: any) => {
     const slug = normalizeSettingsSessionSlug(slugIn);
-    this.setState((prevState: Readonly<LoginAndSettingsModal['state']>) => {
-      const current = this.getConfiguredSessionScanSlugs(prevState);
-      const next = current.includes(slug) ? current.filter((entry: any) => entry !== slug) : [...current, slug];
-      return {
-        sessionScanSlugs: next,
-        sessionScanSlugsInput: this.formatSessionScanSlugsInput(next),
-        sessionScanStatus: '',
-      };
-    });
-  };
-
-  handleSaveSessionScanSettings = () => {
-    const desiredScope = normalizeSessionScanScope(
-      this.state?.sessionScanScope ?? this.props.selectedSessionScope ?? readSessionScanScope(),
-    );
-    const normalizedSlugs = this.getConfiguredSessionScanSlugs({
-      sessionScanSlugs: Array.isArray(this.state?.sessionScanSlugs)
-        ? this.state.sessionScanSlugs
-        : this.props.selectedSessionSlugs,
-      sessionScanSlugsInput: this.state?.sessionScanSlugsInput || '',
-    });
-
-    let finalScope = desiredScope;
-    if (desiredScope === 'list' && !normalizedSlugs.length) {
-      finalScope = 'general';
-    }
-    // Regression guard: scan-scope saves should not silently rewrite the
-    // primary/default session. Only the dedicated session selector owns that.
-    this.props.updateGlobalSessionSelection?.({
-      selectedSessionScope: finalScope,
-      selectedSessionSlugs: normalizedSlugs,
-    });
-
-    const status =
-      desiredScope === 'list' && !normalizedSlugs.length ? 'No sessions selected; saved as general mode.' : 'Saved.';
-
-    this.setState({
-      sessionScanScope: finalScope,
-      sessionScanSlugs: normalizedSlugs,
-      sessionScanSlugsInput: this.formatSessionScanSlugsInput(normalizedSlugs),
-      sessionScanStatus: status,
-    });
-  };
-
-  handleResetSessionScanSettings = () => {
-    this.props.updateGlobalSessionSelection?.({
-      selectedSessionScope: 'general',
-      selectedSessionSlugs: [],
-    });
-    this.setState({
-      sessionScanScope: 'general',
-      sessionScanSlugs: [],
-      sessionScanSlugsInput: '',
-      sessionScanStatus: 'Reset to general mode.',
-    });
+    const current = this.getConfiguredSessionScanSlugs();
+    const next = current.includes(slug) ? current.filter((entry: any) => entry !== slug) : [...current, slug];
+    this.setState({ sessionScanSlugs: next, sessionScanSlugsInput: this.formatSessionScanSlugsInput(next) });
+    this.applySessionScan('list', next);
   };
 
   buildSessionScopeChipOptions = ({
@@ -2065,62 +2032,57 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   renderGlobalSessionSettings = ({ compact = false, scopePrefix = 'ce-web3modal-session-scope' }: any = {}) => {
     const sessionScanScope = this.getSessionScanScopeValue();
-    const selectedSessionSlugs = this.getConfiguredSessionScanSlugs();
-    const selectedSessionLabels = this.buildSessionScopeChipOptions({
-      dataTestIdPrefix: scopePrefix,
-      includePrimaryBadge: true,
-    })
-      .filter((option: any) => selectedSessionSlugs.includes(option.slug))
-      .map((option: any) => option.label);
-    const shouldShowListValidation = sessionScanScope === 'list' && selectedSessionLabels.length === 0;
+    const listChosen = sessionScanScope === 'list';
+    const hintClass = compact ? styles.preLoginSettingsHint : styles.aiSettingsHint;
+    const activeSessionSlug = this.getActiveSessionSlug();
+    // What "Selected session" means right now. Home can still be set to every session, or to none.
+    const selectedHint =
+      sessionScanScope === 'all'
+        ? 'Home is set to ALL, so every session shows. Pick one session on Home to narrow it.'
+        : activeSessionSlug && sessionScanScope !== 'general'
+          ? `${this.getSessionDescriptor(activeSessionSlug).label} is the selected session.`
+          : 'No session is selected, so General shows.';
+    const hintId = `${scopePrefix}-hint`;
 
     return (
       <>
         <label className={compact ? styles.preLoginSettingsField : styles.aiSettingsRow}>
-          <span className={compact ? styles.preLoginSettingsLabel : styles.aiSettingsLabel}>
-            Selected-session scope
-          </span>
+          <span className={compact ? styles.preLoginSettingsLabel : styles.aiSettingsLabel}>Show content from</span>
           <select
-            aria-label="Selected-session scope"
+            aria-label="Show content from"
+            aria-describedby={hintId}
             className={compact ? styles.preLoginSettingsInput : styles.aiSettingsSelect}
-            value={sessionScanScope}
+            value={listChosen ? 'list' : 'active'}
             onChange={this.handleSessionScanScopeChange}
             data-testid={`${scopePrefix}-mode`}
           >
-            <option value="all">All sessions</option>
-            <option value="active">Primary session</option>
-            <option value="general">General only</option>
-            <option value="list">Session list</option>
+            <option value="active">Selected session</option>
+            <option value="list">List of sessions</option>
           </select>
         </label>
 
-        <div className={compact ? styles.preLoginSettingsField : `${styles.aiSettingsRow} ${styles.aiSettingsRowFull}`}>
-          <span className={compact ? styles.preLoginSettingsLabel : styles.aiSettingsLabel}>Selected sessions</span>
-          {this.renderSessionScopeChips({
-            dataTestIdPrefix: scopePrefix,
-            includePrimaryBadge: true,
-          })}
-          {shouldShowListValidation ? (
-            <div className={compact ? styles.preLoginSettingsHint : styles.aiSettingsHint}>
-              List mode needs at least one selected session.
-            </div>
-          ) : null}
-        </div>
-
-        {this.state.sessionScanStatus ? (
-          <div className={compact ? styles.preLoginSettingsHint : styles.aiSettingsHint}>
-            {this.state.sessionScanStatus}
+        {listChosen ? (
+          <div
+            className={compact ? styles.preLoginSettingsField : `${styles.aiSettingsRow} ${styles.aiSettingsRowFull}`}
+          >
+            <span className={compact ? styles.preLoginSettingsLabel : styles.aiSettingsLabel}>
+              Sessions in the list
+            </span>
+            {this.renderSessionScopeChips({
+              dataTestIdPrefix: scopePrefix,
+              includePrimaryBadge: true,
+            })}
+            {this.getConfiguredSessionScanSlugs().length === 0 ? (
+              <div className={hintClass} id={hintId}>
+                Tick at least one session. Until then the selected session shows.
+              </div>
+            ) : null}
           </div>
-        ) : null}
-
-        <div className={compact ? styles.preLoginSettingsActions : styles.aiSettingsActions}>
-          <Button size="sm" color="info" onClick={this.handleSaveSessionScanSettings}>
-            Save session settings
-          </Button>
-          <Button size="sm" color="secondary" outline onClick={this.handleResetSessionScanSettings}>
-            Reset to general
-          </Button>
-        </div>
+        ) : (
+          <div className={hintClass} id={hintId} data-testid={`${scopePrefix}-selected-hint`}>
+            {selectedHint}
+          </div>
+        )}
       </>
     );
   };
@@ -2375,23 +2337,21 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                 {renderSection({
                   key: 'session',
                   title: 'Session',
-                  summary: `${activeSession.label} · ${sessionScanScope === 'list' ? `${normalizedScanList.length} listed` : sessionScanScope}`,
+                  summary:
+                    sessionScanScope === 'list'
+                      ? normalizedScanList.length
+                        ? `${normalizedScanList.length} listed`
+                        : 'List of sessions'
+                      : sessionScanScope === 'all'
+                        ? 'All sessions'
+                        : activeSession.label,
                   children: (
-                    <>
-                      <div className={styles.aiSettingsGrid}>
-                        {this.renderGlobalSessionSettings({
-                          compact: false,
-                          scopePrefix: 'ce-web3modal-session-scope',
-                        })}
-                      </div>
-                      {overview.capabilities.isWorkerCanonical ? (
-                        <div className={styles.aiSettingsHint} data-testid="ce-settings-worker-session-access">
-                          Passkey session access: {this.props.loginComplete ? 'signed in' : 'sign-in required'} ·
-                          Session Worker: {toStr(sessionConfig?.corsWorkerUrl).trim() ? 'configured' : 'URL missing'} ·
-                          AI: {useLocalAi ? 'local override' : 'session default'}
-                        </div>
-                      ) : null}
-                    </>
+                    <div className={styles.aiSettingsGrid}>
+                      {this.renderGlobalSessionSettings({
+                        compact: false,
+                        scopePrefix: 'ce-web3modal-session-scope',
+                      })}
+                    </div>
                   ),
                 })}
 
