@@ -32,7 +32,9 @@ test('capabilities is public even without config authority and advertises sorted
     // ...and gpt-live-1.1 only to a Worker that says it takes it.
     'interview_gpt_live_1_1_v1',
     // ...and the voice interview's context switch only to one that takes the key.
-    'interview_voice_context_v1']) {
+    'interview_voice_context_v1',
+    // ...and the interview's question order only to one that takes that key.
+    'interview_question_order_v1']) {
     assert.ok(body.features.includes(feature));
   }
   assert.equal(body.session, undefined);

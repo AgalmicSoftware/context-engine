@@ -28,14 +28,14 @@ try {
         const ReactDOM = await import('/node_modules/.vite/deps/react-dom_client.js');
         const { default: Card } = await import('/src/components/SurveyTool/SessionVoicePrefillCard.tsx');
         const { normalizeInterviewQuestions, buildRealtimeInterviewInstructions } = await import('/src/components/SurveyTool/sessionInterview.ts');
-        const { sortInterviewQuestionPoolNewestFirst, buildInterviewQuestionPriority } = await import('/src/components/SurveyTool/sessionInterviewQuestionOrder.ts');
+        const { orderInterviewQuestionPool, buildInterviewQuestionPriority } = await import('/src/components/SurveyTool/sessionInterviewQuestionOrder.ts');
         const questionPool = [
           { id: 'opening', type: 'freeform', prompt: 'Opening question', storageRef: { createdAt: '2026-10-28T10:00:00Z' } },
           { id: 'room-first', type: 'freeform', prompt: 'First breakout', storageRef: { createdAt: '2026-10-29T10:00:00Z' } },
           { id: 'room-newest', type: 'freeform', prompt: 'Newest breakout', storageRef: { createdAt: '2026-10-29T11:00:00Z' } },
         ];
         const existingResponseSlice = { answers: { opening: { value: 'Private synthetic answer' } } };
-        const questions = normalizeInterviewQuestions(sortInterviewQuestionPoolNewestFirst(questionPool));
+        const questions = normalizeInterviewQuestions(orderInterviewQuestionPool(questionPool));
         const priority = buildInterviewQuestionPriority(questions, existingResponseSlice);
         window.__voiceBrief = buildRealtimeInterviewInstructions({ questions: questions.filter(q => priority.unansweredQuestionIds.includes(q.id)) });
         (ReactDOM.createRoot || ReactDOM.default.createRoot)(document.getElementById('probe')).render(React.createElement(Card, { workerUrl: 'https://worker.example', sessionSlug: 'workshop', questionPool, existingResponseSlice }));

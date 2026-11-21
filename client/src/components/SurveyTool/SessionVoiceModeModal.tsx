@@ -16,7 +16,8 @@ import SessionVoicePrefillCard from './SessionVoicePrefillCard';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { VOICE_DIALOG_NOTICE_SLOT_ID } from '../../utilities/ui/voiceDialogNoticeSlot';
 import { useKeptRecording } from '../../utilities/audio/useRecordingChunkQueue';
-import { sortInterviewQuestionPoolNewestFirst } from './sessionInterviewQuestionOrder';
+import { orderInterviewQuestionPool } from './sessionInterviewQuestionOrder';
+import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { normalizeInterviewQuestions, type InterviewPrefillPacket, type SessionVoiceMode } from './sessionInterview';
 import type { TranscriptClaim } from './sessionTranscriptClaim';
 import {
@@ -208,9 +209,10 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
       workerUrl={props.workerUrl}
     />
   );
+  const { questionOrder } = normalizeInterviewSettings(props.sessionConfig?.interviewMode);
   const questions = useMemo(
-    () => normalizeInterviewQuestions(sortInterviewQuestionPoolNewestFirst(questionPool)),
-    [questionPool],
+    () => normalizeInterviewQuestions(orderInterviewQuestionPool(questionPool, questionOrder)),
+    [questionPool, questionOrder],
   );
   const title = mode === 'interview' ? 'Interview' : mode === 'recordGroup' ? 'Group Conversation' : 'Voice mode';
   return (

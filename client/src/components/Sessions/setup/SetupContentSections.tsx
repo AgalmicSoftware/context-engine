@@ -628,6 +628,8 @@ type ParticipationProps = SetupSectionProps & {
   gptLive11Supported?: boolean | null;
   /** True when the session's Worker takes the voice context setting; /new leaves it at its default, off. */
   voiceContextSupported?: boolean | null;
+  /** True when the session's Worker takes the question order setting; /new leaves it at its default, newest. */
+  questionOrderSupported?: boolean | null;
 };
 
 export const SetupParticipationSection = ({
@@ -641,6 +643,7 @@ export const SetupParticipationSection = ({
   dataNoteSupported = true,
   gptLive11Supported = true,
   voiceContextSupported = null,
+  questionOrderSupported = null,
 }: ParticipationProps) => (
   <SetupSection
     sectionKey="participation"
@@ -668,6 +671,7 @@ export const SetupParticipationSection = ({
         dataNoteSupported={dataNoteSupported}
         gptLive11Supported={gptLive11Supported}
         voiceContextSupported={voiceContextSupported}
+        questionOrderSupported={questionOrderSupported}
       />
     ) : null}
     <SetupField id="ce-setup-group-creation" label="Who can create groups" help={GROUP_CREATION_HELP}>

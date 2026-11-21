@@ -33,7 +33,10 @@ export const DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
   recordingQuestionTiming: 'end',
   dataNote: '',
   voiceSessionContext: false,
+  questionOrder: 'newest',
 });
+// Newest first, or as the session lists its questions.
+export const INTERVIEW_QUESTION_ORDERS = Object.freeze(['newest', 'arranged']);
 // At most half of a person's AI drafts can be hidden, so most stay useful to them.
 const MAX_HIDDEN_DRAFT_SHARE = 0.5;
 const MAX_FIDELITY_MINIMUM_PEOPLE = 50;
@@ -101,6 +104,8 @@ export const normalizeInterviewSettings = (value = {}) => {
     // Whether the voice interviewer is given the session's context (notes, links, sources). Off until
     // set; summaries for the voice come later.
     voiceSessionContext: source.voiceSessionContext === true,
+    // The order the interviewer and the AI prefill take questions in when nothing else points to one.
+    questionOrder: source.questionOrder === 'arranged' ? 'arranged' : 'newest',
   };
 };
 export const validInterviewSettings = (value = {}) => {
@@ -159,6 +164,7 @@ export const validInterviewSettings = (value = {}) => {
     return false;
   if (value.dataNote !== undefined && (typeof value.dataNote !== 'string' || value.dataNote.length > MAX_DATA_NOTE_CHARS))
     return false;
+  if (value.questionOrder !== undefined && !INTERVIEW_QUESTION_ORDERS.includes(value.questionOrder)) return false;
   return [
     'autoRegenerate',
     'followNewQuestions',

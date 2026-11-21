@@ -5,7 +5,11 @@ import { SESSION_CONFIG_MIGRATION_REQUIRED_REASON } from './sessionConfigSecrets
 import { getDefaultWorkerSessionSlug, validateInboundWorkerSessionSlug } from './sessionSlugResolution.js';
 import { getStorageIndexBinding, resolvePayloadAccessControl } from './storageRouteExecution.js';
 import { workerGroupCodeReadsOn } from './workerGroupInvites.js';
-import { GPT_LIVE_1_1_FEATURE, INTERVIEW_VOICE_CONTEXT_FEATURE } from '../../shared/realtimeInterviewConfig.mjs';
+import {
+  GPT_LIVE_1_1_FEATURE,
+  INTERVIEW_QUESTION_ORDER_FEATURE,
+  INTERVIEW_VOICE_CONTEXT_FEATURE,
+} from '../../shared/realtimeInterviewConfig.mjs';
 import { ANALYSIS_CARD_DRAWING_FEATURE } from '../../shared/analysisCardSaved.mjs';
 import { AGENT_SIGN_IN_FEATURE } from '../../shared/agentSignIn.mjs';
 import { WORKER_GROUP_READ_CODE_FEATURE, WORKER_GROUP_READ_PROOF_V2_FEATURE } from '../../shared/workerGroupJoin.mjs';
@@ -37,6 +41,8 @@ export const FEATURES = Object.freeze([
   'interview_data_note_v1',
   // interviewMode.realtimeModel may be gpt-live-1.1; older Workers refuse it on save.
   GPT_LIVE_1_1_FEATURE,
+  // interviewMode.questionOrder sets the order interviews take questions in; older Workers reject the key.
+  INTERVIEW_QUESTION_ORDER_FEATURE,
   // interviewMode.voiceSessionContext gives the voice interviewer the session's context; older Workers reject the key.
   INTERVIEW_VOICE_CONTEXT_FEATURE,
   'participant_context_links_v1',

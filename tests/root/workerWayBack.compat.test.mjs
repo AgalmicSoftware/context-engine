@@ -628,6 +628,30 @@ describe('putting a session back on a released Worker bundle', () => {
       session.current();
       expect(await session.readConfig()).toMatchObject({ sessionName: 'Renamed on the way back' });
     }), 120000);
+
+    // The interview's question order, another key neither released bundle knows, on the live bundle too.
+    (ref ? it : it.skip)('with the question order set: saves there wait for it to be newest first, which Settings can do', () => voiceDrill(async ({ session, released, current, withModel }) => {
+      const withOrder = (questionOrder, extra = {}) => {
+        const { config } = withModel(undefined, extra);
+        return { config: { ...config, interviewMode: { ...config.interviewMode, ...(questionOrder === 'newest' ? {} : { questionOrder }) } } };
+      };
+      expect(await session.signed(current, 'set-config', withOrder('arranged'))).toMatchObject({ status: 200 });
+      expect((await session.readConfig()).interviewMode.questionOrder).toBe('arranged');
+
+      // (a) Back on the released bundle, every settings save is refused while the order is stored.
+      const previous = session.released(released);
+      for (const update of [withOrder('arranged', { sessionName: 'Refused' }), { config: { sessionName: 'Refused' } }]) {
+        expect(await session.signed(previous, 'set-config', update)).toEqual({
+          status: 400, body: { error: 'Invalid interview mode config.' },
+        });
+      }
+      // (b) The way out: Settings shows the order while it is set, and at newest first the site leaves the key out.
+      expect(await session.signed(previous, 'set-config', withOrder('newest', { sessionName: 'Renamed on the way back' })))
+        .toEqual({ status: 200, body: { ok: true } });
+      expect((await session.readConfig()).interviewMode).not.toHaveProperty('questionOrder');
+      session.current();
+      expect(await session.readConfig()).toMatchObject({ sessionName: 'Renamed on the way back' });
+    }), 120000);
   });
 });
 

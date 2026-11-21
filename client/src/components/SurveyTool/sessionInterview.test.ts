@@ -302,7 +302,9 @@ describe('session interview protocol', () => {
     const read = (promptRevision: unknown) =>
       decodeInterviewPrefill(encodeLinkJson({ ...packet, promptRevision })).packet?.promptRevision;
     expect(read(PREFILL_PROMPT_REVISION)).toBe('ce-prefill-prompt-2');
+    expect(read(`${PREFILL_PROMPT_REVISION}+arranged`)).toBe('ce-prefill-prompt-2+arranged');
     expect(read('anything else')).toBeUndefined();
+    expect(read(`${PREFILL_PROMPT_REVISION}+anything`)).toBeUndefined();
     expect(decodeInterviewPrefill(encodeLinkJson(packet)).packet).not.toHaveProperty('promptRevision');
   });
 

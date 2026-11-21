@@ -772,6 +772,26 @@ describe('saving the edit page through the Session Worker', () => {
     expect(back.result.config.interviewMode).not.toHaveProperty('recordingQuestionTiming');
   });
 
+  it('saves the interview question order only when it is not newest first, and the Worker refuses other orders', () => {
+    const edit = (changes) => (draft) => {
+      draft.interviewMode = { ...draft.interviewMode, ...normalizeInterviewSettings(draft.interviewMode), ...changes };
+    };
+    const stored = publishedSession();
+    expect(stored.interviewMode).not.toHaveProperty('questionOrder');
+    const arranged = editAndSave(stored, edit({ questionOrder: 'arranged' }));
+    expect(arranged.result).toMatchObject({ ok: true });
+    expect(arranged.result.config.interviewMode).toMatchObject({ questionOrder: 'arranged' });
+    expect(
+      normalizeInterviewSettings(projectPublicWorkerSessionConfig(arranged.result.config).interviewMode).questionOrder,
+    ).toBe('arranged');
+    expect(workerSave(stored, { interviewMode: { ...stored.interviewMode, questionOrder: 'oldest' } })).toMatchObject({
+      ok: false,
+    });
+    const back = editAndSave(arranged.result.config, edit({ questionOrder: 'newest' }));
+    expect(back.save.patch.interviewMode).not.toHaveProperty('questionOrder');
+    expect(back.result.config.interviewMode).not.toHaveProperty('questionOrder');
+  });
+
   it('saves the Session Agent as the Worker stores it, without signing anyone out, and turns it off with null', () => {
     const stored = publishedSession();
     expect(stored).not.toHaveProperty('sessionAgent');

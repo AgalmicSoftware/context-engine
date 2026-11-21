@@ -1,10 +1,13 @@
 import { normalizePublicInterviewQuestions } from '../../../../shared/interviewQuestionCatalog.mjs';
+import type { InterviewQuestionOrder } from '../../../../shared/interviewSettings.mjs';
 import type { InterviewQuestion } from './sessionInterview';
 import { hasDraftValue, responseFieldValue, type SessionInterviewModalRecord } from './sessionInterviewModalState';
 
 export type InterviewQuestionPriority = {
   unansweredQuestionIds: string[];
   answeredQuestionIds: string[];
+  /** The order both lists follow, the session's interviewMode.questionOrder; absent means newest first. */
+  order?: InterviewQuestionOrder;
 };
 
 const record = (value: unknown): Record<string, unknown> =>
@@ -26,8 +29,12 @@ const createdAt = (question: unknown): number => {
   return Number.isFinite(date) && date > 0 ? date : 0;
 };
 
-/** Keep eligibility and first-duplicate selection unchanged; dates never enter the hashed question shape. */
-export const sortInterviewQuestionPoolNewestFirst = (pool: unknown[] = []): unknown[] => {
+/** Keep eligibility and first-duplicate selection unchanged; dates never enter the hashed question shape.
+ *  Newest first, or, for 'arranged', the order the session lists them in. */
+export const orderInterviewQuestionPool = (
+  pool: unknown[] = [],
+  order: InterviewQuestionOrder = 'newest',
+): unknown[] => {
   const seen = new Set<string>();
   return pool
     .flatMap((question, index) => {
@@ -36,15 +43,16 @@ export const sortInterviewQuestionPoolNewestFirst = (pool: unknown[] = []): unkn
       seen.add(normalized.id);
       return [{ question, index, date: createdAt(question) }];
     })
-    .sort((a, b) => b.date - a.date || a.index - b.index)
+    .sort((a, b) => (order === 'newest' ? b.date - a.date : 0) || a.index - b.index)
     .map(({ question }) => question);
 };
 
 export const buildInterviewQuestionPriority = (
   questions: InterviewQuestion[],
   ownResponses?: SessionInterviewModalRecord | null,
+  order: InterviewQuestionOrder = 'newest',
 ): InterviewQuestionPriority => {
-  const priority: InterviewQuestionPriority = { unansweredQuestionIds: [], answeredQuestionIds: [] };
+  const priority: InterviewQuestionPriority = { unansweredQuestionIds: [], answeredQuestionIds: [], order };
   for (const question of questions) {
     const answered = hasDraftValue(responseFieldValue(ownResponses, 'answers', question.id));
     priority[answered ? 'answeredQuestionIds' : 'unansweredQuestionIds'].push(question.id);

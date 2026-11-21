@@ -49,6 +49,7 @@ import {
   readWorkerKeepsDraftText,
   readWorkerTakesDataNote,
   readWorkerTakesVoiceContext,
+  readWorkerTakesQuestionOrder,
   readWorkerTakesGptLive11,
   readWorkerReleaseLabel,
   readWorkerKeepsContextCards,
@@ -258,6 +259,9 @@ const SessionSettingsPage = ({
   // Whether it takes the voice interview's context setting; an older one would refuse the whole save.
   // Null while unknown.
   const [workerTakesVoiceContext, setWorkerTakesVoiceContext] = useState<boolean | null>(null);
+  // Whether it takes the interview's question order setting; an older one would refuse the whole save.
+  // Null while unknown.
+  const [workerTakesQuestionOrder, setWorkerTakesQuestionOrder] = useState<boolean | null>(null);
   // Whether it takes gpt-live-1.1 for interviews; an older one would refuse the whole save, so it isn't listed there.
   // Null while unknown.
   const [workerTakesGptLive11, setWorkerTakesGptLive11] = useState<boolean | null>(null);
@@ -275,6 +279,7 @@ const SessionSettingsPage = ({
     setWorkerHasAnalysisCard(false);
     setWorkerTakesDataNote(false);
     setWorkerTakesVoiceContext(null);
+    setWorkerTakesQuestionOrder(null);
     setWorkerTakesGptLive11(null);
     setWorkerAgentOptions({ recordChats: false, anyoneCanAsk: false });
     void readWorkerReleaseLabel(workerOrigin, sessionSlug, fetchImpl).then((release) => {
@@ -306,6 +311,9 @@ const SessionSettingsPage = ({
     });
     void readWorkerTakesVoiceContext(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
       if (!stale) setWorkerTakesVoiceContext(takes);
+    });
+    void readWorkerTakesQuestionOrder(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
+      if (!stale) setWorkerTakesQuestionOrder(takes);
     });
     void readWorkerTakesGptLive11(workerOrigin, sessionSlug, fetchImpl).then((takes) => {
       if (!stale) setWorkerTakesGptLive11(takes);
@@ -669,6 +677,7 @@ const SessionSettingsPage = ({
           dataNoteSupported={onChain || workerTakesDataNote}
           // An on-chain session also sends its settings to its Worker, if it has one, which must take the key.
           voiceContextSupported={onChain && !workerOrigin ? true : workerTakesVoiceContext}
+          questionOrderSupported={onChain && !workerOrigin ? true : workerTakesQuestionOrder}
           gptLive11Supported={onChain ? null : workerTakesGptLive11}
         />
         <SetupResultsSection

@@ -4065,4 +4065,44 @@ describe('Interview cancellation and recovery', () => {
     expect(prompt).toContain('Already answered IDs, only for changes I request: ["q1"]');
     expect(prompt).not.toContain('Private prior answer');
   });
+
+  it('takes the questions, and gives the personal AI prompt, in the order the session lists them when its question order says so', async () => {
+    const props = {
+      ...baseProps,
+      sessionConfig: { interviewMode: { questionOrder: 'arranged' } },
+      questionPool: [
+        { id: 'q1', prompt: 'General question', type: 'freeform', storageRef: { createdAt: '2026-10-28T10:00:00Z' } },
+        { id: 'q2', prompt: 'Newer detail', type: 'freeform', storageRef: { createdAt: '2026-10-29T10:00:00Z' } },
+      ],
+    };
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          type: 'context-engine.interview-question-catalog',
+          version: 1,
+          sessionSlug: 'demo',
+          prefillPromptVersion: 'ce-interview-brief-v6',
+        }),
+      ),
+    );
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: jest.fn(async () => undefined) },
+    });
+    require('./useInterviewOpening').useInterviewOpening.mockReturnValue({ opening: '', notice: '', loading: false });
+    mockVoiceRound('');
+    const voice = render(<SessionVoiceModeModal {...props} mode="interview" />);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    const brief = mockedStartSessionRealtimeInterview.mock.lastCall?.[0].instructions || '';
+    expect(questionBank(brief)).toContain('1. (freeform) General question\n2. (freeform) Newer detail');
+    voice.unmount();
+    render(<SessionVoiceModeModal {...props} mode={null} />);
+    const copy = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
+    await waitFor(() => expect(copy).toHaveAttribute('aria-disabled', 'false'));
+    fireEvent.click(copy);
+    const prompt = jest.mocked(navigator.clipboard.writeText).mock.lastCall?.[0] || '';
+    expect(prompt).toContain('Unanswered question IDs, in the session’s order: ["q1","q2"]');
+    expect(prompt).toContain('"promptRevision":"ce-prefill-prompt-2+arranged",');
+  });
 });

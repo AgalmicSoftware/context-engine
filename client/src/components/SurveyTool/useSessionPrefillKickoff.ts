@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
-import { sortInterviewQuestionPoolNewestFirst, buildInterviewQuestionPriority } from './sessionInterviewQuestionOrder';
+import { orderInterviewQuestionPool, buildInterviewQuestionPriority } from './sessionInterviewQuestionOrder';
+import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { buildExternalInterviewKickoff, normalizeInterviewQuestions } from './sessionInterview';
 import { InterviewCatalogSignInError, verifyInterviewKickoffCatalog } from './sessionInterviewCatalogValidation';
 import { getInterviewCatalogTicket, INTERVIEW_CATALOG_TICKET_RENEW_MS } from './interviewCatalogTicket';
@@ -75,8 +76,13 @@ export const useSessionPrefillKickoff = ({
 
   if (!activeWorkerUrl) return { ready: Boolean(workerUrl) || resolved.key === sessionSlug, kickoff: null };
   const sessionUrl = givenSessionUrl || buildInterviewReturnSessionUrl();
-  const questions = questionPool ? normalizeInterviewQuestions(sortInterviewQuestionPoolNewestFirst(questionPool)) : [];
-  const questionPriority = questionPool ? buildInterviewQuestionPriority(questions, existingResponseSlice) : undefined;
+  const { questionOrder } = normalizeInterviewSettings(sessionConfig?.interviewMode);
+  const questions = questionPool
+    ? normalizeInterviewQuestions(orderInterviewQuestionPool(questionPool, questionOrder))
+    : [];
+  const questionPriority = questionPool
+    ? buildInterviewQuestionPriority(questions, existingResponseSlice, questionOrder)
+    : undefined;
   const buildKickoff = (catalogTicket = '') =>
     buildExternalInterviewKickoff({
       workerUrl: activeWorkerUrl,

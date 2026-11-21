@@ -6,7 +6,8 @@ import {
   normalizeInterviewQuestions,
   INTERVIEW_PROMPT_VERSION,
 } from './sessionInterview';
-import { sortInterviewQuestionPoolNewestFirst, buildInterviewQuestionPriority } from './sessionInterviewQuestionOrder';
+import { orderInterviewQuestionPool, buildInterviewQuestionPriority } from './sessionInterviewQuestionOrder';
+import { sortPileQuestionsByPriority } from './surveyPileQuestionFlow';
 
 const pool = [
   { id: 'opening', type: 'freeform', prompt: 'Opening question', storageRef: { createdAt: '2026-10-28T10:00:00Z' } },
@@ -33,9 +34,13 @@ afterAll(() => {
 });
 
 it('leads the voice brief and personal AI prompt with newest unanswered questions without changing catalog hashes', async () => {
-  const sorted = normalizeInterviewQuestions(sortInterviewQuestionPoolNewestFirst(pool));
+  const sorted = normalizeInterviewQuestions(orderInterviewQuestionPool(pool));
   const priority = buildInterviewQuestionPriority(sorted, saved);
-  expect(priority).toEqual({ unansweredQuestionIds: ['room-newest', 'room-first'], answeredQuestionIds: ['opening'] });
+  expect(priority).toEqual({
+    unansweredQuestionIds: ['room-newest', 'room-first'],
+    answeredQuestionIds: ['opening'],
+    order: 'newest',
+  });
   const instructions = buildRealtimeInterviewInstructions({
     questions: sorted.filter((q) => priority.unansweredQuestionIds.includes(q.id)),
   });
@@ -48,6 +53,7 @@ it('leads the voice brief and personal AI prompt with newest unanswered question
     questionPriority: priority,
   });
   expect(kickoff).toContain('Unanswered question IDs, newest first: ["room-newest","room-first"]');
+  expect(kickoff).toContain('"promptRevision":"ce-prefill-prompt-2",');
   expect(kickoff).toContain('Already answered IDs, only for changes I request: ["opening"]');
   expect(kickoff).not.toContain('Private prior answer');
   expect(kickoff.split('to install:\n')[1].split('\n')[0]).toBe(
@@ -58,12 +64,45 @@ it('leads the voice brief and personal AI prompt with newest unanswered question
   expect(pool[0].id).toBe('opening');
 });
 
+it('keeps the order the session lists its questions in when the session asks for it, dropping repeats, and says so to the AI', () => {
+  const arranged = orderInterviewQuestionPool([...pool, pool[2]], 'arranged');
+  expect(arranged.map((question) => (question as { id: string }).id)).toEqual(['opening', 'room-first', 'room-newest']);
+  const priority = buildInterviewQuestionPriority(normalizeInterviewQuestions(arranged), saved, 'arranged');
+  expect(priority).toEqual({
+    unansweredQuestionIds: ['room-first', 'room-newest'],
+    answeredQuestionIds: ['opening'],
+    order: 'arranged',
+  });
+  const kickoff = buildExternalInterviewKickoff({
+    workerUrl: 'https://worker.example',
+    sessionSlug: 'workshop',
+    sessionUrl: 'https://app.example/session/workshop',
+    questionPriority: priority,
+  });
+  expect(kickoff).toContain('Unanswered question IDs, in the session’s order: ["room-first","room-newest"]');
+  expect(kickoff).not.toContain('newest first');
+  // Drafts made from this wording say so, as the voice's do.
+  expect(kickoff).toContain('"promptRevision":"ce-prefill-prompt-2+arranged",');
+});
+
+it('takes the question pile’s own order when arranged: highlighted first, then the most answered', () => {
+  // The voice and the prefill are given the pile's list, which the pile sorts by highlight and answer count.
+  const pile = sortPileQuestionsByPriority({
+    questions: pool,
+    responseCounts: { 'room-first': 1, 'room-newest': 5 },
+    highlightedQuestionIds: new Set(['opening']),
+  });
+  const ids = (list: unknown[]) => list.map((question) => (question as { id: string }).id);
+  expect(ids(orderInterviewQuestionPool(pile, 'arranged'))).toEqual(['opening', 'room-newest', 'room-first']);
+  expect(ids(orderInterviewQuestionPool(pile, 'newest'))).toEqual(['room-newest', 'room-first', 'opening']);
+});
+
 it('keeps unknown dates in their existing order and treats zero or locked answers as answered', () => {
   const unknown = [
     { id: 'one', prompt: 'One', type: 'rating' },
     { id: 'two', prompt: 'Two', type: 'freeform' },
   ];
-  expect(sortInterviewQuestionPoolNewestFirst(unknown)).toEqual(unknown);
+  expect(orderInterviewQuestionPool(unknown)).toEqual(unknown);
   expect(
     buildInterviewQuestionPriority(normalizeInterviewQuestions(unknown), {
       answers: { one: { value: 0 }, two: { value: '*' } },
@@ -132,7 +171,7 @@ it('preserves the original eligible duplicate selection before sorting', async (
       storageRef: { createdAt: '2026-10-30T12:00:00Z' },
     },
   ];
-  expect(
-    await hashInterviewQuestions(normalizeInterviewQuestions(sortInterviewQuestionPoolNewestFirst(duplicatePool))),
-  ).toBe(await hashInterviewQuestions(normalizeInterviewQuestions(duplicatePool)));
+  expect(await hashInterviewQuestions(normalizeInterviewQuestions(orderInterviewQuestionPool(duplicatePool)))).toBe(
+    await hashInterviewQuestions(normalizeInterviewQuestions(duplicatePool)),
+  );
 });

@@ -1,6 +1,8 @@
 export type GroupSuggestionDataKind = 'country' | 'town' | 'work' | 'interests';
 export const GROUP_SUGGESTION_DATA: Readonly<Record<GroupSuggestionDataKind, string>>;
 export const GROUP_SUGGESTION_NEVER: string;
+export type InterviewQuestionOrder = 'newest' | 'arranged';
+export const INTERVIEW_QUESTION_ORDERS: readonly InterviewQuestionOrder[];
 export type InterviewSettings = {
   openingMode: 'auto' | 'owner';
   openingPrompt: string;
@@ -24,6 +26,7 @@ export type InterviewSettings = {
   recordingQuestionTiming: 'chunk' | 'end';
   dataNote: string;
   voiceSessionContext: boolean;
+  questionOrder: InterviewQuestionOrder;
 };
 export const MAX_RECORDING_QUESTION_COUNT: number;
 export const MAX_DATA_NOTE_CHARS: number;

@@ -22,6 +22,7 @@ const NEWER_INTERVIEW_KEYS = [
   'recordingQuestionTiming',
   'dataNote',
   'voiceSessionContext',
+  'questionOrder',
 ] as const;
 
 export const withoutNewInterviewDefaults = (interviewMode: Record<string, unknown>): Record<string, unknown> => {

@@ -1,5 +1,9 @@
 import { ANALYSIS_CARD_FEATURE } from '@ce-shared/analysisCardSaved.mjs';
-import { GPT_LIVE_1_1_FEATURE, INTERVIEW_VOICE_CONTEXT_FEATURE } from '@ce-shared/realtimeInterviewConfig.mjs';
+import {
+  GPT_LIVE_1_1_FEATURE,
+  INTERVIEW_QUESTION_ORDER_FEATURE,
+  INTERVIEW_VOICE_CONTEXT_FEATURE,
+} from '@ce-shared/realtimeInterviewConfig.mjs';
 
 import { readWorkerCapabilities } from '../../utilities/worker/workerCapabilities';
 
@@ -84,6 +88,17 @@ export const readWorkerTakesVoiceContext = async (
   if (!workerOrigin) return null;
   const found = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
   return found.unavailable ? null : found.features.includes(INTERVIEW_VOICE_CONTEXT_FEATURE);
+};
+
+/** Whether the Session Worker takes the interview's question order setting; null when it can't be read. */
+export const readWorkerTakesQuestionOrder = async (
+  workerOrigin: string,
+  sessionSlug: string,
+  fetchImpl?: typeof fetch,
+): Promise<boolean | null> => {
+  if (!workerOrigin) return null;
+  const found = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
+  return found.unavailable ? null : found.features.includes(INTERVIEW_QUESTION_ORDER_FEATURE);
 };
 
 /** Whether the Session Worker takes gpt-live-1.1 as the interview voice model; null when it can't be read. */

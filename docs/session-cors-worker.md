@@ -3138,7 +3138,7 @@ Signed login/bootstrap requests:
 - `GET /capabilities` is public and returns the code-defined feature list, API
   version, optional bundle hash and the Worker's `release` (the version it was
   bundled from, `null` from unbundled source), cached for 30 seconds. Features
-  include `ai_daily_limit_v1` (`limits.aiPerWalletPerDay` is honoured), `context_link_groups_v1` (a context link may be locked to groups), `draft_text_v1`, `participant_context_links_v1`, `session_feedback` and `storage_read_batch_v1`. With `?slug=<slug>`,
+  include `ai_daily_limit_v1` (`limits.aiPerWalletPerDay` is honoured), `context_link_groups_v1` (a context link may be locked to groups), `draft_text_v1`, `interview_question_order_v1` (`interviewMode.questionOrder` is taken), `participant_context_links_v1`, `session_feedback` and `storage_read_batch_v1`. With `?slug=<slug>`,
   it also reports coordinator, config authority, storage-index and secret-presence
   readiness, plus fixed reasons for unavailable submit, publication, correction
   and backup operations. A fresh authority reports `seeding`; legacy config

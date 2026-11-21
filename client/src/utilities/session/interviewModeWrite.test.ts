@@ -25,4 +25,9 @@ describe('withoutNewInterviewDefaults', () => {
     expect(withoutNewInterviewDefaults({ voiceSessionContext: false })).toEqual({});
     expect(withoutNewInterviewDefaults({ voiceSessionContext: true })).toEqual({ voiceSessionContext: true });
   });
+
+  it('saves the question order only when it isn’t newest first, so older Workers still save', () => {
+    expect(withoutNewInterviewDefaults({ questionOrder: 'newest' })).toEqual({});
+    expect(withoutNewInterviewDefaults({ questionOrder: 'arranged' })).toEqual({ questionOrder: 'arranged' });
+  });
 });
