@@ -75,15 +75,15 @@ export const readWorkerTakesDataNote = async (
   return found.features.includes('interview_data_note_v1');
 };
 
-/** Whether the Session Worker takes the voice interview's context setting (0.9.26 on); false when it can't be read. */
+/** Whether the Session Worker takes the voice interview's context setting (0.9.26 on); null when it can't be read. */
 export const readWorkerTakesVoiceContext = async (
   workerOrigin: string,
   sessionSlug: string,
   fetchImpl?: typeof fetch,
-): Promise<boolean> => {
-  if (!workerOrigin) return false;
+): Promise<boolean | null> => {
+  if (!workerOrigin) return null;
   const found = await readWorkerCapabilities(workerOrigin, sessionSlug, fetchImpl ? { fetchImpl } : {});
-  return found.features.includes(INTERVIEW_VOICE_CONTEXT_FEATURE);
+  return found.unavailable ? null : found.features.includes(INTERVIEW_VOICE_CONTEXT_FEATURE);
 };
 
 /** Whether the Session Worker takes gpt-live-1.1 as the interview voice model; null when it can't be read. */

@@ -627,7 +627,7 @@ type ParticipationProps = SetupSectionProps & {
   /** False when the session's Worker would refuse gpt-live-1.1 as the interview voice model. */
   gptLive11Supported?: boolean | null;
   /** True when the session's Worker takes the voice context setting; /new leaves it at its default, off. */
-  voiceContextSupported?: boolean;
+  voiceContextSupported?: boolean | null;
 };
 
 export const SetupParticipationSection = ({
@@ -640,7 +640,7 @@ export const SetupParticipationSection = ({
   groupCeilingSupported = true,
   dataNoteSupported = true,
   gptLive11Supported = true,
-  voiceContextSupported = false,
+  voiceContextSupported = null,
 }: ParticipationProps) => (
   <SetupSection
     sectionKey="participation"

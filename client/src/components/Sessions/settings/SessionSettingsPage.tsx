@@ -256,7 +256,8 @@ const SessionSettingsPage = ({
   // On-chain sessions save to the registry, which takes it.
   const [workerTakesDataNote, setWorkerTakesDataNote] = useState(false);
   // Whether it takes the voice interview's context setting; an older one would refuse the whole save.
-  const [workerTakesVoiceContext, setWorkerTakesVoiceContext] = useState(false);
+  // Null while unknown.
+  const [workerTakesVoiceContext, setWorkerTakesVoiceContext] = useState<boolean | null>(null);
   // Whether it takes gpt-live-1.1 for interviews; an older one would refuse the whole save, so it isn't listed there.
   // Null while unknown.
   const [workerTakesGptLive11, setWorkerTakesGptLive11] = useState<boolean | null>(null);
@@ -273,7 +274,7 @@ const SessionSettingsPage = ({
     setWorkerRunsWorkersAi(false);
     setWorkerHasAnalysisCard(false);
     setWorkerTakesDataNote(false);
-    setWorkerTakesVoiceContext(false);
+    setWorkerTakesVoiceContext(null);
     setWorkerTakesGptLive11(null);
     setWorkerAgentOptions({ recordChats: false, anyoneCanAsk: false });
     void readWorkerReleaseLabel(workerOrigin, sessionSlug, fetchImpl).then((release) => {
@@ -666,7 +667,8 @@ const SessionSettingsPage = ({
           groupCeilingSupported={workerOffersGroupJoinChoices(saved)}
           draftTextSupported={workerKeepsDraftText !== false}
           dataNoteSupported={onChain || workerTakesDataNote}
-          voiceContextSupported={onChain || workerTakesVoiceContext}
+          // An on-chain session also sends its settings to its Worker, if it has one, which must take the key.
+          voiceContextSupported={onChain && !workerOrigin ? true : workerTakesVoiceContext}
           gptLive11Supported={onChain ? null : workerTakesGptLive11}
         />
         <SetupResultsSection

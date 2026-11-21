@@ -602,6 +602,32 @@ describe('putting a session back on a released Worker bundle', () => {
       expect(await session.readConfig()).toMatchObject({ sessionName: 'Renamed on the way back' });
       expect(await interview()).toEqual({ status: 200, protocol: 'live', model: 'gpt-live-1.1' });
     }), 120000);
+
+    // The voice interview's context switch, a key neither released bundle knows. The pinned bundle takes it
+    // from the release that adds it on, so this runs on the live bundle.
+    (ref ? it : it.skip)('with the voice context switch on: saves there wait for it to be off, which Settings can do', () => voiceDrill(async ({ session, released, current, withModel }) => {
+      const withContext = (voiceSessionContext, extra = {}) => {
+        const { config } = withModel(undefined, extra);
+        return { config: { ...config, interviewMode: { ...config.interviewMode, ...(voiceSessionContext ? { voiceSessionContext } : {}) } } };
+      };
+      expect(await session.signed(current, 'set-config', withContext(true))).toMatchObject({ status: 200 });
+      expect((await session.readConfig()).interviewMode.voiceSessionContext).toBe(true);
+
+      // (a) Back on the released bundle, every settings save is refused while the switch is stored, even one
+      // that doesn't touch interviews, and the site's while the switch is on.
+      const previous = session.released(released);
+      for (const update of [withContext(true, { sessionName: 'Refused' }), { config: { sessionName: 'Refused' } }]) {
+        expect(await session.signed(previous, 'set-config', update)).toEqual({
+          status: 400, body: { error: 'Invalid interview mode config.' },
+        });
+      }
+      // (b) The way out: Settings shows the switch while it is on, and turned off the site leaves the key out.
+      expect(await session.signed(previous, 'set-config', withContext(false, { sessionName: 'Renamed on the way back' })))
+        .toEqual({ status: 200, body: { ok: true } });
+      expect((await session.readConfig()).interviewMode).not.toHaveProperty('voiceSessionContext');
+      session.current();
+      expect(await session.readConfig()).toMatchObject({ sessionName: 'Renamed on the way back' });
+    }), 120000);
   });
 });
 
