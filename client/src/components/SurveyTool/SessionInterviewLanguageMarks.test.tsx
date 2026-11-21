@@ -2,9 +2,9 @@ import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import SessionInterviewLanguageMarks, { LANGUAGE_FLAGS_SHOWN_MS } from './SessionInterviewLanguageMarks';
 
-const globe = () => screen.getByRole('button', { name: 'Languages you can answer in' });
-// Found through the globe: a hidden list has no accessible name to find it by.
-const flags = () => document.getElementById(globe().getAttribute('aria-controls') || '') as HTMLElement;
+const languageButton = () => screen.getByRole('button', { name: 'Languages you can answer in' });
+// Found through the language button: a hidden list has no accessible name to find it by.
+const flags = () => document.getElementById(languageButton().getAttribute('aria-controls') || '') as HTMLElement;
 const wait = (ms: number) => act(() => jest.advanceTimersByTime(ms));
 
 describe('SessionInterviewLanguageMarks', () => {
@@ -19,29 +19,29 @@ describe('SessionInterviewLanguageMarks', () => {
     const view = render(<SessionInterviewLanguageMarks />);
     expect(screen.getByRole('list', { name: 'Some languages you can answer in' })).toBe(flags());
     expect(flags()).toBeVisible();
-    expect(globe()).toHaveAttribute('aria-expanded', 'true');
+    expect(languageButton()).toHaveAttribute('aria-expanded', 'true');
     wait(LANGUAGE_FLAGS_SHOWN_MS - 1);
     expect(flags()).toBeVisible();
     wait(1);
     expect(flags()).not.toBeVisible();
-    expect(globe()).toHaveAttribute('aria-expanded', 'false');
+    expect(languageButton()).toHaveAttribute('aria-expanded', 'false');
     // Closing the interview unmounts it, so the next opening shows them again.
     view.unmount();
     render(<SessionInterviewLanguageMarks />);
     expect(flags()).toBeVisible();
   });
 
-  it('brings the flags back from the globe for another ten seconds, and hides them from it too', () => {
+  it('brings the flags back from the language button for another ten seconds, and hides them from it too', () => {
     render(<SessionInterviewLanguageMarks />);
     wait(LANGUAGE_FLAGS_SHOWN_MS);
-    fireEvent.click(globe());
+    fireEvent.click(languageButton());
     expect(flags()).toBeVisible();
     wait(LANGUAGE_FLAGS_SHOWN_MS - 1);
     expect(flags()).toBeVisible();
     wait(1);
     expect(flags()).not.toBeVisible();
-    fireEvent.click(globe());
-    fireEvent.click(globe());
+    fireEvent.click(languageButton());
+    fireEvent.click(languageButton());
     expect(flags()).not.toBeVisible();
   });
 
@@ -58,12 +58,24 @@ describe('SessionInterviewLanguageMarks', () => {
     expect(flags()).not.toBeVisible();
   });
 
-  it('starts a fresh ten seconds from the globe even if the pointer never left the hidden row', () => {
+  it('starts a fresh ten seconds from the language button even if the pointer never left the hidden row', () => {
     render(<SessionInterviewLanguageMarks />);
     fireEvent.pointerEnter(flags());
-    fireEvent.click(globe());
-    fireEvent.click(globe());
+    fireEvent.click(languageButton());
+    fireEvent.click(languageButton());
     wait(LANGUAGE_FLAGS_SHOWN_MS);
     expect(flags()).not.toBeVisible();
+  });
+
+  it('holds the language button and the flags in one pill, which says whether the flags show', () => {
+    render(<SessionInterviewLanguageMarks />);
+    const pill = languageButton().parentElement as HTMLElement;
+    expect(pill).toContainElement(flags());
+    expect(pill.parentElement).toHaveAttribute('data-open', 'true');
+    // The icon set's language mark, not a globe.
+    expect(languageButton().querySelector('svg')).toHaveAttribute('data-icon', 'language');
+    wait(LANGUAGE_FLAGS_SHOWN_MS);
+    expect(pill.parentElement).toHaveAttribute('data-open', 'false');
+    expect(pill).toContainElement(languageButton());
   });
 });

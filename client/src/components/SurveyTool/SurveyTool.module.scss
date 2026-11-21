@@ -3953,14 +3953,44 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// The round flags on their own row under the title, so the title row never wraps; a faint ring keeps
-// white flags apart from a light header.
-.sessionInterviewLanguages {
+// The interview's language control: the language button and its flags in one outlined pill, so the flags read
+// as part of the button. With the flags showing it takes the row under the title, so the title row never wraps
+// (in a wide header it joins the row, below); with them gone it is the button alone, in the title row. Outlined,
+// where the status beside it is filled, so the two never read as one thing.
+.sessionInterviewLanguageRow {
   display: flex;
   flex-basis: 100%;
   order: 1;
-  gap: 4px;
   padding-block: 2px 4px;
+
+  &[data-open='false'] {
+    flex-basis: auto;
+    order: 0;
+    padding-block: 0;
+  }
+}
+
+.sessionInterviewLanguageGroup {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--ce-panel-text) 32%, transparent);
+  border-radius: 999px;
+
+  // As tall as the status pill beside it, so the pill's own row stays slim on a phone.
+  .sessionInterviewHeaderButton {
+    min-width: 40px;
+    min-height: 34px;
+    padding-block: 4px;
+    border-radius: 999px;
+    font-size: 1.15rem;
+  }
+}
+
+// A faint ring keeps white flags apart from a light header.
+.sessionInterviewLanguages {
+  display: flex;
+  gap: 4px;
+  padding-inline: 0 12px;
 
   &[hidden] {
     display: none;
@@ -3972,6 +4002,22 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     height: 20px;
     border-radius: 50%;
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--ce-panel-text) 30%, transparent);
+  }
+}
+
+// Where the title row has room for it beside a status of ordinary length, as in the wide dialog on a desktop,
+// the language pill sits in the row, flags and all. The row is measured, not the screen: the dialog is narrow
+// on a tablet too.
+.sessionVoiceModeModal :global(.modal-title):has(.sessionInterviewHeader) {
+  container: ce-interview-title / inline-size;
+}
+
+@container ce-interview-title (min-width: 620px) {
+  .sessionInterviewLanguageRow {
+    flex-basis: auto;
+    order: 0;
+    margin-inline: 2px 8px;
+    padding-block: 0;
   }
 }
 
@@ -4020,7 +4066,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// On a phone the header's items share one row with the close button: Back, the title, its ?, the globe, the
+// On a phone the header's items share one row with the close button: Back, the title, its ?, the language button, the
 // status. The flags, while shown, take the row under it.
 @media (max-width: 480px) {
   .sessionVoiceModeModal :global(.modal-header) {
@@ -4062,7 +4108,8 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 }
 
 // The narrowest phones leave the status room for a word or two: slimmer buttons, a smaller title, and no
-// globe. The flags still show on opening, and the "?" still names the languages.
+// language button in the title row. The pill still shows on opening, with its flags, and the "?" still names
+// the languages.
 @media (max-width: 360px) {
   .sessionVoiceModeModal :global(.modal-title):has(.sessionInterviewHeader) {
     min-width: 0;
@@ -4074,7 +4121,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     padding-inline: 3px;
   }
 
-  .sessionInterviewHeader .sessionInterviewLanguageToggle {
+  .sessionInterviewHeader .sessionInterviewLanguageRow[data-open='false'] {
     display: none;
   }
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faGlobe } from '@fortawesome/free-solid-svg-icons';
+import { faLanguage } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
 
 // Round flags drawn on a 20×20 grid; each is read out by its language's name, never its country's.
@@ -87,13 +87,15 @@ const FLAGS: { language: string; art: React.ReactNode }[] = [
   },
 ];
 
-/** How long the flags stay after the interview opens, or after the globe brings them back. */
+/** How long the flags stay after the interview opens, or after the language button brings them back. */
 export const LANGUAGE_FLAGS_SHOWN_MS = 10_000;
 
 /**
- * The globe beside the interview's title, and under the title a row of flags for some of the languages
- * someone can answer in. The row shows on opening, then goes after ten seconds so the title row keeps
- * the status and the close button on a phone. The globe brings it back; a pointer over it holds it.
+ * The interview's language control: one pill holding the language button and, while they show, round flags for
+ * some of the languages someone can answer in, so the flags plainly belong to the button. The flags show on
+ * opening, then go after ten seconds so the title row keeps the status and the close button on a phone. The
+ * button brings them back; a pointer over them holds them. The pill sits in the title row where it has room and
+ * takes the row under the title where it has not, as the stylesheet decides.
  */
 export default function SessionInterviewLanguageMarks() {
   const listId = React.useId();
@@ -105,42 +107,44 @@ export default function SessionInterviewLanguageMarks() {
     return () => window.clearTimeout(timer);
   }, [shown, held]);
   return (
-    <>
-      <button
-        type="button"
-        className={`${styles.sessionInterviewHeaderButton} ${styles.sessionInterviewLanguageToggle}`}
-        data-ce-control-appearance="frameless"
-        aria-label="Languages you can answer in"
-        aria-expanded={shown}
-        aria-controls={listId}
-        onClick={() => {
-          // A row hidden under the pointer may never hear it leave.
-          setHeld(false);
-          setShown((current) => !current);
-        }}
-      >
-        <FontAwesomeIcon icon={faGlobe} />
-      </button>
-      {/* Spans with list roles: the dialog's title is a heading, which can't hold a real list. */}
-      <span
-        id={listId}
-        role="list"
-        aria-label="Some languages you can answer in"
-        className={styles.sessionInterviewLanguages}
-        hidden={!shown}
-        onPointerEnter={() => setHeld(true)}
-        onPointerLeave={() => setHeld(false)}
-      >
-        {FLAGS.map(({ language, art }) => (
-          <span role="listitem" key={language}>
-            {/* The title names it, on hover too. */}
-            <svg viewBox="0 0 20 20" role="img">
-              <title>{language}</title>
-              {art}
-            </svg>
-          </span>
-        ))}
+    <span className={styles.sessionInterviewLanguageRow} data-open={shown}>
+      <span className={styles.sessionInterviewLanguageGroup}>
+        <button
+          type="button"
+          className={`${styles.sessionInterviewHeaderButton} ${styles.sessionInterviewLanguageToggle}`}
+          data-ce-control-appearance="frameless"
+          aria-label="Languages you can answer in"
+          aria-expanded={shown}
+          aria-controls={listId}
+          onClick={() => {
+            // A row hidden under the pointer may never hear it leave.
+            setHeld(false);
+            setShown((current) => !current);
+          }}
+        >
+          <FontAwesomeIcon icon={faLanguage} />
+        </button>
+        {/* Spans with list roles: the dialog's title is a heading, which can't hold a real list. */}
+        <span
+          id={listId}
+          role="list"
+          aria-label="Some languages you can answer in"
+          className={styles.sessionInterviewLanguages}
+          hidden={!shown}
+          onPointerEnter={() => setHeld(true)}
+          onPointerLeave={() => setHeld(false)}
+        >
+          {FLAGS.map(({ language, art }) => (
+            <span role="listitem" key={language}>
+              {/* The title names it, on hover too. */}
+              <svg viewBox="0 0 20 20" role="img">
+                <title>{language}</title>
+                {art}
+              </svg>
+            </span>
+          ))}
+        </span>
       </span>
-    </>
+    </span>
   );
 }
