@@ -1564,6 +1564,24 @@ describe('DebateMap', () => {
       expect(screen.queryByRole('region', { name: 'AI-generated summary' })).not.toBeInTheDocument();
     });
 
+    it("draws the chart straight under the AI's summary, and after the lists when there is none", async () => {
+      const follows = (earlier: Element, later: Element) =>
+        Boolean(earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING);
+      const [branch] = sessionTree;
+      const position = { id: 'p', label: 'Go slow', participantCount: 3, participantTotal: 5 };
+      const summarised = [{ ...branch, comments: [{ id: 's', comment: 'Most would go slowly.' }, position] }];
+      const { unmount } = renderSessionAtlas({ treeData: summarised, requestedModalNodeId: 'b1' });
+      const summary = await screen.findByRole('region', { name: 'AI-generated summary' });
+      const chart = screen.getByText('Where participants stand');
+      expect(follows(summary, chart)).toBe(true);
+      expect(follows(chart, screen.getByRole('region', { name: 'Positions' }))).toBe(true);
+      expect(screen.getAllByText('Where participants stand')).toHaveLength(1);
+      unmount();
+      renderSessionAtlas({ treeData: [{ ...branch, comments: [position] }], requestedModalNodeId: 'b1' });
+      const positions = await screen.findByRole('region', { name: 'Positions' });
+      expect(follows(positions, screen.getByText('Where participants stand'))).toBe(true);
+    });
+
     it("notes the AI's analysis on a question's card in its topic, as the link's description", async () => {
       const analysis = {
         summary: 'Most would start locally.',
