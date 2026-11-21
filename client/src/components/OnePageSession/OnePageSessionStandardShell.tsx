@@ -1024,6 +1024,7 @@ export default function OnePageSessionStandardShell({
                       workerUrl={atlas.workerUrl}
                       requestedNodeId={requestedAtlasNodeId}
                       onRequestedNodeClose={onRequestedAtlasNodeClose}
+                      canBuild={atlas.canBuild}
                     />
                   </Suspense>
                 )}

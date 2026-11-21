@@ -626,6 +626,8 @@ type ParticipationProps = SetupSectionProps & {
   dataNoteSupported?: boolean;
   /** False when the session's Worker would refuse gpt-live-1.1 as the interview voice model. */
   gptLive11Supported?: boolean | null;
+  /** True when the session's Worker takes the voice context setting; /new leaves it at its default, off. */
+  voiceContextSupported?: boolean | null;
 };
 
 export const SetupParticipationSection = ({
@@ -638,6 +640,7 @@ export const SetupParticipationSection = ({
   groupCeilingSupported = true,
   dataNoteSupported = true,
   gptLive11Supported = true,
+  voiceContextSupported = null,
 }: ParticipationProps) => (
   <SetupSection
     sectionKey="participation"
@@ -664,6 +667,7 @@ export const SetupParticipationSection = ({
         }
         dataNoteSupported={dataNoteSupported}
         gptLive11Supported={gptLive11Supported}
+        voiceContextSupported={voiceContextSupported}
       />
     ) : null}
     <SetupField id="ce-setup-group-creation" label="Who can create groups" help={GROUP_CREATION_HELP}>

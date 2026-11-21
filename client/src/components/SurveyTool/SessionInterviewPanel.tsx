@@ -165,12 +165,13 @@ export default function SessionInterviewPanel({
   // The groups the session's AI picked as it last drafted, which Refresh lists again.
   const draftingPicksRef = useRef<InterviewPrefillGroupPick[]>([]);
   const readiness = useInterviewReadiness(resolvedWorkerUrl, sessionSlug);
-  // What the interviewer may know: the context this participant may read.
+  const settings = normalizeInterviewSettings(sessionConfig?.interviewMode);
+  // What the interviewer may know: the context this participant may read, only where the session turns it on.
   const sessionContextPrompt = useSessionContextPrompt({
     sessionSlug,
     sessionConfig,
     account,
-    totalChars: SESSION_CONTEXT_LIMIT,
+    totalChars: settings.voiceSessionContext ? SESSION_CONTEXT_LIMIT : 0,
   });
   const interviewOpening = useInterviewOpening({
     config: sessionConfig,
@@ -263,8 +264,7 @@ export default function SessionInterviewPanel({
   );
   const panelRef = useRef<HTMLDivElement | null>(null);
   // joinMatchingGroups is off by default. On, the AI suggests groups; the ones the person ticks join on submit.
-  const { showFidelityScore, joinMatchingGroups, keepDraftTextForAdmins, suggestQuestions, dataNote } =
-    normalizeInterviewSettings(sessionConfig?.interviewMode);
+  const { showFidelityScore, joinMatchingGroups, keepDraftTextForAdmins, suggestQuestions, dataNote } = settings;
   const [draftTextShown, setDraftTextShown] = useState(keepDraftTextForAdmins);
   // Sharing the voice interview's transcript for research: off until the person ticks it.
   const [transcriptShared, setTranscriptShared] = useState(false);

@@ -298,6 +298,58 @@ test('set-config takes a group member ceiling from 1 to 10,000, and it reaches t
   }
 });
 
+test('set-config keeps atlas question summary settings within their bounds, signs no one out, and null clears them', () => {
+  const initialized = applySessionConfigMutation({ existingConfig: {}, mutation: { kind: 'set-config', incomingConfig: baseConfig }, slug: 'session-a' });
+  const save = (atlasQuestionSummaries, existingConfig = initialized.config) => applySessionConfigMutation({
+    existingConfig, mutation: { kind: 'set-config', incomingConfig: { atlasQuestionSummaries } }, slug: 'session-a',
+  });
+  const saved = save({ callSeconds: 90, categories: 0, answerChars: 200000 });
+  assert.equal(saved.ok, true, saved.error);
+  assert.deepEqual(saved.config.atlasQuestionSummaries, { callSeconds: 90, categories: 0, answerChars: 200000 });
+  assert.equal(saved.config.authzEpoch, initialized.config.authzEpoch);
+  // Builders read it with the build's prompts, not from the public config.
+  assert.equal('atlasQuestionSummaries' in projectPublicWorkerSessionConfig(saved.config), false);
+  for (const [value, error] of [
+    [{ callSeconds: 19 }, 'atlasQuestionSummaries.callSeconds must be a whole number from 20 to 120.'],
+    [{ answers: 1.5 }, 'atlasQuestionSummaries.answers must be a whole number from 1 to 1000.'],
+    [{ categories: '5' }, 'atlasQuestionSummaries.categories must be a whole number from 0 to 10.'],
+    [{ summaryChars: 1001 }, 'atlasQuestionSummaries.summaryChars must be a whole number from 100 to 1000.'],
+    [{ prompt: 'Summarise.' }, 'atlasQuestionSummaries has no setting prompt.'],
+    [[60], 'atlasQuestionSummaries must be an object.'],
+  ]) {
+    assert.deepEqual(save(value), { ok: false, status: 400, error });
+  }
+  // Saved whole: a later save replaces the earlier one, and {} keeps every default.
+  assert.deepEqual(save({ answers: 50 }, saved.config).config.atlasQuestionSummaries, { answers: 50 });
+  assert.deepEqual(save({}, saved.config).config.atlasQuestionSummaries, {});
+  assert.deepEqual(save(JSON.parse('{"__proto__": {"answers": 5}}')), { ok: false, status: 400, error: 'atlasQuestionSummaries has no setting __proto__.' });
+  const cleared = save(null, saved.config);
+  assert.equal(cleared.ok, true, cleared.error);
+  assert.equal('atlasQuestionSummaries' in cleared.config, false);
+  // A Worker-canonical session takes it too.
+  const canonical = applySessionConfigMutation({ existingConfig: profileBearingConfig, mutation: { kind: 'set-config', incomingConfig: { atlasQuestionSummaries: { answers: 50 } } }, slug: 'session-a' });
+  assert.equal(canonical.ok, true, canonical.error);
+  assert.deepEqual(canonical.config.atlasQuestionSummaries, { answers: 50 });
+});
+
+test('set-config keeps ai.serviceTier to the known tiers and signs no one out', () => {
+  const initialized = applySessionConfigMutation({ existingConfig: {}, mutation: { kind: 'set-config', incomingConfig: baseConfig }, slug: 'session-a' });
+  const save = (serviceTier, existingConfig = initialized.config) => applySessionConfigMutation({
+    existingConfig, mutation: { kind: 'set-config', incomingConfig: { ai: { serviceTier } } }, slug: 'session-a',
+  });
+  for (const tier of ['priority', 'fast', 'default', null]) {
+    const saved = save(tier);
+    assert.equal(saved.ok, true, saved.error);
+    assert.equal(saved.config.ai.serviceTier, tier);
+    assert.equal(saved.config.authzEpoch, initialized.config.authzEpoch, String(tier));
+  }
+  // The rest of the session's AI settings stay as they were.
+  assert.deepEqual({ ...save('priority').config.ai, serviceTier: undefined }, { ...initialized.config.ai, serviceTier: undefined });
+  for (const tier of ['turbo', 'Priority', 2, true]) {
+    assert.deepEqual(save(tier), { ok: false, status: 400, error: 'ai.serviceTier must be one of default, priority, fast.' });
+  }
+});
+
 test('set-config accepts only the two context addition policies', () => {
   for (const contextAdditionPolicy of ['admin_only', 'participants']) {
     const result = applySessionConfigMutation({
@@ -588,6 +640,24 @@ test('set-config keeps a note on where the data goes only as text of up to 300 c
   for (const dataNote of ['x'.repeat(301), 42, null, ['a note']]) {
     const result = apply(dataNote);
     assert.equal(result.ok, false, JSON.stringify(dataNote));
+    assert.equal(result.status, 400);
+  }
+});
+
+test('set-config takes the voice interview context switch only as a boolean', () => {
+  const apply = (voiceSessionContext) => applySessionConfigMutation({
+    existingConfig: cloneJson(profileBearingConfig),
+    mutation: { kind: 'set-config', incomingConfig: { interviewMode: { enabled: true, voiceSessionContext } } },
+    slug: 'session-a',
+  });
+  for (const voiceSessionContext of [true, false]) {
+    const result = apply(voiceSessionContext);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.config.interviewMode.voiceSessionContext, voiceSessionContext);
+  }
+  for (const voiceSessionContext of ['true', 1, null]) {
+    const result = apply(voiceSessionContext);
+    assert.equal(result.ok, false, JSON.stringify(voiceSessionContext));
     assert.equal(result.status, 400);
   }
 });

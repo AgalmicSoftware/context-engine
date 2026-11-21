@@ -268,7 +268,7 @@ export const proxyOpenAI = async ({
     });
   }
 
-  const response = await fetchImpl(
+  const send = () => fetchImpl(
     useResponses
       ? (constants?.openAiResponsesUrl || OPENAI_RESPONSES_URL)
       : (constants?.openAiChatUrl || OPENAI_CHAT_URL),
@@ -278,7 +278,15 @@ export const proxyOpenAI = async ({
       body: JSON.stringify(body),
     }
   );
-  const data = await response.json().catch(() => ({}));
+  let response = await send();
+  let data = await response.json().catch(() => ({}));
+  // A model or account that refuses the faster tier gets the request again, once, at the default tier.
+  if (response.status === 400 && body.service_tier !== 'default' && body.service_tier !== 'auto' &&
+      (data?.error?.param === 'service_tier' || /service[_ ]tier/i.test(String(data?.error?.message || '')))) {
+    body.service_tier = 'default';
+    response = await send();
+    data = await response.json().catch(() => ({}));
+  }
   if (!response.ok) {
     const retryAfter = response.headers?.get?.('retry-after');
     const responseHeaders = new Headers(baseHeaders);

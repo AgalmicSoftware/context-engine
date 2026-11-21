@@ -39,8 +39,8 @@ it('leads the voice brief and personal AI prompt with newest unanswered question
   const instructions = buildRealtimeInterviewInstructions({
     questions: sorted.filter((q) => priority.unansweredQuestionIds.includes(q.id)),
   });
-  expect(instructions.indexOf('[room-newest]')).toBeLessThan(instructions.indexOf('[room-first]'));
-  expect(instructions).not.toContain('[opening]');
+  expect(instructions).toContain('1. (freeform) Newest breakout question\n2. (freeform) First breakout question');
+  expect(instructions).not.toContain(pool[0].prompt);
   const kickoff = buildExternalInterviewKickoff({
     workerUrl: 'https://worker.example',
     sessionSlug: 'workshop',
@@ -97,7 +97,7 @@ it('invites revisions when every question is answered, and otherwise lists answe
   expect(instructions).not.toContain('Ask which earlier answer');
   const list = instructions.slice(instructions.indexOf('Already answered (reference only'));
   expect(list.split('\n\n')[0].length).toBeLessThanOrEqual(4000);
-  expect(instructions).toContain(`[${all[0].id}]`);
+  expect(instructions).toContain(`1. (freeform) ${all[0].prompt}`);
 });
 
 it('gives the answered list only the room the open questions leave', () => {

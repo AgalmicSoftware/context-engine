@@ -1931,7 +1931,11 @@ export const recordInterviewProvenance = (
     original: original && withoutSpokenOriginal(original),
   }));
   const normalizedSource = source || resolveRealtimeInterviewSource(engine.props?.sessionConfig);
-  const { researchDetail: sessionResearchDetail, keepDraftTextForAdmins } = normalizeInterviewSettings(
+  const {
+    researchDetail: sessionResearchDetail,
+    keepDraftTextForAdmins,
+    voiceSessionContext,
+  } = normalizeInterviewSettings(
     (engine.props?.sessionConfig as { interviewMode?: unknown } | undefined)?.interviewMode,
   );
   // Full detail only when the session asks for it and the participant was shown it.
@@ -1939,6 +1943,8 @@ export const recordInterviewProvenance = (
     sessionResearchDetail === 'full' && consentOverrides?.researchDetail !== 'minimal' ? 'full' : 'minimal';
   // The voice model the session's settings name, which its Worker runs for the interview.
   const voiceModel = resolveRealtimeInterviewModel(engine.props?.sessionConfig || {});
+  // The voice's instructions, marked where the session's settings give it the session's context.
+  const voiceBriefRevision = `${VOICE_BRIEF_REVISION}${voiceSessionContext ? '+context' : ''}`;
   const pendingQuestionIds = engine.getChangedQidsAndFields?.(0)?.changedQids;
   const researchAnchor = drafts.find((draft) => pendingQuestionIds?.has(draft.questionId)) || drafts[0];
   const normalizedResponderName = String(responderName || '')
@@ -2048,9 +2054,7 @@ export const recordInterviewProvenance = (
                   ...(draftOrigin === 'external_prefill'
                     ? {}
                     : { mappingPromptVersion: INTERVIEW_MAPPING_PROMPT_VERSION }),
-                  ...(draftOrigin === 'voice_interview'
-                    ? { voiceModel, voiceBriefRevision: VOICE_BRIEF_REVISION }
-                    : {}),
+                  ...(draftOrigin === 'voice_interview' ? { voiceModel, voiceBriefRevision } : {}),
                   // Read by research without the AI provenance choice, which carries the prompt version.
                   confidenceMeaning: confidenceMeaningOf(packet?.promptVersion || INTERVIEW_PROMPT_VERSION),
                   // The copied prompt's wording, which the catalog's version doesn't tell.

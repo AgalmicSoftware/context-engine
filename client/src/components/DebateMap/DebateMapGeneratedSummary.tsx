@@ -40,12 +40,15 @@ type Props = {
 };
 
 // The AI's summary of a node: a short lead (the whole summary on request), then every position with how many
-// participants hold it. The positions show straight away: they are what a reader opens the node for.
+// participants hold it. The positions show straight away: they are what a reader opens the node for. A question's
+// node lists its categories of answer the same way.
 export default function DebateMapGeneratedSummary({ entries }: Props) {
   const [open, setOpen] = useState(false);
   const detailsId = `generated-summary-${useId().replace(/:/g, '')}`;
   const summary = String(entries.find((entry) => !entry.label)?.comment || '').trim();
   const positions = entries.filter((entry) => String(entry.label || '').trim());
+  // A question's entries are the kinds of answer it drew, not positions on a map.
+  const listName = positions.some((entry) => entry.kind === 'category') ? 'Categories' : 'Positions';
   const lead = shortenSummary(summary);
   const hasMore = lead !== summary;
 
@@ -73,9 +76,9 @@ export default function DebateMapGeneratedSummary({ entries }: Props) {
         </section>
       )}
       {positions.length > 0 && (
-        <section className={styles.generatedSummarySection} aria-label="Positions">
+        <section className={styles.generatedSummarySection} aria-label={listName}>
           <div className={styles.generatedSummaryHeading}>
-            Positions <span className={styles.generatedSummaryCount}>{positions.length}</span>
+            {listName} <span className={styles.generatedSummaryCount}>{positions.length}</span>
           </div>
           <ul className={styles.generatedSummaryPositions}>
             {positions.map((position, index) => {

@@ -8,6 +8,7 @@ import type {
   DebateAtlasBuild,
   DebateAtlasMapping,
   DebateAtlasPlacedParticipant,
+  DebateAtlasQuestionAnalysis,
 } from '../../domains/debateAtlas/debateAtlasTypes';
 
 // Markers take the document's text colour, which every theme keeps readable on
@@ -234,9 +235,45 @@ const mappedNode = (id: string, mapping: DebateAtlasMapping, sessionSlug: string
   };
 };
 
+// A question's saved analysis, cleaned for drawing whatever a build holds: nothing without a summary, text only
+// where it is text, whole counts, only named categories, and no category above those who answered. How many
+// categories and how long the text are the session's settings, so none is capped here.
+const cleanAnalysis = (analysis: DebateAtlasQuestionAnalysis | undefined) => {
+  const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+  const whole = (value: unknown) => (Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : 0);
+  const summary = text(analysis?.summary);
+  if (!summary) return null;
+  const answered = whole(analysis?.answered);
+  const categories = (Array.isArray(analysis?.categories) ? analysis.categories : [])
+    .map((category) => ({
+      label: text(category?.label),
+      summary: text(category?.summary),
+      participantCount: answered
+        ? Math.min(answered, whole(category?.participantCount))
+        : whole(category?.participantCount),
+    }))
+    .filter((category) => category.label);
+  return { summary, answered, categories };
+};
+
+// A question circle's window leads with the analysis as a topic's does with its summary: the summary, then each
+// category with how many of those who answered fall in it.
+const analysisComments = (id: string, analysis: NonNullable<ReturnType<typeof cleanAnalysis>>) => [
+  { id: `${id}:analysis`, comment: analysis.summary },
+  ...analysis.categories.map((category, index) => ({
+    id: `${id}:category:${index}`,
+    kind: 'category',
+    comment: category.summary,
+    label: category.label,
+    participantCount: category.participantCount,
+    ...(analysis.answered ? { participantTotal: analysis.answered } : {}),
+  })),
+];
+
 // Branches, then topics, then each topic's questions as the smallest circles. A branch maps all its topics'
 // questions on a compass of its own; a topic opens its summary, positions, questions and compass; a question
-// opens to itself, with its link. All of it is in every build, so older builds gain the third level too.
+// opens to itself, with its link, under the AI's analysis of its answers where the build has one. The circles are
+// in every build, so older builds gain the third level too; the analysis is only in builds that made it.
 export const buildDebateAtlasTree = (build: DebateAtlasBuild, { sessionSlug = '' } = {}): DebateNode[] =>
   (build.branches || []).map((branch) => {
     const branchId = `${build.id}:${branch.id}`;
@@ -247,13 +284,17 @@ export const buildDebateAtlasTree = (build: DebateAtlasBuild, { sessionSlug = ''
       ...mappedNode(branchId, branch, sessionSlug),
       children: (branch.topics || []).map((topic) => {
         const topicId = `${build.id}:${topic.id}`;
-        const questions = (topic.questions || []).map(({ id, prompt, type, options, voiceCredits }) => ({
-          id,
-          question: prompt,
-          questionType: type,
-          ...(options ? { options } : {}),
-          ...(voiceCredits ? { voiceCredits } : {}),
-        }));
+        const questions = (topic.questions || []).map(({ id, prompt, type, options, voiceCredits, analysis }) => {
+          const read = cleanAnalysis(analysis);
+          return {
+            id,
+            question: prompt,
+            questionType: type,
+            ...(options ? { options } : {}),
+            ...(voiceCredits ? { voiceCredits } : {}),
+            ...(read ? { analysis: read } : {}),
+          };
+        });
         return {
           id: topicId,
           name: topic.label,
@@ -263,13 +304,18 @@ export const buildDebateAtlasTree = (build: DebateAtlasBuild, { sessionSlug = ''
           // A lone question would be a circle inside a circle of the same thing.
           ...(questions.length > 1
             ? {
-                children: questions.map((question, index) => ({
-                  id: `${topicId}-q${index + 1}`,
-                  name: questionName(question.question),
-                  depth: 2,
-                  isQuestion: true,
-                  questions: [question],
-                })),
+                children: questions.map(({ analysis, ...question }, index) => {
+                  const id = `${topicId}-q${index + 1}`;
+                  return {
+                    id,
+                    name: questionName(question.question),
+                    depth: 2,
+                    isQuestion: true,
+                    // Its own window leads with the analysis, so its card does not repeat it.
+                    questions: [question],
+                    ...(analysis ? { comments: analysisComments(id, analysis) } : {}),
+                  };
+                }),
               }
             : {}),
         };

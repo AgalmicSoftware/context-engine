@@ -255,4 +255,30 @@ describe('PoliticalCompass tooltip hover behavior', () => {
     expect(ring).toHaveAttribute('fill', 'var(--ce-document-canvas)');
     expect(ring).toHaveAttribute('stroke', 'var(--ce-document-text)');
   });
+
+  it('wraps a long side label beside the wide chart instead of cutting it', () => {
+    const compass = createCompass();
+    compass.xAxis.left = 'Existing arrangements should be replaced entirely';
+    const { container } = render(<StandalonePoliticalCompass compass={compass} compact={false} />);
+    const label = [...container.querySelectorAll('svg text')].find(
+      (text) => text.querySelector('title')?.textContent === compass.xAxis.left,
+    );
+    const lines = [...(label?.querySelectorAll('tspan') || [])].map((line) => line.textContent || '');
+    expect(lines.join(' ')).toBe(compass.xAxis.left);
+    // Fifteen characters fit beside the square at the label's size; two lines of this label would not.
+    expect(lines.length).toBeGreaterThan(2);
+    lines.forEach((line) => expect(line.length).toBeLessThanOrEqual(15));
+  });
+
+  it("fills the quadrants with the theme's four chart colours, under a grid", () => {
+    const { container } = render(<StandalonePoliticalCompass compass={createCompass()} compact={false} />);
+    const fills = [...container.querySelectorAll('svg > rect')].map((rect) => rect.getAttribute('fill'));
+    expect(fills.slice(0, 4)).toEqual([
+      'var(--ce-chart-quadrant-top-left)',
+      'var(--ce-chart-quadrant-top-right)',
+      'var(--ce-chart-quadrant-bottom-left)',
+      'var(--ce-chart-quadrant-bottom-right)',
+    ]);
+    expect(screen.getByTestId('ce-political-compass-grid').querySelectorAll('line').length).toBeGreaterThan(20);
+  });
 });

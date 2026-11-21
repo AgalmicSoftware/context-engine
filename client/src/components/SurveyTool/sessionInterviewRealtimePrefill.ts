@@ -25,6 +25,7 @@ export const buildRealtimeInterviewPrefillContext = ({
   responderContext,
   maxLength,
   onOmitted,
+  onNamesQuestions,
 }: {
   questions: InterviewQuestion[];
   prefillPacket?: InterviewPrefillPacket | null;
@@ -33,6 +34,8 @@ export const buildRealtimeInterviewPrefillContext = ({
   responderContext?: unknown;
   maxLength: number;
   onOmitted?: () => void;
+  /** Called when the block names questions by id, so the question rows must carry their ids. */
+  onNamesQuestions?: () => void;
 }): string => {
   const questionById = new Map(questions.map((question) => [question.id, question]));
   const knownQuestionIds = new Set(questionById.keys());
@@ -161,5 +164,7 @@ export const buildRealtimeInterviewPrefillContext = ({
     }
   }
   if (payload.omittedResponseCount || payload.omittedFactCount || payload.omittedBackground) onOmitted?.();
-  return fits(payload) ? `${prefix}${JSON.stringify(payload)}${suffix}` : '';
+  if (!fits(payload)) return '';
+  if (keptPredictions.length || keptFacts.some((fact) => fact.relatedQuestionIds)) onNamesQuestions?.();
+  return `${prefix}${JSON.stringify(payload)}${suffix}`;
 };

@@ -32,6 +32,7 @@ export const DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
   recordingQuestionCount: 3,
   recordingQuestionTiming: 'end',
   dataNote: '',
+  voiceSessionContext: false,
 });
 // At most half of a person's AI drafts can be hidden, so most stay useful to them.
 const MAX_HIDDEN_DRAFT_SHARE = 0.5;
@@ -97,6 +98,9 @@ export const normalizeInterviewSettings = (value = {}) => {
       : DEFAULT_INTERVIEW_SETTINGS.recordingQuestionCount,
     recordingQuestionTiming: source.recordingQuestionTiming === 'chunk' ? 'chunk' : 'end',
     dataNote: typeof source.dataNote === 'string' ? source.dataNote.trim().slice(0, MAX_DATA_NOTE_CHARS) : '',
+    // Whether the voice interviewer is given the session's context (notes, links, sources). Off until
+    // set: a long source slowed every reply, and summaries for the voice come later.
+    voiceSessionContext: source.voiceSessionContext === true,
   };
 };
 export const validInterviewSettings = (value = {}) => {
@@ -166,6 +170,7 @@ export const validInterviewSettings = (value = {}) => {
     'suggestGroups',
     'joinMatchingGroups',
     'showFidelityResults',
+    'voiceSessionContext',
   ].every(
     (key) => value[key] === undefined || typeof value[key] === 'boolean',
   );

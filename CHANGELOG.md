@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.26] - 2026-11-21
+
+Atlas question summaries and a faster question catalogue in the Session Worker, MCP 0.9.1 (published at merge) and the site. Nothing a session already stores is changed: atlas builds made before this release read as before.
+
+### Session Worker — needs a Worker update
+
+- **Atlas question summaries.** An atlas build now gives each question under a topic a short AI summary of its answers and the kinds of answer found, with how many people hold each. Each question's call reads every answer to it that the build may read: no encrypted, restricted, withheld or hidden-question answers. The calls run after the map calls, in the same six at a time, and a question the build has no time left for keeps no summary; the build's four minutes are the only bound, so a build takes longer and costs more in AI calls. A build records how many questions it summarised and how many ran out of time.
+- **Summary sizes are a session setting.** `atlasQuestionSummaries` sets how long a call may run, how many answers and characters it reads, how long the summary and category texts are and how many categories it keeps. It is admin-only, saved with a signed `set-config`, and changing it signs no one out. Each value has a default and bounds. An older Worker leaves the setting stored and unread, and on a Worker-canonical session it refuses a save that sends it.
+- **Faster question catalogue.** The catalogue that interviews, agents and `contextengine.sh/questions/<slug>` read now loads question texts in batches instead of one at a time, with the same access check on each: a first read of about 40 questions should take about 1–2 s instead of 12–15 s.
+- **Voice context setting.** The Worker takes the new interview setting `interviewMode.voiceSessionContext` and lists it as `interview_voice_context_v1`; voice research records note `+context` in the brief revision when the interviewer had the session's context.
+- **OpenAI's faster tier, per session.** A new admin setting, `ai.serviceTier`, sends the session's own OpenAI text calls (interview drafting and start, AI tools, analysis and atlas builds, the Session Agent, context cards) at OpenAI's faster tier, `"priority"` or `"fast"`, at about twice the price. Unset or `"default"`, requests are as before. It does not cover voice, transcription, other providers or a request with its own key. A tier OpenAI refuses for a model is retried once at the default tier. It is saved with a signed `set-config`, is not public and signs no one out; an older Worker keeps the stored value and sends the default tier.
+
+### MCP 0.9.1
+
+- Packaging only: no tool changes over 0.9.0. The package bundles the shared session-settings code, which now names the new Worker field and setting.
+
+### Site — available when the site deploys
+
+- **Question summaries in the atlas.** A question opens to the AI's summary of its answers and the kinds of answer found, in builds from a Worker that makes them. Someone who may build the atlas sees how many questions were summarised when a build did not reach them all.
+- **Quadratic questions in the atlas.** A quadratic question in an atlas node shows its budget and each option on its own row, as it is answered.
+- **Atlas chart.** The axis labels are never cut: they wrap, and the chart's text stays readable at every width. The four quadrants are bright red, blue, green and yellow under a grid, with their own set in the colour-blind setting.
+- **Voice interviews leave out session context.** The voice interviewer is no longer given the session's context (notes, links and sources) unless the session turns on "Interviewer reads the session context" in its interview settings. The setting is offered where the session's Worker supports it, and stays visible while on. The voice prompt is also shorter: question ids only where drafts need them, a shared option list named once, no empty omitted-rows line, and no fixed line telling it not to invent answers, pressure the responder or claim answers were submitted.
+- **Faster drafts after Stop.** The answers drafted when an interview stops are written at low reasoning effort instead of medium: about 24 s instead of 33–42 s in our runs, with nearly the same drafts.
+- **Interview question check.** The interview's check for new questions may take 25 s instead of 10, and "Could not check for new questions" shows only after two failed checks in a row; it goes at the next answer.
+- **Interview languages.** The Interview window's language button and flags share one pill, with a language icon; on a wide screen it sits in the header row.
+- **Deploy helper.** It deploys the 0.9.25 Worker bundles. A Worker updated from the site gets this release's.
+
 ## [0.9.25] - 2026-11-20
 
 Fixes on the home page; the site only. No Worker change: the 0.9.24 Worker bundles, which the deploy helper now uses, differ from 0.9.23's only in the release number they report, so sessions need no update. MCP stays 0.9.0. Nothing a session already stores is changed.

@@ -134,8 +134,9 @@ export const runResultsBuild = async ({
       getSessionSecrets: async () => (secrets ??= await (deps.getSessionSecrets || getStoredSessionSecrets)(env, slug)),
     };
     const remainingMs = () => limits.buildMs - (now() - startedAtMs);
-    const callAi = async (prompt) => {
-      const timeoutMs = Math.min(limits.callMs, remainingMs());
+    // A kind may give some calls a shorter limit than callMs.
+    const callAi = async (prompt, { callMs = limits.callMs } = {}) => {
+      const timeoutMs = Math.min(callMs, limits.callMs, remainingMs());
       if (timeoutMs < limits.minCallMs) return failure(504, `The ${kind.name} build ran out of time.`);
       try {
         return await (deps.callProvider || callResultsAnalysisProvider)({

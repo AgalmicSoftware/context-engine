@@ -364,6 +364,7 @@ control states without component selectors in a theme file.
 | Authoring              | `--ce-authoring-*`                                                            | paired question/survey workspace, section, control, input, and copy colors     |
 | Actions and status     | `--ce-action-*`, `--ce-status-*`, `--ce-link`                                 | interactive, validation, risk, and state semantics                             |
 | Data series            | `--ce-data-series-1` through `--ce-data-series-8`                             | categorical charts and visualizations                                          |
+| Chart quadrants        | `--ce-chart-quadrant-top-left`, `-top-right`, `-bottom-left`, `-bottom-right` | the two-axis chart's four bright fills; each carries `--ce-document-text`      |
 | Response states        | `--ce-response-agree-*`, `--ce-response-unsure-*`, `--ce-response-disagree-*` | readable vote-state badges on the active tooltip surface                       |
 | Data visualization     | `--ce-data-viz-*`                                                             | plot surfaces, axes, labels, points, active points, and point strokes          |
 | Brand media            | `--ce-brand-logo-*`, `--ce-recognition-logo-*`, `--ce-welcome-artwork-*`      | theme-specific logo treatment plus a stable branded Welcome backdrop/blending  |

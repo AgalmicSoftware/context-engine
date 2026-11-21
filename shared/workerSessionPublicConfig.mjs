@@ -89,6 +89,11 @@ export const SESSION_AGENT_READY_FIELD = 'sessionAgentReady';
 // group joins and honours groupMemberCeiling, which older Workers refuse.
 export const GROUP_JOIN_CHOICES_FIELD = 'groupJoinChoices';
 
+// Set the same way: this Worker's atlas builds may give each topic question
+// an AI summary and categories (`analysis`). The site draws one wherever a
+// build holds it; this only says new builds may.
+export const DEBATE_ATLAS_QUESTION_ANALYSIS_FIELD = 'debateAtlasQuestionAnalysis';
+
 // Every "this Worker supports X" field above, in one list: the Worker sets
 // each on every public config read, and Create's readback check skips them.
 export const WORKER_SUPPORT_FIELDS = Object.freeze([
@@ -98,4 +103,5 @@ export const WORKER_SUPPORT_FIELDS = Object.freeze([
   MEMBER_RESULTS_FIELD,
   SESSION_AGENT_READY_FIELD,
   GROUP_JOIN_CHOICES_FIELD,
+  DEBATE_ATLAS_QUESTION_ANALYSIS_FIELD,
 ]);

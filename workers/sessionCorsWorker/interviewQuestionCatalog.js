@@ -15,6 +15,8 @@ const MAX_SCAN_BLOCKS = 2_000_000;
 const RPC_CHUNK_SIZE = 100_000;
 const MAX_LOG_CHUNKS = MAX_SCAN_BLOCKS / RPC_CHUNK_SIZE;
 const MAX_POINTER_READS = 200;
+// The storage route's /storage/read-batch takes up to this many ids at once.
+const READ_BATCH_IDS = 100;
 const MAX_CANDIDATES = 2000;
 // `refused` marks a session whose questions a signed-out visitor may not list at all.
 const catalog = (questions = [], incomplete = false, refused = false) => ({ questions, incomplete, refused });
@@ -23,6 +25,7 @@ import { normalizePublicInterviewQuestions, hasRestrictedPrompt, hasRatingScaleM
 import { selectCanonicalStorageVersions } from './storageResourceOwnership.js';
 import { blockedQuestionIds } from './blockedQuestionIds.js';
 import { WORKER_GROUP_READ_INVITE_HEADER } from '../../shared/workerGroupJoin.mjs';
+import { isSafeCloudflareStorageRefId } from './storageRefNormalization.js';
 const trim = (value) => String(value == null ? '' : value).trim();
 const lower = (value) => trim(value).toLowerCase();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -79,11 +82,18 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute, reader
   // A catalog ticket's reader sees what that person sees; otherwise this is a signed-out view. A
   // private session's read invite rides on each read, so the storage route checks it per item as
   // it does for the page: the catalog shows an invite holder what the group's link shows, no more.
-  const inviteHeaders = trim(readInvite) ? { [WORKER_GROUP_READ_INVITE_HEADER]: trim(readInvite) } : undefined;
-  const callStorage = (path, query) => storageRoute({
+  const requestHeaders = (json) => {
+    const headers = new Headers();
+    if (json) headers.set('content-type', 'application/json');
+    if (trim(readInvite)) headers.set(WORKER_GROUP_READ_INVITE_HEADER, trim(readInvite));
+    return headers;
+  };
+  const callStorage = (path, query, body) => storageRoute({
     path,
-    method: 'GET',
-    request: new Request(`${origin}${path}?${query}`, inviteHeaders ? { headers: inviteHeaders } : undefined),
+    method: body ? 'POST' : 'GET',
+    request: new Request(`${origin}${path}${query ? `?${query}` : ''}`, body
+      ? { method: 'POST', headers: requestHeaders(true), body: JSON.stringify(body) }
+      : { headers: requestHeaders(false) }),
     env,
     config,
     slug,
@@ -99,15 +109,51 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute, reader
     .filter((item) => item?.hidden === true || item?.metadata?.hidden === true)
     .map((item) => lower(item?.metadata?.resourceId))
     .filter(Boolean)]);
-  // Deliberately sequential and bounded. Each read reuses the storage route's
-  // per-item access checks, so this endpoint cannot widen question visibility.
+  // Every payload is read through the storage route, so each item passes the
+  // route's own access check and this endpoint cannot widen question
+  // visibility. A read's `retryable` marks the catalog incomplete only once
+  // the read is used, as the one-at-a-time reads did.
   const readPayload = async (storageRefId) => {
     try {
       const response = await callStorage('/storage/read', `id=${encodeURIComponent(storageRefId)}`);
-      if (retryableReadStatus(response?.status)) incomplete = true;
       const payload = await readJsonResponse(response);
-      return isObj(payload) ? payload : null;
-    } catch { incomplete = true; return null; }
+      return { payload: isObj(payload) ? payload : null, retryable: retryableReadStatus(response?.status) };
+    } catch { return { payload: null, retryable: true }; }
+  };
+  // Up to READ_BATCH_IDS payloads in one /storage/read-batch: one bulk KV read,
+  // then the single read's check on each item. An item the batch could not
+  // carry, or a batch that failed, is read on its own, and so is an id the
+  // batch would refuse, so it can't send the whole batch back to single reads.
+  const readPayloads = async (storageRefIds) => {
+    const reads = new Map();
+    const ids = [];
+    for (const id of new Set(storageRefIds)) {
+      if (isSafeCloudflareStorageRefId(id)) ids.push(id);
+      else reads.set(id, await readPayload(id));
+    }
+    for (let start = 0; start < ids.length; start += READ_BATCH_IDS) {
+      const group = ids.slice(start, start + READ_BATCH_IDS);
+      let items = null;
+      try { items = (await readJsonResponse(await callStorage('/storage/read-batch', '', { ids: group })))?.items; } catch { items = null; }
+      const byId = new Map(Array.isArray(items) ? items.filter(isObj).map((item) => [item.id, item]) : []);
+      for (const id of group) {
+        const item = byId.get(id);
+        if (!item || [413, 415].includes(item.status)) {
+          reads.set(id, await readPayload(id));
+        } else if (item.status !== 200) {
+          reads.set(id, { payload: null, retryable: retryableReadStatus(item.status) });
+        } else {
+          let payload = null;
+          try { payload = JSON.parse(item.text); } catch { payload = null; }
+          reads.set(id, { payload: isObj(payload) ? payload : null, retryable: false });
+        }
+      }
+    }
+    return reads;
+  };
+  const use = (read) => {
+    if (read?.retryable) incomplete = true;
+    return read?.payload || null;
   };
   const versions = [];
   const legacyVersions = [];
@@ -128,8 +174,9 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute, reader
   legacyVersions.sort((left, right) => left.createdAtMs - right.createdAtMs);
   // Legacy reads leave at least MAX_QUESTIONS reads for the chosen versions.
   const legacyReads = legacyVersions.slice(0, MAX_PAYLOAD_READS - MAX_QUESTIONS);
+  const legacyPayloads = await readPayloads(legacyReads.map((version) => version.storageRefId));
   for (const version of legacyReads) {
-    const payload = await readPayload(version.storageRefId);
+    const payload = use(legacyPayloads.get(version.storageRefId));
     const resourceId = payloadQuestionId(payload);
     if (resourceId) versions.push({ ...version, resourceId, payload });
   }
@@ -138,12 +185,19 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute, reader
     .filter((version) => !hiddenIds.has(version.resourceId));
   const chosen = candidates.slice(0, MAX_PAYLOAD_READS - legacyReads.length);
   const questions = [];
-  for (const version of chosen) {
-    if (questions.length >= MAX_QUESTIONS) break;
-    const payload = version.payload || await readPayload(version.storageRefId);
-    // A payload naming another question must not stand in for this one, and
-    // falling back to another version could serve someone else's copy.
-    if (payloadQuestionId(payload) === version.resourceId && normalizeQuestion(payload)) questions.push(payload);
+  // In order, a batch no larger than the questions still wanted, so nothing
+  // past the catalog's last question is read (or, if encrypted, opened).
+  for (let start = 0; start < chosen.length && questions.length < MAX_QUESTIONS;) {
+    const group = chosen.slice(start, start + Math.min(READ_BATCH_IDS, MAX_QUESTIONS - questions.length));
+    start += group.length;
+    const payloads = await readPayloads(group.filter((version) => !version.payload).map((version) => version.storageRefId));
+    for (const version of group) {
+      if (questions.length >= MAX_QUESTIONS) break;
+      const payload = version.payload || use(payloads.get(version.storageRefId));
+      // A payload naming another question must not stand in for this one, and
+      // falling back to another version could serve someone else's copy.
+      if (payloadQuestionId(payload) === version.resourceId && normalizeQuestion(payload)) questions.push(payload);
+    }
   }
   return catalog(
     dedupeQuestions(questions),

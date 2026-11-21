@@ -362,3 +362,117 @@ it('gathers a node\u2019s positions at the two ends of its first axis, only when
   expect(branch.split).toBeUndefined();
   expect(branch.children?.[0].split).toBeUndefined();
 });
+
+it('leads a question circle with the saved analysis, and leaves a build without one as it was', () => {
+  const analysis = {
+    summary: ' Most want contracts published; a few fear the cost. ',
+    answered: 9,
+    categories: [
+      { label: 'Publish everything', summary: 'Openness builds trust.', participantCount: 6 },
+      { label: 'Too costly', participantCount: 2 },
+      { label: ' ', participantCount: 1 },
+    ],
+  };
+  const topics = (withAnalysis: boolean) => [
+    {
+      id: 'b1t1',
+      label: 'Openness',
+      questions: [
+        { id: 'q1', prompt: 'Publish every contract?', ...(withAnalysis ? { analysis } : {}) },
+        { id: 'q2', prompt: 'Short one?', ...(withAnalysis ? { analysis: { summary: '  ', answered: 4 } } : {}) },
+      ],
+    },
+    {
+      id: 'b1t2',
+      label: 'Lone',
+      questions: [{ id: 'q3', prompt: 'Only one?', ...(withAnalysis ? { analysis } : {}) }],
+    },
+  ];
+  const tree = (withAnalysis: boolean) =>
+    buildDebateAtlasTree({ ...build, branches: [{ ...build.branches[0], topics: topics(withAnalysis) }] })[0];
+  const [openness, lone] = tree(true).children || [];
+  const [first, second] = openness.children || [];
+  // The circle's window: the summary, then each named category as a share of those who answered.
+  expect(first.comments).toEqual([
+    { id: `${first.id}:analysis`, comment: 'Most want contracts published; a few fear the cost.' },
+    {
+      id: `${first.id}:category:0`,
+      kind: 'category',
+      label: 'Publish everything',
+      comment: 'Openness builds trust.',
+      participantCount: 6,
+      participantTotal: 9,
+    },
+    {
+      id: `${first.id}:category:1`,
+      kind: 'category',
+      label: 'Too costly',
+      comment: '',
+      participantCount: 2,
+      participantTotal: 9,
+    },
+  ]);
+  // Its own card does not say it twice; the topic's list of cards carries it.
+  expect(first.questions?.[0].analysis).toBeUndefined();
+  expect(openness.questions?.[0].analysis).toMatchObject({ answered: 9, categories: [{}, {}] });
+  // An analysis without a summary is none.
+  expect(second.comments).toBeUndefined();
+  expect(openness.questions?.[1].analysis).toBeUndefined();
+  // A lone question has no circle of its own: its card in the topic carries the analysis.
+  expect(lone.children).toBeUndefined();
+  expect(lone.questions?.[0].analysis).toMatchObject({
+    summary: 'Most want contracts published; a few fear the cost.',
+  });
+  // A build from a Worker that makes none.
+  const [plain] = tree(false).children || [];
+  expect(plain.children?.[0]).toEqual({
+    id: `${plain.id}-q1`,
+    name: 'Publish every contract?',
+    depth: 2,
+    isQuestion: true,
+    questions: [{ id: 'q1', question: 'Publish every contract?', questionType: undefined }],
+  });
+});
+
+it('draws whatever a build holds for an analysis without trusting it', () => {
+  const odd = {
+    summary: 'Read.',
+    answered: 9,
+    categories: [
+      { label: 'Too many', participantCount: 12 },
+      { label: 'Huge', participantCount: Infinity },
+      { label: { not: 'text' }, participantCount: 2 },
+      { label: 'Text only', summary: ['a', 'b'], participantCount: '3' },
+      ...Array.from({ length: 6 }, (_, index) => ({ label: `Extra ${index}`, participantCount: 1 })),
+    ],
+  };
+  const questions = (analysis: unknown) =>
+    buildDebateAtlasTree({
+      ...build,
+      branches: [
+        {
+          ...build.branches[0],
+          topics: [{ id: 'b1t1', label: 'Lone', questions: [{ id: 'q1', prompt: 'Only one?', analysis } as never] }],
+        },
+      ],
+    })[0].children?.[0].questions;
+  expect(questions(odd)?.[0].analysis).toEqual({
+    summary: 'Read.',
+    answered: 9,
+    categories: [
+      { label: 'Too many', summary: '', participantCount: 9 },
+      { label: 'Huge', summary: '', participantCount: 0 },
+      { label: 'Text only', summary: '', participantCount: 3 },
+      // As many as the build stores: how many a build makes is the session's setting.
+      ...Array.from({ length: 6 }, (_, index) => ({ label: `Extra ${index}`, summary: '', participantCount: 1 })),
+    ],
+  });
+  for (const bad of [{ summary: {} }, { summary: ['a'] }, 'text', null, { answered: Infinity, summary: 7 }]) {
+    expect(questions(bad)?.[0].analysis).toBeUndefined();
+  }
+  expect(questions({ summary: 'Read.', answered: Infinity, categories: 'none' })?.[0].analysis).toEqual({
+    summary: 'Read.',
+    answered: 0,
+    categories: [],
+  });
+});

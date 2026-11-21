@@ -69,6 +69,10 @@ const HIDDEN_DRAFTS_HELP =
 const DATA_NOTE_HELP =
   'Optional. A sentence or two shown to participants beside research sharing and hidden AI drafts, such as who funds the study and where the data goes. Plain text; https links open in a new tab. Up to 300 characters, saved in the session’s public settings.';
 const VOICE_MODEL_HELP = `The OpenAI model that holds voice interviews; each costs the same per minute. ${GPT_LIVE_1_1_MODEL} is the default: OpenAI says it pronounces, keeps its accent and transcribes better than ${PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL} in multilingual conversations. A session’s Worker that is too old for ${GPT_LIVE_1_1_MODEL} doesn’t list it and runs ${PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL} by default. The gpt-realtime models are older. The session’s OpenAI key must have access to the model.`;
+const VOICE_CONTEXT_HELP =
+  'Whether the voice interviewer is given the session’s notes, links and readable sources. Off by default. Drafting answers after the interview is unaffected.';
+export const VOICE_CONTEXT_NEEDS_NEWER_WORKER =
+  'This session’s Worker doesn’t take this setting and refuses every save while it is on. Turn it off, then save.';
 export const GPT_LIVE_1_1_NEEDS_NEWER_WORKER = `This session’s Worker doesn’t take ${GPT_LIVE_1_1_MODEL} and refuses every save while it is set. Choose ${PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL}, then save.`;
 const OPENING_HELP =
   'How each voice interview starts. Generate: the AI writes an opening from the session’s information and questions once there are questions it can use, and reuses it until it is regenerated. Owner-written: every interview opens with your question.';
@@ -137,6 +141,9 @@ type Props = {
   // False where the session's Worker predates gpt-live-1.1: it refuses the model, so it isn't listed.
   // Null while that is unknown: not listed, and no warning yet.
   gptLive11Supported?: boolean | null;
+  // True where the session's Worker takes the voice context setting, false where it is known not to: it would
+  // refuse the whole save. Null while that is unknown. Where it isn't true the field shows only while it is on.
+  voiceContextSupported?: boolean | null;
 };
 export const DRAFT_TEXT_NEEDS_WORKER = 'Needs a session hosted on a Session Worker.';
 export const DRAFT_TEXT_NEEDS_NEWER_WORKER = 'Needs a newer Session Worker (0.9.6 or later).';
@@ -148,6 +155,7 @@ export default function InterviewSettingsFields({
   draftTextUnavailable = '',
   dataNoteSupported = true,
   gptLive11Supported = true,
+  voiceContextSupported = null,
 }: Props) {
   const id = useId();
   const tooltipsEnabled = useSessionWizardTooltipPreference(useContext(ReactReduxContext)?.store ?? null);
@@ -161,6 +169,8 @@ export default function InterviewSettingsFields({
   const storedModel = String(raw.realtimeModel || '');
   const model = isRealtimeInterviewModel(storedModel) ? storedModel : workerDefault;
   const modelRefused = storedModel === GPT_LIVE_1_1_MODEL && gptLive11Supported === false;
+  // Shown while it is on, even where the Worker doesn't take it, so it can be turned off and the session saved.
+  const voiceContextRefused = settings.voiceSessionContext && voiceContextSupported === false;
   // A model already set stays listed, so the field shows the truth.
   const models = REALTIME_INTERVIEW_MODELS.filter(
     (option) => option !== GPT_LIVE_1_1_MODEL || gptLive11Supported === true || option === model,
@@ -300,6 +310,35 @@ export default function InterviewSettingsFields({
           </p>
         ) : null}
       </HelpField>
+      {voiceContextSupported === true || settings.voiceSessionContext ? (
+        <HelpField
+          htmlFor={`${id}-voice-context`}
+          label="Interviewer reads the session context"
+          help={VOICE_CONTEXT_HELP}
+        >
+          <Input
+            id={`${id}-voice-context`}
+            type="select"
+            value={String(settings.voiceSessionContext)}
+            invalid={voiceContextRefused}
+            onChange={(e) => change('voiceSessionContext', e.target.value === 'true')}
+            aria-describedby={[
+              setupHelpId(`${id}-voice-context`),
+              voiceContextRefused ? `${id}-voice-context-refused` : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            <option value="false">Off</option>
+            <option value="true">On</option>
+          </Input>
+          {voiceContextRefused ? (
+            <p id={`${id}-voice-context-refused`} role="alert">
+              {VOICE_CONTEXT_NEEDS_NEWER_WORKER}
+            </p>
+          ) : null}
+        </HelpField>
+      ) : null}
       <HelpField htmlFor={`${id}-mode`} label="Opening question" help={OPENING_HELP}>
         <Input
           id={`${id}-mode`}

@@ -15,10 +15,29 @@ export type DebateAtlasMapping = {
   // Everyone whose answers the AI read for it; a position's participantCount is a share of this.
   answered?: number;
 };
-export type DebateAtlasTopic = DebateAtlasMapping & {
-  id: string;
-  label: string;
-  questions?: Array<{ id: string; prompt: string; type?: string; options?: string[]; voiceCredits?: number }>;
+// The AI's reading of one question's answers, in builds from a Worker that makes it: a summary, then the kinds of
+// answer it found, most held first. `answered` is everyone whose answers it read; a category's count is a share
+// of it, and one person may be counted in more than one category.
+export type DebateAtlasQuestionAnalysis = {
+  summary: string;
+  categories?: Array<{ label: string; summary?: string; participantCount: number }>;
+  answered?: number;
 };
+export type DebateAtlasQuestion = {
+  id: string;
+  prompt: string;
+  type?: string;
+  options?: string[];
+  voiceCredits?: number;
+  analysis?: DebateAtlasQuestionAnalysis;
+};
+export type DebateAtlasTopic = DebateAtlasMapping & { id: string; label: string; questions?: DebateAtlasQuestion[] };
 export type DebateAtlasBranch = DebateAtlasMapping & { id: string; label: string; topics: DebateAtlasTopic[] };
-export type DebateAtlasBuild = ResultsBuildSummary & { missingTopics?: string[]; branches: DebateAtlasBranch[] };
+// How far a build got with its questions' analyses, in builds that make them: `listed` questions in all,
+// `summarised` with an analysis, `outOfTime` not reached or cut off. The rest failed or kept nothing.
+export type DebateAtlasQuestionSummaries = { listed?: number; summarised?: number; outOfTime?: number };
+export type DebateAtlasBuild = ResultsBuildSummary & {
+  missingTopics?: string[];
+  questionSummaries?: DebateAtlasQuestionSummaries;
+  branches: DebateAtlasBranch[];
+};

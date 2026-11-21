@@ -610,7 +610,41 @@ Admin test panel:
   participants' answers its call read, as the whole they are part of. A branch
   of one topic shares that topic's compass. Branch calls start after every
   topic call, so a build short of time loses a branch's compass before a topic.
-  Each response reaches its topic's call and its branch's. The AI sees
+  Last, one call per question listed under a topic stores that question's
+  `analysis`: a summary, the categories its responses fall into, each with a
+  label, an optional one-sentence summary and `participantCount` (one person
+  may sit in several), most held first, and `answered`; it is kept only with a
+  summary. These calls start after every topic and branch call, so they never
+  delay one, and they have no ceiling of their own: the build's 4 minutes
+  bound them, and a build short of time leaves a question without an
+  `analysis` first. How many questions there can be is set by the AI sample's
+  limit of 80 questions and the plan's 12 topics. Topic and branch calls read
+  the AI sample, at most 420 responses across all questions; a question's call
+  reads every response to that question the build may read (the same
+  sanitizer, each answer cut as in the sample), so `answered` matches Results
+  unless a setting below cuts it short. The build's `questionSummaries` counts
+  the questions it shows (`listed`), those with an `analysis` (`summarised`)
+  and those whose call had no time or ran out of it (`outOfTime`); the rest
+  failed or kept nothing. Builds from before these calls have neither field.
+  The session setting `atlasQuestionSummaries` sets these calls
+  (shared/atlasQuestionSummaries.mjs); each key is optional and a key left out
+  keeps its default: `callSeconds` (60; 20 to 120), `answers` read per
+  question (200; 1 to 1000), `answerChars`, their text in characters (60000;
+  1000 to 200000), `summaryChars` (400; 100 to 1000), `categories` (5; 0 to
+  10, 0 for none), `labelChars` (80; 20 to 120) and `categorySummaryChars`
+  (200; 0 to 400, 0 for none). An admin saves it with a signed `set-config`,
+  for example `{"atlasQuestionSummaries": {"callSeconds": 90}}`; the object is
+  saved whole, a value out of bounds or an unknown key is refused with 400,
+  and `null` puts every key back to its default. Changing it signs no one out.
+  It is not in the public config; builders see the settings a build would use
+  as `nextBuild.questionSummaries`. A stored value out of bounds is read as its
+  default. An older Worker leaves the setting stored and unread; on a
+  Worker-canonical session it refuses a save that sends it, and on other
+  sessions it saves it unchecked.
+  A question's call reads its answers in order until `answerChars` is spent,
+  cutting the answer that reaches it.
+  Each sampled response reaches its topic's call and its branch's, and each
+  response its question's call. The AI sees
   synthetic participant IDs only; the Worker maps them back to addresses
   afterwards and drops any citation of a participant who did not answer that
   topic or branch. The coordinator lets one build run at a time per session and
@@ -619,10 +653,13 @@ Admin test panel:
   `GET /debate-atlas?sessionSlug=<slug>&id=` returns the build list and the
   newest build (or the one named by `id`) to viewers under the artifact rule
   above, and to signed-in builders on any session, with `canBuild`. Builders
-  also get `nextBuild`: the model a build would call and its two prompt
-  templates, with the session's data as placeholders, which the site shows
-  while a build runs. The public config sets `debateAtlas: true` so the site
-  knows the Worker builds atlases.
+  also get `nextBuild`: the model a build would call and its prompt templates
+  (`plan`, `map` and `question`), with the session's data as placeholders,
+  which the site shows while a build runs. The public config sets
+  `debateAtlas: true` so the site knows the Worker builds atlases, and
+  `debateAtlasQuestionAnalysis: true` so it knows new builds may give
+  questions an `analysis`. A build is kept as built: a question hidden
+  afterwards keeps its prompt and `analysis` there until the next build.
 - Risk matrices are built the same way, apart from the generated Results views'
   Risk Matrix. `POST /admin/risk-matrix/build` (signed admin action
   `risk-matrix/build`) accepts the same builders and reads the same stored
@@ -2879,6 +2916,21 @@ Never return secrets in responses.
   `ai.taskReasoningEffort`, and every read carries `setConfigMergesAi: true`,
   set by the Worker and never stored. Older Workers replace
   `ai` whole and lack the field, so editors leave `ai` alone on them.
+- `ai.serviceTier` picks OpenAI's processing tier for the session's own OpenAI
+  text calls: `"default"` (or no setting) as before, or `"priority"` /
+  `"fast"`, OpenAI's faster tier at about twice the price. It covers every
+  call made with the session's key through the Worker's AI policy: interview
+  drafting (`interview-map`), the interview's opening and start, generate,
+  rewrite, summarise, rank, compare and categorise, AI analysis and atlas
+  builds, the Session Agent, and context cards and reads. It does not cover
+  voice (Realtime), transcription, other providers, or a request that brings
+  its own key. If OpenAI refuses the tier for a model with a 400 naming
+  `service_tier`, the Worker asks once more at the default tier. An admin sets
+  it with a signed `set-config`, for example
+  `{"ai": {"serviceTier": "priority"}}`, and `{"ai": {"serviceTier": null}}`
+  turns it off; any other value is refused with `400`. It is not in the
+  public config and signs no one out. Older Workers keep the stored value and
+  send the default tier.
 - The curated lists `HIGHLIGHTED_QUESTION_IDS`, `BLOCKED_QUESTION_IDS`,
   `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS` are accepted as lists of at
   most 500 IDs of 1-128 letters, digits or `._:-`; anything else returns `400`.
@@ -3350,6 +3402,11 @@ Signed login/bootstrap requests:
   (`/agent/interview-brief` remains a compatibility alias)
   - Public, CORS-scoped, and disabled when `interviewModeEnabled=false` or
     `interviewMode.enabled=false`.
+  - It reads the questions' text a hundred at a time through the storage
+    route's batch read (one bulk storage read), and each question still
+    passes that route's own access check; a question the batch can't carry
+    is read on its own. It reads no further than the catalog's last
+    question.
   - Without `ticket`, it lists only questions a signed-out visitor may read.
     A session that lets no signed-out visitor list its questions answers 401
     with `reason: "sign_in_required"` instead of asking for a retry, and an

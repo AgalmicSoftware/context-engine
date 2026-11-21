@@ -190,7 +190,7 @@ export function useSessionContextSources({
 /**
  * The shared context block for an AI acting for this reader: the session's
  * notes and links plus the sources this reader may see. '' while loading or
- * when there is nothing.
+ * when there is nothing, and with no room (totalChars 0), which reads no source.
  */
 export function useSessionContextPrompt({ totalChars, ...input }: Input & { totalChars: number }) {
   const { sources, loading, isAdmin } = useSessionContextSources({ ...input, offersAdding: false });
@@ -207,6 +207,10 @@ export function useSessionContextPrompt({ totalChars, ...input }: Input & { tota
       context: { account: input.account },
       asAdmin: isAdmin,
     };
+    if (!totalChars) {
+      setPrompt({ identity, text: '' });
+      return;
+    }
     void loadContextSourcesForAi(sources, options).then((loaded) => {
       if (!current) return;
       const text = buildSessionContextPrompt({ sessionContext: JSON.parse(notes), sources: loaded, totalChars }).text;

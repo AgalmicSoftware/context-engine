@@ -802,9 +802,10 @@ it('reads answers saved outside a rebuilt card window for the voice interviewer,
     { questionId: 'q3', answer: 'Agree', confidence: 0.9 },
   ]);
 
-  expect(instructions).toContain('[q3]');
-  expect(instructions).not.toContain('[q1]');
-  expect(instructions).not.toContain('[q2]');
+  // The question rows, before the answered list that names q1 and q2.
+  const bank = instructions.slice(instructions.indexOf('\nQuestions:')).split('\n\n')[0];
+  expect(bank).toMatch(/\) Q3\b/);
+  expect(bank).not.toMatch(/\) Q[12]\b/);
   // Repeating the saved q1 adds nothing; the new q2 answer says what it changes.
   expect(draftIds()).toEqual(['q2', 'q3']);
   expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
@@ -844,7 +845,7 @@ it.each([
       predictionCondition: 'shown',
       draftOrigin: 'voice_interview',
       voiceModel: 'gpt-live-1.1',
-      voiceBriefRevision: 'ce-voice-brief-3',
+      voiceBriefRevision: 'ce-voice-brief-5',
       mappingPromptVersion: 'ce-interview-mapping-v3',
     });
     expect(rows[0].interviewProvenance.unselectedPredictions?.map((entry) => entry.questionId)).toEqual(unselected);

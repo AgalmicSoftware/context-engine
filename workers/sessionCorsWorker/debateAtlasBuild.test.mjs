@@ -8,11 +8,17 @@ import {
   describeNextDebateAtlasBuild,
   dispatchDebateAtlasReadRequest,
   normalizeDebateAtlasPlan,
+  normalizeDebateAtlasQuestion,
   normalizeDebateAtlasTopic,
   runWithConcurrency,
 } from './debateAtlasBuild.js';
 import { dispatchResultsBuildStore } from './resultsBuildStore.js';
 import { dispatchAdminRequest } from './adminRequestDispatch.js';
+import { buildIndexKey, buildPayloadKey } from './storageRouteExecution.js';
+import { ATLAS_QUESTION_SUMMARY_SETTINGS } from '../../shared/atlasQuestionSummaries.mjs';
+
+// The defaults a session without its own atlasQuestionSummaries setting uses.
+const DEFAULTS = Object.fromEntries(Object.entries(ATLAS_QUESTION_SUMMARY_SETTINGS).map(([key, bound]) => [key, bound.default]));
 
 // Addresses are built at run time so no fixture holds a key-shaped string.
 const address = (digit) => `0x${String(digit).repeat(40)}`;
@@ -50,6 +56,8 @@ const createSource = ({ questionCount = 4 } = {}) => {
   })));
   return {
     ok: true,
+    // Every row the build may read; the AI sample is drawn from these.
+    snapshot: { responses: responses.map(({ participantId, questionId, answer }) => ({ participantId, questionId, answer })) },
     aiSnapshot: { questions, responses },
     counts: {
       responseCount: responses.length + 5,
@@ -90,13 +98,25 @@ const topicReply = {
   ],
 };
 
+const questionReply = {
+  summary: 'Most want care.',
+  categories: [
+    { label: 'Care first', summary: 'Slow and safe.', participantIds: ['participant_001', 'participant_002'] },
+    { label: 'Move now', participantIds: ['participant_003', 'participant_999'] },
+  ],
+};
+
 const isPlanPrompt = (prompt) => prompt.startsWith('You are planning');
 const isBranchPrompt = (prompt) => prompt.startsWith('You are mapping one branch');
+const isQuestionPrompt = (prompt) => prompt.startsWith('You are summarising');
+const isTopicPrompt = (prompt) => prompt.startsWith('You are mapping one topic');
+const withoutAnalysis = ({ analysis: _analysis, ...question }) => question;
 
-const runBuild = async ({ source = createSource(), provider, store = createStore(), config = {}, body = {}, now, attemptId } = {}) => {
+const runBuild = async ({ source = createSource(), provider, store = createStore(), config = {}, body = {}, now, attemptId, env = {} } = {}) => {
   const prompts = [];
+  const timeouts = [];
   const result = await buildDebateAtlas({
-    env: {},
+    env,
     slug: 'atlas-session',
     config: { sessionName: 'Salon', ai: { model: 'test-model' }, ...config },
     body,
@@ -104,38 +124,50 @@ const runBuild = async ({ source = createSource(), provider, store = createStore
     ...(attemptId ? { attemptId } : {}),
     deps: {
       callBuildStore: store.callBuildStore,
-      loadSource: async () => source,
+      ...(source ? { loadSource: async () => source } : {}),
       getSessionSecrets: async () => ({}),
       loadParticipantContextSources: async () => [],
       ...(now ? { now } : {}),
-      callProvider: async ({ prompt }) => {
+      callProvider: async ({ prompt, deps: callDeps }) => {
         prompts.push(prompt);
+        timeouts.push(callDeps.resultsAnalysisProviderTimeoutMs);
         return provider(prompt);
       },
     },
   });
-  return { result, prompts, store };
+  return { result, prompts, timeouts, store };
 };
 
 test('builds an atlas from a planning call, a call per topic and one per branch, each response reaching its topic and branch and no address', async () => {
   const source = createSource();
   const { result, prompts, store } = await runBuild({
     source,
-    provider: async (prompt) => ({ ok: true, value: isPlanPrompt(prompt) ? planFor(['q1', 'q2', 'q3', 'q4']) : topicReply }),
+    provider: async (prompt) => ({
+      ok: true,
+      value: isPlanPrompt(prompt) ? planFor(['q1', 'q2', 'q3', 'q4']) : isQuestionPrompt(prompt) ? questionReply : topicReply,
+    }),
   });
 
   assert.equal(result.ok, true, result.error);
   assert.deepEqual(store.calls, ['reserve', 'finalize']);
   assert.equal(prompts.filter(isPlanPrompt).length, 1);
-  const topicPrompts = prompts.filter((prompt) => !isPlanPrompt(prompt) && !isBranchPrompt(prompt));
+  const topicPrompts = prompts.filter(isTopicPrompt);
   const branchPrompts = prompts.filter(isBranchPrompt);
+  const questionPrompts = prompts.filter(isQuestionPrompt);
   assert.equal(topicPrompts.length, 4);
   assert.equal(branchPrompts.length, 2);
-  // Branches start after every topic, so a build short of time loses a branch compass first.
-  assert.ok(prompts.slice(prompts.findIndex(isBranchPrompt)).every(isBranchPrompt));
+  assert.equal(questionPrompts.length, 4);
+  assert.equal(prompts.length, 11);
+  // Topics, then branches, then questions, so a build short of time loses a
+  // question's summary first and a branch compass next.
+  assert.deepEqual(prompts.map((prompt) => (isPlanPrompt(prompt) ? 'plan' : isTopicPrompt(prompt) ? 'topic' : isBranchPrompt(prompt) ? 'branch' : 'question')),
+    ['plan', 'topic', 'topic', 'topic', 'topic', 'branch', 'branch', 'question', 'question', 'question', 'question']);
   for (const response of source.aiSnapshot.responses) {
     assert.equal(topicPrompts.filter((prompt) => prompt.includes(response.answer)).length, 1, response.answer);
     assert.equal(branchPrompts.filter((prompt) => prompt.includes(response.answer)).length, 1, response.answer);
+    // A question's call reads its own answers and no other question's.
+    assert.deepEqual(questionPrompts.map((prompt) => prompt.includes(response.answer)),
+      questionPrompts.map((prompt) => prompt.includes(`"id":"${response.questionId}"`)), response.answer);
   }
   assert.ok(branchPrompts.every((prompt) => !prompt.includes('Topic:') && prompt.includes("this branch's main disagreements")));
   assert.ok(prompts.every((prompt) => ![...PARTICIPANT_ADDRESSES.values(), RESULTS_ADMIN].some((value) => prompt.toLowerCase().includes(value))));
@@ -147,8 +179,21 @@ test('builds an atlas from a planning call, a call per topic and one per branch,
   assert.equal(build.model, 'test-model');
   assert.deepEqual(build.counts, { responses: 17, participants: 3, questions: 5, aiResponses: 12, aiQuestions: 4 });
   assert.deepEqual(build.missingTopics, []);
+  assert.deepEqual(build.questionSummaries, { listed: 4, summarised: 4, outOfTime: 0 });
   const topic = build.branches[0].topics[0];
-  assert.deepEqual(topic.questions, [{ id: 'q1', prompt: 'Question 1?', type: 'freeform' }]);
+  // Each category counts only those who answered the question, the most held first.
+  assert.deepEqual(topic.questions, [{
+    id: 'q1',
+    prompt: 'Question 1?',
+    type: 'freeform',
+    analysis: {
+      summary: 'Most want care.',
+      categories: [{ label: 'Care first', summary: 'Slow and safe.', participantCount: 2 }, { label: 'Move now', participantCount: 1 }],
+      answered: 3,
+    },
+  }]);
+  assert.ok(build.branches.every((branch) => branch.topics.every((each) => each.questions.every((question) => question.analysis))));
+  assert.ok(build.branches.every((branch) => !('analysis' in branch) && branch.topics.every((each) => !('analysis' in each))));
   assert.deepEqual(topic.positions, [{ label: 'Go slow', summary: 'Care first.', participantCount: 2, x: 0.1, y: 0.8 }]);
   assert.deepEqual(topic.participants, [
     { address: PARTICIPANT_ADDRESSES.get('participant_001'), x: 0.2, y: 0.9, reason: 'Wants care.' },
@@ -179,7 +224,7 @@ test('keeps the choices a topic question offers, so the atlas can show them', as
 
   assert.equal(result.ok, true, result.error);
   const questions = result.build.branches.flatMap((branch) => branch.topics.flatMap((topic) => topic.questions));
-  assert.deepEqual(questions.slice(0, 3), [
+  assert.deepEqual(questions.slice(0, 3).map(withoutAnalysis), [
     { id: 'q1', prompt: 'Question 1?', type: 'freeform' },
     { id: 'q2', prompt: 'Question 2?', type: 'multichoice', options: ['Assemblies', 'Open data'] },
     { id: 'q3', prompt: 'Question 3?', type: 'quadratic', options: ['Parks', 'Roads'], voiceCredits: 25 },
@@ -238,8 +283,8 @@ test(`runs at most ${DEBATE_ATLAS_LIMITS.concurrency} topic calls at once`, asyn
     },
   });
   assert.equal(result.ok, true, result.error);
-  // The plan, 12 topics and the 2 branches.
-  assert.equal(prompts.length, 15);
+  // The plan, 12 topics, the 2 branches and the 12 questions.
+  assert.equal(prompts.length, 27);
   assert.equal(peak, DEBATE_ATLAS_LIMITS.concurrency);
 });
 
@@ -360,6 +405,308 @@ test('participants without an address are labelled by number, and AI text loses 
   assert.deepEqual(topic.participants, [{ label: 'Participant 2', x: 0.5, y: 0.5, reason: 'Mixed.' }]);
 });
 
+const reply = (prompt) => (isPlanPrompt(prompt) ? null : isQuestionPrompt(prompt) ? questionReply : topicReply);
+
+test('a question keeps its summary and categories counted among those who answered it, the most held first', () => {
+  const answeredBy = new Set(['participant_001', 'participant_002', 'participant_003']);
+  const many = Array.from({ length: 7 }, (_, index) => ({
+    label: `Category ${index + 1}`,
+    participantIds: ['participant_001', 'participant_002', 'participant_003', 'participant_999'].slice(0, (index % 3) + 1),
+  }));
+  const question = normalizeDebateAtlasQuestion({
+    answeredBy,
+    value: {
+      summary: `Mostly agree; see ${address(9)}.`,
+      categories: [
+        ...many,
+        { label: '', participantIds: ['participant_001'] },
+        { label: 'Nobody here', participantIds: ['participant_999'] },
+        { label: 'Repeats', summary: 'x'.repeat(500), participantIds: ['participant_001', 'participant_001'] },
+      ],
+    },
+  });
+  assert.equal(question.summary, 'Mostly agree; see [redacted-address].');
+  assert.equal(question.answered, 3);
+  assert.equal(question.categories.length, DEFAULTS.categories);
+  assert.deepEqual(question.categories.map((category) => category.participantCount), [3, 3, 2, 2, 1]);
+  assert.ok(question.categories.every((category) => category.participantCount <= question.answered && !category.label.startsWith('Nobody')));
+  assert.equal(normalizeDebateAtlasQuestion({ answeredBy, value: { summary: 'S.', categories: [{ label: 'Repeats', summary: 'x'.repeat(500), participantIds: ['participant_001'] }] } })
+    .categories[0].summary.length, 200);
+
+  // A summary alone is kept; categories without a summary, nothing usable, or not an object, is no analysis.
+  assert.deepEqual(normalizeDebateAtlasQuestion({ answeredBy, value: { summary: 'Split.', categories: 'many' } }), { summary: 'Split.', categories: [], answered: 3 });
+  for (const value of [{}, { summary: '  ', categories: [{ label: 'Care', participantIds: ['participant_001'] }] }, 'Split.', null]) {
+    assert.equal(normalizeDebateAtlasQuestion({ answeredBy, value }), null);
+  }
+});
+
+test('question calls have a shorter limit, start after every map call, and are the first left out when time runs short', async () => {
+  // Every call is answered at once; the clock jumps when the last branch call is made.
+  let clock = 0;
+  let branchesLeft = 2;
+  const { result, prompts, timeouts } = await runBuild({
+    now: () => clock,
+    provider: async (prompt) => {
+      if (isPlanPrompt(prompt)) return { ok: true, value: planFor(['q1', 'q2', 'q3', 'q4']) };
+      if (isBranchPrompt(prompt) && (branchesLeft -= 1) === 0) clock = DEBATE_ATLAS_LIMITS.buildMs - DEBATE_ATLAS_LIMITS.minCallMs + 1;
+      return { ok: true, value: reply(prompt) };
+    },
+  });
+  assert.equal(result.ok, true, result.error);
+  // The plan, 4 topics and 2 branches ran with the full limit; no question call started.
+  assert.equal(prompts.length, 7);
+  assert.equal(prompts.filter(isQuestionPrompt).length, 0);
+  assert.deepEqual(timeouts, Array(7).fill(DEBATE_ATLAS_LIMITS.callMs));
+  assert.deepEqual(result.build.missingTopics, []);
+  assert.ok(result.build.branches.every((branch) => branch.compass && branch.topics.every((topic) => topic.questions.every((question) => !('analysis' in question)))));
+  assert.deepEqual(result.build.questionSummaries, { listed: 4, summarised: 0, outOfTime: 4 });
+
+  // With time to spare, each question call gets its own shorter limit, and less when the build has less left.
+  clock = 0;
+  const roomy = await runBuild({ now: () => clock, provider: async (prompt) => ({ ok: true, value: isPlanPrompt(prompt) ? planFor(['q1', 'q2', 'q3', 'q4']) : reply(prompt) }) });
+  assert.deepEqual(roomy.timeouts, [...Array(7).fill(DEBATE_ATLAS_LIMITS.callMs), ...Array(4).fill(DEFAULTS.callSeconds * 1000)]);
+  assert.ok(DEFAULTS.callSeconds * 1000 < DEBATE_ATLAS_LIMITS.callMs);
+  // The setting can't go below the time a build needs left to start a call, nor above a call's limit.
+  assert.equal(ATLAS_QUESTION_SUMMARY_SETTINGS.callSeconds.min * 1000, DEBATE_ATLAS_LIMITS.minCallMs);
+  assert.equal(ATLAS_QUESTION_SUMMARY_SETTINGS.callSeconds.max * 1000, DEBATE_ATLAS_LIMITS.callMs);
+  let late = 0;
+  const squeezed = await runBuild({
+    now: () => late,
+    provider: async (prompt) => {
+      if (isPlanPrompt(prompt)) return { ok: true, value: planFor(['q1', 'q2', 'q3', 'q4']) };
+      if (isBranchPrompt(prompt)) late = DEBATE_ATLAS_LIMITS.buildMs - 30_000;
+      return { ok: true, value: reply(prompt) };
+    },
+  });
+  assert.deepEqual(squeezed.timeouts.slice(-4), Array(4).fill(30_000));
+});
+
+test('a question call reads every answer the build may read, not only the sample its topic call reads, within its caps', async () => {
+  const source = createSource({ questionCount: 2 });
+  const extra = Array.from({ length: DEFAULTS.answers + 10 }, (_, index) => ({
+    participantId: `participant_${String(index + 4).padStart(3, '0')}`, questionId: 'q1', answer: `extra answer ${index}`,
+  }));
+  source.snapshot.responses.push(...extra);
+  source.snapshot.responses.push({ participantId: 'participant_001', questionId: 'q2', answer: ['Parks 3', 'Roads -1'], additional: 'a note' });
+  const plan = { title: 'Atlas', branches: [{ label: 'All', topics: [{ label: 'One', questionIds: ['q1'] }, { label: 'Two', questionIds: ['q2'] }] }] };
+  const { result, prompts } = await runBuild({ source, provider: async (prompt) => ({ ok: true, value: isPlanPrompt(prompt) ? plan : reply(prompt) }) });
+  assert.equal(result.ok, true, result.error);
+  const [q1Prompt, q2Prompt] = prompts.filter(isQuestionPrompt);
+  const q1Input = JSON.parse(q1Prompt.slice(q1Prompt.lastIndexOf('\n{')));
+  assert.equal(q1Input.responses.length, DEFAULTS.answers);
+  assert.ok(q1Input.responses.every((response) => Object.keys(response).join() === 'participantId,answer'));
+  // The topic's own call still reads only the sample.
+  assert.equal(prompts.filter(isTopicPrompt).some((prompt) => prompt.includes('extra answer')), false);
+  assert.equal(result.build.branches[0].topics[0].questions[0].analysis.answered, DEFAULTS.answers);
+  // A list answer reads as text, as in the sample.
+  assert.deepEqual(JSON.parse(q2Prompt.slice(q2Prompt.lastIndexOf('\n{'))).responses.at(-1), { participantId: 'participant_001', answer: 'Parks 3; Roads -1', additional: 'a note' });
+
+  // Long answers stop at the text cap, the last one cut, and only those read are counted.
+  const long = createSource({ questionCount: 1 });
+  long.snapshot.responses = Array.from({ length: 60 }, (_, index) => ({ participantId: `participant_${String(index + 1).padStart(3, '0')}`, questionId: 'q1', answer: 'x'.repeat(5000) }));
+  const capped = await runBuild({
+    source: long,
+    provider: async (prompt) => ({ ok: true, value: isPlanPrompt(prompt) ? { title: 'A', branches: [{ label: 'B', topics: [{ label: 'T', questionIds: ['q1'] }] }] } : reply(prompt) }),
+  });
+  const longPrompt = capped.prompts.find(isQuestionPrompt);
+  const read = JSON.parse(longPrompt.slice(longPrompt.lastIndexOf('\n{'))).responses;
+  const whole = Math.floor(DEFAULTS.answerChars / 1400);
+  assert.deepEqual(read.map((response) => response.answer.length), [...Array(whole).fill(1400), DEFAULTS.answerChars - whole * 1400]);
+  assert.equal(capped.result.build.branches[0].topics[0].questions[0].analysis.answered, whole + 1);
+});
+
+test('a topic whose own call fails shows none of its questions, summarised or not', async () => {
+  const { result } = await runBuild({
+    provider: async (prompt) => {
+      if (isPlanPrompt(prompt)) return { ok: true, value: planFor(['q1', 'q2', 'q3', 'q4']) };
+      return isTopicPrompt(prompt) && prompt.includes('"Topic 1.2"') ? { ok: false, status: 502, error: 'upstream' } : { ok: true, value: reply(prompt) };
+    },
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.deepEqual(result.build.missingTopics, ['Topic 1.2']);
+  const shown = result.build.branches.flatMap((branch) => branch.topics.flatMap((topic) => topic.questions.map((question) => question.id)));
+  assert.deepEqual(shown, ['q1', 'q3', 'q4']);
+  assert.deepEqual(result.build.questionSummaries, { listed: 3, summarised: 3, outOfTime: 0 });
+});
+
+test('a failed question call leaves that question without a summary and the build whole', async () => {
+  const { result } = await runBuild({
+    provider: async (prompt) => {
+      if (isPlanPrompt(prompt)) return { ok: true, value: planFor(['q1', 'q2', 'q3', 'q4']) };
+      // As callAi passes on a provider that hit the call's limit.
+      if (isQuestionPrompt(prompt) && prompt.includes('"id":"q2"')) return { ok: false, status: 502, error: 'AI results analysis generation timed out.' };
+      return { ok: true, value: reply(prompt) };
+    },
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.deepEqual(result.build.missingTopics, []);
+  const questions = result.build.branches.flatMap((branch) => branch.topics.flatMap((topic) => topic.questions));
+  assert.deepEqual(questions.map((question) => [question.id, 'analysis' in question]), [['q1', true], ['q2', false], ['q3', true], ['q4', true]]);
+  // A call that ran out of its own time counts as out of time; one that failed otherwise, as neither.
+  assert.deepEqual(result.build.questionSummaries, { listed: 4, summarised: 3, outOfTime: 1 });
+  const failed = await runBuild({
+    provider: async (prompt) => {
+      if (isPlanPrompt(prompt)) return { ok: true, value: planFor(['q1', 'q2', 'q3', 'q4']) };
+      return isQuestionPrompt(prompt) ? { ok: false, status: 502, error: 'upstream' } : { ok: true, value: reply(prompt) };
+    },
+  });
+  assert.deepEqual(failed.result.build.questionSummaries, { listed: 4, summarised: 0, outOfTime: 0 });
+});
+
+test('a rate-limited question call costs only that summary: the map calls run and keep their limits', async () => {
+  const { result, timeouts, prompts } = await runBuild({
+    provider: async (prompt) => {
+      if (isPlanPrompt(prompt)) return { ok: true, value: planFor(['q1', 'q2', 'q3', 'q4']) };
+      return isQuestionPrompt(prompt) ? { ok: false, status: 429, error: 'rate limited' } : { ok: true, value: reply(prompt) };
+    },
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.deepEqual(result.build.missingTopics, []);
+  assert.ok(result.build.branches.every((branch) => branch.compass && branch.topics.every((topic) => topic.positions.length)));
+  assert.deepEqual(timeouts.filter((_, index) => !isQuestionPrompt(prompts[index])), Array(7).fill(DEBATE_ATLAS_LIMITS.callMs));
+  // Counted as neither summarised nor out of time.
+  assert.deepEqual(result.build.questionSummaries, { listed: 4, summarised: 0, outOfTime: 0 });
+});
+
+test('a build summarises every question listed under its topics, with no ceiling of its own', async () => {
+  const count = 45;
+  const ids = Array.from({ length: count }, (_, index) => `q${index + 1}`);
+  const { result, prompts } = await runBuild({
+    source: createSource({ questionCount: count }),
+    provider: async (prompt) => ({ ok: true, value: isPlanPrompt(prompt) ? planFor(ids, 2) : reply(prompt) }),
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.equal(prompts.filter(isQuestionPrompt).length, count);
+  const questions = result.build.branches.flatMap((branch) => branch.topics.flatMap((topic) => topic.questions));
+  assert.ok(questions.length === count && questions.every((question) => question.analysis));
+  assert.deepEqual(result.build.questionSummaries, { listed: count, summarised: count, outOfTime: 0 });
+});
+
+test('the session setting sets each question call’s time, input and output; a bad stored value falls back to its default', async () => {
+  const source = createSource({ questionCount: 1 });
+  source.snapshot.responses = Array.from({ length: 30 }, (_, index) => ({ participantId: `participant_${String(index + 1).padStart(3, '0')}`, questionId: 'q1', answer: 'y'.repeat(100) }));
+  const plan = { title: 'A', branches: [{ label: 'B', topics: [{ label: 'T', questionIds: ['q1'] }] }] };
+  const long = {
+    summary: 's'.repeat(2000),
+    categories: Array.from({ length: 6 }, (_, index) => ({ label: `${index}${'l'.repeat(200)}`, summary: 'c'.repeat(500), participantIds: ['participant_001'] })),
+  };
+  const run = (atlasQuestionSummaries) => runBuild({
+    source,
+    config: { atlasQuestionSummaries },
+    provider: async (prompt) => ({ ok: true, value: isPlanPrompt(prompt) ? plan : isQuestionPrompt(prompt) ? long : topicReply }),
+  });
+  const set = await run({ callSeconds: 25, answers: 20, answerChars: 1000, summaryChars: 150, categories: 2, labelChars: 30, categorySummaryChars: 0 });
+  assert.equal(set.result.ok, true, set.result.error);
+  assert.equal(set.timeouts[set.prompts.findIndex(isQuestionPrompt)], 25_000);
+  const prompt = set.prompts.find(isQuestionPrompt);
+  // 20 answers allowed, but only 10 of 100 characters fit in 1,000.
+  assert.equal(JSON.parse(prompt.slice(prompt.lastIndexOf('\n{'))).responses.length, 10);
+  assert.match(prompt, /under 150 characters in all/);
+  assert.match(prompt, /1 to 2 distinct categories/);
+  assert.equal(prompt.includes('on what these responses share'), false);
+  const { analysis } = set.result.build.branches[0].topics[0].questions[0];
+  assert.equal(analysis.summary.length, 150);
+  assert.equal(analysis.answered, 10);
+  assert.deepEqual(analysis.categories.map((category) => [category.label.length, 'summary' in category]), [[30, false], [30, false]]);
+
+  // An answer and note longer than the whole cap are cut to it, not dropped.
+  const first = createSource({ questionCount: 1 });
+  first.snapshot.responses = ['participant_001', 'participant_002'].map((participantId) => ({ participantId, questionId: 'q1', answer: 'z'.repeat(1400), additional: 'n'.repeat(900) }));
+  const cut = await runBuild({
+    source: first,
+    config: { atlasQuestionSummaries: { answerChars: 1000 } },
+    provider: async (prompt) => ({ ok: true, value: isPlanPrompt(prompt) ? plan : isQuestionPrompt(prompt) ? long : topicReply }),
+  });
+  const cutPrompt = cut.prompts.find(isQuestionPrompt);
+  assert.deepEqual(JSON.parse(cutPrompt.slice(cutPrompt.lastIndexOf('\n{'))).responses, [{ participantId: 'participant_001', answer: 'z'.repeat(1000) }]);
+  assert.equal(cut.result.build.branches[0].topics[0].questions[0].analysis.answered, 1);
+
+  // No categories at all, when the session wants a summary only.
+  const none = await run({ categories: 0 });
+  assert.match(none.prompts.find(isQuestionPrompt), /Leave "categories" empty\./);
+  assert.deepEqual(none.result.build.branches[0].topics[0].questions[0].analysis.categories, []);
+
+  // A value out of bounds (stored by an older path, say) is read as the default.
+  const bad = await run({ callSeconds: 999, categories: -1, summaryChars: 'long' });
+  assert.equal(bad.timeouts[bad.prompts.findIndex(isQuestionPrompt)], DEFAULTS.callSeconds * 1000);
+  assert.equal(bad.result.build.branches[0].topics[0].questions[0].analysis.categories.length, DEFAULTS.categories);
+  assert.equal(bad.result.build.branches[0].topics[0].questions[0].analysis.summary.length, DEFAULTS.summaryChars);
+});
+
+// Stored as the Worker keeps them: a session open to everyone, with answers
+// it may never summarise beside the ones it may.
+test('no call of a build reads an encrypted, restricted, withheld-audience or hidden-question answer', async () => {
+  const sessionId = `0x${'a'.repeat(32)}`;
+  const config = {
+    slug: 'atlas-session', sessionIdHex: sessionId, sessionName: 'Atlas session', ai: { model: 'test-model' },
+    sessionModeProfile: { authority: { mode: 'worker_canonical' }, storage: { backend: 'cloudflare' } },
+    storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } },
+    BLOCKED_QUESTION_IDS: ['blocked'],
+  };
+  const values = new Map();
+  const kv = {
+    get: async (key) => (Array.isArray(key) ? new Map(key.map((name) => [name, values.get(name) ?? null])) : values.get(key) ?? null),
+    put: async (key, value) => { values.set(key, value); },
+    list: async ({ prefix = '' } = {}) => ({ keys: [...values.keys()].filter((name) => name.startsWith(prefix)).sort().map((name) => ({ name })), list_complete: true }),
+  };
+  const put = async (resource, id, payload, metadata = {}) => {
+    const full = { id, resource, backend: 'cloudflare', contentType: 'application/json', encrypted: false, createdAt: '2026-11-20T00:00:00.000Z', ...metadata };
+    await kv.put(buildIndexKey({ slug: 'atlas-session', resource, id }), JSON.stringify(full));
+    await kv.put(buildPayloadKey({ slug: 'atlas-session', id }), JSON.stringify({ metadata: full, payloadBase64url: Buffer.from(JSON.stringify(payload)).toString('base64url') }));
+  };
+  const question = (questionId) => put('questions', `ref-${questionId}`, { sessionSlug: 'atlas-session', sessionId, id: questionId, prompt: `Prompt ${questionId}?`, type: 'freeform' }, { resourceId: questionId });
+  for (const id of ['open', 'blocked', 'flagged']) await question(id);
+  await kv.put('ce-storage-hidden:atlas-session:questions:flagged', JSON.stringify({ version: 1, hidden: true }));
+  const answer = (id, digit, questionId, text, metadata = {}) => put('responses', id,
+    { sessionSlug: 'atlas-session', sessionId, questionId, answer: text }, { responder: `0x${digit.repeat(40)}`, ...metadata });
+  await answer('r1', '1', 'open', 'Open answer one');
+  await answer('r2', '2', 'open', 'Open answer two');
+  await answer('r3', '3', 'open', 'Open answer three');
+  await answer('r4', '4', 'open', 'SECRET encrypted answer', { encrypted: true });
+  await answer('r5', '5', 'open', 'SECRET admins-only answer', { accessConditions: { match: 'any', conditions: [{ kind: 'role', role: 'admin' }] } });
+  await answer('r6', '6', 'open', 'SECRET narrower answer', { payloadAccessControl: { gate: 'sbt', encryption: 'none' } });
+  await answer('r7', '1', 'blocked', 'SECRET answer to a hidden question');
+  await answer('r8', '2', 'flagged', 'SECRET answer to a flagged question');
+
+  const { result, prompts } = await runBuild({
+    source: null,
+    env: { CE_STORAGE_INDEX_KV: kv },
+    config,
+    provider: async (prompt) => ({
+      ok: true,
+      value: isPlanPrompt(prompt) ? { title: 'Atlas', branches: [{ label: 'All', topics: [{ label: 'Open', questionIds: ['open', 'blocked', 'flagged'] }] }] } : reply(prompt),
+    }),
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.equal(prompts.filter(isQuestionPrompt).length, 1);
+  for (const prompt of prompts) {
+    assert.equal(prompt.includes('SECRET'), false);
+    assert.equal(/blocked|flagged/.test(prompt), false);
+  }
+  const questionPrompt = prompts.find(isQuestionPrompt);
+  assert.ok(['one', 'two', 'three'].every((word) => questionPrompt.includes(`Open answer ${word}`)));
+  const [topic] = result.build.branches[0].topics;
+  assert.deepEqual(topic.questions.map((entry) => entry.id), ['open']);
+  assert.equal(topic.questions[0].analysis.answered, 3);
+});
+
+// The store is shape-blind; this records that both shapes go in and come out
+// as given. The way-back drill checks released Workers read them.
+test('the build store keeps a build with or without question summaries as given', async () => {
+  const store = createStore();
+  const before = { title: 'Atlas', missingTopics: [], branches: [{ id: 'b1', label: 'B', topics: [{ id: 'b1t1', label: 'T', questions: [{ id: 'q1', prompt: 'Q?', type: 'freeform' }] }] }] };
+  const after = structuredClone(before);
+  after.branches[0].topics[0].questions[0].analysis = { summary: 'Split.', categories: [{ label: 'Care', participantCount: 1 }], answered: 2 };
+  for (const build of [{ id: 'atlas_old_00000001', ...before }, { id: 'atlas_new_00000002', ...after }]) {
+    const { attemptId } = (await store.callBuildStore({}, 'atlas-session', 'reserve', {})).body;
+    assert.equal((await store.callBuildStore({}, 'atlas-session', 'finalize', { attemptId, build })).ok, true);
+  }
+  for (const [id, expected] of [['atlas_old_00000001', before], ['atlas_new_00000002', after]]) {
+    const read = await store.callBuildStore({}, 'atlas-session', 'read', { id });
+    assert.deepEqual(read.body.build, { id, ...expected });
+  }
+});
+
 test('runWithConcurrency keeps order', async () => {
   const results = await runWithConcurrency([30, 10, 20], 2, async (delay, index) => {
     await new Promise((resolve) => setTimeout(resolve, delay));
@@ -446,7 +793,13 @@ test('the next build is described with the session model and placeholder prompts
   assert.ok(next.prompts.plan.startsWith('You are planning') && next.prompts.plan.includes('"Salon"'));
   assert.match(next.prompts.plan, /\n<Questions>\n/);
   assert.match(next.prompts.map, /\{"questions":<Questions>,"responses":<Responses>,"placeParticipants":<Participants>\}$/);
-  assert.ok(!/"</.test(next.prompts.plan + next.prompts.map));
+  assert.match(next.prompts.question, /^You are summarising/);
+  assert.deepEqual(next.questionSummaries, DEFAULTS);
+  const own = describeNextDebateAtlasBuild({ atlasQuestionSummaries: { summaryChars: 250, categories: 0 } });
+  assert.deepEqual(own.questionSummaries, { ...DEFAULTS, summaryChars: 250, categories: 0 });
+  assert.match(own.prompts.question, /under 250 characters in all[\s\S]*Leave "categories" empty\./);
+  assert.match(next.prompts.question, /\{"question":<Question>,"responses":<Responses>\}$/);
+  assert.ok(!/"</.test(next.prompts.plan + next.prompts.map + next.prompts.question));
   // A summary short enough to lead a node's panel whole, as a tweet would.
   assert.match(next.prompts.map, /"summary": "[^"]*under 280 characters/);
 });

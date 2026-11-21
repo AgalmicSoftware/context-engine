@@ -113,3 +113,18 @@ it('offers no toggle when the summary is short and there are no positions', () =
   expect(screen.getByText(first)).toBeInTheDocument();
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
 });
+
+it("lists a question's kinds of answer as categories, not positions", () => {
+  render(
+    <DebateMapGeneratedSummary
+      entries={[
+        { id: 's', comment: first },
+        { id: 'c1', kind: 'category', label: 'Check learning', comment: '', participantCount: 4, participantTotal: 8 },
+      ]}
+    />,
+  );
+  expect(screen.getByRole('region', { name: 'AI-generated summary' })).toHaveTextContent(first);
+  const categories = screen.getByRole('region', { name: 'Categories' });
+  expect(within(categories).getByText('4 of 8 participants')).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'Positions' })).not.toBeInTheDocument();
+});

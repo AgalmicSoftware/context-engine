@@ -852,7 +852,8 @@ export const mapInterviewEvidenceToResponses = async ({
       taskType: 'interview-map',
       thinking: true,
       preferLocal: false,
-      reasoningEffort: 'medium',
+      // Low effort drafts in about two thirds of the time with nearly the same answers.
+      reasoningEffort: 'low',
       service_tier: 'default',
       response_format: { type: 'json_object' },
     },

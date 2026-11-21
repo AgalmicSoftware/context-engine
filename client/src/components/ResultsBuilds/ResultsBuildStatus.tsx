@@ -24,6 +24,8 @@ const PROMPT_SECTIONS: Record<ResultsBuildKind, Array<{ key: string; label: stri
   'debate-atlas': [
     { key: 'plan', label: 'Planning prompt', heading: 'Planning, once' },
     { key: 'map', label: 'Mapping prompt', heading: 'Mapping, once per topic and per category of several topics' },
+    // Only a Worker that summarises each question's answers sends this one.
+    { key: 'question', label: 'Question prompt', heading: 'Summarising, once per question' },
   ],
   'risk-matrix': [{ key: 'build', label: 'Building prompt', heading: 'Building, in one call' }],
 };

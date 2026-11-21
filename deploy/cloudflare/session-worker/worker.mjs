@@ -25300,6 +25300,7 @@ var init_sessionConfigEdits = __esm({
       "adminAddress",
       "adminAddresses",
       "resultsAdminAddresses",
+      "atlasQuestionSummaries",
       "corsWorkerUrl",
       "allowOrigins",
       "sessionModeProfile",
@@ -25355,6 +25356,8 @@ var init_sessionConfigEdits = __esm({
       // Checked on each atlas build and read and never held in a sign-in, so
       // changing it signs no one out either.
       "resultsAdminAddresses",
+      // Read on each atlas build only, the same way.
+      "atlasQuestionSummaries",
       // Read on each interview request and never held in a sign-in, so changing
       // any interview setting, even turning interviews off, signs no one out.
       "interviewModeEnabled",
@@ -25417,6 +25420,10 @@ var init_sessionConfigEdits = __esm({
       if (record2(result.agentHttp) && additiveInvites) {
         result.agentHttp = without(result.agentHttp, /* @__PURE__ */ new Set(["invites"]));
         if (!Object.keys(result.agentHttp).length) delete result.agentHttp;
+      }
+      if (record2(result.ai) && Object.hasOwn(result.ai, "serviceTier")) {
+        result.ai = without(result.ai, /* @__PURE__ */ new Set(["serviceTier"]));
+        if (!Object.keys(result.ai).length) delete result.ai;
       }
       return result;
     };
@@ -25611,8 +25618,8 @@ var init_storageRefNormalization = __esm({
         resource: opts.resource
       }, opts);
     };
-    resolvePayloadStorageRef = (record5, opts = {}) => {
-      const raw = isObj(record5) ? record5 : {};
+    resolvePayloadStorageRef = (record6, opts = {}) => {
+      const raw = isObj(record6) ? record6 : {};
       const ref = raw.storageRef ? normalizeStorageRef(raw.storageRef, {
         ...opts,
         legacyArweaveTxId: raw.arweaveTxId || raw.txId || opts.legacyArweaveTxId
@@ -25627,17 +25634,17 @@ var init_storageRefNormalization = __esm({
         resource: raw.resource || opts.resource
       });
     };
-    getLegacyArweaveTxId = (record5, opts = {}) => {
-      if (!isObj(record5)) return trim(record5);
-      const storageRef = record5.storageRef ? normalizeStorageRef(record5.storageRef, {
+    getLegacyArweaveTxId = (record6, opts = {}) => {
+      if (!isObj(record6)) return trim(record6);
+      const storageRef = record6.storageRef ? normalizeStorageRef(record6.storageRef, {
         ...opts,
-        legacyArweaveTxId: record5.arweaveTxId || record5.txId || opts.legacyArweaveTxId
+        legacyArweaveTxId: record6.arweaveTxId || record6.txId || opts.legacyArweaveTxId
       }) : null;
       if (storageRef) return isArweaveStorageBackend(storageRef.backend) ? storageRef.id : "";
-      return trim(record5.arweaveTxId || record5.txId || opts.legacyArweaveTxId);
+      return trim(record6.arweaveTxId || record6.txId || opts.legacyArweaveTxId);
     };
-    attachStorageRefCompatibilityFields = (record5, opts = {}) => {
-      const source = isObj(record5) ? { ...record5 } : {};
+    attachStorageRefCompatibilityFields = (record6, opts = {}) => {
+      const source = isObj(record6) ? { ...record6 } : {};
       const storageRef = resolvePayloadStorageRef(source, opts);
       if (!storageRef) return source;
       source.storageRef = storageRef;
@@ -26002,7 +26009,7 @@ var init_deployHelperEndpointConfig = __esm({
 });
 
 // shared/workerSessionPublicConfig.mjs
-var PUBLIC_WORKER_CONFIG_FIELDS, PUBLIC_WORKER_AI_FIELDS, SET_CONFIG_MERGES_AI_FIELD, DEBATE_ATLAS_FIELD, RISK_MATRIX_FIELD, MEMBER_RESULTS_FIELD, SESSION_AGENT_READY_FIELD, GROUP_JOIN_CHOICES_FIELD, WORKER_SUPPORT_FIELDS;
+var PUBLIC_WORKER_CONFIG_FIELDS, PUBLIC_WORKER_AI_FIELDS, SET_CONFIG_MERGES_AI_FIELD, DEBATE_ATLAS_FIELD, RISK_MATRIX_FIELD, MEMBER_RESULTS_FIELD, SESSION_AGENT_READY_FIELD, GROUP_JOIN_CHOICES_FIELD, DEBATE_ATLAS_QUESTION_ANALYSIS_FIELD, WORKER_SUPPORT_FIELDS;
 var init_workerSessionPublicConfig = __esm({
   "shared/workerSessionPublicConfig.mjs"() {
     PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
@@ -26074,13 +26081,15 @@ var init_workerSessionPublicConfig = __esm({
     MEMBER_RESULTS_FIELD = "memberResults";
     SESSION_AGENT_READY_FIELD = "sessionAgentReady";
     GROUP_JOIN_CHOICES_FIELD = "groupJoinChoices";
+    DEBATE_ATLAS_QUESTION_ANALYSIS_FIELD = "debateAtlasQuestionAnalysis";
     WORKER_SUPPORT_FIELDS = Object.freeze([
       SET_CONFIG_MERGES_AI_FIELD,
       DEBATE_ATLAS_FIELD,
       RISK_MATRIX_FIELD,
       MEMBER_RESULTS_FIELD,
       SESSION_AGENT_READY_FIELD,
-      GROUP_JOIN_CHOICES_FIELD
+      GROUP_JOIN_CHOICES_FIELD,
+      DEBATE_ATLAS_QUESTION_ANALYSIS_FIELD
     ]);
   }
 });
@@ -26547,23 +26556,23 @@ var init_workerConfigModeValidation = __esm({
       }, {});
     };
     sessionModeValuesEqual = (left, right) => JSON.stringify(stableSessionModeValue(left)) === JSON.stringify(stableSessionModeValue(right));
-    validateEnumField = (record5, key, path, allowed) => {
-      if (!hasOwn(record5, key)) return valid();
-      const value = record5[key];
+    validateEnumField = (record6, key, path, allowed) => {
+      if (!hasOwn(record6, key)) return valid();
+      const value = record6[key];
       return typeof value === "string" && allowed.has(value) ? valid() : invalid(path);
     };
-    validateRequiredEnumField = (record5, key, path, allowed) => hasOwn(record5, key) ? validateEnumField(record5, key, path, allowed) : invalid(path);
-    validateObjectField = (record5, key, path) => {
-      if (!hasOwn(record5, key)) return { ok: true, value: null };
-      return isObj3(record5[key]) ? { ok: true, value: record5[key] } : { ok: false, path };
+    validateRequiredEnumField = (record6, key, path, allowed) => hasOwn(record6, key) ? validateEnumField(record6, key, path, allowed) : invalid(path);
+    validateObjectField = (record6, key, path) => {
+      if (!hasOwn(record6, key)) return { ok: true, value: null };
+      return isObj3(record6[key]) ? { ok: true, value: record6[key] } : { ok: false, path };
     };
-    validateExactKeys = (record5, path, allowed) => {
+    validateExactKeys = (record6, path, allowed) => {
       const allowedKeys2 = new Set(allowed);
-      const unknownKey = Object.keys(record5).find((key) => !allowedKeys2.has(key));
+      const unknownKey = Object.keys(record6).find((key) => !allowedKeys2.has(key));
       return unknownKey ? invalid(path ? `${path}.${unknownKey}` : unknownKey) : valid();
     };
-    validateRequiredObjectField = (record5, key, path, allowed) => {
-      const result = validateObjectField(record5, key, path);
+    validateRequiredObjectField = (record6, key, path, allowed) => {
+      const result = validateObjectField(record6, key, path);
       if (!result.ok || !result.value) return result.ok ? invalid(path) : result;
       const keysResult = validateExactKeys(result.value, path, allowed);
       return keysResult.ok ? result : keysResult;
@@ -26630,14 +26639,14 @@ var init_workerConfigModeValidation = __esm({
       }
       return { ok: true, sbtChainIds };
     };
-    validatePayloadAccessControl = (record5, path) => {
-      if (!isObj3(record5)) return invalid(path);
+    validatePayloadAccessControl = (record6, path) => {
+      if (!isObj3(record6)) return invalid(path);
       for (const [key, allowed] of [
         ["mode", PAYLOAD_ACCESS_MODES],
         ["gate", PAYLOAD_ACCESS_GATES],
         ["encryption", PAYLOAD_ENCRYPTION_MODES]
       ]) {
-        const result = validateEnumField(record5, key, `${path}.${key}`, allowed);
+        const result = validateEnumField(record6, key, `${path}.${key}`, allowed);
         if (!result.ok) return result;
       }
       return valid();
@@ -27841,14 +27850,14 @@ var init_deployHelperCore = __esm({
         return null;
       }
     };
-    writeDeployJournalRecord = async (binding, key, record5) => binding.put(
+    writeDeployJournalRecord = async (binding, key, record6) => binding.put(
       key,
-      JSON.stringify(record5),
+      JSON.stringify(record6),
       { expirationTtl: DEPLOYMENT_JOURNAL_TTL_SECONDS }
     );
-    writeDurableDeployJournalRecord = async (binding, key, record5) => binding.put(
+    writeDurableDeployJournalRecord = async (binding, key, record6) => binding.put(
       key,
-      JSON.stringify(record5)
+      JSON.stringify(record6)
     );
     normalizeResourceStage = (value, fallback) => {
       const normalized = toStr9(value).trim().toLowerCase();
@@ -29231,9 +29240,9 @@ var init_deployHelperCore = __esm({
       const recoveryKeyRecordPath = `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/ce-deployment-recovery-key:${deploymentId}`;
       if (envelopeKekSecretPreserved) {
         const readback = await cfFetch(apiToken, recoveryKeyRecordPath, { method: "GET" }, cfFetchOptions);
-        const record5 = readback?.data?.result || readback?.data;
-        if (readback.ok && record5?.deploymentId === deploymentId && /^[a-f0-9]{64}$/.test(record5?.fingerprint || "")) {
-          deploymentPayload.recoveryKeyFingerprint = record5.fingerprint;
+        const record6 = readback?.data?.result || readback?.data;
+        if (readback.ok && record6?.deploymentId === deploymentId && /^[a-f0-9]{64}$/.test(record6?.fingerprint || "")) {
+          deploymentPayload.recoveryKeyFingerprint = record6.fingerprint;
         } else if (!readback.ok && Number(readback.status) !== 404) {
           return buildDeploymentFailure(503, {
             error: "Could not read the preserved recovery key fingerprint; retry.",
@@ -29529,13 +29538,13 @@ var init_deployHelperCore = __esm({
           }, { fallbackEligible: true });
         }
       };
-      const buildTerminalJournalReplay = (record5) => {
-        let result2 = record5?.result;
+      const buildTerminalJournalReplay = (record6) => {
+        let result2 = record6?.result;
         if (result2?.ok !== true) return result2;
         if (result2.body?.recoveryKeyFingerprint || result2.body?.envelopeKekSecretSet || result2.body?.envelopeKekSecretPreserved) {
           result2 = { ...result2, body: { ...result2.body, keyPreserved: true } };
         }
-        const recordedFullRequestDigest = toStr9(record5?.fullRequestDigest).trim().toLowerCase();
+        const recordedFullRequestDigest = toStr9(record6?.fullRequestDigest).trim().toLowerCase();
         const fullRequestDigestMatches = recordedFullRequestDigest ? recordedFullRequestDigest === context.fullRequestDigest : context.requestDigest === context.fullRequestDigest;
         if (fullRequestDigestMatches) return result2;
         return {
@@ -29861,9 +29870,9 @@ var init_resultsAnalysisSettings = __esm({
       inputScope: "submitted",
       publication: "latest_success_visible"
     });
-    allowedKeys = (record5, keys) => {
+    allowedKeys = (record6, keys) => {
       const allowed = new Set(keys);
-      const unknown = Object.keys(record5 || {}).find((key) => !allowed.has(key));
+      const unknown = Object.keys(record6 || {}).find((key) => !allowed.has(key));
       return unknown || "";
     };
     normalizeBoolean = (value, fallback) => typeof value === "boolean" ? value : fallback;
@@ -30445,7 +30454,8 @@ var init_interviewSettings = __esm({
       fidelityMinimumPeople: 5,
       recordingQuestionCount: 3,
       recordingQuestionTiming: "end",
-      dataNote: ""
+      dataNote: "",
+      voiceSessionContext: false
     });
     MAX_HIDDEN_DRAFT_SHARE = 0.5;
     MAX_FIDELITY_MINIMUM_PEOPLE = 50;
@@ -30490,7 +30500,10 @@ var init_interviewSettings = __esm({
         // The most questions a group recording drafts each time: once when the recording stops, or after every chunk.
         recordingQuestionCount: Number.isInteger(source.recordingQuestionCount) ? Math.max(1, Math.min(MAX_RECORDING_QUESTION_COUNT, source.recordingQuestionCount)) : DEFAULT_INTERVIEW_SETTINGS.recordingQuestionCount,
         recordingQuestionTiming: source.recordingQuestionTiming === "chunk" ? "chunk" : "end",
-        dataNote: typeof source.dataNote === "string" ? source.dataNote.trim().slice(0, MAX_DATA_NOTE_CHARS) : ""
+        dataNote: typeof source.dataNote === "string" ? source.dataNote.trim().slice(0, MAX_DATA_NOTE_CHARS) : "",
+        // Whether the voice interviewer is given the session's context (notes, links, sources). Off until
+        // set: a long source slowed every reply, and summaries for the voice come later.
+        voiceSessionContext: source.voiceSessionContext === true
       };
     };
     validInterviewSettings = (value = {}) => {
@@ -30525,7 +30538,8 @@ var init_interviewSettings = __esm({
         "showFidelityScore",
         "suggestGroups",
         "joinMatchingGroups",
-        "showFidelityResults"
+        "showFidelityResults",
+        "voiceSessionContext"
       ].every(
         (key) => value[key] === void 0 || typeof value[key] === "boolean"
       );
@@ -30553,13 +30567,14 @@ var init_siweMessage = __esm({
 });
 
 // shared/realtimeInterviewConfig.mjs
-var GPT_LIVE_1_1_MODEL, GPT_LIVE_1_1_FEATURE, DEFAULT_REALTIME_INTERVIEW_MODEL, PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL, liveModels, REALTIME_INTERVIEW_MODELS, models, isRealtimeInterviewModel, isLiveInterviewModel, normalizeRealtimeInterviewModel, resolveRealtimeInterviewModel;
+var GPT_LIVE_1_1_MODEL, GPT_LIVE_1_1_FEATURE, DEFAULT_REALTIME_INTERVIEW_MODEL, PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL, INTERVIEW_VOICE_CONTEXT_FEATURE, liveModels, REALTIME_INTERVIEW_MODELS, models, isRealtimeInterviewModel, isLiveInterviewModel, normalizeRealtimeInterviewModel, resolveRealtimeInterviewModel;
 var init_realtimeInterviewConfig = __esm({
   "shared/realtimeInterviewConfig.mjs"() {
     GPT_LIVE_1_1_MODEL = "gpt-live-1.1";
     GPT_LIVE_1_1_FEATURE = "interview_gpt_live_1_1_v1";
     DEFAULT_REALTIME_INTERVIEW_MODEL = GPT_LIVE_1_1_MODEL;
     PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL = "gpt-live-1";
+    INTERVIEW_VOICE_CONTEXT_FEATURE = "interview_voice_context_v1";
     liveModels = /* @__PURE__ */ new Set([GPT_LIVE_1_1_MODEL, PREVIOUS_DEFAULT_REALTIME_INTERVIEW_MODEL]);
     REALTIME_INTERVIEW_MODELS = Object.freeze([
       ...liveModels,
@@ -31427,6 +31442,265 @@ ${SESSION_AGENT_RULES.map((rule) => `- ${rule}`).join("\n")}`,
   }
 });
 
+// shared/atlasQuestionSummaries.mjs
+var ATLAS_QUESTION_SUMMARY_SETTINGS, KEYS2, record3, inBounds, validateAtlasQuestionSummaries, resolveAtlasQuestionSummaries;
+var init_atlasQuestionSummaries = __esm({
+  "shared/atlasQuestionSummaries.mjs"() {
+    ATLAS_QUESTION_SUMMARY_SETTINGS = Object.freeze({
+      // Each question's call: no less than the 20 seconds a build needs left to
+      // start any call, no more than its per-call limit of 120 seconds.
+      callSeconds: Object.freeze({ default: 60, min: 20, max: 120 }),
+      // Answers one question's call reads, and their text in characters.
+      answers: Object.freeze({ default: 200, min: 1, max: 1e3 }),
+      answerChars: Object.freeze({ default: 6e4, min: 1e3, max: 2e5 }),
+      // What the build keeps: the summary's length, how many categories (0 for
+      // none), and each category's label and sentence (0 for no sentence).
+      summaryChars: Object.freeze({ default: 400, min: 100, max: 1e3 }),
+      categories: Object.freeze({ default: 5, min: 0, max: 10 }),
+      labelChars: Object.freeze({ default: 80, min: 20, max: 120 }),
+      categorySummaryChars: Object.freeze({ default: 200, min: 0, max: 400 })
+    });
+    KEYS2 = Object.keys(ATLAS_QUESTION_SUMMARY_SETTINGS);
+    record3 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    inBounds = (key, value) => Number.isInteger(value) && value >= ATLAS_QUESTION_SUMMARY_SETTINGS[key].min && value <= ATLAS_QUESTION_SUMMARY_SETTINGS[key].max;
+    validateAtlasQuestionSummaries = (value) => {
+      if (!record3(value)) return { ok: false, error: "atlasQuestionSummaries must be an object." };
+      const unknown = Object.keys(value).find((key) => !KEYS2.includes(key));
+      if (unknown) return { ok: false, error: `atlasQuestionSummaries has no setting ${unknown}.` };
+      const wrong = KEYS2.find((key) => key in value && !inBounds(key, value[key]));
+      if (wrong) {
+        const { min, max } = ATLAS_QUESTION_SUMMARY_SETTINGS[wrong];
+        return { ok: false, error: `atlasQuestionSummaries.${wrong} must be a whole number from ${min} to ${max}.` };
+      }
+      return { ok: true, value: Object.fromEntries(KEYS2.filter((key) => key in value).map((key) => [key, value[key]])) };
+    };
+    resolveAtlasQuestionSummaries = (config) => {
+      const saved = record3(config?.atlasQuestionSummaries) ? config.atlasQuestionSummaries : {};
+      return Object.fromEntries(KEYS2.map((key) => [key, inBounds(key, saved[key]) ? saved[key] : ATLAS_QUESTION_SUMMARY_SETTINGS[key].default]));
+    };
+  }
+});
+
+// shared/aiDefaults.mjs
+var DEFAULT_AI_MODEL, DEFAULT_AI_MODELS, DEFAULT_ANTHROPIC_MODEL, TRANSCRIPTION_FALLBACK_MODEL, GROUP_TRANSCRIPTION_MODEL;
+var init_aiDefaults = __esm({
+  "shared/aiDefaults.mjs"() {
+    DEFAULT_AI_MODEL = "gpt-6.1-terra";
+    DEFAULT_AI_MODELS = Object.freeze({ fast: DEFAULT_AI_MODEL, thinking: "gpt-6.1-sol" });
+    DEFAULT_ANTHROPIC_MODEL = "claude-opus-5-5";
+    TRANSCRIPTION_FALLBACK_MODEL = "whisper-1";
+    GROUP_TRANSCRIPTION_MODEL = "gpt-4o-transcribe-diarize";
+  }
+});
+
+// shared/aiModelFamily.mjs
+var toModelLeaf, inferAiProviderFromModel, isGpt5Or6, isOSeries, isOpenAiReasoningModel, usesOpenAiResponsesApi, takesLongReply, interviewMapOutputTokens, LADDER, GPT_FULL, GPT_FROM_LOW, GPT_5, GPT_5_POINT, LOW_TO_HIGH, CLAUDE, reasoningEffortsOf, takesReasoningEffort, fitReasoningEffort;
+var init_aiModelFamily = __esm({
+  "shared/aiModelFamily.mjs"() {
+    toModelLeaf = (model) => String(model ?? "").trim().toLowerCase().split("/").pop() || "";
+    inferAiProviderFromModel = (model) => {
+      const name = String(model ?? "").trim().toLowerCase();
+      if (!name) return "";
+      if (name.startsWith("claude")) return "anthropic";
+      if (/^(?:gpt-|o[1-9]|chatgpt)/.test(name)) return "openai";
+      if (name.startsWith("@cf/")) return "workers-ai";
+      return name.includes("/") ? "openrouter" : "";
+    };
+    isGpt5Or6 = (leaf) => /^gpt-[56](?:$|[.-])/.test(leaf);
+    isOSeries = (leaf) => /^o[1-9](?:$|-)/.test(leaf);
+    isOpenAiReasoningModel = (model) => {
+      const leaf = toModelLeaf(model);
+      return isGpt5Or6(leaf) || isOSeries(leaf);
+    };
+    usesOpenAiResponsesApi = ({ provider = "", model = "", endpoint = "" } = {}) => {
+      if (String(provider || "").trim().toLowerCase() !== "openai") return false;
+      const route = String(endpoint || "").trim().toLowerCase();
+      return route === "responses" || route.includes("/responses") || isGpt5Or6(toModelLeaf(model));
+    };
+    takesLongReply = (model) => {
+      const leaf = toModelLeaf(model);
+      if (/-chat(?:$|-)/.test(leaf)) return false;
+      return isGpt5Or6(leaf) || isOSeries(leaf) || /^gpt-4\.1(?:$|-)/.test(leaf) || /^claude-(?:opus|sonnet|haiku|fable|mythos)-(?:[5-9]|4[.-][5-9])(?:$|[.-])/.test(leaf);
+    };
+    interviewMapOutputTokens = (model, provider = "") => String(provider || "").trim().toLowerCase() !== "custom" && takesLongReply(model) ? 32e3 : 8e3;
+    LADDER = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
+    GPT_FULL = Object.freeze(["none", "low", "medium", "high", "xhigh", "max"]);
+    GPT_FROM_LOW = Object.freeze(["low", "medium", "high", "xhigh", "max"]);
+    GPT_5 = Object.freeze(["minimal", "low", "medium", "high"]);
+    GPT_5_POINT = Object.freeze(["none", "low", "medium", "high"]);
+    LOW_TO_HIGH = Object.freeze(["low", "medium", "high"]);
+    CLAUDE = Object.freeze(["low", "medium", "high", "xhigh", "max"]);
+    reasoningEffortsOf = (model) => {
+      const leaf = toModelLeaf(model);
+      if (/^gpt-6(?:\.\d+)?-(?:sol|astra)(?:$|-)/.test(leaf)) return GPT_FROM_LOW;
+      if (/^gpt-(?:5\.6|6)(?:$|[.-])/.test(leaf)) return GPT_FULL;
+      if (/^gpt-5(?:-mini|-nano)?(?:-\d{4}-\d{2}-\d{2})?$/.test(leaf)) return GPT_5;
+      if (isGpt5Or6(leaf)) return GPT_5_POINT;
+      if (isOSeries(leaf)) return LOW_TO_HIGH;
+      if (/^claude-(?:opus|sonnet|haiku|fable|mythos)-[5-9]/.test(leaf)) return CLAUDE;
+      if (/^claude-(?:opus-4-[5-9]|sonnet-4-[6-9])/.test(leaf)) return LOW_TO_HIGH;
+      return null;
+    };
+    takesReasoningEffort = (model) => reasoningEffortsOf(model) !== null;
+    fitReasoningEffort = (model, effort) => {
+      const wanted = String(effort ?? "").trim().toLowerCase();
+      const accepted = reasoningEffortsOf(model);
+      if (!wanted || !accepted || accepted.includes(wanted)) return wanted;
+      const rank = LADDER.includes(wanted) ? LADDER.indexOf(wanted) : LADDER.indexOf("low");
+      return accepted.find((level) => LADDER.indexOf(level) >= rank) || accepted[accepted.length - 1];
+    };
+  }
+});
+
+// workers/sessionCorsWorker/aiModelParams.js
+var isChatReasoningModel, applyChatCompletionBudget, resolveResponsesOutputTokens;
+var init_aiModelParams = __esm({
+  "workers/sessionCorsWorker/aiModelParams.js"() {
+    init_aiModelFamily();
+    init_aiModelFamily();
+    isChatReasoningModel = ({ model = "", thinking = false } = {}) => thinking === true || isOpenAiReasoningModel(model);
+    applyChatCompletionBudget = ({
+      body,
+      model = "",
+      thinking = false,
+      max_tokens,
+      max_completion_tokens,
+      temperature,
+      defaultMaxCompletionTokens = 16e3,
+      defaultMaxTokens = 2048,
+      defaultTemperature = 0.7
+    } = {}) => {
+      const target = body && typeof body === "object" ? body : {};
+      if (isChatReasoningModel({ model, thinking })) {
+        target.max_completion_tokens = max_completion_tokens ?? max_tokens ?? defaultMaxCompletionTokens;
+        delete target.max_tokens;
+        delete target.temperature;
+        return target;
+      }
+      target.max_tokens = max_tokens ?? defaultMaxTokens;
+      target.temperature = temperature !== void 0 ? temperature : defaultTemperature;
+      delete target.max_completion_tokens;
+      return target;
+    };
+    resolveResponsesOutputTokens = ({
+      max_output_tokens,
+      max_completion_tokens,
+      max_tokens,
+      fallback = 16e3
+    } = {}) => max_output_tokens ?? max_completion_tokens ?? max_tokens ?? fallback;
+  }
+});
+
+// workers/sessionCorsWorker/aiRequestPolicy.js
+var trim2, record4, tasks, taskName, OPENAI_FAST_SERVICE_TIERS, SESSION_AI_SERVICE_TIERS, modelEntry, configuredModels, resolveSessionAiModel, AI_MODEL_NOT_ALLOWED, isSessionTranscriptionModelAllowed, operationCeilings, tokenFields, effortOrder, minimumTaskEffort, configuredFunctions, boundSessionAiRequest;
+var init_aiRequestPolicy = __esm({
+  "workers/sessionCorsWorker/aiRequestPolicy.js"() {
+    init_aiDefaults();
+    init_aiModelFamily();
+    init_aiModelParams();
+    trim2 = (value) => typeof value === "string" ? value.trim() : "";
+    record4 = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    tasks = /* @__PURE__ */ new Set(["generate", "rewrite", "summarize", "rank", "analysis", "compare", "categorize", "interview-map", "interview-opening", "context-read", "context-card", "session-agent"]);
+    taskName = (payload) => tasks.has(payload?.taskType) ? payload.taskType : "";
+    OPENAI_FAST_SERVICE_TIERS = Object.freeze(["priority", "fast"]);
+    SESSION_AI_SERVICE_TIERS = Object.freeze(["default", ...OPENAI_FAST_SERVICE_TIERS]);
+    modelEntry = (entry2, provider, fallback = DEFAULT_AI_MODEL) => {
+      const obj = record4(entry2);
+      return {
+        model: trim2(obj.model || obj.name || obj.value || entry2) || fallback,
+        provider: (trim2(obj.provider) || provider || "openai").toLowerCase()
+      };
+    };
+    configuredModels = (config, task) => {
+      const ai = record4(config?.ai);
+      const models2 = record4(ai.models);
+      const providers = record4(ai.modelProviders);
+      const provider = trim2(ai.mode || ai.provider).toLowerCase() || "openai";
+      const fallback = trim2(ai.model) || DEFAULT_AI_MODEL;
+      const fast = modelEntry(models2.fast || models2.default, trim2(providers.fast || providers.default) || provider, fallback);
+      const thinking = modelEntry(models2.thinking || models2.reasoning, trim2(providers.thinking || providers.reasoning) || provider, fallback);
+      const feature = task && models2[task] ? modelEntry(models2[task], trim2(providers[task]) || provider, fallback) : null;
+      return { fast, thinking, feature, ...trim2(ai.model) ? { default: modelEntry(ai.model, provider) } : {} };
+    };
+    resolveSessionAiModel = (config, { taskType = "", modelType = "fast" } = {}) => {
+      const models2 = configuredModels(config, tasks.has(taskType) ? taskType : "");
+      return models2.feature || models2[modelType === "thinking" ? "thinking" : "fast"];
+    };
+    AI_MODEL_NOT_ALLOWED = Object.freeze({
+      error: "This model is not allowed on the session's AI key. Use the session model or your own key.",
+      reason: "ai_model_not_allowed"
+    });
+    isSessionTranscriptionModelAllowed = ({ config, provider, model, groupSpeakerLabels = false }) => {
+      const ai = record4(config?.ai);
+      const entry2 = record4(ai.models?.transcription || ai.transcription);
+      if (groupSpeakerLabels && provider === "openai" && model === GROUP_TRANSCRIPTION_MODEL && (trim2(entry2.provider).toLowerCase() || "openai") === "openai") return true;
+      return provider === (trim2(entry2.provider).toLowerCase() || "openai") && model === (trim2(entry2.model) || TRANSCRIPTION_FALLBACK_MODEL);
+    };
+    operationCeilings = Object.freeze({
+      generate: 16e3,
+      rewrite: 16e3,
+      summarize: 16e3,
+      rank: 16e3,
+      compare: 16e3,
+      categorize: 16e3,
+      analysis: 7e3,
+      // One short question, but models that think spend part of the cap on thinking.
+      "interview-opening": 2e3,
+      // A context PDF's text, read once by an admin's request.
+      "context-read": 8e3,
+      // A context source's card: a summary, tags and names, thinking included.
+      "context-card": 1500,
+      // One Session Agent answer of at most 150 words, thinking included.
+      "session-agent": 3e3
+    });
+    tokenFields = ["max_tokens", "max_completion_tokens", "max_output_tokens", "max_tokens_to_sample", "maxTokens"];
+    effortOrder = ["none", "minimal", "low", "medium", "high"];
+    minimumTaskEffort = Object.freeze({ "interview-map": "medium" });
+    configuredFunctions = (config) => {
+      const value = config?.ai?.providers?.custom?.functions ?? config?.ai?.custom?.functions;
+      if (typeof value !== "string") return value;
+      try {
+        return JSON.parse(value);
+      } catch {
+        return value.trim() || void 0;
+      }
+    };
+    boundSessionAiRequest = ({ payload = {}, provider, config, requestKey = "" }) => {
+      if (requestKey) return { ok: true, payload };
+      const task = taskName(payload);
+      const models2 = configuredModels(config, task);
+      const allowed = Object.values(models2).filter((entry2) => entry2?.provider === provider);
+      const model = trim2(payload.model) || (models2.feature?.provider === provider ? models2.feature.model : allowed[0]?.model);
+      if (!model || !allowed.some((entry2) => entry2.model === model)) return { ok: false, ...AI_MODEL_NOT_ALLOWED };
+      const reasoning = isChatReasoningModel({ model }) || models2.thinking.provider === provider && models2.thinking.model === model;
+      const responses = usesOpenAiResponsesApi({ provider, model, endpoint: payload.endpoint });
+      const ceiling = task === "interview-map" ? interviewMapOutputTokens(model, provider) : operationCeilings[task] || (reasoning || responses ? 16e3 : 2048);
+      const requested = tokenFields.filter((key) => Object.hasOwn(payload, key)).map((key) => {
+        const value = payload[key];
+        return typeof value === "number" && Number.isFinite(value) && value >= 1 ? Math.floor(value) : ceiling;
+      });
+      const tokens = Math.min(ceiling, ...requested);
+      const ai = record4(config?.ai);
+      const savedEffort = ai.taskReasoningEffort?.[task] || task === "analysis" && ai.taskReasoningEffort?.generate || ai.reasoningEffort || ai.reasoning_effort || "low";
+      const sessionEffort = ["low", "medium", "high"].includes(savedEffort) ? savedEffort : "low";
+      const floor = ai.taskReasoningEffort?.[task] ? "" : minimumTaskEffort[task];
+      const maximumEffort = floor && effortOrder.indexOf(floor) > effortOrder.indexOf(sessionEffort) ? floor : sessionEffort;
+      const requestedEffort = trim2(payload.reasoning_effort || payload.reasoningEffort || payload.reasoning?.effort);
+      const effort = effortOrder.includes(requestedEffort) && effortOrder.indexOf(requestedEffort) < effortOrder.indexOf(maximumEffort) ? requestedEffort : maximumEffort;
+      const serviceTier = provider === "openai" && OPENAI_FAST_SERVICE_TIERS.includes(ai.serviceTier) ? ai.serviceTier : "default";
+      const bounded = { ...payload, model, service_tier: serviceTier, reasoning_effort: effort, thinking: reasoning };
+      for (const key of tokenFields) bounded[key] = tokens;
+      delete bounded.tools;
+      delete bounded.functions;
+      if (provider === "custom") {
+        const functions = configuredFunctions(config);
+        if (functions) bounded.functions = functions;
+      }
+      return { ok: true, payload: bounded };
+    };
+  }
+});
+
 // workers/sessionCorsWorker/aiRateLimitPolicy.js
 var isObj7, AI_DAILY_LIMIT_MAX, resolveAiDailyLimit, validAiDailyLimit;
 var init_aiRateLimitPolicy = __esm({
@@ -31462,6 +31736,8 @@ var init_sessionConfigMutation = __esm({
     init_workerGroupJoin();
     init_sessionContext();
     init_sessionAgent();
+    init_atlasQuestionSummaries();
+    init_aiRequestPolicy();
     init_aiRateLimitPolicy();
     init_sessionConfigNormalization();
     init_authorizationScopeFreshness();
@@ -31725,6 +32001,15 @@ var init_sessionConfigMutation = __esm({
           if (!context.ok) return { ok: false, status: 400, error: `Invalid session context: ${context.errors[0].message}` };
           incomingConfig = { ...incomingConfig, sessionContext: context.value };
         }
+        if (hasOwn4(incomingConfig, "atlasQuestionSummaries") && incomingConfig.atlasQuestionSummaries !== null) {
+          const summaries = validateAtlasQuestionSummaries(incomingConfig.atlasQuestionSummaries);
+          if (!summaries.ok) return { ok: false, status: 400, error: summaries.error };
+          incomingConfig = { ...incomingConfig, atlasQuestionSummaries: summaries.value };
+        }
+        const serviceTier = incomingConfig.ai && typeof incomingConfig.ai === "object" ? incomingConfig.ai.serviceTier : void 0;
+        if (serviceTier !== void 0 && serviceTier !== null && !SESSION_AI_SERVICE_TIERS.includes(serviceTier)) {
+          return { ok: false, status: 400, error: `ai.serviceTier must be one of ${SESSION_AI_SERVICE_TIERS.join(", ")}.` };
+        }
         if (hasOwn4(incomingConfig, "sessionAgent")) {
           const sessionAgent = validateSessionAgent(incomingConfig.sessionAgent);
           if (!sessionAgent.ok) return { ok: false, status: 400, error: `Invalid Session Agent setting: ${sessionAgent.errors[0].message}` };
@@ -31745,6 +32030,7 @@ var init_sessionConfigMutation = __esm({
         }
         mergedConfig = mergeWorkerConfigRecords({ existingConfig: existing, incomingConfig, slug });
         if (mergedConfig.sessionAgent === null) delete mergedConfig.sessionAgent;
+        if (mergedConfig.atlasQuestionSummaries === null) delete mergedConfig.atlasQuestionSummaries;
       } else if (kind === "set-limits") {
         const incomingLimits = mutation?.incomingLimits && typeof mutation.incomingLimits === "object" ? mutation.incomingLimits : null;
         if (!incomingLimits) return { ok: false, status: 400, error: "Missing limits." };
@@ -31827,7 +32113,7 @@ var init_sessionConfigMutation = __esm({
 });
 
 // workers/sessionCorsWorker/workerGroups.js
-var trim2, isObj8, WORKER_GROUP_JOIN_MODES2, WORKER_GROUP_MEMBER_VISIBILITY, WORKER_GROUP_REMOVAL_AUTH, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, JOIN_MODE_SET, resolveWorkerGroupMemberCeiling, normalizeWorkerGroupId, resolveWorkerGroupListed, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeRemovalAuth, REMOVERS_BY_REMOVAL_AUTH, workerGroupRemovalRefusal, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, TRANSIENT_WORKER_GROUP_REASONS, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, checkWorkerGroupReadInvite, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, isSelfJoinableWorkerGroup, workerGroupHasRoom, listWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForMember, dispatchPublicWorkerGroupListRequest, WORKER_GROUP_SECRET_ACTIONS, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
+var trim3, isObj8, WORKER_GROUP_JOIN_MODES2, WORKER_GROUP_MEMBER_VISIBILITY, WORKER_GROUP_REMOVAL_AUTH, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, JOIN_MODE_SET, resolveWorkerGroupMemberCeiling, normalizeWorkerGroupId, resolveWorkerGroupListed, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeRemovalAuth, REMOVERS_BY_REMOVAL_AUTH, workerGroupRemovalRefusal, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, TRANSIENT_WORKER_GROUP_REASONS, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, checkWorkerGroupReadInvite, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, isSelfJoinableWorkerGroup, workerGroupHasRoom, listWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForMember, dispatchPublicWorkerGroupListRequest, WORKER_GROUP_SECRET_ACTIONS, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
 var init_workerGroups = __esm({
   "workers/sessionCorsWorker/workerGroups.js"() {
     init_sessionConfigAuthority();
@@ -31838,7 +32124,7 @@ var init_workerGroups = __esm({
     init_workerConfigModeValidation();
     init_stringCoercion();
     init_workerGroupJoin();
-    trim2 = (value) => toStr6(value).trim();
+    trim3 = (value) => toStr6(value).trim();
     isObj8 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     WORKER_GROUP_JOIN_MODES2 = Object.freeze({
       OPEN: "open",
@@ -31870,14 +32156,14 @@ var init_workerGroups = __esm({
     JOIN_MODE_SET = new Set(Object.values(WORKER_GROUP_JOIN_MODES2));
     resolveWorkerGroupMemberCeiling = (value) => Number.isSafeInteger(value) && value >= 1 && value <= WORKER_GROUP_MEMBER_CEILING_MAX ? value : WORKER_GROUP_MEMBER_CEILING_DEFAULT;
     normalizeWorkerGroupId = (value) => {
-      const normalized = trim2(value).toLowerCase();
+      const normalized = trim3(value).toLowerCase();
       if (!normalized || normalized.length > MAX_WORKER_GROUP_ID_LENGTH) return "";
       if (!/^[a-z0-9][a-z0-9._-]*$/.test(normalized)) return "";
       return normalized;
     };
     resolveWorkerGroupListed = ({ joinMode, memberVisibility, listed } = {}) => typeof listed === "boolean" ? listed || joinMode === WORKER_GROUP_JOIN_MODES2.OPEN : memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION;
-    isAddressShapedWorkerGroupId = (value) => /^0x[0-9a-f]{40}$/i.test(trim2(value));
-    encodedPrincipalKeyPart = (value) => btoa(trim2(value || "id")).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "") || "id";
+    isAddressShapedWorkerGroupId = (value) => /^0x[0-9a-f]{40}$/i.test(trim3(value));
+    encodedPrincipalKeyPart = (value) => btoa(trim3(value || "id")).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "") || "id";
     canonicalSessionIdKeyPart = (value) => {
       const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: value });
       if (!canonicalSessionId) return "";
@@ -31896,7 +32182,7 @@ var init_workerGroups = __esm({
     };
     nowIso = (deps = {}) => new Date(deps.now?.() || Date.now()).toISOString();
     parsePositiveInt = (value, fallback) => {
-      const parsed = Number.parseInt(trim2(value), 10);
+      const parsed = Number.parseInt(trim3(value), 10);
       return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
     };
     resolveWorkerGroupMemberPageRequest = ({ cursor, limit } = {}) => {
@@ -31953,7 +32239,7 @@ var init_workerGroups = __esm({
     workerGroupRecordMatchesIdentity = ({ row, slug, sessionId }) => {
       const canonicalSlug = canonicalWorkerGroupSessionSlug(slug);
       const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
-      return isObj8(row) && !!canonicalSlug && !!canonicalSessionId && trim2(row.sessionSlug) === canonicalSlug && resolveCanonicalWorkerSessionIdHex({ sessionId: row.sessionId }) === canonicalSessionId;
+      return isObj8(row) && !!canonicalSlug && !!canonicalSessionId && trim3(row.sessionSlug) === canonicalSlug && resolveCanonicalWorkerSessionIdHex({ sessionId: row.sessionId }) === canonicalSessionId;
     };
     groupKey = ({ slug, sessionId, groupId }) => `ce-worker-group:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${normalizeWorkerGroupId(groupId)}`;
     groupPrefix = ({ slug, sessionId }) => `ce-worker-group:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:`;
@@ -31968,17 +32254,17 @@ var init_workerGroups = __esm({
     legacyGroupIndexPrefix = ({ slug }) => `ce-worker-group-index:${sessionSlugStorageKey(slug)}:`;
     jsonResponse = (deps, body, status, headers2) => deps?.json?.(body, status, headers2) || new Response(JSON.stringify(body), { status, headers: headers2 });
     normalizeJoinMode = (value) => {
-      const mode = trim2(value || WORKER_GROUP_JOIN_MODES2.ADMIN_ADD).toLowerCase();
+      const mode = trim3(value || WORKER_GROUP_JOIN_MODES2.ADMIN_ADD).toLowerCase();
       if (Object.values(WORKER_GROUP_JOIN_MODES2).includes(mode)) return mode;
       return "";
     };
     normalizeMemberVisibility = (value) => {
-      const visibility = trim2(value || WORKER_GROUP_MEMBER_VISIBILITY.ADMIN_ONLY).toLowerCase();
+      const visibility = trim3(value || WORKER_GROUP_MEMBER_VISIBILITY.ADMIN_ONLY).toLowerCase();
       if (Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(visibility)) return visibility;
       return "";
     };
     normalizeRemovalAuth = (value) => {
-      const auth = trim2(value || WORKER_GROUP_REMOVAL_AUTH.BOTH).toLowerCase();
+      const auth = trim3(value || WORKER_GROUP_REMOVAL_AUTH.BOTH).toLowerCase();
       if (Object.values(WORKER_GROUP_REMOVAL_AUTH).includes(auth)) return auth;
       return "";
     };
@@ -31993,7 +32279,7 @@ var init_workerGroups = __esm({
       return remover === "member" ? "worker_group_leave_denied" : "worker_group_removal_denied";
     };
     normalizeImageUrl = (value) => {
-      const raw = trim2(value);
+      const raw = trim3(value);
       if (!raw) return { ok: true, value: "" };
       if (raw.length > MAX_WORKER_GROUP_IMAGE_URL_LENGTH) return { ok: false };
       const normalized = normalizeWorkerGroupUrl(raw);
@@ -32006,7 +32292,7 @@ var init_workerGroups = __esm({
       const seen = /* @__PURE__ */ new Set();
       for (const candidate of value) {
         if (typeof candidate !== "string") return { ok: false };
-        const tag2 = trim2(candidate);
+        const tag2 = trim3(candidate);
         if (!tag2 || tag2.length > MAX_WORKER_GROUP_TAG_LENGTH) return { ok: false };
         const key = tag2.toLowerCase();
         if (seen.has(key)) continue;
@@ -32039,7 +32325,7 @@ var init_workerGroups = __esm({
       return { ok: true, value: memberLimit };
     };
     normalizeGroupJoinEndsAt = (value, deps = {}, { allowPast = false } = {}) => {
-      const raw = trim2(value);
+      const raw = trim3(value);
       if (!raw) return { ok: true, value: "" };
       const timestamp = Date.parse(raw);
       const now = Number(deps.now?.() || Date.now());
@@ -32047,12 +32333,12 @@ var init_workerGroups = __esm({
       return { ok: true, value: new Date(timestamp).toISOString() };
     };
     normalizeEvmAddress = (value, deps = {}) => {
-      const address3 = trim2(value);
+      const address3 = trim3(value);
       if (typeof deps.isAddress === "function" && !deps.isAddress(address3)) return "";
       if (!/^0x[0-9a-fA-F]{40}$/.test(address3)) return "";
       if (typeof deps.getAddress === "function") {
         try {
-          const normalized = trim2(deps.getAddress(address3));
+          const normalized = trim3(deps.getAddress(address3));
           if (/^0x[0-9a-fA-F]{40}$/.test(normalized)) return normalized;
         } catch {
           return "";
@@ -32061,13 +32347,13 @@ var init_workerGroups = __esm({
       return address3.toLowerCase();
     };
     normalizePrincipalId = (value) => {
-      const id2 = trim2(value);
+      const id2 = trim3(value);
       if (!id2 || id2.length > 180) return "";
       if (!/^[A-Za-z0-9:_@./=-]+$/.test(id2)) return "";
       return id2;
     };
     principalKeyFor = (kind, value) => {
-      const normalizedValue = trim2(value);
+      const normalizedValue = trim3(value);
       const keyValue = kind === "evm_address" || kind === "passkey_account" ? normalizedValue.toLowerCase() : normalizedValue;
       return `${kind}:${keyValue}`;
     };
@@ -32082,7 +32368,7 @@ var init_workerGroups = __esm({
         };
       }
       if (!isObj8(input)) return { ok: false, reason: "invalid_principal" };
-      const kind = trim2(input.kind || input.type).toLowerCase();
+      const kind = trim3(input.kind || input.type).toLowerCase();
       if (kind === "passkey_account" || kind === "evm_address") {
         const address3 = normalizeEvmAddress(input.address || input.account || input.id, deps);
         if (!address3) return { ok: false, reason: "invalid_principal_address" };
@@ -32117,7 +32403,7 @@ var init_workerGroups = __esm({
       return { ok: false, reason: "missing_principal" };
     };
     createWorkerGroupId = (deps = {}) => {
-      const supplied = trim2(deps.randomUUID?.());
+      const supplied = trim3(deps.randomUUID?.());
       if (supplied) {
         const normalized = normalizeWorkerGroupId(supplied);
         if (normalized) return normalized;
@@ -32145,9 +32431,9 @@ var init_workerGroups = __esm({
       const listed = Object.prototype.hasOwnProperty.call(input, "listed") ? input.listed : existing ? existing.listed : memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION;
       const removalAuth = normalizeRemovalAuth(input.removalAuth || existing?.removalAuth);
       if (!removalAuth) return { ok: false, status: 400, reason: "invalid_removal_auth" };
-      const label = trim2(input.label || existing?.label);
+      const label = trim3(input.label || existing?.label);
       if (!label || label.length > 120) return { ok: false, status: 400, reason: "invalid_group_label" };
-      const description = trim2(input.description ?? existing?.description);
+      const description = trim3(input.description ?? existing?.description);
       if (description.length > 500) return { ok: false, status: 400, reason: "invalid_group_description" };
       const imageUrlResult = normalizeImageUrl(input.imageUrl ?? existing?.imageUrl);
       if (!imageUrlResult.ok) return { ok: false, status: 400, reason: "invalid_group_image_url" };
@@ -32159,9 +32445,9 @@ var init_workerGroups = __esm({
         Object.prototype.hasOwnProperty.call(input, "memberLimit") ? input.memberLimit : existing?.memberLimit
       );
       if (!memberLimitResult.ok) return { ok: false, status: 400, reason: "invalid_group_member_limit" };
-      const joinEndsAtResult = Object.prototype.hasOwnProperty.call(input, "joinEndsAt") ? normalizeGroupJoinEndsAt(input.joinEndsAt, deps, { allowPast: !!existing }) : { ok: true, value: trim2(existing?.joinEndsAt) };
+      const joinEndsAtResult = Object.prototype.hasOwnProperty.call(input, "joinEndsAt") ? normalizeGroupJoinEndsAt(input.joinEndsAt, deps, { allowPast: !!existing }) : { ok: true, value: trim3(existing?.joinEndsAt) };
       if (!joinEndsAtResult.ok) return { ok: false, status: 400, reason: "invalid_group_join_end" };
-      const requestedAdminAddress = Object.prototype.hasOwnProperty.call(input, "adminAddress") ? trim2(input.adminAddress) : trim2(existing?.adminAddress || actorPrincipal?.address);
+      const requestedAdminAddress = Object.prototype.hasOwnProperty.call(input, "adminAddress") ? trim3(input.adminAddress) : trim3(existing?.adminAddress || actorPrincipal?.address);
       const adminAddress = requestedAdminAddress ? normalizeEvmAddress(requestedAdminAddress, deps) : "";
       if (requestedAdminAddress && !adminAddress) {
         return { ok: false, status: 400, reason: "invalid_group_admin_address" };
@@ -32214,7 +32500,7 @@ var init_workerGroups = __esm({
       if (!canonicalSlug || !canonicalSessionId) {
         return { ok: false, status: 400, reason: "worker_group_session_identity_invalid" };
       }
-      const explicitBootstrapId = trim2(env?.CE_WORKER_GROUPS_BOOTSTRAP);
+      const explicitBootstrapId = trim3(env?.CE_WORKER_GROUPS_BOOTSTRAP);
       if (explicitBootstrapId === WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL) {
         const kv2 = resolveWorkerGroupsKv(env);
         if (requireExhaustiveEmptyScan && typeof kv2?.list !== "function") {
@@ -32274,7 +32560,7 @@ var init_workerGroups = __esm({
         const configIdentity = normalizeWorkerSessionSlug(config?.slug);
         const configSessionId = resolveCanonicalWorkerSessionIdHex(config);
         const expectedIdentity = normalizeWorkerSessionSlug(canonicalSlug);
-        const bootstrapId = trim2(bootstrap?.bootstrapId);
+        const bootstrapId = trim3(bootstrap?.bootstrapId);
         if (Number(bootstrap?.version) === 2 && bootstrap?.state === "fresh_empty" && /^[0-9a-f]{64}$/.test(bootstrapId) && configIdentity === expectedIdentity && configSessionId === canonicalSessionId) {
           const existingGroups = typeof kv.list === "function" ? await scanWorkerGroupRecordsForIdentity({
             store: { kind: "kv", store: kv },
@@ -32315,12 +32601,12 @@ var init_workerGroups = __esm({
         if (!listed || typeof listed !== "object" || !Array.isArray(listed.keys)) {
           throw new Error("Worker group KV listing returned an invalid page.");
         }
-        keys.push(...listed.keys.map((entry2) => trim2(entry2?.name || entry2)).filter(Boolean));
+        keys.push(...listed.keys.map((entry2) => trim3(entry2?.name || entry2)).filter(Boolean));
         if (listed.list_complete !== false) {
           hasMore = false;
           continue;
         }
-        const nextCursor = trim2(listed.cursor);
+        const nextCursor = trim3(listed.cursor);
         if (!nextCursor || seenCursors.has(nextCursor)) {
           throw new Error("Worker group KV listing did not provide a usable continuation cursor.");
         }
@@ -32341,7 +32627,7 @@ var init_workerGroups = __esm({
       if (listed.keys.length > limit) {
         throw new Error("Worker group KV listing exceeded the requested page size.");
       }
-      const keys = listed.keys.map((entry2) => trim2(entry2?.name || entry2)).filter(Boolean);
+      const keys = listed.keys.map((entry2) => trim3(entry2?.name || entry2)).filter(Boolean);
       if (listed.list_complete !== false) return { keys, nextCursor: "" };
       const nextCursor = typeof listed.cursor === "string" ? listed.cursor : "";
       if (!nextCursor || nextCursor.length > 1024 || nextCursor === cursor) {
@@ -32497,7 +32783,7 @@ var init_workerGroups = __esm({
         row: member,
         slug,
         sessionId: canonicalSessionId
-      }) || normalizeWorkerGroupId(member?.groupId) !== normalizedGroupId || !normalizedPrincipal.ok || trim2(member?.principalKey) !== normalizedPrincipal.key) {
+      }) || normalizeWorkerGroupId(member?.groupId) !== normalizedGroupId || !normalizedPrincipal.ok || trim3(member?.principalKey) !== normalizedPrincipal.key) {
         throw new Error("Worker group membership record identity is invalid.");
       }
       await store.store.put(
@@ -32620,7 +32906,7 @@ var init_workerGroups = __esm({
       if (!canonicalSlug || !canonicalSessionId) {
         return { ok: false, status: 400, reason: "worker_group_session_identity_invalid" };
       }
-      const requestedGroupId = trim2(input?.groupId);
+      const requestedGroupId = trim3(input?.groupId);
       if (requestedGroupId && isAddressShapedWorkerGroupId(requestedGroupId)) {
         return { ok: false, status: 400, reason: "invalid_worker_group_id" };
       }
@@ -32833,8 +33119,8 @@ var init_workerGroups = __esm({
       const authorityByGroupId = /* @__PURE__ */ new Map();
       for (const authority of catalog2.groups || []) {
         const groupId = normalizeWorkerGroupId(authority?.groupId);
-        const joinMode = trim2(authority?.joinMode).toLowerCase();
-        const memberVisibility = trim2(authority?.memberVisibility).toLowerCase();
+        const joinMode = trim3(authority?.joinMode).toLowerCase();
+        const memberVisibility = trim3(authority?.memberVisibility).toLowerCase();
         const memberCount = Number(authority?.memberCount);
         if (!groupId || authorityByGroupId.has(groupId) || !JOIN_MODE_SET.has(joinMode) || !Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(memberVisibility) || !Number.isSafeInteger(memberCount) || memberCount < 0) {
           return normalizeWorkerGroupMembershipFailure();
@@ -32919,7 +33205,7 @@ var init_workerGroups = __esm({
       groupId: normalizeWorkerGroupId(member?.groupId),
       sessionSlug: normalizeWorkerSessionSlug(member?.sessionSlug),
       principal: member?.principal,
-      addedAt: trim2(member?.addedAt)
+      addedAt: trim3(member?.addedAt)
     });
     listWorkerGroupMembersForPrincipal = async ({
       env,
@@ -32950,8 +33236,8 @@ var init_workerGroups = __esm({
       if (authority?.listed !== true && authority?.isMember !== true) {
         return { ok: false, status: 404, reason: "worker_group_not_found" };
       }
-      const memberVisibility = trim2(authority?.memberVisibility).toLowerCase();
-      const joinMode = trim2(authority?.joinMode).toLowerCase();
+      const memberVisibility = trim3(authority?.memberVisibility).toLowerCase();
+      const joinMode = trim3(authority?.joinMode).toLowerCase();
       const memberCount = Number(authority?.memberCount);
       if (!Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(memberVisibility) || !JOIN_MODE_SET.has(joinMode) || !Number.isSafeInteger(memberCount) || memberCount < 0) {
         return normalizeWorkerGroupMembershipFailure();
@@ -32998,8 +33284,8 @@ var init_workerGroups = __esm({
       const seenGroupIds = /* @__PURE__ */ new Set();
       for (const authoritativeGroup of authority.groups) {
         const authoritativeGroupId = normalizeWorkerGroupId(authoritativeGroup?.groupId);
-        const authoritativeJoinMode = trim2(authoritativeGroup?.joinMode).toLowerCase();
-        const authoritativeVisibility = trim2(authoritativeGroup?.memberVisibility).toLowerCase();
+        const authoritativeJoinMode = trim3(authoritativeGroup?.joinMode).toLowerCase();
+        const authoritativeVisibility = trim3(authoritativeGroup?.memberVisibility).toLowerCase();
         const authoritativeMemberCount = Number(authoritativeGroup?.memberCount);
         if (!authoritativeGroupId || seenGroupIds.has(authoritativeGroupId) || !JOIN_MODE_SET.has(authoritativeJoinMode) || !Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(authoritativeVisibility) || !Number.isSafeInteger(authoritativeMemberCount) || authoritativeMemberCount < 0) {
           return normalizeWorkerGroupMembershipFailure();
@@ -33116,7 +33402,7 @@ var init_workerGroups = __esm({
           if (group.joinMode !== WORKER_GROUP_JOIN_MODES2.OPEN) {
             return { ok: false, status: 403, reason: WORKER_GROUP_JOIN_REFUSED };
           }
-          const joinEndsAt = Date.parse(trim2(group.joinEndsAt));
+          const joinEndsAt = Date.parse(trim3(group.joinEndsAt));
           if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(deps.now?.() || Date.now())) {
             return { ok: false, status: 403, reason: "worker_group_join_ended" };
           }
@@ -33316,7 +33602,7 @@ var init_workerGroups = __esm({
     };
     participantGroupCreationAllowed = (config) => config?.groupCreationPolicy === "participants";
     isSelfJoinableWorkerGroup = (group, nowMs2) => {
-      const joinEndsAt = Date.parse(trim2(group?.joinEndsAt));
+      const joinEndsAt = Date.parse(trim3(group?.joinEndsAt));
       return group?.joinMode === WORKER_GROUP_JOIN_MODES2.OPEN && !(Number.isFinite(joinEndsAt) && joinEndsAt <= nowMs2);
     };
     workerGroupHasRoom = (group, config) => {
@@ -33955,14 +34241,14 @@ var init_workerGroups = __esm({
 });
 
 // workers/sessionCorsWorker/workerCanonicalAuthority.js
-var trim3, lower, isObj9, ALLOWED_WORKER_SCOPE_KEYS, normalizeScopeList, listAddresses, resolveRoleAddressSet, resolveAuthorityPolicy, resolveLoginConditions, evaluateLoginCondition, passesLoginGate, isWorkerCanonicalSessionConfig, resolveWorkerCanonicalLoginScopes, evaluateWorkerCanonicalAnonymousAccess;
+var trim4, lower, isObj9, ALLOWED_WORKER_SCOPE_KEYS, normalizeScopeList, listAddresses, resolveRoleAddressSet, resolveAuthorityPolicy, resolveLoginConditions, evaluateLoginCondition, passesLoginGate, isWorkerCanonicalSessionConfig, resolveWorkerCanonicalLoginScopes, evaluateWorkerCanonicalAnonymousAccess;
 var init_workerCanonicalAuthority = __esm({
   "workers/sessionCorsWorker/workerCanonicalAuthority.js"() {
     init_workerGroups();
     init_sessionConfigMutation();
     init_stringCoercion();
-    trim3 = (value) => toStr6(value).trim();
-    lower = (value) => trim3(value).toLowerCase();
+    trim4 = (value) => toStr6(value).trim();
+    lower = (value) => trim4(value).toLowerCase();
     isObj9 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     ALLOWED_WORKER_SCOPE_KEYS = /* @__PURE__ */ new Set([
       "ai",
@@ -34012,7 +34298,7 @@ var init_workerCanonicalAuthority = __esm({
         return resolveRoleAddressSet({ config, role }).has(lower(address3));
       }
       if (kind === "worker_group") {
-        const groupId = trim3(condition?.groupId);
+        const groupId = trim4(condition?.groupId);
         if (!groupId) return false;
         const checkMembership = typeof deps?.isWorkerGroupMember === "function" ? deps.isWorkerGroupMember : isWorkerGroupMember;
         const result = await checkMembership({
@@ -34837,7 +35123,7 @@ async function issueAgentCredential({
   const normalizedTtl = Math.max(1, Math.ceil((expiresMs - issuedMs) / 1e3));
   const token = `ceagt_${randomSecret2()}`;
   const tokenHash = await sha256Hex2(token);
-  const record5 = {
+  const record6 = {
     type: "agent_credential",
     version: 2,
     workerVersion: SESSION_AGENT_VERSION,
@@ -34863,7 +35149,7 @@ async function issueAgentCredential({
     expiresAt,
     ttlSeconds: normalizedTtl
   };
-  assertNoSecretShape(record5, "Agent credential records must not serialize bearer tokens.");
+  assertNoSecretShape(record6, "Agent credential records must not serialize bearer tokens.");
   const metadata = {
     v: 2,
     t: "agent_credential",
@@ -34876,7 +35162,7 @@ async function issueAgentCredential({
   assertNoSecretShape(metadata, "Agent credential metadata must not serialize secrets.");
   const recordKey2 = tokenKvKey(tokenHash);
   try {
-    await kv.put(recordKey2, JSON.stringify(record5), {
+    await kv.put(recordKey2, JSON.stringify(record6), {
       expirationTtl: Math.max(60, normalizedTtl),
       metadata
     });
@@ -34915,8 +35201,8 @@ async function issueAgentCredential({
     ok: true,
     token,
     tokenHash,
-    tokenPrefix: record5.tokenPrefix,
-    record: record5
+    tokenPrefix: record6.tokenPrefix,
+    record: record6
   };
 }
 async function loadAgentCredential({ env = {}, token = "", now = null } = {}) {
@@ -34972,8 +35258,8 @@ async function revokeAgentCredentialHash({ env = {}, tokenHash = "" } = {}) {
   }
   return { ok: true, tokenHash: safeString(tokenHash).toLowerCase() };
 }
-function agentCredentialHasScope(record5 = {}, scope = "") {
-  const scopes = new Set(normalizeScopes(record5.scopes || []));
+function agentCredentialHasScope(record6 = {}, scope = "") {
+  const scopes = new Set(normalizeScopes(record6.scopes || []));
   return scopes.has(scope);
 }
 var AGENT_CREDENTIAL_KV_PREFIX, AGENT_CREDENTIAL_SLOT_KV_PREFIX, AGENT_CREDENTIAL_DEFAULT_TTL_SECONDS, AGENT_BROWSER_CREDENTIAL_TTL_SECONDS, AGENT_MEMBER_CREDENTIAL_MAX_TTL_SECONDS, AGENT_CREDENTIAL_AUDIENCES, AGENT_CREDENTIAL_KINDS, AGENT_CREDENTIAL_SCOPES, AGENT_CREDENTIAL_DEFAULT_SCOPES;
@@ -35057,26 +35343,26 @@ var init_authority = __esm({
       };
       return agentEnv;
     };
-    validateCredentialAuthority = async ({ env, record: record5, validateSourceJwt, depth = 0 }) => {
+    validateCredentialAuthority = async ({ env, record: record6, validateSourceJwt, depth = 0 }) => {
       const ctx = env.AGENT_CONTEXT;
       if (!ctx || !agentHttpEnabled(ctx.config)) throw authorityError("agent_http_disabled");
-      if (record5.sessionId !== ctx.sessionId || record5.sessionSlug !== ctx.slug || record5.sessionWorkerOrigin !== ctx.origin || record5.authzEpoch !== ctx.authzEpoch) {
+      if (record6.sessionId !== ctx.sessionId || record6.sessionSlug !== ctx.slug || record6.sessionWorkerOrigin !== ctx.origin || record6.authzEpoch !== ctx.authzEpoch) {
         throw authorityError("agent_credential_authority_stale", 401);
       }
-      if (!Object.values(AGENT_CREDENTIAL_KINDS).includes(record5.credentialKind) || !Object.values(AGENT_CREDENTIAL_AUDIENCES).includes(record5.audience) || record5.credentialKind === "browser" !== (record5.audience === AGENT_CREDENTIAL_AUDIENCES.SESSION_AGENT_BROWSER)) {
+      if (!Object.values(AGENT_CREDENTIAL_KINDS).includes(record6.credentialKind) || !Object.values(AGENT_CREDENTIAL_AUDIENCES).includes(record6.audience) || record6.credentialKind === "browser" !== (record6.audience === AGENT_CREDENTIAL_AUDIENCES.SESSION_AGENT_BROWSER)) {
         throw authorityError("agent_credential_purpose_invalid", 401);
       }
-      if (record5.credentialKind === "browser" && !record5.sourceCredentialHash || record5.credentialKind === "member" && !record5.sourceParticipant) throw authorityError("agent_credential_source_missing", 401);
-      if (record5.sourceCredentialHash) {
+      if (record6.credentialKind === "browser" && !record6.sourceCredentialHash || record6.credentialKind === "member" && !record6.sourceParticipant) throw authorityError("agent_credential_source_missing", 401);
+      if (record6.sourceCredentialHash) {
         if (depth > 0) throw authorityError("agent_credential_source_invalid", 401);
-        const source = await loadAgentCredentialHash({ env, tokenHash: record5.sourceCredentialHash, now: new Date(ctx.now()).toISOString() });
+        const source = await loadAgentCredentialHash({ env, tokenHash: record6.sourceCredentialHash, now: new Date(ctx.now()).toISOString() });
         if (!source.ok) throw authorityError("agent_credential_source_inactive", 401);
         await validateCredentialAuthority({ env, record: source.record, validateSourceJwt, depth: depth + 1 });
-        if (source.record.principal.principalId !== record5.principal.principalId || source.record.accountAddress.toLowerCase() !== record5.accountAddress.toLowerCase() || record5.scopes.some((scope) => !source.record.scopes.includes(scope)) || Date.parse(record5.expiresAt) > Date.parse(source.record.expiresAt)) throw authorityError("agent_credential_source_invalid", 401);
+        if (source.record.principal.principalId !== record6.principal.principalId || source.record.accountAddress.toLowerCase() !== record6.accountAddress.toLowerCase() || record6.scopes.some((scope) => !source.record.scopes.includes(scope)) || Date.parse(record6.expiresAt) > Date.parse(source.record.expiresAt)) throw authorityError("agent_credential_source_invalid", 401);
       }
-      if (record5.sourceParticipant) {
+      if (record6.sourceParticipant) {
         if (!validateSourceJwt) throw authorityError("agent_credential_source_unavailable", 503);
-        await validateSourceJwt(record5.sourceParticipant);
+        await validateSourceJwt(record6.sourceParticipant);
       }
     };
     validateAgentParticipantSource = async ({ request, env, payload, slug, deps = {} }) => {
@@ -35099,8 +35385,8 @@ var init_authority = __esm({
       if (!payload || payload.slug !== context.slug || payload.sessionId !== context.sessionId || payload.authzEpoch !== context.authzEpoch || !Number.isSafeInteger(payload.exp) || payload.exp * 1e3 <= context.now()) {
         throw authorityError("agent_member_source_stale", 401);
       }
-      const record5 = await validateAuthTokenRecord({ env, payload, slug: context.slug });
-      if (!record5.ok) throw authorityError("agent_member_source_revoked", 401);
+      const record6 = await validateAuthTokenRecord({ env, payload, slug: context.slug });
+      if (!record6.ok) throw authorityError("agent_member_source_revoked", 401);
       const source = await validateAgentParticipantSource({ request: new Request(context.origin), env, payload, slug: context.slug, deps });
       if (!source.ok) throw authorityError("agent_member_source_revoked", 401);
       try {
@@ -62998,10 +63284,10 @@ var init_transport = __esm({
 });
 
 // shared/questions/ratingScale.mjs
-var trim4, isObj10, RATING_SCALE_METADATA_KEYS, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, hasRatingScaleMetadata, toFiniteNumber, normalizeRatingLabel, normalizeRatingScale, DEFAULT_RATING_SCALE, ratingStepFor, decimalPlaces, normalizeRatingAnswer;
+var trim5, isObj10, RATING_SCALE_METADATA_KEYS, hasMetadataValue, recordHasRatingScaleMetadata, pickRatingScaleRecord, hasRatingScaleMetadata, toFiniteNumber, normalizeRatingLabel, normalizeRatingScale, DEFAULT_RATING_SCALE, ratingStepFor, decimalPlaces, normalizeRatingAnswer;
 var init_ratingScale = __esm({
   "shared/questions/ratingScale.mjs"() {
-    trim4 = (value) => String(value == null ? "" : value).trim();
+    trim5 = (value) => String(value == null ? "" : value).trim();
     isObj10 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     RATING_SCALE_METADATA_KEYS = [
       "min",
@@ -63013,8 +63299,8 @@ var init_ratingScale = __esm({
       "maxLabel",
       "highLabel"
     ];
-    hasMetadataValue = (value) => value !== void 0 && value !== null && trim4(value) !== "";
-    recordHasRatingScaleMetadata = (record5 = {}) => RATING_SCALE_METADATA_KEYS.some((key) => hasMetadataValue(record5[key]));
+    hasMetadataValue = (value) => value !== void 0 && value !== null && trim5(value) !== "";
+    recordHasRatingScaleMetadata = (record6 = {}) => RATING_SCALE_METADATA_KEYS.some((key) => hasMetadataValue(record6[key]));
     pickRatingScaleRecord = (question = {}) => {
       const scale = isObj10(question.scale) ? question.scale : null;
       if (scale && recordHasRatingScaleMetadata(scale)) return scale;
@@ -63028,7 +63314,7 @@ var init_ratingScale = __esm({
       return Number.isFinite(number2) ? number2 : null;
     };
     normalizeRatingLabel = (value, fallback) => {
-      const label = trim4(value);
+      const label = trim5(value);
       return label || String(fallback);
     };
     normalizeRatingScale = (question = {}) => {
@@ -63056,7 +63342,7 @@ var init_ratingScale = __esm({
     };
     DEFAULT_RATING_SCALE = Object.freeze({ min: 0, max: 10, minLabel: "0", maxLabel: "10" });
     ratingStepFor = (question = {}) => {
-      const source = [question.scale, question.ratingScale].find((record5) => isObj10(record5) && recordHasRatingScaleMetadata(record5)) || question;
+      const source = [question.scale, question.ratingScale].find((record6) => isObj10(record6) && recordHasRatingScaleMetadata(record6)) || question;
       const step = Number(source.step);
       return Number.isFinite(step) && step > 0 ? step : 1;
     };
@@ -63080,9 +63366,9 @@ var init_ratingScale = __esm({
 
 // workers/sessionCorsWorker/agent/ratingScale.mjs
 function normalizeAgentRatingScale(question = {}) {
-  const record5 = withLegacyScale(question);
-  const { min, max } = normalizeRatingScale(record5) || DEFAULT_RATING_SCALE;
-  return { min, max, step: ratingStepFor(record5) };
+  const record6 = withLegacyScale(question);
+  const { min, max } = normalizeRatingScale(record6) || DEFAULT_RATING_SCALE;
+  return { min, max, step: ratingStepFor(record6) };
 }
 function normalizeAgentRatingAnswer(value, question = {}) {
   return normalizeRatingAnswer(value, withLegacyScale(question));
@@ -63925,9 +64211,9 @@ async function listKvRecordsByPrefix(env = {}, prefix = "", {
     for (const entry2 of keys) {
       const key = safeString(entry2?.name || entry2);
       if (!key) continue;
-      const record5 = safeJsonParse(await kv.get(key).catch(() => null), null);
-      if (record5 && typeof record5 === "object" && !Array.isArray(record5)) {
-        records.push({ ...record5, key });
+      const record6 = safeJsonParse(await kv.get(key).catch(() => null), null);
+      if (record6 && typeof record6 === "object" && !Array.isArray(record6)) {
+        records.push({ ...record6, key });
       }
       if (records.length >= maxRecords) return records;
     }
@@ -63966,8 +64252,8 @@ async function listKvKeyMetadataByPrefix(env = {}, prefix = "", {
 async function readKvRecord(env = {}, key = "") {
   const kv = env?.AGENT_ACTION_KV;
   if (!key || !kv || typeof kv.get !== "function") return null;
-  const record5 = safeJsonParse(await kv.get(key).catch(() => null), null);
-  return record5 && typeof record5 === "object" && !Array.isArray(record5) ? { ...record5, key } : null;
+  const record6 = safeJsonParse(await kv.get(key).catch(() => null), null);
+  return record6 && typeof record6 === "object" && !Array.isArray(record6) ? { ...record6, key } : null;
 }
 function buildAgentActivityMetadata({
   type = "",
@@ -64055,31 +64341,31 @@ function publicItem(item = {}, {
   assertNoSecretShape(out, "Agent activity items must not serialize secrets.");
   return out;
 }
-function draftItem(record5 = {}, options = {}) {
+function draftItem(record6 = {}, options = {}) {
   return publicItem({
     type: "answer_draft",
-    sessionSlug: sanitizeSessionSlug(record5.sessionSlug),
-    questionId: safeString(record5.questionId),
-    createdAt: safeString(record5.selectedAt || record5.createdAt),
-    status: safeString(record5.status || "draft_saved"),
-    editCount: Number(record5.editCount || 0),
-    originSource: safeString(record5.originSource || record5.origin?.source),
-    summary: options.includeContent ? `Draft: ${safeString(record5.answerLabel).slice(0, 140)}` : "Answer draft saved for review",
+    sessionSlug: sanitizeSessionSlug(record6.sessionSlug),
+    questionId: safeString(record6.questionId),
+    createdAt: safeString(record6.selectedAt || record6.createdAt),
+    status: safeString(record6.status || "draft_saved"),
+    editCount: Number(record6.editCount || 0),
+    originSource: safeString(record6.originSource || record6.origin?.source),
+    summary: options.includeContent ? `Draft: ${safeString(record6.answerLabel).slice(0, 140)}` : "Answer draft saved for review",
     pendingAction: "review_draft",
     content: {
-      answerLabel: safeString(record5.answerLabel),
-      answerValue: safeString(record5.answerValue),
-      controlType: safeString(record5.controlType)
+      answerLabel: safeString(record6.answerLabel),
+      answerValue: safeString(record6.answerValue),
+      controlType: safeString(record6.controlType)
     }
   }, options);
 }
-function recommendationItems(record5 = {}, options = {}) {
-  const recommendations = Array.isArray(record5.recommendations) ? record5.recommendations : [];
+function recommendationItems(record6 = {}, options = {}) {
+  const recommendations = Array.isArray(record6.recommendations) ? record6.recommendations : [];
   return recommendations.map((recommendation) => publicItem({
     type: "question_vote_recommendation",
-    sessionSlug: sanitizeSessionSlug(record5.sessionSlug),
+    sessionSlug: sanitizeSessionSlug(record6.sessionSlug),
     questionId: safeString(recommendation.questionId),
-    createdAt: safeString(record5.createdAt),
+    createdAt: safeString(record6.createdAt),
     status: "pending_review",
     summary: `Suggested ${safeString(recommendation.suggestedVote || "vote")} vote`,
     pendingAction: "approve_or_override_agent_question_votes",
@@ -64091,13 +64377,13 @@ function recommendationItems(record5 = {}, options = {}) {
     }
   }, options));
 }
-function decisionItems(record5 = {}, options = {}) {
-  const decisions = Array.isArray(record5.decisions) ? record5.decisions : [];
+function decisionItems(record6 = {}, options = {}) {
+  const decisions = Array.isArray(record6.decisions) ? record6.decisions : [];
   return decisions.map((decision) => publicItem({
     type: "question_vote_decision",
-    sessionSlug: sanitizeSessionSlug(record5.sessionSlug),
+    sessionSlug: sanitizeSessionSlug(record6.sessionSlug),
     questionId: safeString(decision.questionId),
-    createdAt: safeString(record5.createdAt),
+    createdAt: safeString(record6.createdAt),
     status: decision.applied ? "applied" : safeString(decision.approvalStatus || "pending_review"),
     summary: decision.applied ? `Applied ${safeString(decision.finalVote || decision.suggestedVote)} vote` : `Pending ${safeString(decision.suggestedVote || decision.finalVote || "vote")} decision`,
     pendingAction: decision.applied ? "" : "approve_or_override_agent_question_votes",
@@ -64110,35 +64396,35 @@ function decisionItems(record5 = {}, options = {}) {
     }
   }, options));
 }
-function proposedQuestionItem(record5 = {}, options = {}) {
-  const prompt = safeString(record5.prompt);
+function proposedQuestionItem(record6 = {}, options = {}) {
+  const prompt = safeString(record6.prompt);
   return publicItem({
     type: "proposed_question",
-    sessionSlug: sanitizeSessionSlug(record5.sessionSlug),
-    questionId: safeString(record5.questionId),
-    createdAt: safeString(record5.createdAt),
-    status: safeString(record5.status || "active"),
+    sessionSlug: sanitizeSessionSlug(record6.sessionSlug),
+    questionId: safeString(record6.questionId),
+    createdAt: safeString(record6.createdAt),
+    status: safeString(record6.status || "active"),
     summary: prompt ? `Question proposed: ${prompt.slice(0, 140)}` : "Question proposed for review",
     pendingAction: "",
     content: {
       prompt,
-      questionType: safeString(record5.questionType),
-      tags: Array.isArray(record5.tags) ? record5.tags.map(safeString).filter(Boolean) : []
+      questionType: safeString(record6.questionType),
+      tags: Array.isArray(record6.tags) ? record6.tags.map(safeString).filter(Boolean) : []
     }
   }, options);
 }
-function groupProposalItem(record5 = {}, options = {}) {
+function groupProposalItem(record6 = {}, options = {}) {
   return publicItem({
     type: "group_proposal",
-    sessionSlug: sanitizeSessionSlug(record5.sessionSlug),
-    createdAt: safeString(record5.createdAt),
-    status: safeString(record5.status || "pending_user_decision"),
-    summary: safeString(record5.message) || "Group membership suggestion",
+    sessionSlug: sanitizeSessionSlug(record6.sessionSlug),
+    createdAt: safeString(record6.createdAt),
+    status: safeString(record6.status || "pending_user_decision"),
+    summary: safeString(record6.message) || "Group membership suggestion",
     pendingAction: "review_group_proposal",
     content: {
-      categoryId: safeString(record5.categoryId),
-      optionIds: Array.isArray(record5.optionIds) ? record5.optionIds.map(safeString).filter(Boolean) : [],
-      message: safeString(record5.message)
+      categoryId: safeString(record6.categoryId),
+      optionIds: Array.isArray(record6.optionIds) ? record6.optionIds.map(safeString).filter(Boolean) : [],
+      message: safeString(record6.message)
     }
   }, options);
 }
@@ -64158,8 +64444,8 @@ async function listMetadataBackedRecords(env = {}, prefix = "", {
       records.push(metadataRecord);
       continue;
     }
-    const record5 = await readKvRecord(env, entry2.key);
-    if (record5 && filter(record5)) records.push(record5);
+    const record6 = await readKvRecord(env, entry2.key);
+    if (record6 && filter(record6)) records.push(record6);
   }
   return records;
 }
@@ -64179,28 +64465,28 @@ async function listAgentActivity({
   const drafts = await listMetadataBackedRecords(env, `${ANSWER_DRAFT_KV_PREFIX2}${userId}:`, {
     includeContent,
     limit: 300,
-    filter: (record5) => !slugSet.size || slugSet.has(sanitizeSessionSlug(record5.sessionSlug))
+    filter: (record6) => !slugSet.size || slugSet.has(sanitizeSessionSlug(record6.sessionSlug))
   });
-  drafts.forEach((record5) => items.push(draftItem(record5, options)));
+  drafts.forEach((record6) => items.push(draftItem(record6, options)));
   for (const slug of slugs) {
     for (const subjectKey of /* @__PURE__ */ new Set([kvKeySafePart(userId), userId])) {
       const recommendations = await listKvRecordsByPrefix(env, `${AGENT_QUESTION_VOTE_RECOMMENDATION_KV_PREFIX}${slug}:${subjectKey}:`, { limit: 300 });
-      recommendations.filter((record5) => safeString(record5.telegramUserId) === userId).forEach((record5) => items.push(...recommendationItems(record5, options)));
+      recommendations.filter((record6) => safeString(record6.telegramUserId) === userId).forEach((record6) => items.push(...recommendationItems(record6, options)));
       const decisions = await listKvRecordsByPrefix(env, `${AGENT_QUESTION_VOTE_DECISION_KV_PREFIX}${slug}:${subjectKey}:`, { limit: 300 });
-      decisions.filter((record5) => safeString(record5.telegramUserId) === userId).forEach((record5) => items.push(...decisionItems(record5, options)));
+      decisions.filter((record6) => safeString(record6.telegramUserId) === userId).forEach((record6) => items.push(...decisionItems(record6, options)));
     }
     const proposed = await listMetadataBackedRecords(env, `${PROPOSED_QUESTION_KV_PREFIX}${slug}:`, {
       includeContent,
       limit: 1e3,
-      filter: (record5) => safeString(record5.createdByTelegramUserId) === userId
+      filter: (record6) => safeString(record6.createdByTelegramUserId) === userId
     });
-    proposed.forEach((record5) => items.push(proposedQuestionItem(record5, options)));
+    proposed.forEach((record6) => items.push(proposedQuestionItem(record6, options)));
     const groupProposals = await listMetadataBackedRecords(env, `${LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX}${slug}:`, {
       includeContent,
       limit: 1e3,
-      filter: (record5) => [record5.proposedBy, record5.targetTelegramUserId].map(safeString).includes(userId)
+      filter: (record6) => [record6.proposedBy, record6.targetTelegramUserId].map(safeString).includes(userId)
     });
-    groupProposals.forEach((record5) => items.push(groupProposalItem(record5, options)));
+    groupProposals.forEach((record6) => items.push(groupProposalItem(record6, options)));
   }
   return items.filter(Boolean).sort((left, right) => Date.parse(createdAtOf(right)) - Date.parse(createdAtOf(left))).slice(0, Math.max(1, Math.min(100, Number(limit) || 50)));
 }
@@ -64238,16 +64524,16 @@ function answerDraftViewKey({
   const qid = questionIdKeyPart(selectedQuestionId || "question");
   return telegramUserId && slug && qid ? `${ANSWER_DRAFT_VIEW_KV_PREFIX}${telegramUserId}:${slug}:${qid}` : "";
 }
-function answerDraftFingerprint(record5 = {}) {
+function answerDraftFingerprint(record6 = {}) {
   return stableFingerprint({
-    answerLabel: safeString(record5.answerLabel),
-    answerValue: safeString(record5.answerValue),
-    controlType: safeString(record5.controlType)
+    answerLabel: safeString(record6.answerLabel),
+    answerValue: safeString(record6.answerValue),
+    controlType: safeString(record6.controlType)
   });
 }
-function answerDraftOrigin(record5 = null) {
-  if (!record5 || typeof record5 !== "object" || Array.isArray(record5)) return null;
-  const origin = record5.origin && typeof record5.origin === "object" && !Array.isArray(record5.origin) ? record5.origin : null;
+function answerDraftOrigin(record6 = null) {
+  if (!record6 || typeof record6 !== "object" || Array.isArray(record6)) return null;
+  const origin = record6.origin && typeof record6.origin === "object" && !Array.isArray(record6.origin) ? record6.origin : null;
   if (origin) {
     return {
       source: safeString(origin.source) || null,
@@ -64260,23 +64546,23 @@ function answerDraftOrigin(record5 = null) {
     };
   }
   return {
-    source: safeString(record5.source) || null,
-    agentMetadata: record5.agentMetadata && typeof record5.agentMetadata === "object" && !Array.isArray(record5.agentMetadata) ? record5.agentMetadata : null,
-    answerLabel: safeString(record5.answerLabel),
-    answerValue: safeString(record5.answerValue),
-    controlType: safeString(record5.controlType),
-    fingerprint: safeString(record5.fingerprint) || answerDraftFingerprint(record5),
-    savedAt: safeString(record5.selectedAt) || null
+    source: safeString(record6.source) || null,
+    agentMetadata: record6.agentMetadata && typeof record6.agentMetadata === "object" && !Array.isArray(record6.agentMetadata) ? record6.agentMetadata : null,
+    answerLabel: safeString(record6.answerLabel),
+    answerValue: safeString(record6.answerValue),
+    controlType: safeString(record6.controlType),
+    fingerprint: safeString(record6.fingerprint) || answerDraftFingerprint(record6),
+    savedAt: safeString(record6.selectedAt) || null
   };
 }
 async function writeDraftLifecycleEvent() {
   return false;
 }
-function canonicalDraftAnswerForm(record5 = {}) {
-  const raw = safeString(record5.answerValue);
+function canonicalDraftAnswerForm(record6 = {}) {
+  const raw = safeString(record6.answerValue);
   const parsed = safeEnvJsonParse(raw, null);
   const source = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
-  const type = CANONICAL_ANSWER_KINDS[lower2(safeString(source?.questionType))] || CANONICAL_ANSWER_KINDS[lower2(safeString(record5.controlType))] || "unknown";
+  const type = CANONICAL_ANSWER_KINDS[lower2(safeString(source?.questionType))] || CANONICAL_ANSWER_KINDS[lower2(safeString(record6.controlType))] || "unknown";
   const text9 = safeString(source ? source.text ?? source.value ?? "" : raw);
   const comments = safeString(source?.comments);
   if (type === "binary") {
@@ -64296,8 +64582,8 @@ function canonicalDraftAnswerForm(record5 = {}) {
   }
   return { type, text: text9, comments };
 }
-function answerDraftSemanticFingerprint(record5 = {}) {
-  return stableFingerprint(canonicalDraftAnswerForm(record5));
+function answerDraftSemanticFingerprint(record6 = {}) {
+  return stableFingerprint(canonicalDraftAnswerForm(record6));
 }
 function buildDraftDelta(origin = null, finalAnswer = null) {
   if (!origin || !finalAnswer) return null;
@@ -64441,7 +64727,7 @@ async function persistAnswerDraft({
   const existing = safeEnvJsonParse(stored, null);
   const previous = existing && typeof existing === "object" && !Array.isArray(existing) ? existing : null;
   const savedAt = createdAt || nowIso2();
-  const record5 = {
+  const record6 = {
     version: 2,
     telegramUserId: safeString(normalized.user?.telegramUserId),
     chatId: safeString(normalized.chat?.chatId),
@@ -64456,64 +64742,64 @@ async function persistAnswerDraft({
     selectedAt: savedAt
   };
   if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
-    record5.source = safeString(metadata.source) || null;
-    record5.actionMetadata = { ...metadata };
+    record6.source = safeString(metadata.source) || null;
+    record6.actionMetadata = { ...metadata };
   }
   if (agentMetadata && typeof agentMetadata === "object" && !Array.isArray(agentMetadata)) {
-    record5.agentMetadata = { ...agentMetadata };
+    record6.agentMetadata = { ...agentMetadata };
   }
-  if (!record5.telegramUserId || !record5.sessionSlug || !record5.questionId || !record5.answerLabel) {
+  if (!record6.telegramUserId || !record6.sessionSlug || !record6.questionId || !record6.answerLabel) {
     return { ok: false, reason: "answer_draft_incomplete" };
   }
-  record5.fingerprint = answerDraftFingerprint(record5);
-  record5.semanticFingerprint = answerDraftSemanticFingerprint(record5);
-  record5.origin = answerDraftOrigin(previous) || {
-    source: record5.source || null,
-    agentMetadata: record5.agentMetadata || null,
-    answerLabel: record5.answerLabel,
-    answerValue: record5.answerValue,
-    controlType: record5.controlType,
-    fingerprint: record5.fingerprint,
+  record6.fingerprint = answerDraftFingerprint(record6);
+  record6.semanticFingerprint = answerDraftSemanticFingerprint(record6);
+  record6.origin = answerDraftOrigin(previous) || {
+    source: record6.source || null,
+    agentMetadata: record6.agentMetadata || null,
+    answerLabel: record6.answerLabel,
+    answerValue: record6.answerValue,
+    controlType: record6.controlType,
+    fingerprint: record6.fingerprint,
     savedAt
   };
   const previousSemanticFingerprint = previous ? safeString(previous.semanticFingerprint) || answerDraftSemanticFingerprint(previous) : "";
-  const contentChanged = Boolean(previous) && previousSemanticFingerprint !== record5.semanticFingerprint;
-  const isAgentWrite = record5.source === "agent_handoff";
-  record5.editCount = Number(previous?.editCount || 0) + (contentChanged ? 1 : 0);
-  record5.lastEditedAt = contentChanged ? savedAt : safeString(previous?.lastEditedAt) || null;
-  record5.humanEditCount = Number(previous?.humanEditCount || 0) + (contentChanged && !isAgentWrite ? 1 : 0);
-  record5.lastEditSource = contentChanged ? record5.source || null : safeString(previous?.lastEditSource) || null;
+  const contentChanged = Boolean(previous) && previousSemanticFingerprint !== record6.semanticFingerprint;
+  const isAgentWrite = record6.source === "agent_handoff";
+  record6.editCount = Number(previous?.editCount || 0) + (contentChanged ? 1 : 0);
+  record6.lastEditedAt = contentChanged ? savedAt : safeString(previous?.lastEditedAt) || null;
+  record6.humanEditCount = Number(previous?.humanEditCount || 0) + (contentChanged && !isAgentWrite ? 1 : 0);
+  record6.lastEditSource = contentChanged ? record6.source || null : safeString(previous?.lastEditSource) || null;
   const previousAgentRevision = previous?.agentRevision && typeof previous.agentRevision === "object" && !Array.isArray(previous.agentRevision) ? previous.agentRevision : null;
-  record5.agentRevision = isAgentWrite ? { semanticFingerprint: record5.semanticFingerprint, savedAt } : previousAgentRevision;
-  assertNoSecretShape(record5, "Agent answer drafts must not serialize secrets.");
+  record6.agentRevision = isAgentWrite ? { semanticFingerprint: record6.semanticFingerprint, savedAt } : previousAgentRevision;
+  assertNoSecretShape(record6, "Agent answer drafts must not serialize secrets.");
   const activityMetadata = buildAgentActivityMetadata({
     type: "answer_draft",
-    status: record5.status,
-    createdAt: record5.selectedAt,
+    status: record6.status,
+    createdAt: record6.selectedAt,
     pendingAction: "review_draft",
-    sessionSlug: record5.sessionSlug,
-    questionId: record5.questionId,
-    telegramUserId: record5.telegramUserId,
-    editCount: record5.editCount,
-    originSource: record5.origin?.source || ""
+    sessionSlug: record6.sessionSlug,
+    questionId: record6.questionId,
+    telegramUserId: record6.telegramUserId,
+    editCount: record6.editCount,
+    originSource: record6.origin?.source || ""
   });
-  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record5), {
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record6), {
     expirationTtl: DEFAULT_GROUP_SESSION_TTL_SECONDS,
     metadata: activityMetadata
   });
   if (!previous || contentChanged) {
     await writeDraftLifecycleEvent(env, {
       event: previous ? "draft_edited" : "draft_created",
-      sessionSlug: record5.sessionSlug,
-      questionId: record5.questionId,
-      source: safeString(record5.source),
-      originSource: safeString(record5.origin?.source),
-      controlType: record5.controlType,
-      editCount: record5.editCount,
-      telegramUserId: record5.telegramUserId
+      sessionSlug: record6.sessionSlug,
+      questionId: record6.questionId,
+      source: safeString(record6.source),
+      originSource: safeString(record6.origin?.source),
+      controlType: record6.controlType,
+      editCount: record6.editCount,
+      telegramUserId: record6.telegramUserId
     });
   }
-  return { ok: true, key, draft: record5 };
+  return { ok: true, key, draft: record6 };
 }
 var init_answerDrafts = __esm({
   "workers/sessionCorsWorker/agent/answerDrafts.mjs"() {
@@ -64526,7 +64812,7 @@ var init_answerDrafts = __esm({
 });
 
 // shared/questions/answerValue.mjs
-var QUESTION_TYPES2, BINARY_ANSWERS, MAX_FREEFORM_LENGTH, trim5, fail3, ratingScaleFor, optionsOf, isSingleSelect, matchOption, normalizeAnswerValue;
+var QUESTION_TYPES2, BINARY_ANSWERS, MAX_FREEFORM_LENGTH, trim6, fail3, ratingScaleFor, optionsOf, isSingleSelect, matchOption, normalizeAnswerValue;
 var init_answerValue = __esm({
   "shared/questions/answerValue.mjs"() {
     init_quadraticAllocation();
@@ -64534,19 +64820,19 @@ var init_answerValue = __esm({
     QUESTION_TYPES2 = Object.freeze(["binary", "rating", "multichoice", "quadratic", "freeform"]);
     BINARY_ANSWERS = Object.freeze(["Agree", "Unsure", "Disagree"]);
     MAX_FREEFORM_LENGTH = 8e3;
-    trim5 = (value) => typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "";
+    trim6 = (value) => typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "";
     fail3 = (error) => ({ ok: false, error });
     ratingScaleFor = (question = {}) => ({ ...normalizeRatingScale(question) || DEFAULT_RATING_SCALE, step: ratingStepFor(question) });
     optionsOf = (question) => Array.isArray(question.options) ? question.options.filter((option) => typeof option === "string") : [];
     isSingleSelect = (question) => question.singleSelect === true || question.oneSelectionOnly === true || question.singleChoice === true;
     matchOption = (options, value) => {
-      const wanted = trim5(value).toLowerCase();
+      const wanted = trim6(value).toLowerCase();
       return options.find((option) => option.trim().toLowerCase() === wanted);
     };
     normalizeAnswerValue = (question = {}, value, { maxFreeformLength = MAX_FREEFORM_LENGTH } = {}) => {
       switch (question.type) {
         case "binary": {
-          const match = BINARY_ANSWERS.find((answer) => answer.toLowerCase() === trim5(value).toLowerCase());
+          const match = BINARY_ANSWERS.find((answer) => answer.toLowerCase() === trim6(value).toLowerCase());
           return match ? { ok: true, value: match } : fail3('Binary answers must be "Agree", "Unsure", or "Disagree".');
         }
         case "rating": {
@@ -64563,7 +64849,7 @@ var init_answerValue = __esm({
           const chosen = [];
           for (const pick of picks) {
             const option = matchOption(options, pick);
-            if (!option) return fail3(`"${trim5(pick)}" is not one of this question's options: ${options.join(" | ")}`);
+            if (!option) return fail3(`"${trim6(pick)}" is not one of this question's options: ${options.join(" | ")}`);
             if (!chosen.includes(option)) chosen.push(option);
           }
           if (!chosen.length) return fail3("Choose at least one option.");
@@ -64573,7 +64859,7 @@ var init_answerValue = __esm({
           return { ok: true, value: chosen };
         }
         case "quadratic": {
-          const votes = Array.isArray(value) ? value.map((vote) => typeof vote === "string" && trim5(vote) !== "" ? Number(vote) : vote) : value;
+          const votes = Array.isArray(value) ? value.map((vote) => typeof vote === "string" && trim6(vote) !== "" ? Number(vote) : vote) : value;
           const error = validateQuadraticAllocation(votes, question);
           if (error) {
             return fail3(`${error} Options in order: ${optionsOf(question).join(" | ")}; budget ${getVoiceCredits(question)} credits (sum of squared votes).`);
@@ -64581,13 +64867,13 @@ var init_answerValue = __esm({
           return { ok: true, value: votes };
         }
         case "freeform": {
-          const text9 = trim5(value);
+          const text9 = trim6(value);
           if (!text9) return fail3("Freeform answers must be non-empty text.");
           if (text9.length > maxFreeformLength) return fail3(`Freeform answers must be ${maxFreeformLength} characters or fewer.`);
           return { ok: true, value: text9 };
         }
         default:
-          return fail3(`Unsupported question type "${trim5(question.type)}".`);
+          return fail3(`Unsupported question type "${trim6(question.type)}".`);
       }
     };
   }
@@ -64608,7 +64894,7 @@ async function listKvRecordsByPrefix2(env = {}, prefix = "", {
   limit = Infinity,
   parseJson: parseJson4 = safeJsonParse,
   // Applied as each batch arrives, so only what a caller keeps stays in memory.
-  select = (record5) => record5
+  select = (record6) => record6
 } = {}) {
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.list !== "function" || typeof kv.get !== "function") return [];
@@ -64626,9 +64912,9 @@ async function listKvRecordsByPrefix2(env = {}, prefix = "", {
       const batch = keys.slice(offset, offset + BULK_GET_KEYS);
       const values = await getBatch(kv, batch);
       for (const key of batch) {
-        const record5 = parseJson4(values.get(key), null);
-        if (!record5 || typeof record5 !== "object" || Array.isArray(record5)) continue;
-        const selected = select({ ...record5, key });
+        const record6 = parseJson4(values.get(key), null);
+        if (!record6 || typeof record6 !== "object" || Array.isArray(record6)) continue;
+        const selected = select({ ...record6, key });
         if (selected) records.push(selected);
         if (records.length >= maxRecords) return records;
       }
@@ -64657,15 +64943,15 @@ function normalizeResultAnswerLabel(value = "") {
 function selectCurrentSubmittedAnswers(records = []) {
   const byParticipantQuestion = /* @__PURE__ */ new Map();
   const anonymous = [];
-  for (const record5 of Array.isArray(records) ? records : []) {
-    const participant = safeString(record5.telegramUserId);
+  for (const record6 of Array.isArray(records) ? records : []) {
+    const participant = safeString(record6.telegramUserId);
     if (!participant) {
-      anonymous.push(record5);
+      anonymous.push(record6);
       continue;
     }
-    const key = JSON.stringify([sanitizeSessionSlug(record5.sessionSlug) || safeString(record5.sessionId), participant, safeString(record5.questionId)]);
+    const key = JSON.stringify([sanitizeSessionSlug(record6.sessionSlug) || safeString(record6.sessionId), participant, safeString(record6.questionId)]);
     const existing = byParticipantQuestion.get(key);
-    if (!existing || compareAnswers(existing, record5) < 0) byParticipantQuestion.set(key, record5);
+    if (!existing || compareAnswers(existing, record6) < 0) byParticipantQuestion.set(key, record6);
   }
   return [...byParticipantQuestion.values(), ...anonymous].sort(compareAnswerChronology);
 }
@@ -64675,52 +64961,52 @@ async function loadSubmittedResultRecords(env = {}, sessionSlug = "", { includeR
   if (!prefix) return [];
   const rows = await listKvRecordsByPrefix2(env, prefix, {
     parseJson: safeEnvJsonParse,
-    select: (record5) => safeString(record5.status) === "direct_submitted" && sanitizeSessionSlug(record5.sessionSlug) === slug && safeString(record5.questionId) ? resultRecord(record5, slug, includeRawAnswer) : null
+    select: (record6) => safeString(record6.status) === "direct_submitted" && sanitizeSessionSlug(record6.sessionSlug) === slug && safeString(record6.questionId) ? resultRecord(record6, slug, includeRawAnswer) : null
   });
   return rows.sort((left, right) => safeString(left.createdAt).localeCompare(safeString(right.createdAt)));
 }
-function resultRecord(record5, slug, includeRawAnswer) {
-  const answer = structuredResultAnswer(record5);
+function resultRecord(record6, slug, includeRawAnswer) {
+  const answer = structuredResultAnswer(record6);
   return {
-    key: safeString(record5.key),
-    requestId: safeString(record5.requestId),
-    createdAt: safeString(record5.createdAt),
+    key: safeString(record6.key),
+    requestId: safeString(record6.requestId),
+    createdAt: safeString(record6.createdAt),
     sessionSlug: slug,
-    answerRevision: answerRevision(record5),
-    telegramUserId: safeString(record5.telegramUserId),
-    questionId: safeString(record5.questionId),
+    answerRevision: answerRevision(record6),
+    telegramUserId: safeString(record6.telegramUserId),
+    questionId: safeString(record6.questionId),
     label: normalizeResultAnswerLabel(firstAnswerValue(
       answer.label,
       answer.value,
       answer.text,
-      record5.answerLabel,
-      record5.answerValue
+      record6.answerLabel,
+      record6.answerValue
     )),
     value: safeAnswerString(firstAnswerValue(
       answer.value,
       answer.text,
       answer.label,
-      record5.answerValue,
-      record5.answerLabel
+      record6.answerValue,
+      record6.answerLabel
     )),
-    questionType: safeString(answer.questionType || record5.questionType || record5.controlType),
-    ...includeRawAnswer ? { answer: record5.answer || null } : answer.questionType === "quadratic" ? { answer: { value: answer.value, encrypted: answer.encrypted === true } } : {},
+    questionType: safeString(answer.questionType || record6.questionType || record6.controlType),
+    ...includeRawAnswer ? { answer: record6.answer || null } : answer.questionType === "quadratic" ? { answer: { value: answer.value, encrypted: answer.encrypted === true } } : {},
     text: safeAnswerString(firstAnswerValue(
       answer.text,
-      record5.answerText
+      record6.answerText
     )),
     comments: safeAnswerString(firstAnswerValue(
       answer.comments,
       answer.additionalComments,
-      record5.comments,
-      record5.answerComments
+      record6.comments,
+      record6.answerComments
     )),
-    txHash: safeString(record5.onChain?.txHash)
+    txHash: safeString(record6.onChain?.txHash)
   };
 }
-function structuredResultAnswer(record5 = {}) {
-  const answer = record5.answer && typeof record5.answer === "object" && !Array.isArray(record5.answer) ? { ...record5.answer } : {};
-  const parsed = safeEnvJsonParse(answer.value || record5.answerValue, null);
+function structuredResultAnswer(record6 = {}) {
+  const answer = record6.answer && typeof record6.answer === "object" && !Array.isArray(record6.answer) ? { ...record6.answer } : {};
+  const parsed = safeEnvJsonParse(answer.value || record6.answerValue, null);
   if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
     return {
       ...answer,
@@ -64757,20 +65043,20 @@ function consensusQuestionsForResults(questions = []) {
 function summarizeQuestionResults(records = [], questions = []) {
   const promptMap = questionPromptById(questions);
   const byQuestion = /* @__PURE__ */ new Map();
-  for (const record5 of records) {
-    if (!byQuestion.has(record5.questionId)) {
-      byQuestion.set(record5.questionId, {
-        questionId: record5.questionId,
-        prompt: promptMap.get(record5.questionId) || shortQuestionId(record5.questionId),
+  for (const record6 of records) {
+    if (!byQuestion.has(record6.questionId)) {
+      byQuestion.set(record6.questionId, {
+        questionId: record6.questionId,
+        prompt: promptMap.get(record6.questionId) || shortQuestionId(record6.questionId),
         total: 0,
         participants: /* @__PURE__ */ new Set(),
         counts: /* @__PURE__ */ new Map()
       });
     }
-    const item = byQuestion.get(record5.questionId);
+    const item = byQuestion.get(record6.questionId);
     item.total += 1;
-    if (record5.telegramUserId) item.participants.add(record5.telegramUserId);
-    item.counts.set(record5.label, (item.counts.get(record5.label) || 0) + 1);
+    if (record6.telegramUserId) item.participants.add(record6.telegramUserId);
+    item.counts.set(record6.label, (item.counts.get(record6.label) || 0) + 1);
   }
   return Array.from(byQuestion.values()).map((item) => {
     const counts = Array.from(item.counts.entries()).sort(([left], [right]) => left.localeCompare(right));
@@ -64793,7 +65079,7 @@ var init_submittedResults = __esm({
     init_agentSubmitQueue();
     init_runtimeCore();
     compareText = (left, right) => left === right ? 0 : left < right ? -1 : 1;
-    answerRevision = (record5) => Number.isSafeInteger(record5.answerRevision) && record5.answerRevision >= 0 ? record5.answerRevision : 0;
+    answerRevision = (record6) => Number.isSafeInteger(record6.answerRevision) && record6.answerRevision >= 0 ? record6.answerRevision : 0;
     compareAnswerChronology = (left, right) => compareText(safeString(left.createdAt), safeString(right.createdAt)) || compareText(safeString(left.requestId), safeString(right.requestId)) || compareText(stableJson(left), stableJson(right));
     compareAnswers = (left, right) => answerRevision(left) - answerRevision(right) || compareAnswerChronology(left, right);
   }
@@ -64813,14 +65099,14 @@ function answerScore(label = "", value = "", question = {}) {
   return 2 * (answer.value - min) / (max - min) - 1;
 }
 function averageAnswerScore(records = [], questionLookup = /* @__PURE__ */ new Map()) {
-  const scored = records.map((record5) => answerScore(record5.label, record5.value, questionLookup.get(record5.questionId))).filter((score) => Number.isFinite(score));
+  const scored = records.map((record6) => answerScore(record6.label, record6.value, questionLookup.get(record6.questionId))).filter((score) => Number.isFinite(score));
   if (!scored.length) return null;
   return scored.reduce((sum, score) => sum + score, 0) / scored.length;
 }
 function countResultVotes(records = [], questionLookup = /* @__PURE__ */ new Map()) {
   const counts = { agree: 0, disagree: 0, unsure: 0, responded: 0 };
-  for (const record5 of records) {
-    const score = answerScore(record5.label, record5.value, questionLookup.get(record5.questionId));
+  for (const record6 of records) {
+    const score = answerScore(record6.label, record6.value, questionLookup.get(record6.questionId));
     if (!Number.isFinite(score)) continue;
     if (score > 0.25) counts.agree += 1;
     else if (score < -0.25) counts.disagree += 1;
@@ -64842,10 +65128,10 @@ function questionTypeById(questions = []) {
   }
   return map;
 }
-function qualitativeTextFromResultRecord(record5 = {}, questionTypeLookup = /* @__PURE__ */ new Map()) {
-  const type = lower2(record5.questionType || questionTypeLookup.get(record5.questionId));
-  const text9 = safeAnswerString(record5.text);
-  const comments = safeAnswerString(record5.comments);
+function qualitativeTextFromResultRecord(record6 = {}, questionTypeLookup = /* @__PURE__ */ new Map()) {
+  const type = lower2(record6.questionType || questionTypeLookup.get(record6.questionId));
+  const text9 = safeAnswerString(record6.text);
+  const comments = safeAnswerString(record6.comments);
   const parts = [];
   if (type === "freeform" && text9) parts.push(text9);
   if (comments) parts.push(comments);
@@ -64860,14 +65146,14 @@ function qualitativeResponsesForGroup({
   limit = 8
 } = {}) {
   const responses = [];
-  for (const record5 of records) {
-    const text9 = qualitativeTextFromResultRecord(record5, questionTypeLookup);
+  for (const record6 of records) {
+    const text9 = qualitativeTextFromResultRecord(record6, questionTypeLookup);
     if (!text9) continue;
     responses.push({
-      participant: aliases.get(record5.telegramUserId) || "Participant",
-      questionId: record5.questionId,
-      questionLabel: questionIndex.get(record5.questionId) || "Q?",
-      prompt: promptMap.get(record5.questionId) || shortQuestionId(record5.questionId),
+      participant: aliases.get(record6.telegramUserId) || "Participant",
+      questionId: record6.questionId,
+      questionLabel: questionIndex.get(record6.questionId) || "Q?",
+      prompt: promptMap.get(record6.questionId) || shortQuestionId(record6.questionId),
       text: text9.slice(0, 500)
     });
     if (responses.length >= limit) break;
@@ -64891,7 +65177,7 @@ function requestedScoreBuckets({ records = [], participantIds = [], questionLook
   if (!Number.isFinite(count2) || count2 <= 0) return null;
   const scored = participantIds.map((id2) => ({
     id: id2,
-    score: averageAnswerScore(records.filter((record5) => record5.telegramUserId === id2), questionLookup)
+    score: averageAnswerScore(records.filter((record6) => record6.telegramUserId === id2), questionLookup)
   })).sort((left, right) => (right.score ?? 0) - (left.score ?? 0) || String(left.id).localeCompare(String(right.id)));
   const resolvedCount = Math.max(1, Math.min(6, Math.floor(count2), scored.length));
   if (!resolvedCount || !scored.length) return [];
@@ -64931,7 +65217,7 @@ function buildParticipantResultGroups({
   const buckets = Array.isArray(requestedBuckets) ? requestedBuckets : (() => {
     const out = /* @__PURE__ */ new Map();
     for (const id2 of participantIds) {
-      const participantRecords = records.filter((record5) => record5.telegramUserId === id2);
+      const participantRecords = records.filter((record6) => record6.telegramUserId === id2);
       const score = averageAnswerScore(participantRecords, questionLookup);
       const bucket = groupBucketForScore(score);
       if (!out.has(bucket.bucketId)) {
@@ -64954,7 +65240,7 @@ function buildParticipantResultGroups({
   })();
   return buckets.filter((bucket) => bucket.participantIds.length).sort((left, right) => bucketAverageScore(right) - bucketAverageScore(left) || right.participantIds.length - left.participantIds.length || left.theme.localeCompare(right.theme)).map((bucket, index) => {
     const participantSet = new Set(bucket.participantIds);
-    const clusterRecords = records.filter((record5) => participantSet.has(record5.telegramUserId));
+    const clusterRecords = records.filter((record6) => participantSet.has(record6.telegramUserId));
     const qualitativeResponses = qualitativeResponsesForGroup({
       records: clusterRecords,
       aliases,
@@ -64963,8 +65249,8 @@ function buildParticipantResultGroups({
       questionTypeLookup
     });
     const topStatements = questionIds.map((id2, questionNumber) => {
-      const clusterQuestionRecords = clusterRecords.filter((record5) => record5.questionId === id2);
-      const overallQuestionRecords = records.filter((record5) => record5.questionId === id2);
+      const clusterQuestionRecords = clusterRecords.filter((record6) => record6.questionId === id2);
+      const overallQuestionRecords = records.filter((record6) => record6.questionId === id2);
       const clusterAverage = averageAnswerScore(clusterQuestionRecords, questionLookup);
       const overallAverage = averageAnswerScore(overallQuestionRecords, questionLookup);
       return {
@@ -64992,25 +65278,25 @@ function buildParticipantResultGroups({
 function buildParticipantGraph(records = [], questions = [], options = {}) {
   const questionTypeLookup = questionTypeById(questions);
   const questionLookup = new Map(questions.map((question) => [questionId(question), question]));
-  const graphRecords = (Array.isArray(records) ? records : []).map((record5) => ({
-    ...record5,
-    questionType: safeString(questionTypeLookup.get(record5.questionId) || record5.questionType)
+  const graphRecords = (Array.isArray(records) ? records : []).map((record6) => ({
+    ...record6,
+    questionType: safeString(questionTypeLookup.get(record6.questionId) || record6.questionType)
   }));
-  const questionIds = Array.from(new Set(graphRecords.map((record5) => record5.questionId).filter(Boolean)));
+  const questionIds = Array.from(new Set(graphRecords.map((record6) => record6.questionId).filter(Boolean)));
   const questionIndex = new Map(questionIds.map((id2, index) => [id2, `Q${index + 1}`]));
-  const participants = Array.from(new Set(graphRecords.map((record5) => record5.telegramUserId).filter(Boolean)));
+  const participants = Array.from(new Set(graphRecords.map((record6) => record6.telegramUserId).filter(Boolean)));
   const aliases = new Map(participants.map((id2, index) => [id2, participantAlias(id2, index)]));
   const lines = participants.map((id2) => {
-    const answered = graphRecords.filter((record5) => record5.telegramUserId === id2).map((record5) => `${questionIndex.get(record5.questionId) || "Q?"}:${record5.label}`);
+    const answered = graphRecords.filter((record6) => record6.telegramUserId === id2).map((record6) => `${questionIndex.get(record6.questionId) || "Q?"}:${record6.label}`);
     return `${aliases.get(id2)} -> ${answered.join(", ") || "No answers"}`;
   });
   const promptMap = questionPromptById(questions);
   const legend = questionIds.slice(0, 5).map((id2, index) => `${index + 1}. ${promptMap.get(id2) || shortQuestionId(id2)}`);
   const imageParticipants = participants.slice(0, 8).map((id2) => ({
     participant: aliases.get(id2),
-    answers: graphRecords.filter((record5) => record5.telegramUserId === id2).map((record5) => ({
-      question: questionIndex.get(record5.questionId) || "Q?",
-      label: record5.label
+    answers: graphRecords.filter((record6) => record6.telegramUserId === id2).map((record6) => ({
+      question: questionIndex.get(record6.questionId) || "Q?",
+      label: record6.label
     }))
   }));
   const groups = buildParticipantResultGroups({
@@ -65045,12 +65331,12 @@ var init_participantResults = __esm({
 });
 
 // shared/storage/canonicalStorageVersions.mjs
-var trim6, compareStorageIds, compareVersionAge, isAdminStorageVersion, isPreferredStorageVersion, selectCanonicalStorageVersions;
+var trim7, compareStorageIds, compareVersionAge, isAdminStorageVersion, isPreferredStorageVersion, selectCanonicalStorageVersions;
 var init_canonicalStorageVersions = __esm({
   "shared/storage/canonicalStorageVersions.mjs"() {
-    trim6 = (value) => (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
+    trim7 = (value) => (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
     compareStorageIds = (left, right) => left < right ? -1 : left > right ? 1 : 0;
-    compareVersionAge = (left, right) => (Number(left.createdAtMs) || 0) - (Number(right.createdAtMs) || 0) || compareStorageIds(trim6(left.storageRefId), trim6(right.storageRefId));
+    compareVersionAge = (left, right) => (Number(left.createdAtMs) || 0) - (Number(right.createdAtMs) || 0) || compareStorageIds(trim7(left.storageRefId), trim7(right.storageRefId));
     isAdminStorageVersion = (candidate) => candidate.uploadAuthority === "admin";
     isPreferredStorageVersion = (candidate, current) => {
       if (!current) return true;
@@ -65063,7 +65349,7 @@ var init_canonicalStorageVersions = __esm({
     selectCanonicalStorageVersions = (candidates = []) => {
       const chosen = /* @__PURE__ */ new Map();
       (Array.isArray(candidates) ? candidates : []).forEach((candidate) => {
-        const id2 = trim6(candidate?.resourceId).toLowerCase();
+        const id2 = trim7(candidate?.resourceId).toLowerCase();
         if (!id2) return;
         if (isPreferredStorageVersion(candidate, chosen.get(id2))) chosen.set(id2, candidate);
       });
@@ -66635,45 +66921,45 @@ function questionIdFromPrompt({
   ].join("|");
   return `${PROPOSED_QUESTION_ID_PREFIX}${buildOpaqueActionId(seed).replace(/^ceab_/, "")}`;
 }
-function proposedAnswerSchema(record5 = {}) {
-  const type = normalizeQuestionType3(record5.questionType);
+function proposedAnswerSchema(record6 = {}) {
+  const type = normalizeQuestionType3(record6.questionType);
   return JSON.stringify({
     type,
-    options: type === "multichoice" || type === "quadratic" ? record5.options ?? [] : [],
-    singleSelect: type === "multichoice" && record5.singleSelect === true,
-    ratingScale: type === "rating" ? record5.ratingScale || normalizeRatingScale2(DEFAULT_RATING_SCALE) : null,
-    voiceCredits: type === "quadratic" ? record5.voiceCredits ?? 99 : null
+    options: type === "multichoice" || type === "quadratic" ? record6.options ?? [] : [],
+    singleSelect: type === "multichoice" && record6.singleSelect === true,
+    ratingScale: type === "rating" ? record6.ratingScale || normalizeRatingScale2(DEFAULT_RATING_SCALE) : null,
+    voiceCredits: type === "quadratic" ? record6.voiceCredits ?? 99 : null
   });
 }
-function proposedRecordToQuestion(record5 = {}) {
-  const questionId4 = safeString(record5.questionId);
-  const prompt = normalizePrompt(record5.prompt || record5.questionText);
+function proposedRecordToQuestion(record6 = {}) {
+  const questionId4 = safeString(record6.questionId);
+  const prompt = normalizePrompt(record6.prompt || record6.questionText);
   if (!questionId4 || !prompt) return null;
-  const questionType = normalizeQuestionType3(record5.questionType);
-  const tags = normalizeQuestionTags(record5.tags);
-  const references = normalizeQuestionReferences(record5.references);
-  const geoRefs = normalizeQuestionGeoRefs(record5.geoRefs || record5.geoIds || record5.geoId);
+  const questionType = normalizeQuestionType3(record6.questionType);
+  const tags = normalizeQuestionTags(record6.tags);
+  const references = normalizeQuestionReferences(record6.references);
+  const geoRefs = normalizeQuestionGeoRefs(record6.geoRefs || record6.geoIds || record6.geoId);
   const question = {
     questionId: questionId4,
     id: questionId4,
     questionType,
     prompt,
     questionText: prompt,
-    sessionSlug: sanitizeSessionSlug(record5.sessionSlug),
+    sessionSlug: sanitizeSessionSlug(record6.sessionSlug),
     source: "telegram_question_proposal",
     visibility: "public",
     canAnswer: true,
     proposed: true,
-    createdAt: safeString(record5.createdAt) || null
+    createdAt: safeString(record6.createdAt) || null
   };
-  const options = questionType === "quadratic" && Array.isArray(record5.options) ? record5.options : normalizeOptions3(record5.options);
+  const options = questionType === "quadratic" && Array.isArray(record6.options) ? record6.options : normalizeOptions3(record6.options);
   if (options.length) question.options = options;
-  if (questionType === "multichoice" && record5.singleSelect === true) {
+  if (questionType === "multichoice" && record6.singleSelect === true) {
     question.singleSelect = true;
   }
-  if (questionType === "quadratic") question.voiceCredits = record5.voiceCredits ?? 99;
+  if (questionType === "quadratic") question.voiceCredits = record6.voiceCredits ?? 99;
   if (questionType === "rating") {
-    const ratingScale = normalizeRatingScale2(record5.ratingScale || record5.rating_scale);
+    const ratingScale = normalizeRatingScale2(record6.ratingScale || record6.rating_scale);
     if (ratingScale) question.ratingScale = ratingScale;
   }
   if (tags.length) question.tags = tags;
@@ -66690,16 +66976,16 @@ function questionTagsShapeIsValid(value) {
   if (value === null) return false;
   return Array.isArray(value) || typeof value === "string";
 }
-function proposedRecordMalformedReason(record5 = {}) {
-  if (!record5 || typeof record5 !== "object" || Array.isArray(record5)) return "record_not_object";
+function proposedRecordMalformedReason(record6 = {}) {
+  if (!record6 || typeof record6 !== "object" || Array.isArray(record6)) return "record_not_object";
   let questionId4 = "";
   try {
-    questionId4 = safeString(record5.questionId);
+    questionId4 = safeString(record6.questionId);
   } catch {
     return "question_id_invalid";
   }
   if (!questionId4) return "question_id_missing";
-  const promptValue = record5.prompt ?? record5.questionText;
+  const promptValue = record6.prompt ?? record6.questionText;
   if (!questionTextValueIsString(promptValue)) return "question_prompt_invalid";
   let prompt = "";
   try {
@@ -66708,7 +66994,7 @@ function proposedRecordMalformedReason(record5 = {}) {
     return "question_prompt_invalid";
   }
   if (!prompt) return "question_prompt_missing";
-  if (!questionTagsShapeIsValid(record5.tags)) return "question_tags_invalid";
+  if (!questionTagsShapeIsValid(record6.tags)) return "question_tags_invalid";
   return "";
 }
 async function persistAgentProposedQuestion({
@@ -66768,7 +67054,7 @@ async function persistAgentProposedQuestion({
     telegramUserId,
     chatId
   });
-  const record5 = {
+  const record6 = {
     version: 1,
     questionId: questionId4,
     sessionSlug: slug,
@@ -66789,32 +67075,32 @@ async function persistAgentProposedQuestion({
     createdAt: nowIso2(createdAt)
   };
   if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
-    record5.actionMetadata = { ...metadata };
+    record6.actionMetadata = { ...metadata };
   }
   const key = `${prefix}${questionId4}`;
   const stored = await env.AGENT_ACTION_KV.get(key);
   if (stored != null) {
     const existing = safeJsonParse(stored, null);
-    const sameSchema = !!existing && typeof existing === "object" && !Array.isArray(existing) && proposedAnswerSchema(existing) === proposedAnswerSchema(record5);
+    const sameSchema = !!existing && typeof existing === "object" && !Array.isArray(existing) && proposedAnswerSchema(existing) === proposedAnswerSchema(record6);
     if (!sameSchema) return { ok: false, reason: "question_schema_conflict", questionId: questionId4 };
     if (lower2(existing.status) !== "active") return { ok: false, reason: "question_archived", questionId: questionId4 };
     return { ok: true, questionId: questionId4, question: proposedRecordToQuestion(existing), record: existing };
   }
-  assertNoSecretShape(record5, "Agent proposed questions must not serialize secrets.");
+  assertNoSecretShape(record6, "Agent proposed questions must not serialize secrets.");
   const activityMetadata = buildAgentActivityMetadata({
     type: "proposed_question",
-    status: record5.status,
-    createdAt: record5.createdAt,
+    status: record6.status,
+    createdAt: record6.createdAt,
     pendingAction: "",
-    sessionSlug: record5.sessionSlug,
-    questionId: record5.questionId,
-    telegramUserId: record5.createdByTelegramUserId
+    sessionSlug: record6.sessionSlug,
+    questionId: record6.questionId,
+    telegramUserId: record6.createdByTelegramUserId
   });
-  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record5), {
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record6), {
     expirationTtl: ttlSeconds,
     metadata: activityMetadata
   });
-  return { ok: true, questionId: questionId4, question: proposedRecordToQuestion(record5), record: record5 };
+  return { ok: true, questionId: questionId4, question: proposedRecordToQuestion(record6), record: record6 };
 }
 async function archiveAgentProposedQuestion({
   env = {},
@@ -66835,25 +67121,25 @@ async function archiveAgentProposedQuestion({
   if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
     throw new Error("proposed_question_record_invalid");
   }
-  const record5 = {
+  const record6 = {
     ...existing,
     status: "archived",
     archivedAt: lower2(existing.status) === "archived" && safeString(existing.archivedAt) ? safeString(existing.archivedAt) : nowIso2(now),
     archivedBy: "service"
   };
-  assertNoSecretShape(record5, "Agent proposed questions must not serialize secrets.");
+  assertNoSecretShape(record6, "Agent proposed questions must not serialize secrets.");
   const existingMetadata = await readProposedQuestionMetadata(env, key);
   const metadata = existingMetadata ? { ...existingMetadata, s: "archived" } : buildAgentActivityMetadata({
     type: "proposed_question",
-    status: record5.status,
-    createdAt: record5.createdAt,
+    status: record6.status,
+    createdAt: record6.createdAt,
     pendingAction: "",
-    sessionSlug: record5.sessionSlug,
-    questionId: record5.questionId,
-    telegramUserId: record5.createdByTelegramUserId
+    sessionSlug: record6.sessionSlug,
+    questionId: record6.questionId,
+    telegramUserId: record6.createdByTelegramUserId
   });
   assertNoSecretShape(metadata, "Agent proposed question metadata must not serialize secrets.");
-  await kv.put(key, JSON.stringify(record5), {
+  await kv.put(key, JSON.stringify(record6), {
     expirationTtl: DEFAULT_PROPOSED_QUESTION_TTL_SECONDS,
     metadata
   });
@@ -67684,7 +67970,7 @@ async function persistDraftEditMetric({
     metrics
   });
   const key = `${DRAFT_EDIT_METRIC_KV_PREFIX}${slug}:${questionIdKeyPart(qid)}:${fingerprint}`;
-  const record5 = {
+  const record6 = {
     type: "telegram_draft_edit_metric",
     version: 1,
     sessionSlug: slug,
@@ -67696,8 +67982,8 @@ async function persistDraftEditMetric({
     metrics,
     createdAt: recordedAt
   };
-  assertNoSecretShape(record5, "Agent draft-edit metric records must not serialize secrets.");
-  await kv.put(key, JSON.stringify(record5));
+  assertNoSecretShape(record6, "Agent draft-edit metric records must not serialize secrets.");
+  await kv.put(key, JSON.stringify(record6));
   return { ok: true, stored: true, key, metrics };
 }
 var DRAFT_EDIT_METRIC_KV_PREFIX;
@@ -67879,7 +68165,7 @@ async function executeAgentSubmitRequest({
     telegramUserId
   });
   if (agentSubmitQueueEnabled(env)) {
-    const record6 = buildQueuedSubmitRecord({
+    const record7 = buildQueuedSubmitRecord({
       session,
       canonicalBody: {
         session: slug,
@@ -67919,7 +68205,7 @@ async function executeAgentSubmitRequest({
         createdAt
       }
     });
-    const queued = await queueAgentSubmitRecord({ env, kvKey, record: record6 }).catch((error) => ({
+    const queued = await queueAgentSubmitRecord({ env, kvKey, record: record7 }).catch((error) => ({
       ok: false,
       reason: "agent_submit_queue_failed",
       retryable: true,
@@ -67930,8 +68216,8 @@ async function executeAgentSubmitRequest({
       return {
         ok: true,
         requestId,
-        status: record6.status,
-        canonicalApiRequest: record6.canonicalApiRequest,
+        status: record7.status,
+        canonicalApiRequest: record7.canonicalApiRequest,
         idempotencyKey,
         queued: true,
         replayed: false
@@ -68024,19 +68310,19 @@ async function executeAgentSubmitRequest({
   if (directSubmit.replayed) return { ...directSubmit, requestId, idempotencyKey };
   if (!admitted) return { ...directSubmit, ok: false, requestId, idempotencyKey };
   const status = directSubmit.ok === true ? "direct_submitted" : directSubmit.reconciliationRequired ? "direct_submit_reconciliation_required" : "direct_submit_failed";
-  const record5 = {
+  const record6 = {
     ...baseRecord,
     status,
     onChain: { ...directSubmit, submissionAttemptId },
     canonicalApiRequest: { ...baseRecord.canonicalApiRequest, status: directSubmit.ok ? "executed_direct_onchain" : status }
   };
-  assertNoSecretShape(record5, "Agent direct submit records must not serialize secrets.");
-  const persisted = await env.AGENT_SERVICES.persistSubmitOutcome(record5);
+  assertNoSecretShape(record6, "Agent direct submit records must not serialize secrets.");
+  const persisted = await env.AGENT_SERVICES.persistSubmitOutcome(record6);
   if (persisted.replayed && persisted.record) return resultFromRecord(persisted.record, true);
   if (!persisted.ok || persisted.replayed) return { ...persisted, requestId, idempotencyKey };
   if (directSubmit.ok) await emitSubmittedEvent().catch(() => {
   });
-  return resultFromRecord(persisted.record || record5, persisted.replayed);
+  return resultFromRecord(persisted.record || record6, persisted.replayed);
 }
 var activeSubmissions, resultFromRecord;
 var init_answerSubmission = __esm({
@@ -68054,15 +68340,15 @@ var init_answerSubmission = __esm({
     init_draftAnswerEncoding();
     init_answerDrafts();
     activeSubmissions = /* @__PURE__ */ new Map();
-    resultFromRecord = (record5, replayed = false) => ({
-      ok: ["direct_submitted", "submit_queued"].includes(record5.status),
-      requestId: record5.requestId,
-      status: record5.status,
-      idempotencyKey: record5.idempotencyKey,
-      canonicalApiRequest: record5.canonicalApiRequest || null,
-      onChain: record5.onChain || null,
-      reason: record5.onChain?.reason || (record5.status === "submit_request_created" ? "direct_submit_unavailable" : record5.status),
-      retryable: record5.onChain?.retryable === true,
+    resultFromRecord = (record6, replayed = false) => ({
+      ok: ["direct_submitted", "submit_queued"].includes(record6.status),
+      requestId: record6.requestId,
+      status: record6.status,
+      idempotencyKey: record6.idempotencyKey,
+      canonicalApiRequest: record6.canonicalApiRequest || null,
+      onChain: record6.onChain || null,
+      reason: record6.onChain?.reason || (record6.status === "submit_request_created" ? "direct_submit_unavailable" : record6.status),
+      retryable: record6.onChain?.retryable === true,
       replayed
     });
   }
@@ -68091,7 +68377,7 @@ async function writeAgentSkillUpdateFlag({
 } = {}) {
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.put !== "function") return { ok: false, reason: "action_kv_unavailable" };
-  const record5 = {
+  const record6 = {
     version: 1,
     updateAvailable: true,
     latestVersion: safeString(latestVersion).slice(0, 40),
@@ -68099,9 +68385,9 @@ async function writeAgentSkillUpdateFlag({
     updatedBy: accountAddress ? shortAddress(accountAddress) : "",
     updatedAt: createdAt || nowIso2()
   };
-  assertNoSecretShape(record5, "Agent skill-update flag must not serialize secrets.");
-  await kv.put(AGENT_SKILL_UPDATE_KV_KEY, JSON.stringify(record5));
-  return { ok: true, latestVersion: record5.latestVersion };
+  assertNoSecretShape(record6, "Agent skill-update flag must not serialize secrets.");
+  await kv.put(AGENT_SKILL_UPDATE_KV_KEY, JSON.stringify(record6));
+  return { ok: true, latestVersion: record6.latestVersion };
 }
 async function clearAgentSkillUpdateFlag(env = {}) {
   const kv = env?.AGENT_ACTION_KV;
@@ -68164,9 +68450,9 @@ function submitRequestSessionKvPrefix(sessionSlug = "") {
   const slug = sanitizeSessionSlug(sessionSlug);
   return slug ? `${SUBMIT_REQUEST_SESSION_KV_PREFIX}${slug}:` : "";
 }
-function submitRequestSessionKvKey(record5 = {}) {
-  const prefix = submitRequestSessionKvPrefix(record5.sessionSlug);
-  const requestId = safeString(record5.requestId);
+function submitRequestSessionKvKey(record6 = {}) {
+  const prefix = submitRequestSessionKvPrefix(record6.sessionSlug);
+  const requestId = safeString(record6.requestId);
   return prefix && requestId ? `${prefix}${requestId}` : "";
 }
 function submitRequestUserKvPrefix({
@@ -68177,17 +68463,17 @@ function submitRequestUserKvPrefix({
   const userId = safeString(telegramUserId).replace(/[^0-9A-Za-z_-]/g, "").slice(0, 128);
   return slug && userId ? `${SUBMIT_REQUEST_USER_KV_PREFIX}${slug}:${userId}:` : "";
 }
-function submitRequestUserKvKey(record5 = {}) {
+function submitRequestUserKvKey(record6 = {}) {
   const prefix = submitRequestUserKvPrefix({
-    sessionSlug: record5.sessionSlug,
-    telegramUserId: record5.telegramUserId
+    sessionSlug: record6.sessionSlug,
+    telegramUserId: record6.telegramUserId
   });
-  const questionId4 = safeString(record5.questionId).replace(/[^0-9A-Za-z._:-]/g, "").slice(0, 160);
-  const requestId = safeString(record5.requestId);
+  const questionId4 = safeString(record6.questionId).replace(/[^0-9A-Za-z._:-]/g, "").slice(0, 160);
+  const requestId = safeString(record6.requestId);
   return prefix && requestId ? `${prefix}${questionId4 || "question"}:${requestId}` : "";
 }
-function canonicalAnswerKvKey(record5 = {}) {
-  const requestId = safeString(record5.requestId || record5.idempotencyKey).replace(/[^0-9A-Za-z_-]/g, "").slice(0, 160);
+function canonicalAnswerKvKey(record6 = {}) {
+  const requestId = safeString(record6.requestId || record6.idempotencyKey).replace(/[^0-9A-Za-z_-]/g, "").slice(0, 160);
   return requestId ? `${CANONICAL_ANSWER_KV_PREFIX}${requestId}` : "";
 }
 function canonicalAnswerSessionKvPrefix(sessionSlug = "") {
@@ -68198,9 +68484,9 @@ function canonicalAnswerUserKvPrefix({ sessionSlug = "", telegramUserId = "" } =
   const prefix = submitRequestUserKvPrefix({ sessionSlug, telegramUserId });
   return prefix ? `${CANONICAL_ANSWER_USER_KV_PREFIX}${prefix.slice(SUBMIT_REQUEST_USER_KV_PREFIX.length)}` : "";
 }
-function canonicalAnswerSessionKvKey(record5 = {}) {
-  const prefix = canonicalAnswerSessionKvPrefix(record5.sessionSlug);
-  const requestId = safeString(record5.requestId || record5.idempotencyKey).replace(/[^0-9A-Za-z_-]/g, "").slice(0, 160);
+function canonicalAnswerSessionKvKey(record6 = {}) {
+  const prefix = canonicalAnswerSessionKvPrefix(record6.sessionSlug);
+  const requestId = safeString(record6.requestId || record6.idempotencyKey).replace(/[^0-9A-Za-z_-]/g, "").slice(0, 160);
   return prefix && requestId ? `${prefix}${requestId}` : "";
 }
 function agentSubmitQueueEnabled(env = {}) {
@@ -68232,44 +68518,44 @@ function safeSessionSnapshotForSubmitQueue(session = {}) {
 function objectOrNull(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : null;
 }
-function normalizeSubmitRecordTimestamps(record5 = {}) {
-  const createdAt = safeString(record5.createdAt || record5.processedAt || record5.updatedAt) || nowIso2();
+function normalizeSubmitRecordTimestamps(record6 = {}) {
+  const createdAt = safeString(record6.createdAt || record6.processedAt || record6.updatedAt) || nowIso2();
   return {
-    ...record5,
+    ...record6,
     createdAt
   };
 }
-function buildCanonicalAnswerRecord(record5 = {}, {
+function buildCanonicalAnswerRecord(record6 = {}, {
   sourceKey = ""
 } = {}) {
-  const requestId = safeString(record5.requestId || record5.idempotencyKey);
-  const sessionSlug = sanitizeSessionSlug(record5.sessionSlug);
-  const questionId4 = safeString(record5.questionId);
+  const requestId = safeString(record6.requestId || record6.idempotencyKey);
+  const sessionSlug = sanitizeSessionSlug(record6.sessionSlug);
+  const questionId4 = safeString(record6.questionId);
   if (!requestId || !sessionSlug || !questionId4) return null;
-  const createdAt = safeString(record5.createdAt || record5.processedAt || record5.updatedAt);
-  const updatedAt = safeString(record5.processedAt || record5.updatedAt || createdAt);
+  const createdAt = safeString(record6.createdAt || record6.processedAt || record6.updatedAt);
+  const updatedAt = safeString(record6.processedAt || record6.updatedAt || createdAt);
   const canonical = {
     version: 1,
     type: "telegram_canonical_answer",
     requestId,
-    idempotencyKey: safeString(record5.idempotencyKey),
-    status: safeString(record5.status),
-    lane: safeString(record5.lane),
-    telegramUserId: safeString(record5.telegramUserId),
-    username: safeString(record5.username),
-    languageCode: safeString(record5.languageCode),
-    chatId: safeString(record5.chatId),
+    idempotencyKey: safeString(record6.idempotencyKey),
+    status: safeString(record6.status),
+    lane: safeString(record6.lane),
+    telegramUserId: safeString(record6.telegramUserId),
+    username: safeString(record6.username),
+    languageCode: safeString(record6.languageCode),
+    chatId: safeString(record6.chatId),
     sessionSlug,
     questionId: questionId4,
-    questionIdShort: safeString(record5.questionIdShort),
-    answerFingerprint: safeString(record5.answerFingerprint),
-    ...Number.isSafeInteger(record5.answerRevision) ? { answerRevision: record5.answerRevision } : {},
-    answer: objectOrNull(record5.answer),
-    onChainAnswer: objectOrNull(record5.onChainAnswer),
-    answerRef: objectOrNull(record5.answerRef),
-    canonicalApiRequest: objectOrNull(record5.canonicalApiRequest),
-    onChain: objectOrNull(record5.onChain),
-    directSubmitAttempt: objectOrNull(record5.directSubmitAttempt),
+    questionIdShort: safeString(record6.questionIdShort),
+    answerFingerprint: safeString(record6.answerFingerprint),
+    ...Number.isSafeInteger(record6.answerRevision) ? { answerRevision: record6.answerRevision } : {},
+    answer: objectOrNull(record6.answer),
+    onChainAnswer: objectOrNull(record6.onChainAnswer),
+    answerRef: objectOrNull(record6.answerRef),
+    canonicalApiRequest: objectOrNull(record6.canonicalApiRequest),
+    onChain: objectOrNull(record6.onChain),
+    directSubmitAttempt: objectOrNull(record6.directSubmitAttempt),
     sourceKey: safeString(sourceKey),
     createdAt,
     updatedAt
@@ -68282,7 +68568,7 @@ function buildQueuedSubmitRecord({
   session = {},
   canonicalBody = {}
 } = {}) {
-  const record5 = normalizeSubmitRecordTimestamps({
+  const record6 = normalizeSubmitRecordTimestamps({
     ...baseRecord,
     action: AGENT_ACTIONS.DIRECT_SUBMIT_RESPONSE,
     status: "submit_queued",
@@ -68294,28 +68580,28 @@ function buildQueuedSubmitRecord({
     },
     sessionSnapshot: safeSessionSnapshotForSubmitQueue(session)
   });
-  assertNoSecretShape(record5, "Queued Agent submit records must not serialize secrets.");
-  return record5;
+  assertNoSecretShape(record6, "Queued Agent submit records must not serialize secrets.");
+  return record6;
 }
 async function persistQueuedSubmitRecord({
   env = {},
   kvKey = "",
-  record: record5 = {}
+  record: record6 = {}
 } = {}) {
   if (!env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== "function") {
     return { ok: false, reason: "action_kv_unavailable" };
   }
-  assertNoSecretShape(record5, "Queued Agent submit records must not serialize secrets.");
-  await persistAgentSubmitRecord({ env, kvKey, record: record5 });
+  assertNoSecretShape(record6, "Queued Agent submit records must not serialize secrets.");
+  await persistAgentSubmitRecord({ env, kvKey, record: record6 });
   return { ok: true };
 }
 async function persistCanonicalAnswerRecord({
   kv,
-  record: record5 = {},
+  record: record6 = {},
   sourceKey = ""
 } = {}) {
   if (!kv || typeof kv.put !== "function") return { ok: false, reason: "action_kv_unavailable" };
-  const canonical = buildCanonicalAnswerRecord(record5, { sourceKey });
+  const canonical = buildCanonicalAnswerRecord(record6, { sourceKey });
   if (!canonical) return { ok: false, reason: "canonical_answer_incomplete" };
   const userPrefix = canonicalAnswerUserKvPrefix(canonical);
   const keys = [
@@ -68331,16 +68617,16 @@ async function persistCanonicalAnswerRecord({
 async function persistAgentSubmitRecord({
   env = {},
   kvKey = "",
-  record: record5 = {}
+  record: record6 = {}
 } = {}) {
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.put !== "function") {
     return { ok: false, reason: "action_kv_unavailable" };
   }
-  const requestId = safeString(record5.requestId);
+  const requestId = safeString(record6.requestId);
   const canonicalKey = kvKey || submitRequestKvKey(requestId);
   if (!canonicalKey) return { ok: false, reason: "submit_request_key_missing" };
-  const storedRecord = normalizeSubmitRecordTimestamps(record5);
+  const storedRecord = normalizeSubmitRecordTimestamps(record6);
   assertNoSecretShape(storedRecord, "Agent submit records must not serialize secrets.");
   const serialized = JSON.stringify(storedRecord);
   const canonical = await persistCanonicalAnswerRecord({ kv, record: storedRecord, sourceKey: canonicalKey });
@@ -68365,7 +68651,7 @@ async function persistAgentSubmitRecord({
 }
 async function enqueueAgentSubmitRecord({
   env = {},
-  record: record5 = {}
+  record: record6 = {}
 } = {}) {
   if (!agentSubmitQueueEnabled(env)) {
     return { ok: false, skipped: true, reason: "agent_submit_queue_disabled" };
@@ -68373,8 +68659,8 @@ async function enqueueAgentSubmitRecord({
   const body = {
     type: AGENT_SUBMIT_QUEUE_MESSAGE_TYPE,
     version: 1,
-    requestId: safeString(record5.requestId),
-    record: record5
+    requestId: safeString(record6.requestId),
+    record: record6
   };
   assertNoSecretShape(body, "Queued Agent submit messages must not serialize secrets.");
   await env.AGENT_RESPONSE_QUEUE.send(body, { contentType: "json" });
@@ -68383,17 +68669,17 @@ async function enqueueAgentSubmitRecord({
 async function queueAgentSubmitRecord({
   env = {},
   kvKey = "",
-  record: record5 = {}
+  record: record6 = {}
 } = {}) {
   const normalizedRecord = {
-    ...normalizeSubmitRecordTimestamps(record5),
-    queueGeneration: safeString(record5.queueGeneration) || crypto.randomUUID()
+    ...normalizeSubmitRecordTimestamps(record6),
+    queueGeneration: safeString(record6.queueGeneration) || crypto.randomUUID()
   };
   const persisted = await persistQueuedSubmitRecord({ env, kvKey, record: normalizedRecord });
   if (!persisted.ok) return persisted;
   const queued = await enqueueAgentSubmitRecord({ env, record: normalizedRecord });
   if (!queued.ok) return queued;
-  return { ok: true, queued: true, requestId: record5.requestId };
+  return { ok: true, queued: true, requestId: record6.requestId };
 }
 function queueAttemptPolicy(env, attempts = 1) {
   const configured = Number(env.AGENT_CONTEXT?.config?.agentHttp?.submitMaxAttempts);
@@ -68417,16 +68703,16 @@ function withRetryExhaustion(outcome, policy) {
 function outcomeStatus(outcome) {
   return outcome.ok === true ? "direct_submitted" : outcome.retryable === true ? "submit_queued" : outcome.reconciliationRequired === true ? "direct_submit_reconciliation_required" : "direct_submit_failed";
 }
-function replayResult(record5) {
+function replayResult(record6) {
   return {
-    ok: record5.status === "direct_submitted",
-    requestId: record5.requestId,
+    ok: record6.status === "direct_submitted",
+    requestId: record6.requestId,
     replayed: true,
-    status: record5.status,
+    status: record6.status,
     retryable: false,
-    reconciliationRequired: record5.status === "direct_submit_reconciliation_required" || record5.onChain?.reconciliationRequired === true,
-    reason: record5.onChain?.reason || null,
-    onChain: record5.onChain || null
+    reconciliationRequired: record6.status === "direct_submit_reconciliation_required" || record6.onChain?.reconciliationRequired === true,
+    reason: record6.onChain?.reason || null,
+    onChain: record6.onChain || null
   };
 }
 function sameQueuedRequest(left, right) {
@@ -68469,26 +68755,26 @@ async function newerRevisionStored({ env, kv, source }) {
   }
   return false;
 }
-function recoveryDiagnostics(record5, reason) {
+function recoveryDiagnostics(record6, reason) {
   return {
     event: "agent_submit_recovery_required",
     reason,
-    requestId: safeString(record5.requestId),
-    status: safeString(record5.status),
-    sessionSlug: safeString(record5.sessionSlug),
-    txHash: safeString(record5.onChain?.txHash),
-    storageId: safeString(record5.onChain?.storageId),
-    createdAt: safeString(record5.createdAt),
-    queueGeneration: safeString(record5.queueGeneration)
+    requestId: safeString(record6.requestId),
+    status: safeString(record6.status),
+    sessionSlug: safeString(record6.sessionSlug),
+    txHash: safeString(record6.onChain?.txHash),
+    storageId: safeString(record6.onChain?.storageId),
+    createdAt: safeString(record6.createdAt),
+    queueGeneration: safeString(record6.queueGeneration)
   };
 }
-async function retainOutcomeForRecovery(env, record5, error) {
-  const recovery = record5.onChain?.retryable === true ? {
-    ...record5,
+async function retainOutcomeForRecovery(env, record6, error) {
+  const recovery = record6.onChain?.retryable === true ? {
+    ...record6,
     status: "direct_submit_failed",
-    canonicalApiRequest: { ...record5.canonicalApiRequest, status: "direct_submit_failed" },
-    onChain: { ...record5.onChain, retryable: false, safeToRetry: true, recoveryReason: "submit_result_persistence_failed" }
-  } : { ...record5, canonicalApiRequest: { ...record5.canonicalApiRequest, status: record5.status === "direct_submitted" ? "executed_direct_onchain" : record5.status } };
+    canonicalApiRequest: { ...record6.canonicalApiRequest, status: "direct_submit_failed" },
+    onChain: { ...record6.onChain, retryable: false, safeToRetry: true, recoveryReason: "submit_result_persistence_failed" }
+  } : { ...record6, canonicalApiRequest: { ...record6.canonicalApiRequest, status: record6.status === "direct_submitted" ? "executed_direct_onchain" : record6.status } };
   const body = { type: AGENT_SUBMIT_QUEUE_MESSAGE_TYPE, version: 1, requestId: recovery.requestId, persistenceOnly: true, record: recovery };
   let retained = false;
   try {
@@ -68506,7 +68792,7 @@ async function retainOutcomeForRecovery(env, record5, error) {
     reason: "submit_result_persistence_failed",
     error: safeString(error?.message || error),
     retryable: false,
-    reconciliationRequired: record5.onChain?.ok === true || record5.onChain?.reconciliationRequired === true,
+    reconciliationRequired: record6.onChain?.ok === true || record6.onChain?.reconciliationRequired === true,
     persistenceOnlyQueued: retained,
     diagnosticsRetained: retained,
     onChain: recovery.onChain
@@ -68568,50 +68854,50 @@ async function persistQueueOutcome({ env, source, outcome, now }) {
   };
 }
 async function persistRecoveryMessage({ env, body, requireExisting = false }) {
-  const record5 = objectOrNull(body.record);
-  if (!record5 || safeString(body.requestId) !== safeString(record5.requestId) || !record5.requestId || !record5.sessionSlug || !record5.questionId || !["direct_submitted", "direct_submit_failed", "direct_submit_reconciliation_required"].includes(record5.status) || !objectOrNull(record5.onChain)) {
+  const record6 = objectOrNull(body.record);
+  if (!record6 || safeString(body.requestId) !== safeString(record6.requestId) || !record6.requestId || !record6.sessionSlug || !record6.questionId || !["direct_submitted", "direct_submit_failed", "direct_submit_reconciliation_required"].includes(record6.status) || !objectOrNull(record6.onChain)) {
     return { ok: false, retryable: false, reason: "submit_recovery_record_invalid" };
   }
-  if (record5.submissionJournal === true) {
-    const result = await env.AGENT_SERVICES.recoverSubmitOutcome(record5);
+  if (record6.submissionJournal === true) {
+    const result = await env.AGENT_SERVICES.recoverSubmitOutcome(record6);
     return result.record ? { ...replayResult(result.record), persistenceOnly: true } : result;
   }
   try {
     const kv = env.AGENT_ACTION_KV;
     if (typeof kv?.get !== "function" || typeof kv?.put !== "function") throw new Error("action_kv_unavailable");
-    const raw = await kv.get(submitRequestKvKey(record5.requestId));
+    const raw = await kv.get(submitRequestKvKey(record6.requestId));
     const existing = raw == null ? null : objectOrNull(safeJsonParse(raw, null));
     if (requireExisting && !existing) return { ok: false, reason: "submit_intent_missing" };
-    if (raw != null && (!existing || !sameQueuedRequest(existing, record5))) {
+    if (raw != null && (!existing || !sameQueuedRequest(existing, record6))) {
       return { ok: false, retryable: false, reason: "submit_recovery_request_mismatch" };
     }
-    if (staleQueueGeneration(existing, record5)) return { ok: true, replayed: true, reason: "stale_submit_recovery" };
-    if (existing?.status === "direct_submitted" && record5.status !== "direct_submitted") return replayResult(existing);
-    if (existing?.status === "direct_submit_failed" && existing.onChain?.safeToRetry !== true && record5.onChain.safeToRetry === true) {
+    if (staleQueueGeneration(existing, record6)) return { ok: true, replayed: true, reason: "stale_submit_recovery" };
+    if (existing?.status === "direct_submitted" && record6.status !== "direct_submitted") return replayResult(existing);
+    if (existing?.status === "direct_submit_failed" && existing.onChain?.safeToRetry !== true && record6.onChain.safeToRetry === true) {
       return replayResult(existing);
     }
-    if ((existing?.status === "direct_submit_reconciliation_required" || existing?.onChain?.reconciliationRequired === true) && record5.onChain.safeToRetry === true && (!record5.onChain.submissionAttemptId || record5.onChain.submissionAttemptId !== existing.onChain?.submissionAttemptId)) {
+    if ((existing?.status === "direct_submit_reconciliation_required" || existing?.onChain?.reconciliationRequired === true) && record6.onChain.safeToRetry === true && (!record6.onChain.submissionAttemptId || record6.onChain.submissionAttemptId !== existing.onChain?.submissionAttemptId)) {
       return replayResult(existing);
     }
-    if (existing?.onChain?.txHash && record5.onChain?.txHash && existing.onChain.txHash !== record5.onChain.txHash) {
-      return { ok: false, requestId: record5.requestId, retryable: true, persistenceOnly: true, reason: "submit_recovery_outcome_conflict" };
+    if (existing?.onChain?.txHash && record6.onChain?.txHash && existing.onChain.txHash !== record6.onChain.txHash) {
+      return { ok: false, requestId: record6.requestId, retryable: true, persistenceOnly: true, reason: "submit_recovery_outcome_conflict" };
     }
-    const persisted = await persistAgentSubmitRecord({ env, record: { ...record5, createdAt: existing?.createdAt || record5.createdAt } });
+    const persisted = await persistAgentSubmitRecord({ env, record: { ...record6, createdAt: existing?.createdAt || record6.createdAt } });
     if (!persisted.ok) throw new Error(persisted.reason || "submit_recovery_write_failed");
-    return { ok: true, requestId: record5.requestId, status: record5.status, persistenceOnly: true };
+    return { ok: true, requestId: record6.requestId, status: record6.status, persistenceOnly: true };
   } catch (error) {
-    return { ok: false, requestId: record5.requestId, retryable: true, persistenceOnly: true, reason: "submit_recovery_write_failed", error: safeString(error?.message || error) };
+    return { ok: false, requestId: record6.requestId, retryable: true, persistenceOnly: true, reason: "submit_recovery_write_failed", error: safeString(error?.message || error) };
   }
 }
 async function processQueuedAgentSubmitRecord({
   env = {},
-  record: record5 = {},
+  record: record6 = {},
   createdAt = null,
   now = /* @__PURE__ */ new Date(),
   attempts = 1,
   contractFactory
 } = {}) {
-  const requestId = safeString(record5.requestId);
+  const requestId = safeString(record6.requestId);
   const retryPolicy = queueAttemptPolicy(env, attempts);
   const kvKey = submitRequestKvKey(requestId);
   if (!kvKey) return { ok: false, retryable: false, reason: "submit_request_key_missing" };
@@ -68625,13 +68911,13 @@ async function processQueuedAgentSubmitRecord({
   } catch (error) {
     const outcome = withRetryExhaustion({ ok: false, retryable: true, reason: "submit_request_read_failed", error: safeString(error?.message || error) }, retryPolicy);
     if (outcome.retryable) return { ...outcome, requestId };
-    return retainOutcomeForRecovery(env, { ...record5, status: "direct_submit_failed", onChain: outcome }, error);
+    return retainOutcomeForRecovery(env, { ...record6, status: "direct_submit_failed", onChain: outcome }, error);
   }
   const existing = rawExisting == null ? null : objectOrNull(safeJsonParse(rawExisting, null));
-  if (rawExisting != null && (!existing || !sameQueuedRequest(existing, record5))) {
+  if (rawExisting != null && (!existing || !sameQueuedRequest(existing, record6))) {
     return { ok: false, requestId, retryable: false, reason: "submit_request_record_invalid" };
   }
-  if (staleQueueGeneration(existing, record5)) return { ok: true, requestId, replayed: true, reason: "stale_submit_delivery" };
+  if (staleQueueGeneration(existing, record6)) return { ok: true, requestId, replayed: true, reason: "stale_submit_delivery" };
   if (existing?.status === "direct_submit_failed") return replayResult(existing);
   if (existing?.status === "direct_submitted") {
     return { ok: true, requestId, replayed: true, status: "direct_submitted" };
@@ -68648,7 +68934,7 @@ async function processQueuedAgentSubmitRecord({
       onChain: existing.onChain || null
     };
   }
-  const source = existing || record5;
+  const source = existing || record6;
   const executionTime = now instanceof Date ? now : new Date(now);
   if (!Number.isFinite(executionTime.getTime())) {
     return { ok: false, requestId, retryable: false, reason: "submit_execution_time_invalid" };
@@ -68839,16 +69125,16 @@ async function scheduleProjectionRepair(coordinator) {
   if (!current || current <= Number(coordinator.now()) || current > nextAt) await coordinator.state.storage.setAlarm(nextAt);
 }
 async function projectOutcome(coordinator, key, stored) {
-  const record5 = journalRecord(stored);
-  const projectionKey = `${PROJECTION_PREFIX}${record5.sessionId}:${record5.requestId}`;
-  const digest2 = await sha256Hex2(stableJson(record5));
+  const record6 = journalRecord(stored);
+  const projectionKey = `${PROJECTION_PREFIX}${record6.sessionId}:${record6.requestId}`;
+  const digest2 = await sha256Hex2(stableJson(record6));
   const previous = stored.kvProjection || {};
   if (previous.digest === digest2 && previous.pending !== true) return;
   const now = Number(coordinator.now());
   let notBeforeMs = Number(previous.notBeforeMs) || now;
   const pending = { digest: digest2, pending: true, notBeforeMs };
   await coordinator.state.storage.transaction(async (storage) => {
-    await storage.put(key, { ...record5, kvProjection: pending });
+    await storage.put(key, { ...record6, kvProjection: pending });
     await storage.put(projectionKey, { key, notBeforeMs });
   });
   if (now < notBeforeMs) {
@@ -68857,18 +69143,18 @@ async function projectOutcome(coordinator, key, stored) {
   }
   notBeforeMs = now + 1e3;
   await coordinator.state.storage.transaction(async (storage) => {
-    await storage.put(key, { ...record5, kvProjection: { ...pending, notBeforeMs } });
+    await storage.put(key, { ...record6, kvProjection: { ...pending, notBeforeMs } });
     await storage.put(projectionKey, { key, notBeforeMs });
   });
   await scheduleProjectionRepair(coordinator);
   try {
-    const kv = createAgentStorage({ kv: coordinator.env.GROUP_KV, sessionId: record5.sessionId, cursorSecret: coordinator.env.TOKEN_HMAC_SECRET });
-    const persisted = await persistAgentSubmitRecord({ env: { AGENT_ACTION_KV: kv }, record: record5 });
+    const kv = createAgentStorage({ kv: coordinator.env.GROUP_KV, sessionId: record6.sessionId, cursorSecret: coordinator.env.TOKEN_HMAC_SECRET });
+    const persisted = await persistAgentSubmitRecord({ env: { AGENT_ACTION_KV: kv }, record: record6 });
     if (!persisted.ok) throw new Error(persisted.reason);
   } catch {
     notBeforeMs = Number(coordinator.now()) + 1e3;
     await coordinator.state.storage.transaction(async (storage) => {
-      await storage.put(key, { ...record5, kvProjection: { ...pending, notBeforeMs } });
+      await storage.put(key, { ...record6, kvProjection: { ...pending, notBeforeMs } });
       await storage.put(projectionKey, { key, notBeforeMs });
     });
     await scheduleProjectionRepair(coordinator);
@@ -68876,7 +69162,7 @@ async function projectOutcome(coordinator, key, stored) {
   }
   notBeforeMs = Number(coordinator.now()) + 1e3;
   await coordinator.state.storage.transaction(async (storage) => {
-    await storage.put(key, { ...record5, kvProjection: { digest: digest2, pending: false, notBeforeMs } });
+    await storage.put(key, { ...record6, kvProjection: { digest: digest2, pending: false, notBeforeMs } });
     await storage.delete(projectionKey);
   });
 }
@@ -68902,50 +69188,50 @@ var init_submissionJournal = __esm({
     init_agentSubmitQueue();
     init_runtimePrimitives();
     PROJECTION_PREFIX = "ce-agent-submit-projection:";
-    answerHeadKey = async (record5) => `ce-agent-answer-head:${record5.sessionId}:${await sha256Hex2(stableJson([record5.principalId, record5.questionId]))}`;
+    answerHeadKey = async (record6) => `ce-agent-answer-head:${record6.sessionId}:${await sha256Hex2(stableJson([record6.principalId, record6.questionId]))}`;
     reply = (body, status = 200) => Response.json(body, { status });
     sameRequest = (a, b2) => ["sessionId", "sessionSlug", "workerOrigin", "accountAddress", "principalId", "questionId", "idempotencyKey", "requestId"].every((key) => a[key] === b2[key]);
     journalRecord = (stored) => {
       if (!stored) return null;
-      const { kvProjection: _projection, ...record5 } = stored;
-      return record5;
+      const { kvProjection: _projection, ...record6 } = stored;
+      return record6;
     };
     dispatchAgentSubmissionJournal = (coordinator, operation, payload) => coordinator.serializeSessionConfigOperation(async () => {
-      const record5 = payload?.record;
+      const record6 = payload?.record;
       if (operation === "head") {
-        if (!record5 || record5.sessionSlug !== payload.slug || ["principalId", "questionId"].some((key2) => typeof record5[key2] !== "string" || !record5[key2])) {
+        if (!record6 || record6.sessionSlug !== payload.slug || ["principalId", "questionId"].some((key2) => typeof record6[key2] !== "string" || !record6[key2])) {
           return reply({ ok: false, reason: "submit_journal_record_invalid" }, 400);
         }
         const authority2 = await coordinator.readSessionConfigAuthority(payload.slug);
-        if (resolveCanonicalWorkerSessionIdHex(authority2?.config) !== record5.sessionId) return reply({ ok: false, reason: "submit_journal_session_mismatch" }, 409);
-        return reply({ ok: true, head: await coordinator.state.storage.get(await answerHeadKey(record5)) || null });
+        if (resolveCanonicalWorkerSessionIdHex(authority2?.config) !== record6.sessionId) return reply({ ok: false, reason: "submit_journal_session_mismatch" }, 409);
+        return reply({ ok: true, head: await coordinator.state.storage.get(await answerHeadKey(record6)) || null });
       }
       if (operation === "claim") {
-        if (!record5 || record5.sessionSlug !== payload.slug || ["principalId", "questionId", "transport", "contentDigest"].some((key3) => typeof record5[key3] !== "string" || !record5[key3])) {
+        if (!record6 || record6.sessionSlug !== payload.slug || ["principalId", "questionId", "transport", "contentDigest"].some((key3) => typeof record6[key3] !== "string" || !record6[key3])) {
           return reply({ ok: false, reason: "submit_journal_record_invalid" }, 400);
         }
         const authority2 = await coordinator.readSessionConfigAuthority(payload.slug);
-        if (resolveCanonicalWorkerSessionIdHex(authority2?.config) !== record5.sessionId) return reply({ ok: false, reason: "submit_journal_session_mismatch" }, 409);
-        const key2 = await answerHeadKey(record5);
+        if (resolveCanonicalWorkerSessionIdHex(authority2?.config) !== record6.sessionId) return reply({ ok: false, reason: "submit_journal_session_mismatch" }, 409);
+        const key2 = await answerHeadKey(record6);
         const head = await coordinator.state.storage.get(key2);
-        if (head?.contentDigest === record5.contentDigest) return reply({ ok: true, head });
+        if (head?.contentDigest === record6.contentDigest) return reply({ ok: true, head });
         assertExpectedSessionAuthority(authority2, payload.expectedAuthority, payload.slug);
         const revision = (head?.revision || 0) + 1;
         if (!Number.isSafeInteger(revision)) return reply({ ok: false, reason: "submit_revision_exhausted" }, 409);
-        const next2 = { revision, contentDigest: record5.contentDigest, ...await answerRevisionIdentity({ ...record5, revision }) };
+        const next2 = { revision, contentDigest: record6.contentDigest, ...await answerRevisionIdentity({ ...record6, revision }) };
         await coordinator.state.storage.put(key2, next2);
         return reply({ ok: true, head: next2 });
       }
-      if (!["begin", "finish", "read"].includes(operation) || !record5 || !/^[A-Za-z0-9_-]{1,160}$/.test(record5.requestId || "") || !record5.idempotencyKey || record5.sessionSlug !== payload.slug || operation !== "read" && !record5.onChain?.submissionAttemptId) {
+      if (!["begin", "finish", "read"].includes(operation) || !record6 || !/^[A-Za-z0-9_-]{1,160}$/.test(record6.requestId || "") || !record6.idempotencyKey || record6.sessionSlug !== payload.slug || operation !== "read" && !record6.onChain?.submissionAttemptId) {
         return reply({ ok: false, reason: "submit_journal_record_invalid" }, 400);
       }
       const authority = await coordinator.readSessionConfigAuthority(payload.slug);
-      if (resolveCanonicalWorkerSessionIdHex(authority?.config) !== record5.sessionId) return reply({ ok: false, reason: "submit_journal_session_mismatch" }, 409);
-      const key = `ce-agent-submit:${record5.sessionId}:${record5.requestId}`;
+      if (resolveCanonicalWorkerSessionIdHex(authority?.config) !== record6.sessionId) return reply({ ok: false, reason: "submit_journal_session_mismatch" }, 409);
+      const key = `ce-agent-submit:${record6.sessionId}:${record6.requestId}`;
       const stored = await coordinator.state.storage.get(key);
       const existing = journalRecord(stored);
-      if (existing && !sameRequest(existing, record5)) return reply({ ok: false, reason: "submit_journal_request_mismatch" }, 409);
-      let next = record5;
+      if (existing && !sameRequest(existing, record6)) return reply({ ok: false, reason: "submit_journal_request_mismatch" }, 409);
+      let next = record6;
       let replayed = false;
       if (operation === "read") {
         if (!existing) return reply({ ok: true, record: null });
@@ -68959,31 +69245,31 @@ var init_submissionJournal = __esm({
         } else if (existing?.status === "direct_submit_in_progress") {
           next = existing;
         } else if (existing) next = {
-          ...record5,
+          ...record6,
           createdAt: existing.createdAt,
           draftProvenance: existing.draftProvenance,
           responsePayload: existing.responsePayload,
-          onChain: { ...record5.onChain, ...existing.onChain?.storageId ? { storageId: existing.onChain.storageId, storageRef: existing.onChain.storageRef } : {} }
+          onChain: { ...record6.onChain, ...existing.onChain?.storageId ? { storageId: existing.onChain.storageId, storageRef: existing.onChain.storageRef } : {} }
         };
       } else {
         if (!existing) return reply({ ok: false, reason: "submit_intent_missing" }, 409);
-        if (!["direct_submitted", "direct_submit_failed", "direct_submit_reconciliation_required"].includes(record5.status)) return reply({ ok: false, reason: "submit_journal_outcome_invalid" }, 400);
-        if (existing.status === "direct_submitted" || record5.onChain.safeToRetry === true && existing.onChain?.submissionAttemptId !== record5.onChain.submissionAttemptId) {
+        if (!["direct_submitted", "direct_submit_failed", "direct_submit_reconciliation_required"].includes(record6.status)) return reply({ ok: false, reason: "submit_journal_outcome_invalid" }, 400);
+        if (existing.status === "direct_submitted" || record6.onChain.safeToRetry === true && existing.onChain?.submissionAttemptId !== record6.onChain.submissionAttemptId) {
           next = existing;
           replayed = true;
         } else next = {
-          ...record5,
+          ...record6,
           createdAt: existing.createdAt,
           draftProvenance: existing.draftProvenance,
           responsePayload: existing.responsePayload,
-          onChain: { ...record5.onChain, ...existing.onChain?.storageId && !record5.onChain?.storageId ? { storageId: existing.onChain.storageId, storageRef: existing.onChain.storageRef } : {} }
+          onChain: { ...record6.onChain, ...existing.onChain?.storageId && !record6.onChain?.storageId ? { storageId: existing.onChain.storageId, storageRef: existing.onChain.storageRef } : {} }
         };
       }
       if (operation === "begin" && !replayed) {
         next = { ...next, admissionComplete: true };
         await coordinator.state.storage.transaction(async (storage) => {
           await storage.put(key, { ...next, kvProjection: { ...stored?.kvProjection, pending: false } });
-          await storage.delete(`${PROJECTION_PREFIX}${record5.sessionId}:${record5.requestId}`);
+          await storage.delete(`${PROJECTION_PREFIX}${record6.sessionId}:${record6.requestId}`);
         });
       } else if (operation === "finish" || stored?.kvProjection?.pending) {
         await projectOutcome(coordinator, key, { ...next, kvProjection: stored?.kvProjection });
@@ -69140,7 +69426,7 @@ async function saveAgentQuestionQueueConfig({
   }
   const existing = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
   const now = safeString(createdAt) || (/* @__PURE__ */ new Date()).toISOString();
-  const record5 = {
+  const record6 = {
     type: "telegram_question_queue_config",
     version: 1,
     sessionSlug: sanitizeSessionSlug(sessionSlug),
@@ -69150,9 +69436,9 @@ async function saveAgentQuestionQueueConfig({
     createdAt: safeString(existing?.createdAt) || now,
     updatedAt: now
   };
-  assertNoSecretShape(record5, "Agent question queue config records must not serialize secrets.");
-  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record5));
-  return { ok: true, key, config: record5 };
+  assertNoSecretShape(record6, "Agent question queue config records must not serialize secrets.");
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record6));
+  return { ok: true, key, config: record6 };
 }
 function normalizeQuestionQueueCriteria(input = {}) {
   const criteria = input.criteria && typeof input.criteria === "object" && !Array.isArray(input.criteria) ? input.criteria : {};
@@ -69282,7 +69568,7 @@ async function advanceAgentQuestionQueueState({
         selectedAt: now
       }] : []
     ].slice(-MAX_HISTORY);
-    const record5 = {
+    const record6 = {
       type: "telegram_question_queue_state",
       version: 1,
       sessionSlug: sanitizeSessionSlug(sessionSlug),
@@ -69295,8 +69581,8 @@ async function advanceAgentQuestionQueueState({
       createdAt: safeString(existing?.createdAt) || now,
       updatedAt: now
     };
-    assertNoSecretShape(record5, "Agent question queue state records must not serialize secrets.");
-    await kv.put(key, JSON.stringify(record5));
+    assertNoSecretShape(record6, "Agent question queue state records must not serialize secrets.");
+    await kv.put(key, JSON.stringify(record6));
     advanced = true;
   }
   return { questionId: questionId4, sponsored, cycled, advanced, replayed: false, servedCount: nextServed.length, candidateCount: candidates.length };
@@ -69583,23 +69869,23 @@ var init_wrappedJournal = __esm({
     reply4 = (body, status = 200) => Response.json(body, { status });
     busy = () => reply4({ ok: false, status: 503, reason: "wrapped_storage_busy", retryable: true, retryAfterSeconds: 1 }, 503);
     dispatchWrappedResearch = (coordinator, payload) => coordinator.serializeSessionConfigOperation(async () => {
-      const record5 = payload?.record;
-      if (!record5 || !["answers", "votes"].includes(record5.kind) || record5.sessionSlug !== payload.slug || typeof record5.subjectId !== "string" || !record5.subjectId || record5.subjectId.length > 256 || typeof record5.requestId !== "string" || !record5.requestId || record5.requestId.length > 160 || !/^[a-f0-9]{64}$/.test(record5.summaryHash || "") || !Array.isArray(record5.events) || record5.events.length < 1 || record5.events.length > 50 || record5.kind === "votes" && !["linear", "quadratic"].includes(record5.mode)) {
+      const record6 = payload?.record;
+      if (!record6 || !["answers", "votes"].includes(record6.kind) || record6.sessionSlug !== payload.slug || typeof record6.subjectId !== "string" || !record6.subjectId || record6.subjectId.length > 256 || typeof record6.requestId !== "string" || !record6.requestId || record6.requestId.length > 160 || !/^[a-f0-9]{64}$/.test(record6.summaryHash || "") || !Array.isArray(record6.events) || record6.events.length < 1 || record6.events.length > 50 || record6.kind === "votes" && !["linear", "quadratic"].includes(record6.mode)) {
         return reply4({ ok: false, reason: "wrapped_request_invalid" }, 400);
       }
       const authority = await coordinator.readSessionConfigAuthority(payload.slug);
       assertExpectedSessionAuthority(authority, payload.expectedAuthority, payload.slug);
-      if (resolveCanonicalWorkerSessionIdHex(authority?.config) !== record5.sessionId) {
+      if (resolveCanonicalWorkerSessionIdHex(authority?.config) !== record6.sessionId) {
         return reply4({ ok: false, reason: "wrapped_session_mismatch" }, 409);
       }
-      const kv = createAgentStorage({ kv: coordinator.env.GROUP_KV, sessionId: record5.sessionId, cursorSecret: coordinator.env.TOKEN_HMAC_SECRET });
+      const kv = createAgentStorage({ kv: coordinator.env.GROUP_KV, sessionId: record6.sessionId, cursorSecret: coordinator.env.TOKEN_HMAC_SECRET });
       const storage = coordinator.state.storage;
-      const stateKey = record5.kind === "answers" ? answerStateKey(record5.sessionSlug, record5.subjectId) : voteStateKey(record5.sessionSlug, record5.subjectId, record5.mode);
-      const namespace = `ce-agent-wrapped:${record5.sessionId}:${await sha256Hex2(stateKey)}`;
+      const stateKey = record6.kind === "answers" ? answerStateKey(record6.sessionSlug, record6.subjectId) : voteStateKey(record6.sessionSlug, record6.subjectId, record6.mode);
+      const namespace = `ce-agent-wrapped:${record6.sessionId}:${await sha256Hex2(stateKey)}`;
       const durableStateKey = `${namespace}:state`;
-      const requestKey = `${namespace}:request:${await sha256Hex2(record5.requestId)}`;
+      const requestKey = `${namespace}:request:${await sha256Hex2(record6.requestId)}`;
       const existing = await storage.get(requestKey);
-      if (existing && existing.summaryHash !== record5.summaryHash) return reply4({ ok: false, status: 409, reason: "request_id_conflict" }, 409);
+      if (existing && existing.summaryHash !== record6.summaryHash) return reply4({ ok: false, status: 409, reason: "request_id_conflict" }, 409);
       if (existing?.complete) return reply4({ ...existing.response, replay: true });
       let state2 = await storage.get(durableStateKey);
       if (!state2) state2 = { value: safeJsonParse(await kv.get(stateKey), null), notBeforeMs: 0, pending: null };
@@ -69633,20 +69919,20 @@ var init_wrappedJournal = __esm({
         if (existing) return reply4({ ...existing.response, replay: true });
       }
       if (now < state2.notBeforeMs) return busy();
-      const base = state2.value || record5.initialState;
-      if (!base || !record5.changes || typeof record5.changes !== "object") return reply4({ ok: false, reason: "wrapped_state_invalid" }, 400);
+      const base = state2.value || record6.initialState;
+      if (!base || !record6.changes || typeof record6.changes !== "object") return reply4({ ok: false, reason: "wrapped_state_invalid" }, 400);
       let value;
-      let events = record5.events;
-      if (record5.kind === "answers") {
+      let events = record6.events;
+      if (record6.kind === "answers") {
         const runScopes = (base.runScopes || []).map((scope) => ({ ...scope }));
         for (const event of events) {
           const { runId, questionId: questionId4, eventKind } = event.value;
           let scope = runScopes.find((entry2) => entry2.runId === runId);
           if (!scope) {
-            if (!Array.isArray(record5.runStatementIds) || !record5.runStatementIds.length) {
+            if (!Array.isArray(record6.runStatementIds) || !record6.runStatementIds.length) {
               return reply4({ ok: false, status: 400, reason: "wrapped_run_scope_invalid" }, 400);
             }
-            scope = { runId, runStatementIds: [...new Set(record5.runStatementIds)], coverage: "" };
+            scope = { runId, runStatementIds: [...new Set(record6.runStatementIds)], coverage: "" };
             scope.coverage = "0".repeat(scope.runStatementIds.length);
             runScopes.push(scope);
           }
@@ -69662,7 +69948,7 @@ var init_wrappedJournal = __esm({
           }, 409);
         }
         const byStatement = { ...base.byStatement };
-        for (const [id2, change] of Object.entries(record5.changes)) {
+        for (const [id2, change] of Object.entries(record6.changes)) {
           byStatement[id2] = { ...byStatement[id2], agent: change.agent, agentSkip: change.agentSkip };
         }
         const counts = { answers: 0, skips: 0 };
@@ -69670,26 +69956,26 @@ var init_wrappedJournal = __esm({
           if (entry2.agent) counts.answers++;
           if (entry2.agentSkip) counts.skips++;
         }
-        value = { ...base, byStatement, runScopes, counts, updatedAt: record5.createdAt };
-      } else value = { ...base, ...record5.changes, updatedAt: record5.createdAt };
+        value = { ...base, byStatement, runScopes, counts, updatedAt: record6.createdAt };
+      } else value = { ...base, ...record6.changes, updatedAt: record6.createdAt };
       value.recentRequestIds = [
-        ...(base.recentRequestIds || []).filter((entry2) => entry2.requestId !== record5.requestId),
-        { requestId: record5.requestId, summaryHash: record5.summaryHash, at: record5.createdAt }
+        ...(base.recentRequestIds || []).filter((entry2) => entry2.requestId !== record6.requestId),
+        { requestId: record6.requestId, summaryHash: record6.summaryHash, at: record6.createdAt }
       ].slice(-MAX_RECENT_REQUEST_IDS);
       const pending = {
-        summaryHash: record5.summaryHash,
+        summaryHash: record6.summaryHash,
         events,
-        stateMetadata: record5.stateMetadata,
-        response: record5.response,
+        stateMetadata: record6.stateMetadata,
+        response: record6.response,
         complete: false
       };
-      if (record5.kind === "answers") pending.stateMetadata = { ...pending.stateMetadata, a: value.counts.answers, s: value.counts.skips };
+      if (record6.kind === "answers") pending.stateMetadata = { ...pending.stateMetadata, a: value.counts.answers, s: value.counts.skips };
       state2 = { ...state2, value, pending: requestKey };
       await storage.transaction(async (tx) => {
         await tx.put(requestKey, pending);
         await tx.put(durableStateKey, state2);
       });
-      return await project() ? reply4(record5.response) : busy();
+      return await project() ? reply4(record6.response) : busy();
     });
   }
 });
@@ -69856,12 +70142,12 @@ var init_storageBackupRevision = __esm({
 });
 
 // workers/sessionCorsWorker/payloadAccessControl.js
-var trim7, lower4, isObj11, LEGACY_PAYLOAD_ACCESS_MODES, PAYLOAD_ACCESS_GATES3, PAYLOAD_ENCRYPTION_MODES3, normalizeGate, normalizeEncryption, normalizeLegacyPayloadAccessMode, normalizePayloadAccessControl2, deriveLegacyPayloadAccessMode2;
+var trim8, lower4, isObj11, LEGACY_PAYLOAD_ACCESS_MODES, PAYLOAD_ACCESS_GATES3, PAYLOAD_ENCRYPTION_MODES3, normalizeGate, normalizeEncryption, normalizeLegacyPayloadAccessMode, normalizePayloadAccessControl2, deriveLegacyPayloadAccessMode2;
 var init_payloadAccessControl = __esm({
   "workers/sessionCorsWorker/payloadAccessControl.js"() {
     init_stringCoercion();
-    trim7 = (value) => toStr6(value).trim();
-    lower4 = (value) => trim7(value).toLowerCase().replace(/-/g, "_");
+    trim8 = (value) => toStr6(value).trim();
+    lower4 = (value) => trim8(value).toLowerCase().replace(/-/g, "_");
     isObj11 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     LEGACY_PAYLOAD_ACCESS_MODES = Object.freeze({
       PUBLIC_READ: "public_read",
@@ -69971,7 +70257,7 @@ var init_storageKvBindings = __esm({
 });
 
 // workers/sessionCorsWorker/storageEnvelopeEncryption.js
-var textEncoder3, STORAGE_ENVELOPE_KEK_SECRET_NAME2, STORAGE_ENVELOPE_PREVIOUS_KEK_SECRET_NAME, ENVELOPE_VERSION, AES_GCM2, AES_256_GCM, trim8, isObj12, cloneJson, safeSlugPart, bytesToBase64url2, base64urlToBytes2, toUint8Array, getCryptoImpl2, randomBytes5, nowIso3, importAesKey, deriveDeploymentKeyBytes, readDeploymentSecret, importDeploymentKek, aesEncrypt, aesDecrypt, wrapBytesWithKey, unwrapBytesWithKey, wrapResponseFieldKey, unwrapResponseFieldKey, readSessionKeyRecord, isCoordinatorWrappedSessionKeyRecord, unwrapSessionKeyBytes, ensureStorageEnvelopeSessionKey, encryptPayloadWithStorageEnvelope, decryptPayloadWithStorageEnvelope, auditSuffix, writeStorageEnvelopeKeyReleaseAudit, writeStorageVisibilityAudit;
+var textEncoder3, STORAGE_ENVELOPE_KEK_SECRET_NAME2, STORAGE_ENVELOPE_PREVIOUS_KEK_SECRET_NAME, ENVELOPE_VERSION, AES_GCM2, AES_256_GCM, trim9, isObj12, cloneJson, safeSlugPart, bytesToBase64url2, base64urlToBytes2, toUint8Array, getCryptoImpl2, randomBytes5, nowIso3, importAesKey, deriveDeploymentKeyBytes, readDeploymentSecret, importDeploymentKek, aesEncrypt, aesDecrypt, wrapBytesWithKey, unwrapBytesWithKey, wrapResponseFieldKey, unwrapResponseFieldKey, readSessionKeyRecord, isCoordinatorWrappedSessionKeyRecord, unwrapSessionKeyBytes, ensureStorageEnvelopeSessionKey, encryptPayloadWithStorageEnvelope, decryptPayloadWithStorageEnvelope, auditSuffix, writeStorageEnvelopeKeyReleaseAudit, writeStorageVisibilityAudit;
 var init_storageEnvelopeEncryption = __esm({
   "workers/sessionCorsWorker/storageEnvelopeEncryption.js"() {
     init_sessionWriteCoordinator();
@@ -69983,10 +70269,10 @@ var init_storageEnvelopeEncryption = __esm({
     ENVELOPE_VERSION = 1;
     AES_GCM2 = "AES-GCM";
     AES_256_GCM = "AES-256-GCM";
-    trim8 = (value) => toStr6(value).trim();
+    trim9 = (value) => toStr6(value).trim();
     isObj12 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     cloneJson = (value) => JSON.parse(JSON.stringify(value || {}));
-    safeSlugPart = (value) => trim8(value || "general").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "") || "general";
+    safeSlugPart = (value) => trim9(value || "general").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "") || "general";
     bytesToBase64url2 = (bytes3) => {
       const source = bytes3 instanceof Uint8Array ? bytes3 : new Uint8Array(bytes3 || []);
       if (typeof Buffer !== "undefined") {
@@ -69999,7 +70285,7 @@ var init_storageEnvelopeEncryption = __esm({
       return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
     };
     base64urlToBytes2 = (value) => {
-      const text9 = trim8(value);
+      const text9 = trim9(value);
       if (!text9) return new Uint8Array();
       const base64 = text9.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(text9.length / 4) * 4, "=");
       if (typeof Buffer !== "undefined") return new Uint8Array(Buffer.from(base64, "base64"));
@@ -70033,7 +70319,7 @@ var init_storageEnvelopeEncryption = __esm({
     nowIso3 = (deps = {}) => new Date(deps.now?.() || Date.now()).toISOString();
     importAesKey = async (keyBytes, usages, deps = {}) => getCryptoImpl2(deps).subtle.importKey("raw", keyBytes, { name: AES_GCM2 }, false, usages);
     deriveDeploymentKeyBytes = async (secret, deps = {}) => {
-      const raw = trim8(secret);
+      const raw = trim9(secret);
       const material = /^[a-f0-9]{64}$/i.test(raw) ? raw.toLowerCase() : raw;
       if (!material) throw new Error(`${STORAGE_ENVELOPE_KEK_SECRET_NAME2} is missing.`);
       const digest2 = await getCryptoImpl2(deps).subtle.digest("SHA-256", textEncoder3.encode(material));
@@ -70085,7 +70371,7 @@ var init_storageEnvelopeEncryption = __esm({
       };
     };
     unwrapBytesWithKey = async ({ wrappingKey, wrapped, aad = "", deps = {} }) => {
-      if (!isObj12(wrapped) || !trim8(wrapped.iv) || !trim8(wrapped.wrappedKey)) {
+      if (!isObj12(wrapped) || !trim9(wrapped.iv) || !trim9(wrapped.wrappedKey)) {
         throw new Error("Invalid wrapped storage envelope key.");
       }
       const params = { name: AES_GCM2, iv: base64urlToBytes2(wrapped.iv) };
@@ -70112,23 +70398,23 @@ var init_storageEnvelopeEncryption = __esm({
       const envelope = isObj12(config.storageEnvelope) ? config.storageEnvelope : {};
       return isObj12(envelope.sessionKey) ? envelope.sessionKey : null;
     };
-    isCoordinatorWrappedSessionKeyRecord = (record5, slug) => {
-      if (!isObj12(record5)) return false;
-      const createdAt = trim8(record5.createdAt);
+    isCoordinatorWrappedSessionKeyRecord = (record6, slug) => {
+      if (!isObj12(record6)) return false;
+      const createdAt = trim9(record6.createdAt);
       const createdAtMs2 = Date.parse(createdAt);
-      return record5.version === ENVELOPE_VERSION && record5.keyProvider === "worker_secret" && record5.alg === AES_256_GCM && record5.wrapAlg === "AES-GCM-KW-v1" && Number.isFinite(createdAtMs2) && new Date(createdAtMs2).toISOString() === createdAt && trim8(record5.keyId) === `session:${safeSlugPart(slug)}:${createdAt}` && /^[A-Za-z0-9_-]{16}$/.test(trim8(record5.iv)) && /^[A-Za-z0-9_-]{64}$/.test(trim8(record5.wrappedKey));
+      return record6.version === ENVELOPE_VERSION && record6.keyProvider === "worker_secret" && record6.alg === AES_256_GCM && record6.wrapAlg === "AES-GCM-KW-v1" && Number.isFinite(createdAtMs2) && new Date(createdAtMs2).toISOString() === createdAt && trim9(record6.keyId) === `session:${safeSlugPart(slug)}:${createdAt}` && /^[A-Za-z0-9_-]{16}$/.test(trim9(record6.iv)) && /^[A-Za-z0-9_-]{64}$/.test(trim9(record6.wrappedKey));
     };
     unwrapSessionKeyBytes = async ({ env, config, slug, deps = {} }) => {
-      const record5 = readSessionKeyRecord(config);
-      if (!record5) throw new Error("Storage envelope session key is missing.");
+      const record6 = readSessionKeyRecord(config);
+      if (!record6) throw new Error("Storage envelope session key is missing.");
       const aad = `ce-storage-envelope:session:${safeSlugPart(slug)}`;
       const attempts = [false, true];
       let lastError = null;
       for (const previous of attempts) {
-        if (previous && !trim8(readDeploymentSecret({ env, previous, deps }))) continue;
+        if (previous && !trim9(readDeploymentSecret({ env, previous, deps }))) continue;
         try {
           const deploymentKey = await importDeploymentKek({ env, previous, deps });
-          return await unwrapBytesWithKey({ wrappingKey: deploymentKey, wrapped: record5, aad, deps });
+          return await unwrapBytesWithKey({ wrappingKey: deploymentKey, wrapped: record6, aad, deps });
         } catch (error) {
           lastError = error;
         }
@@ -70228,7 +70514,7 @@ var init_storageEnvelopeEncryption = __esm({
           },
           conditionRef: conditionRef || "gate_fallback",
           ...isObj12(accessConditions) ? { accessConditions: cloneJson(accessConditions) } : {},
-          contentType: trim8(contentType) || "application/octet-stream",
+          contentType: trim9(contentType) || "application/octet-stream",
           encryptedAt: nowIso3(deps)
         }
       };
@@ -70263,11 +70549,11 @@ var init_storageEnvelopeEncryption = __esm({
       });
     };
     auditSuffix = (deps = {}) => {
-      if (typeof deps.randomUUID === "function") return trim8(deps.randomUUID());
+      if (typeof deps.randomUUID === "function") return trim9(deps.randomUUID());
       try {
         return bytesToBase64url2(randomBytes5(12, deps));
       } catch {
-        return trim8(Date.now());
+        return trim9(Date.now());
       }
     };
     writeStorageEnvelopeKeyReleaseAudit = async ({
@@ -70283,8 +70569,8 @@ var init_storageEnvelopeEncryption = __esm({
         version: ENVELOPE_VERSION,
         event: "storage_envelope_key_release",
         sessionSlug: safeSlugPart(slug),
-        payloadId: trim8(payloadId),
-        principal: trim8(principal).toLowerCase() || "anonymous",
+        payloadId: trim9(payloadId),
+        principal: trim9(principal).toLowerCase() || "anonymous",
         conditionMatched: isObj12(conditionMatched) ? cloneJson(conditionMatched) : conditionMatched || "gate_fallback",
         timestamp
       };
@@ -70312,9 +70598,9 @@ var init_storageEnvelopeEncryption = __esm({
         version: ENVELOPE_VERSION,
         event: hidden ? "storage_resource_hidden" : "storage_resource_unhidden",
         sessionSlug: safeSlugPart(slug),
-        resource: trim8(resource),
-        resourceId: trim8(resourceId),
-        principal: trim8(principal).toLowerCase(),
+        resource: trim9(resource),
+        resourceId: trim9(resourceId),
+        principal: trim9(principal).toLowerCase(),
         timestamp
       };
       const kv = getStorageAuditBinding(env);
@@ -70747,18 +71033,18 @@ var init_storageUploadValidation = __esm({
 });
 
 // workers/sessionCorsWorker/storageResourceOwnership.js
-var OWNED_STORAGE_RESOURCES, trim9, lower5, isObj15, isOwnedStorageResource, recordKey, readJsonRecord, LEGACY_STORAGE_OWNER, readStorageResourceOwner, writeStorageResourceOwner, isStorageResourceHidden, writeStorageResourceHidden, hiddenStorageResourcePrefix, listHiddenStorageResourceIds;
+var OWNED_STORAGE_RESOURCES, trim10, lower5, isObj15, isOwnedStorageResource, recordKey, readJsonRecord, LEGACY_STORAGE_OWNER, readStorageResourceOwner, writeStorageResourceOwner, isStorageResourceHidden, writeStorageResourceHidden, hiddenStorageResourcePrefix, listHiddenStorageResourceIds;
 var init_storageResourceOwnership = __esm({
   "workers/sessionCorsWorker/storageResourceOwnership.js"() {
     init_sessionSlugResolution();
     init_stringCoercion();
     init_canonicalStorageVersions();
     OWNED_STORAGE_RESOURCES = Object.freeze(["questions", "surveys"]);
-    trim9 = (value) => toStr6(value).trim();
-    lower5 = (value) => trim9(value).toLowerCase();
+    trim10 = (value) => toStr6(value).trim();
+    lower5 = (value) => trim10(value).toLowerCase();
     isObj15 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-    isOwnedStorageResource = (resource) => OWNED_STORAGE_RESOURCES.includes(trim9(resource));
-    recordKey = (kind, { slug, resource, resourceId = "" }) => `ce-storage-${kind}:${sessionSlugStorageKey(slug)}:${trim9(resource)}:${lower5(resourceId)}`;
+    isOwnedStorageResource = (resource) => OWNED_STORAGE_RESOURCES.includes(trim10(resource));
+    recordKey = (kind, { slug, resource, resourceId = "" }) => `ce-storage-${kind}:${sessionSlugStorageKey(slug)}:${trim10(resource)}:${lower5(resourceId)}`;
     readJsonRecord = async (index, key) => {
       const raw = await index.get(key);
       if (raw == null || raw === "") return null;
@@ -70773,11 +71059,11 @@ var init_storageResourceOwnership = __esm({
     readStorageResourceOwner = ({ index, slug, resource, resourceId }) => readJsonRecord(index, recordKey("owner", { slug, resource, resourceId }));
     writeStorageResourceOwner = ({ index, slug, resource, resourceId, uploader, storageRefId, createdAt }) => index.put(recordKey("owner", { slug, resource, resourceId }), JSON.stringify({
       version: 1,
-      resource: trim9(resource),
+      resource: trim10(resource),
       resourceId: lower5(resourceId),
       uploader: lower5(uploader),
-      storageRefId: trim9(storageRefId),
-      createdAt: trim9(createdAt)
+      storageRefId: trim10(storageRefId),
+      createdAt: trim10(createdAt)
     }));
     isStorageResourceHidden = async ({ index, slug, resource, resourceId }) => (await readJsonRecord(index, recordKey("hidden", { slug, resource, resourceId })))?.hidden === true;
     writeStorageResourceHidden = ({ index, slug, resource, resourceId, hidden, actor, updatedAt }) => {
@@ -70786,10 +71072,10 @@ var init_storageResourceOwnership = __esm({
       return index.put(key, JSON.stringify({
         version: 1,
         hidden: true,
-        resource: trim9(resource),
+        resource: trim10(resource),
         resourceId: lower5(resourceId),
         updatedBy: lower5(actor),
-        updatedAt: trim9(updatedAt)
+        updatedAt: trim10(updatedAt)
       }));
     };
     hiddenStorageResourcePrefix = ({ slug, resource }) => recordKey("hidden", { slug, resource });
@@ -70804,10 +71090,10 @@ var init_storageResourceOwnership = __esm({
         (Array.isArray(listed?.keys) ? listed.keys : []).forEach((entry2) => {
           budget?.rows();
           if (budget) budget.metadata(entry2);
-          const id2 = trim9(entry2?.name || entry2).slice(prefix.length);
+          const id2 = trim10(entry2?.name || entry2).slice(prefix.length);
           if (id2) ids.add(id2);
         });
-        cursor = listed?.list_complete === false ? trim9(listed?.cursor) : "";
+        cursor = listed?.list_complete === false ? trim10(listed?.cursor) : "";
         if (listed?.list_complete === false && (!cursor || seenCursors.has(cursor))) throw new Error("Cloudflare hidden-resource cursor is unavailable or did not advance.");
         if (cursor) seenCursors.add(cursor);
       } while (cursor);
@@ -70960,7 +71246,7 @@ var init_storageScanBudget = __esm({
 });
 
 // workers/sessionCorsWorker/responseAnswerValidation.js
-var decoder5, isObj16, trim10, lower6, parseJson, refusal, listUploadedAnswers, isBlank, isMaskedQuestion, readQuestionVersions, readQuestionPayloads, QUESTION_SET_TTL_MS, MAX_CACHED_SESSIONS, MAX_CACHED_PAYLOAD_BYTES, questionSets, forgetSessionQuestions, sessionQuestionSet, loadQuestionSet, questionPayloadsOf, agentKv, readProposedQuestion, countProposedQuestions, countSessionQuestions, findAnsweredQuestions, checkUploadedAnswers;
+var decoder5, isObj16, trim11, lower6, parseJson, refusal, listUploadedAnswers, isBlank, isMaskedQuestion, readQuestionVersions, readQuestionPayloads, QUESTION_SET_TTL_MS, MAX_CACHED_SESSIONS, MAX_CACHED_PAYLOAD_BYTES, questionSets, forgetSessionQuestions, sessionQuestionSet, loadQuestionSet, questionPayloadsOf, agentKv, readProposedQuestion, countProposedQuestions, countSessionQuestions, findAnsweredQuestions, checkUploadedAnswers;
 var init_responseAnswerValidation = __esm({
   "workers/sessionCorsWorker/responseAnswerValidation.js"() {
     init_answerValue();
@@ -70973,8 +71259,8 @@ var init_responseAnswerValidation = __esm({
     init_storage();
     decoder5 = new TextDecoder();
     isObj16 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-    trim10 = (value) => typeof value === "string" ? value.trim() : "";
-    lower6 = (value) => trim10(value).toLowerCase();
+    trim11 = (value) => typeof value === "string" ? value.trim() : "";
+    lower6 = (value) => trim11(value).toLowerCase();
     parseJson = (bytes3) => {
       try {
         return bytes3 ? JSON.parse(decoder5.decode(bytes3)) : null;
@@ -70986,7 +71272,7 @@ var init_responseAnswerValidation = __esm({
     listUploadedAnswers = (payload) => (Array.isArray(payload?.responses) ? payload.responses : [payload]).filter(isObj16).map((item) => {
       const field = item.answer;
       return {
-        rawQuestionId: trim10(item.questionID || item.questionId),
+        rawQuestionId: trim11(item.questionID || item.questionId),
         questionId: lower6(item.questionID || item.questionId),
         value: isObj16(field) ? field.value : field,
         encrypted: isObj16(field) && field.encrypted === true
@@ -71008,9 +71294,9 @@ var init_responseAnswerValidation = __esm({
         candidates.push({
           resourceId,
           metadata,
-          createdAtMs: Date.parse(trim10(metadata.createdAt)) || 0,
-          storageRefId: trim10(metadata.id),
-          uploader: trim10(metadata.uploader),
+          createdAtMs: Date.parse(trim11(metadata.createdAt)) || 0,
+          storageRefId: trim11(metadata.id),
+          uploader: trim11(metadata.uploader),
           uploadAuthority: metadata.uploadAuthority
         });
       }
@@ -71022,7 +71308,7 @@ var init_responseAnswerValidation = __esm({
       const bulk = await readStoredCloudflarePayloadsBulk({ env, index, slug, metadataList: readable, budget });
       const payloads = /* @__PURE__ */ new Map();
       for (const metadata of readable) {
-        const id2 = trim10(metadata.id);
+        const id2 = trim11(metadata.id);
         let bytes3 = bulk.has(id2) ? bulk.get(id2) : await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget });
         if (bytes3 && isObj16(metadata.envelope)) {
           try {
@@ -71063,7 +71349,7 @@ var init_responseAnswerValidation = __esm({
       let sets = questionSets.get(index);
       if (!sets) questionSets.set(index, sets = /* @__PURE__ */ new Map());
       const key = `${sessionSlugStorageKey(slug)}
-${trim10(config?.sessionId)}`;
+${trim11(config?.sessionId)}`;
       const state2 = sets.get(key) || { generation: 0, cached: null };
       sets.delete(key);
       sets.set(key, state2);
@@ -71080,7 +71366,7 @@ ${trim10(config?.sessionId)}`;
       const found = /* @__PURE__ */ new Map();
       const missing = [];
       for (const metadata of metadataList) {
-        const id2 = trim10(metadata.id);
+        const id2 = trim11(metadata.id);
         if (set.payloads.has(id2)) found.set(id2, set.payloads.get(id2));
         else missing.push(metadata);
       }
@@ -71098,7 +71384,7 @@ ${trim10(config?.sessionId)}`;
     };
     agentKv = ({ env, config }) => {
       try {
-        return createAgentStorage({ kv: env.GROUP_KV, sessionId: trim10(config?.sessionId) });
+        return createAgentStorage({ kv: env.GROUP_KV, sessionId: trim11(config?.sessionId) });
       } catch {
         return null;
       }
@@ -71121,7 +71407,7 @@ ${trim10(config?.sessionId)}`;
       const wantedPayloads = await questionPayloadsOf({ env, config, index, slug, set, metadataList: wanted, deps });
       for (const answer of answers) {
         const candidate = set.current.get(answer.questionId);
-        if (candidate) questions.set(answer.questionId, wantedPayloads.get(trim10(candidate.metadata.id)) || null);
+        if (candidate) questions.set(answer.questionId, wantedPayloads.get(trim11(candidate.metadata.id)) || null);
       }
       if (answers.some((answer) => !questions.has(answer.questionId)) && set.untrusted.length) {
         for (const [, question] of await questionPayloadsOf({ env, config, index, slug, set, metadataList: set.untrusted, deps })) {
@@ -71154,7 +71440,7 @@ ${trim10(config?.sessionId)}`;
           return refusal(422, "This answer is for a question this session does not have. Reload the session and try again.", "response_question_unknown");
         }
         const question = questions.get(answer.questionId);
-        const type = question && trim10(question.type || question.questionType);
+        const type = question && trim11(question.type || question.questionType);
         if (!QUESTION_TYPES2.includes(type) || answer.encrypted || isBlank(answer.value) || isMaskedQuestion(question)) continue;
         const checked = normalizeAnswerValue({ ...question, type }, answer.value, { maxFreeformLength: Infinity });
         if (!checked.ok) return refusal(422, `This answer can't be saved: ${checked.error}`, "response_answer_invalid");
@@ -71455,223 +71741,6 @@ var init_draftTextRoute = __esm({
   }
 });
 
-// shared/aiDefaults.mjs
-var DEFAULT_AI_MODEL, DEFAULT_AI_MODELS, DEFAULT_ANTHROPIC_MODEL, TRANSCRIPTION_FALLBACK_MODEL, GROUP_TRANSCRIPTION_MODEL;
-var init_aiDefaults = __esm({
-  "shared/aiDefaults.mjs"() {
-    DEFAULT_AI_MODEL = "gpt-6.1-terra";
-    DEFAULT_AI_MODELS = Object.freeze({ fast: DEFAULT_AI_MODEL, thinking: "gpt-6.1-sol" });
-    DEFAULT_ANTHROPIC_MODEL = "claude-opus-5-5";
-    TRANSCRIPTION_FALLBACK_MODEL = "whisper-1";
-    GROUP_TRANSCRIPTION_MODEL = "gpt-4o-transcribe-diarize";
-  }
-});
-
-// shared/aiModelFamily.mjs
-var toModelLeaf, inferAiProviderFromModel, isGpt5Or6, isOSeries, isOpenAiReasoningModel, usesOpenAiResponsesApi, takesLongReply, interviewMapOutputTokens, LADDER, GPT_FULL, GPT_FROM_LOW, GPT_5, GPT_5_POINT, LOW_TO_HIGH, CLAUDE, reasoningEffortsOf, takesReasoningEffort, fitReasoningEffort;
-var init_aiModelFamily = __esm({
-  "shared/aiModelFamily.mjs"() {
-    toModelLeaf = (model) => String(model ?? "").trim().toLowerCase().split("/").pop() || "";
-    inferAiProviderFromModel = (model) => {
-      const name = String(model ?? "").trim().toLowerCase();
-      if (!name) return "";
-      if (name.startsWith("claude")) return "anthropic";
-      if (/^(?:gpt-|o[1-9]|chatgpt)/.test(name)) return "openai";
-      if (name.startsWith("@cf/")) return "workers-ai";
-      return name.includes("/") ? "openrouter" : "";
-    };
-    isGpt5Or6 = (leaf) => /^gpt-[56](?:$|[.-])/.test(leaf);
-    isOSeries = (leaf) => /^o[1-9](?:$|-)/.test(leaf);
-    isOpenAiReasoningModel = (model) => {
-      const leaf = toModelLeaf(model);
-      return isGpt5Or6(leaf) || isOSeries(leaf);
-    };
-    usesOpenAiResponsesApi = ({ provider = "", model = "", endpoint = "" } = {}) => {
-      if (String(provider || "").trim().toLowerCase() !== "openai") return false;
-      const route = String(endpoint || "").trim().toLowerCase();
-      return route === "responses" || route.includes("/responses") || isGpt5Or6(toModelLeaf(model));
-    };
-    takesLongReply = (model) => {
-      const leaf = toModelLeaf(model);
-      if (/-chat(?:$|-)/.test(leaf)) return false;
-      return isGpt5Or6(leaf) || isOSeries(leaf) || /^gpt-4\.1(?:$|-)/.test(leaf) || /^claude-(?:opus|sonnet|haiku|fable|mythos)-(?:[5-9]|4[.-][5-9])(?:$|[.-])/.test(leaf);
-    };
-    interviewMapOutputTokens = (model, provider = "") => String(provider || "").trim().toLowerCase() !== "custom" && takesLongReply(model) ? 32e3 : 8e3;
-    LADDER = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
-    GPT_FULL = Object.freeze(["none", "low", "medium", "high", "xhigh", "max"]);
-    GPT_FROM_LOW = Object.freeze(["low", "medium", "high", "xhigh", "max"]);
-    GPT_5 = Object.freeze(["minimal", "low", "medium", "high"]);
-    GPT_5_POINT = Object.freeze(["none", "low", "medium", "high"]);
-    LOW_TO_HIGH = Object.freeze(["low", "medium", "high"]);
-    CLAUDE = Object.freeze(["low", "medium", "high", "xhigh", "max"]);
-    reasoningEffortsOf = (model) => {
-      const leaf = toModelLeaf(model);
-      if (/^gpt-6(?:\.\d+)?-(?:sol|astra)(?:$|-)/.test(leaf)) return GPT_FROM_LOW;
-      if (/^gpt-(?:5\.6|6)(?:$|[.-])/.test(leaf)) return GPT_FULL;
-      if (/^gpt-5(?:-mini|-nano)?(?:-\d{4}-\d{2}-\d{2})?$/.test(leaf)) return GPT_5;
-      if (isGpt5Or6(leaf)) return GPT_5_POINT;
-      if (isOSeries(leaf)) return LOW_TO_HIGH;
-      if (/^claude-(?:opus|sonnet|haiku|fable|mythos)-[5-9]/.test(leaf)) return CLAUDE;
-      if (/^claude-(?:opus-4-[5-9]|sonnet-4-[6-9])/.test(leaf)) return LOW_TO_HIGH;
-      return null;
-    };
-    takesReasoningEffort = (model) => reasoningEffortsOf(model) !== null;
-    fitReasoningEffort = (model, effort) => {
-      const wanted = String(effort ?? "").trim().toLowerCase();
-      const accepted = reasoningEffortsOf(model);
-      if (!wanted || !accepted || accepted.includes(wanted)) return wanted;
-      const rank = LADDER.includes(wanted) ? LADDER.indexOf(wanted) : LADDER.indexOf("low");
-      return accepted.find((level) => LADDER.indexOf(level) >= rank) || accepted[accepted.length - 1];
-    };
-  }
-});
-
-// workers/sessionCorsWorker/aiModelParams.js
-var isChatReasoningModel, applyChatCompletionBudget, resolveResponsesOutputTokens;
-var init_aiModelParams = __esm({
-  "workers/sessionCorsWorker/aiModelParams.js"() {
-    init_aiModelFamily();
-    init_aiModelFamily();
-    isChatReasoningModel = ({ model = "", thinking = false } = {}) => thinking === true || isOpenAiReasoningModel(model);
-    applyChatCompletionBudget = ({
-      body,
-      model = "",
-      thinking = false,
-      max_tokens,
-      max_completion_tokens,
-      temperature,
-      defaultMaxCompletionTokens = 16e3,
-      defaultMaxTokens = 2048,
-      defaultTemperature = 0.7
-    } = {}) => {
-      const target = body && typeof body === "object" ? body : {};
-      if (isChatReasoningModel({ model, thinking })) {
-        target.max_completion_tokens = max_completion_tokens ?? max_tokens ?? defaultMaxCompletionTokens;
-        delete target.max_tokens;
-        delete target.temperature;
-        return target;
-      }
-      target.max_tokens = max_tokens ?? defaultMaxTokens;
-      target.temperature = temperature !== void 0 ? temperature : defaultTemperature;
-      delete target.max_completion_tokens;
-      return target;
-    };
-    resolveResponsesOutputTokens = ({
-      max_output_tokens,
-      max_completion_tokens,
-      max_tokens,
-      fallback = 16e3
-    } = {}) => max_output_tokens ?? max_completion_tokens ?? max_tokens ?? fallback;
-  }
-});
-
-// workers/sessionCorsWorker/aiRequestPolicy.js
-var trim11, record3, tasks, taskName, modelEntry, configuredModels, resolveSessionAiModel, AI_MODEL_NOT_ALLOWED, isSessionTranscriptionModelAllowed, operationCeilings, tokenFields, effortOrder, minimumTaskEffort, configuredFunctions, boundSessionAiRequest;
-var init_aiRequestPolicy = __esm({
-  "workers/sessionCorsWorker/aiRequestPolicy.js"() {
-    init_aiDefaults();
-    init_aiModelFamily();
-    init_aiModelParams();
-    trim11 = (value) => typeof value === "string" ? value.trim() : "";
-    record3 = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
-    tasks = /* @__PURE__ */ new Set(["generate", "rewrite", "summarize", "rank", "analysis", "compare", "categorize", "interview-map", "interview-opening", "context-read", "context-card", "session-agent"]);
-    taskName = (payload) => tasks.has(payload?.taskType) ? payload.taskType : "";
-    modelEntry = (entry2, provider, fallback = DEFAULT_AI_MODEL) => {
-      const obj = record3(entry2);
-      return {
-        model: trim11(obj.model || obj.name || obj.value || entry2) || fallback,
-        provider: (trim11(obj.provider) || provider || "openai").toLowerCase()
-      };
-    };
-    configuredModels = (config, task) => {
-      const ai = record3(config?.ai);
-      const models2 = record3(ai.models);
-      const providers = record3(ai.modelProviders);
-      const provider = trim11(ai.mode || ai.provider).toLowerCase() || "openai";
-      const fallback = trim11(ai.model) || DEFAULT_AI_MODEL;
-      const fast = modelEntry(models2.fast || models2.default, trim11(providers.fast || providers.default) || provider, fallback);
-      const thinking = modelEntry(models2.thinking || models2.reasoning, trim11(providers.thinking || providers.reasoning) || provider, fallback);
-      const feature = task && models2[task] ? modelEntry(models2[task], trim11(providers[task]) || provider, fallback) : null;
-      return { fast, thinking, feature, ...trim11(ai.model) ? { default: modelEntry(ai.model, provider) } : {} };
-    };
-    resolveSessionAiModel = (config, { taskType = "", modelType = "fast" } = {}) => {
-      const models2 = configuredModels(config, tasks.has(taskType) ? taskType : "");
-      return models2.feature || models2[modelType === "thinking" ? "thinking" : "fast"];
-    };
-    AI_MODEL_NOT_ALLOWED = Object.freeze({
-      error: "This model is not allowed on the session's AI key. Use the session model or your own key.",
-      reason: "ai_model_not_allowed"
-    });
-    isSessionTranscriptionModelAllowed = ({ config, provider, model, groupSpeakerLabels = false }) => {
-      const ai = record3(config?.ai);
-      const entry2 = record3(ai.models?.transcription || ai.transcription);
-      if (groupSpeakerLabels && provider === "openai" && model === GROUP_TRANSCRIPTION_MODEL && (trim11(entry2.provider).toLowerCase() || "openai") === "openai") return true;
-      return provider === (trim11(entry2.provider).toLowerCase() || "openai") && model === (trim11(entry2.model) || TRANSCRIPTION_FALLBACK_MODEL);
-    };
-    operationCeilings = Object.freeze({
-      generate: 16e3,
-      rewrite: 16e3,
-      summarize: 16e3,
-      rank: 16e3,
-      compare: 16e3,
-      categorize: 16e3,
-      analysis: 7e3,
-      // One short question, but models that think spend part of the cap on thinking.
-      "interview-opening": 2e3,
-      // A context PDF's text, read once by an admin's request.
-      "context-read": 8e3,
-      // A context source's card: a summary, tags and names, thinking included.
-      "context-card": 1500,
-      // One Session Agent answer of at most 150 words, thinking included.
-      "session-agent": 3e3
-    });
-    tokenFields = ["max_tokens", "max_completion_tokens", "max_output_tokens", "max_tokens_to_sample", "maxTokens"];
-    effortOrder = ["none", "minimal", "low", "medium", "high"];
-    minimumTaskEffort = Object.freeze({ "interview-map": "medium" });
-    configuredFunctions = (config) => {
-      const value = config?.ai?.providers?.custom?.functions ?? config?.ai?.custom?.functions;
-      if (typeof value !== "string") return value;
-      try {
-        return JSON.parse(value);
-      } catch {
-        return value.trim() || void 0;
-      }
-    };
-    boundSessionAiRequest = ({ payload = {}, provider, config, requestKey = "" }) => {
-      if (requestKey) return { ok: true, payload };
-      const task = taskName(payload);
-      const models2 = configuredModels(config, task);
-      const allowed = Object.values(models2).filter((entry2) => entry2?.provider === provider);
-      const model = trim11(payload.model) || (models2.feature?.provider === provider ? models2.feature.model : allowed[0]?.model);
-      if (!model || !allowed.some((entry2) => entry2.model === model)) return { ok: false, ...AI_MODEL_NOT_ALLOWED };
-      const reasoning = isChatReasoningModel({ model }) || models2.thinking.provider === provider && models2.thinking.model === model;
-      const responses = usesOpenAiResponsesApi({ provider, model, endpoint: payload.endpoint });
-      const ceiling = task === "interview-map" ? interviewMapOutputTokens(model, provider) : operationCeilings[task] || (reasoning || responses ? 16e3 : 2048);
-      const requested = tokenFields.filter((key) => Object.hasOwn(payload, key)).map((key) => {
-        const value = payload[key];
-        return typeof value === "number" && Number.isFinite(value) && value >= 1 ? Math.floor(value) : ceiling;
-      });
-      const tokens = Math.min(ceiling, ...requested);
-      const ai = record3(config?.ai);
-      const savedEffort = ai.taskReasoningEffort?.[task] || task === "analysis" && ai.taskReasoningEffort?.generate || ai.reasoningEffort || ai.reasoning_effort || "low";
-      const sessionEffort = ["low", "medium", "high"].includes(savedEffort) ? savedEffort : "low";
-      const floor = ai.taskReasoningEffort?.[task] ? "" : minimumTaskEffort[task];
-      const maximumEffort = floor && effortOrder.indexOf(floor) > effortOrder.indexOf(sessionEffort) ? floor : sessionEffort;
-      const requestedEffort = trim11(payload.reasoning_effort || payload.reasoningEffort || payload.reasoning?.effort);
-      const effort = effortOrder.includes(requestedEffort) && effortOrder.indexOf(requestedEffort) < effortOrder.indexOf(maximumEffort) ? requestedEffort : maximumEffort;
-      const bounded = { ...payload, model, service_tier: "default", reasoning_effort: effort, thinking: reasoning };
-      for (const key of tokenFields) bounded[key] = tokens;
-      delete bounded.tools;
-      delete bounded.functions;
-      if (provider === "custom") {
-        const functions = configuredFunctions(config);
-        if (functions) bounded.functions = functions;
-      }
-      return { ok: true, payload: bounded };
-    };
-  }
-});
-
 // workers/sessionCorsWorker/aiProviderExecution.js
 var ANTHROPIC_URL, OPENAI_CHAT_URL, OPENAI_RESPONSES_URL, OPENROUTER_CHAT_URL, CUSTOM_RPC_URL_OVERRIDE_REQUIRES_REQUEST_KEY_ERROR, extractOpenAiCompletion, normalizeComparableRpcUrl, resolveJson, jsonSchemaOf, toResponsesTextFormat, claudeOutputConfig, proxyAnthropic, proxyOpenAI, proxyOpenRouter, answerText, workersAiReply, workersAiAnswer, WORKERS_AI_BUSY, proxyWorkersAi, proxyCustomRPC;
 var init_aiProviderExecution = __esm({
@@ -71895,7 +71964,7 @@ var init_aiProviderExecution = __esm({
           temperature
         });
       }
-      const response3 = await fetchImpl(
+      const send = () => fetchImpl(
         useResponses ? constants?.openAiResponsesUrl || OPENAI_RESPONSES_URL : constants?.openAiChatUrl || OPENAI_CHAT_URL,
         {
           method: "POST",
@@ -71903,7 +71972,13 @@ var init_aiProviderExecution = __esm({
           body: JSON.stringify(body)
         }
       );
-      const data = await response3.json().catch(() => ({}));
+      let response3 = await send();
+      let data = await response3.json().catch(() => ({}));
+      if (response3.status === 400 && body.service_tier !== "default" && body.service_tier !== "auto" && (data?.error?.param === "service_tier" || /service[_ ]tier/i.test(String(data?.error?.message || "")))) {
+        body.service_tier = "default";
+        response3 = await send();
+        data = await response3.json().catch(() => ({}));
+      }
       if (!response3.ok) {
         const retryAfter = response3.headers?.get?.("retry-after");
         const responseHeaders = new Headers(baseHeaders);
@@ -72917,7 +72992,7 @@ var init_contextSourceRoute = __esm({
         CONTEXT_SOURCE_LIMITS.titleChars
       );
       const fetchedAt = now();
-      const record5 = {
+      const record6 = {
         v: 1,
         kind: "link",
         url: parsed.toString(),
@@ -72926,18 +73001,18 @@ var init_contextSourceRoute = __esm({
         snapshot: { text: text9, fetchedAt, contentType: fetched.mediaType, truncated: fetched.text.length > text9.length }
       };
       const stored = await storeRecord(store, {
-        bytes: encoder7.encode(JSON.stringify(record5)),
+        bytes: encoder7.encode(JSON.stringify(record6)),
         contentType: "application/json",
         accessConditions: access2.accessConditions,
         // A refreshed link stays its first adder's, who may still remove it. A new
         // one is counted by its address: its page text and time change each fetch.
-        ...replaces ? { contextUploader: replaces.uploader } : { countKey: `link:${record5.url}` },
+        ...replaces ? { contextUploader: replaces.uploader } : { countKey: `link:${record6.url}` },
         tags: [
           ...commonTags("link"),
           { name: CONTEXT_TAGS.role, value: CONTEXT_ROLE },
           { name: CONTEXT_TAGS.name, value: title },
           { name: CONTEXT_TAGS.mime, value: "application/json" },
-          { name: CONTEXT_TAGS.url, value: record5.url },
+          { name: CONTEXT_TAGS.url, value: record6.url },
           { name: CONTEXT_TAGS.fetchedAt, value: fetchedAt },
           ...adderTags
         ]
@@ -72956,12 +73031,12 @@ var init_contextSourceRoute = __esm({
           id: stored.id,
           kind: "link",
           title,
-          url: record5.url,
+          url: record6.url,
           fetchedAt,
           adminsOnly: isAdminsOnlyAccess(access2.accessConditions),
           lockedGroupIds: lockedGroupsOf(access2.accessConditions),
           chars: text9.length,
-          truncated: record5.snapshot.truncated
+          truncated: record6.snapshot.truncated
         }
       });
     };
@@ -76808,11 +76883,11 @@ var init_sessionSecretsAuthority = __esm({
       throw new Error("Invalid session secrets authority.");
     };
     readSessionSecretsAuthority = async (coordinator, storage, slug) => {
-      const record5 = await storage.get(SESSION_SECRETS_AUTHORITY_KEY);
-      if (record5 != null) {
-        if (record5.version !== 1 || record5.slug !== slug || !Number.isSafeInteger(record5.revision) || record5.revision < 1) fail8();
-        await decryptSessionSecretsEnvelope(record5.envelope, { env: coordinator.env, slug });
-        return record5;
+      const record6 = await storage.get(SESSION_SECRETS_AUTHORITY_KEY);
+      if (record6 != null) {
+        if (record6.version !== 1 || record6.slug !== slug || !Number.isSafeInteger(record6.revision) || record6.revision < 1) fail8();
+        await decryptSessionSecretsEnvelope(record6.envelope, { env: coordinator.env, slug });
+        return record6;
       }
       const raw = await coordinator.env.GROUP_KV.get(`session:${normalizeWorkerSessionSlug(slug)}:secrets`);
       if (raw == null) return null;
@@ -76824,8 +76899,8 @@ var init_sessionSecretsAuthority = __esm({
       return adopted;
     };
     readCommittedSessionSecrets = async (coordinator, storage, slug) => {
-      const record5 = await readSessionSecretsAuthority(coordinator, storage, slug);
-      return record5 ? decryptSessionSecretsEnvelope(record5.envelope, { env: coordinator.env, slug }) : {};
+      const record6 = await readSessionSecretsAuthority(coordinator, storage, slug);
+      return record6 ? decryptSessionSecretsEnvelope(record6.envelope, { env: coordinator.env, slug }) : {};
     };
     commitSessionSecrets = async (coordinator, storage, slug, secrets) => {
       const previous = await storage.get(SESSION_SECRETS_AUTHORITY_KEY);
@@ -76840,13 +76915,13 @@ var init_sessionSecretsAuthority = __esm({
       return envelope;
     };
     repairPendingSessionSecretsProjection = async (coordinator) => {
-      const record5 = await coordinator.state.storage.get(SESSION_SECRETS_AUTHORITY_KEY);
-      if (!record5?.projectionPending) return;
-      await decryptSessionSecretsEnvelope(record5.envelope, { env: coordinator.env, slug: record5.slug });
-      await putKvJson(coordinator.env, `session:${normalizeWorkerSessionSlug(record5.slug)}:secrets`, record5.envelope);
+      const record6 = await coordinator.state.storage.get(SESSION_SECRETS_AUTHORITY_KEY);
+      if (!record6?.projectionPending) return;
+      await decryptSessionSecretsEnvelope(record6.envelope, { env: coordinator.env, slug: record6.slug });
+      await putKvJson(coordinator.env, `session:${normalizeWorkerSessionSlug(record6.slug)}:secrets`, record6.envelope);
       await coordinator.state.storage.transaction(async (transaction) => {
         const current = await transaction.get(SESSION_SECRETS_AUTHORITY_KEY);
-        if (current?.revision === record5.revision) {
+        if (current?.revision === record6.revision) {
           await transaction.put(SESSION_SECRETS_AUTHORITY_KEY, { ...current, projectionPending: false });
         }
       });
@@ -77343,9 +77418,9 @@ var init_sessionNames = __esm({
           await storage.delete(sessionNameKey(address3));
           return json5({ ok: true, name: null, setAt: null });
         }
-        const record5 = { name: normalized.name, setAt: new Date(Number.isFinite(payload.now) ? payload.now : Date.now()).toISOString() };
-        await storage.put(sessionNameKey(address3), record5);
-        return json5({ ok: true, ...record5 });
+        const record6 = { name: normalized.name, setAt: new Date(Number.isFinite(payload.now) ? payload.now : Date.now()).toISOString() };
+        await storage.put(sessionNameKey(address3), record6);
+        return json5({ ok: true, ...record6 });
       }
       if (operation === "clear") {
         await storage.delete(sessionNameKey(address3));
@@ -77412,10 +77487,10 @@ var init_agentSignInStore = __esm({
       return ADDRESS_RE4.test(text9) ? text9 : "";
     };
     refused = (reason, status = 409) => ({ ok: false, reason, status });
-    linkOf = (record5) => record5 && addressOf3(record5.passkey) ? {
-      passkey: record5.passkey,
-      linkedAt: record5.linkedAt || null,
-      agentAccess: record5.agentAccess === AGENT_ACCESS.CANCELLED ? AGENT_ACCESS.CANCELLED : AGENT_ACCESS.ACTIVE
+    linkOf = (record6) => record6 && addressOf3(record6.passkey) ? {
+      passkey: record6.passkey,
+      linkedAt: record6.linkedAt || null,
+      agentAccess: record6.agentAccess === AGENT_ACCESS.CANCELLED ? AGENT_ACCESS.CANCELLED : AGENT_ACCESS.ACTIVE
     } : null;
     operations = {
       // What is kept about one address: the passkey attached to it, and the account it is a passkey for.
@@ -77443,12 +77518,12 @@ var init_agentSignInStore = __esm({
       // A code shown is a code spent, whatever came of it: it is deleted before anything about it is judged.
       "code-redeem": async (txn, { codeHash, origin, now }) => {
         if (!HASH_RE.test(codeHash)) return refused("sign_in_code_invalid", 401);
-        const record5 = await txn.get(codeKey(codeHash));
-        if (!record5) return refused("sign_in_code_invalid", 401);
+        const record6 = await txn.get(codeKey(codeHash));
+        if (!record6) return refused("sign_in_code_invalid", 401);
         await txn.delete(codeKey(codeHash));
-        const account = addressOf3(record5.account);
+        const account = addressOf3(record6.account);
         if (account && await txn.get(liveKey(account)) === codeHash) await txn.delete(liveKey(account));
-        if (!account || !(Number(record5.expiresAt) > now) || !origin || record5.origin !== origin) return refused("sign_in_code_invalid", 401);
+        if (!account || !(Number(record6.expiresAt) > now) || !origin || record6.origin !== origin) return refused("sign_in_code_invalid", 401);
         const link = linkOf(await txn.get(accountKey(account)));
         if (link?.agentAccess === AGENT_ACCESS.CANCELLED) return refused("sign_in_code_invalid", 401);
         return { ok: true, account, link };
@@ -77465,18 +77540,18 @@ var init_agentSignInStore = __esm({
           txn.get(passkeyKey(account))
         ]);
         if (taken || passkeyIsAccount || accountIsPasskey) return refused("passkey_in_use");
-        const record5 = { passkey: passkeyAddress, linkedAt: new Date(now).toISOString(), agentAccess: AGENT_ACCESS.ACTIVE };
-        await txn.put(accountKey(account), record5);
+        const record6 = { passkey: passkeyAddress, linkedAt: new Date(now).toISOString(), agentAccess: AGENT_ACCESS.ACTIVE };
+        await txn.put(accountKey(account), record6);
         await txn.put(passkeyKey(passkeyAddress), { account });
-        return { ok: true, link: linkOf(record5) };
+        return { ok: true, link: linkOf(record6) };
       },
       // Only the attached passkey ends, or restores, the agent's use of the account.
       access: async (txn, { address: account, passkey, agentAccess, now }) => {
         if (![AGENT_ACCESS.ACTIVE, AGENT_ACCESS.CANCELLED].includes(agentAccess)) return refused("invalid_agent_access", 400);
-        const record5 = await txn.get(accountKey(account));
-        const link = linkOf(record5);
+        const record6 = await txn.get(accountKey(account));
+        const link = linkOf(record6);
         if (!link || link.passkey !== addressOf3(passkey)) return refused("passkey_not_attached", 403);
-        await txn.put(accountKey(account), { ...record5, agentAccess, changedAt: new Date(now).toISOString() });
+        await txn.put(accountKey(account), { ...record6, agentAccess, changedAt: new Date(now).toISOString() });
         if (agentAccess === AGENT_ACCESS.CANCELLED) {
           const live = await txn.get(liveKey(account));
           if (HASH_RE.test(live || "")) await txn.delete(codeKey(live));
@@ -78393,9 +78468,9 @@ var init_sponsoredBootstrapGrantStore = __esm({
       const getKvJsonFn = typeof deps.getKvJson === "function" ? deps.getKvJson : getKvJson;
       return getKvJsonFn(env, buildSponsoredGrantKvKey(token));
     };
-    writeSponsoredGrantRecord = async (env, token, record5, ttlSeconds = null, deps = {}) => {
+    writeSponsoredGrantRecord = async (env, token, record6, ttlSeconds = null, deps = {}) => {
       const putKvJsonFn = typeof deps.putKvJson === "function" ? deps.putKvJson : putKvJson;
-      return putKvJsonFn(env, buildSponsoredGrantKvKey(token), record5, ttlSeconds || void 0);
+      return putKvJsonFn(env, buildSponsoredGrantKvKey(token), record6, ttlSeconds || void 0);
     };
     deleteSponsoredGrantRecord = async (env, token) => env?.GROUP_KV?.delete?.(buildSponsoredGrantKvKey(token));
     normalizeSensitiveValues = (values = []) => Array.from(new Set(
@@ -78759,9 +78834,9 @@ var init_resultsAnalysisArtifactValidation = __esm({
       });
       return refs;
     };
-    normalizeSourceFields = (record5, allowed, errors, participantLimit = LIMITS.sourceRefs) => {
-      const participantIds = normalizeIdRefs({ value: record5.participantIds, allowed: allowed.participants, label: "participantId", errors, limit: participantLimit });
-      const questionIds = normalizeIdRefs({ value: record5.questionIds, allowed: allowed.questions, label: "questionId", errors });
+    normalizeSourceFields = (record6, allowed, errors, participantLimit = LIMITS.sourceRefs) => {
+      const participantIds = normalizeIdRefs({ value: record6.participantIds, allowed: allowed.participants, label: "participantId", errors, limit: participantLimit });
+      const questionIds = normalizeIdRefs({ value: record6.questionIds, allowed: allowed.questions, label: "questionId", errors });
       if (participantIds.length && questionIds.length) {
         for (const participantId of participantIds) {
           if (!questionIds.some((questionId4) => allowed.questionsByParticipant.get(participantId)?.has(questionId4))) {
@@ -78780,9 +78855,9 @@ var init_resultsAnalysisArtifactValidation = __esm({
       };
     };
     normalizeSummaryRecord = (value) => {
-      const record5 = isObj23(value) ? value : {};
-      const overview = cleanText(record5.overview || record5.summary || record5.interpretation || record5.narrative);
-      const themes = toArray(record5.themes || record5.keyFindings || record5.findings).slice(0, LIMITS.breakdownThemes).map((entry2, index) => {
+      const record6 = isObj23(value) ? value : {};
+      const overview = cleanText(record6.overview || record6.summary || record6.interpretation || record6.narrative);
+      const themes = toArray(record6.themes || record6.keyFindings || record6.findings).slice(0, LIMITS.breakdownThemes).map((entry2, index) => {
         const item = isObj23(entry2) ? entry2 : { summary: entry2 };
         const label = cleanText(item.label || item.name || item.title || `Theme ${index + 1}`, LIMITS.labelChars);
         const summary = cleanText(item.summary || item.description || item.finding || item.body);
@@ -78966,11 +79041,11 @@ var init_resultsAnalysisArtifactValidation = __esm({
     });
     normalizeRiskAxis = (axis, fallback) => {
       if (!isObj23(axis)) return null;
-      const record5 = axis;
-      const label = cleanText(record5.label || record5.name, LIMITS.labelChars);
+      const record6 = axis;
+      const label = cleanText(record6.label || record6.name, LIMITS.labelChars);
       if (!label) return null;
-      const id2 = slugId(record5.id || label, fallback.id);
-      const rawLevels = toArray(record5.levels);
+      const id2 = slugId(record6.id || label, fallback.id);
+      const rawLevels = toArray(record6.levels);
       const seen = /* @__PURE__ */ new Set();
       const levels = rawLevels.slice(0, LIMITS.riskAxisLevels).map((level, index) => {
         const levelRecord = isObj23(level) ? level : { label: level, id: level };
@@ -79293,11 +79368,11 @@ var init_storageAudience = __esm({
       return source.map((entry2) => trim17(entry2).toLowerCase()).filter(Boolean).sort();
     };
     normalizeAccessAudienceExtras = ({ value, metadata } = {}) => {
-      const record5 = parseAccessRecord(value);
+      const record6 = parseAccessRecord(value);
       return {
-        groupIds: normalizeAccessGroupIds(record5.groupIds || metadata?.groupIds),
-        role: trim17(record5.role || metadata?.role).toLowerCase(),
-        accessConditions: stableCanonicalSerialize(record5.accessConditions || metadata?.accessConditions || null)
+        groupIds: normalizeAccessGroupIds(record6.groupIds || metadata?.groupIds),
+        role: trim17(record6.role || metadata?.role).toLowerCase(),
+        accessConditions: stableCanonicalSerialize(record6.accessConditions || metadata?.accessConditions || null)
       };
     };
     metadataAccessMatchesPublishedAudience = (metadata = {}, config = {}) => {
@@ -79528,9 +79603,9 @@ var init_contextSourceLoader = __esm({
         let url = "";
         if (kind === "link") {
           try {
-            const record5 = JSON.parse(text9);
-            text9 = typeof record5?.snapshot?.text === "string" ? record5.snapshot.text : "";
-            url = typeof record5?.url === "string" ? record5.url : "";
+            const record6 = JSON.parse(text9);
+            text9 = typeof record6?.snapshot?.text === "string" ? record6.snapshot.text : "";
+            url = typeof record6?.url === "string" ? record6.url : "";
           } catch {
             unreadable += 1;
             continue;
@@ -79575,9 +79650,9 @@ var init_storedRating = __esm({
     RATING_MAX = 10;
     LEGACY_RATING_MAX = 100;
     readStoredRating = (value) => {
-      const record5 = value && typeof value === "object" && !Array.isArray(value) ? value : null;
-      if (record5?.encrypted === true) return null;
-      const raw = record5 ? record5.value : value;
+      const record6 = value && typeof value === "object" && !Array.isArray(value) ? value : null;
+      if (record6?.encrypted === true) return null;
+      const raw = record6 ? record6.value : value;
       if (typeof raw !== "number" && typeof raw !== "string") return null;
       if (typeof raw === "string" && !raw.trim()) return null;
       const rating = Number(raw);
@@ -81105,8 +81180,8 @@ var init_resultsBuild = __esm({
           getSessionSecrets: async () => secrets ?? (secrets = await (deps.getSessionSecrets || getSessionSecrets)(env, slug))
         };
         const remainingMs = () => limits.buildMs - (now() - startedAtMs);
-        const callAi = async (prompt) => {
-          const timeoutMs = Math.min(limits.callMs, remainingMs());
+        const callAi = async (prompt, { callMs = limits.callMs } = {}) => {
+          const timeoutMs = Math.min(callMs, limits.callMs, remainingMs());
           if (timeoutMs < limits.minCallMs) return failure(504, `The ${kind.name} build ran out of time.`);
           try {
             return await (deps.callProvider || callResultsAnalysisProvider)({
@@ -81205,9 +81280,10 @@ var init_resultsBuild = __esm({
 });
 
 // workers/sessionCorsWorker/debateAtlasBuild.js
-var DEBATE_ATLAS_BUILD_ACTION, DEBATE_ATLAS_LIMITS, toArray3, trim21, text7, unit, buildDebateAtlasPlanPrompt, buildDebateAtlasTopicPrompt, describeNextDebateAtlasBuild, planQuestion, normalizeDebateAtlasPlan, normalizeCompass, normalizeDebateAtlasTopic, runWithConcurrency, failure2, buildDebateAtlas, dispatchDebateAtlasReadRequest;
+var DEBATE_ATLAS_BUILD_ACTION, DEBATE_ATLAS_LIMITS, toArray3, trim21, text7, unit, buildDebateAtlasPlanPrompt, buildDebateAtlasTopicPrompt, buildDebateAtlasQuestionPrompt, describeNextDebateAtlasBuild, planQuestion, normalizeDebateAtlasPlan, normalizeCompass, normalizeDebateAtlasTopic, normalizeDebateAtlasQuestion, runWithConcurrency, failure2, buildDebateAtlas, dispatchDebateAtlasReadRequest;
 var init_debateAtlasBuild = __esm({
   "workers/sessionCorsWorker/debateAtlasBuild.js"() {
+    init_atlasQuestionSummaries();
     init_resultsAnalysisGeneration();
     init_resultsBuild();
     DEBATE_ATLAS_BUILD_ACTION = "debate-atlas/build";
@@ -81216,6 +81292,9 @@ var init_debateAtlasBuild = __esm({
       topics: 12,
       positions: 6,
       placedParticipants: 40,
+      // The platform's limit: a Durable Object request keeps at most 6 outgoing
+      // connections open, and queues more with their time running. Every call of
+      // a build, question calls too, shares these 6.
       concurrency: 6,
       ...RESULTS_BUILD_LIMITS,
       textChars: 600
@@ -81263,6 +81342,23 @@ ${[
 
 ${topic ? "Topic" : "Branch"} input:
 ${JSON.stringify({ questions, responses, placeParticipants })}`;
+    buildDebateAtlasQuestionPrompt = ({ topic = "", question = {}, responses = [], settings = resolveAtlasQuestionSummaries() } = {}) => `You are summarising the responses to one question of a Context Engine debate atlas.
+Topic: ${JSON.stringify(text7(topic, 120))}.
+Return one JSON object with no Markdown fences and no tool calls, in this shape:
+{
+  "summary": "neutral sentences, under ${settings.summaryChars} characters in all, on what the responses say and where they agree or split",
+  "categories": [${settings.categories ? `{ "label": "a short category name, under ${settings.labelChars} characters", ${settings.categorySummaryChars ? `"summary": "one sentence, under ${settings.categorySummaryChars} characters, on what these responses share", ` : ""}"participantIds": ["participant_001"] }` : ""}]
+}
+
+Rules:
+${[
+      ...RESULTS_BUILD_RULES,
+      settings.categories ? `Sort the responses into 1 to ${settings.categories} distinct categories by what they say, keeping a minority view even when one participant holds it. Each category cites every participant whose response belongs to it, and only participants in the responses.` : 'Leave "categories" empty.',
+      "Write every text field as plain text, with no Markdown or HTML."
+    ].map((rule) => `- ${rule}`).join("\n")}
+
+Question input:
+${JSON.stringify({ question, responses })}`;
     describeNextDebateAtlasBuild = (config) => {
       const unquote = (prompt) => prompt.replace(/"(<[A-Za-z ,]+>)"/g, "$1");
       return {
@@ -81279,8 +81375,16 @@ ${JSON.stringify({ questions, responses, placeParticipants })}`;
             questions: "<Questions>",
             responses: "<Responses>",
             placeParticipants: "<Participants>"
+          })),
+          question: unquote(buildDebateAtlasQuestionPrompt({
+            topic: "<Topic>",
+            question: "<Question>",
+            responses: "<Responses>",
+            settings: resolveAtlasQuestionSummaries(config)
           }))
-        }
+        },
+        // The question summary settings a build would use, the session's own or the defaults.
+        questionSummaries: resolveAtlasQuestionSummaries(config)
       };
     };
     planQuestion = (question, responseCount) => ({
@@ -81311,10 +81415,10 @@ ${JSON.stringify({ questions, responses, placeParticipants })}`;
       return { title: text7(value?.title, 120), branches };
     };
     normalizeCompass = (value) => {
-      const axis = (record5, ends) => {
-        const out = { label: text7(record5?.label, 80) };
+      const axis = (record6, ends) => {
+        const out = { label: text7(record6?.label, 80) };
         ends.forEach((end) => {
-          out[end] = text7(record5?.[end], 80);
+          out[end] = text7(record6?.[end], 80);
         });
         return Object.values(out).every(Boolean) ? out : null;
       };
@@ -81355,6 +81459,17 @@ ${JSON.stringify({ questions, responses, placeParticipants })}`;
       }).filter(Boolean) : [];
       return positions.length ? { summary: text7(value?.summary, 600), compass, positions, participants, answered: answeredBy.size } : null;
     };
+    normalizeDebateAtlasQuestion = ({ value, answeredBy, settings = resolveAtlasQuestionSummaries() }) => {
+      const summary = text7(value?.summary, settings.summaryChars);
+      const categories = toArray3(value?.categories).map((category) => {
+        const label = text7(category?.label, settings.labelChars);
+        const holders = new Set(toArray3(category?.participantIds).map(trim21).filter((id2) => answeredBy.has(id2)));
+        if (!label || !holders.size) return null;
+        const categorySummary = text7(category?.summary, settings.categorySummaryChars);
+        return { label, ...categorySummary ? { summary: categorySummary } : {}, participantCount: holders.size };
+      }).filter(Boolean).sort((a, b2) => b2.participantCount - a.participantCount).slice(0, settings.categories);
+      return summary ? { summary, categories, answered: answeredBy.size } : null;
+    };
     runWithConcurrency = async (items, limit, task) => {
       const results = new Array(items.length);
       let next = 0;
@@ -81374,7 +81489,17 @@ ${JSON.stringify({ questions, responses, placeParticipants })}`;
       kindName: "debate-atlas",
       limits: DEBATE_ATLAS_LIMITS,
       compose: async ({ source, callAi, contextText }) => {
-        const { questions, responses } = source.aiSnapshot;
+        const { questions, responses, inputLimits = {} } = source.aiSnapshot;
+        const settings = resolveAtlasQuestionSummaries(args.config);
+        const allResponsesByQuestion = /* @__PURE__ */ new Map();
+        toArray3(source.snapshot?.responses).forEach(({ questionId: questionId4, participantId, answer, additional }) => {
+          const kept = {
+            participantId,
+            answer: (Array.isArray(answer) ? answer.join("; ") : String(answer ?? "")).slice(0, inputLimits.maxResponseAnswerChars || 1400),
+            ...additional ? { additional: String(additional).slice(0, inputLimits.maxResponseAdditionalChars || 900) } : {}
+          };
+          allResponsesByQuestion.set(questionId4, [...allResponsesByQuestion.get(questionId4) || [], kept]);
+        });
         const responsesByQuestion = /* @__PURE__ */ new Map();
         responses.forEach((response3) => {
           responsesByQuestion.set(response3.questionId, [...responsesByQuestion.get(response3.questionId) || [], response3]);
@@ -81391,7 +81516,30 @@ ${JSON.stringify({ questions, responses, placeParticipants })}`;
         const questionsById = new Map(questions.map((question) => [question.id, question]));
         const topics = plan.branches.flatMap((branch) => branch.topics.map((topic) => ({ branch, topic, questionIds: topic.questionIds })));
         const branchJobs = plan.branches.filter((branch) => branch.topics.length > 1).map((branch) => ({ branch, topic: null, questionIds: branch.topics.flatMap((topic) => topic.questionIds) }));
-        const mapped = await runWithConcurrency([...topics, ...branchJobs], DEBATE_ATLAS_LIMITS.concurrency, async ({ branch, topic, questionIds }) => {
+        const aiQuestion = (id2) => {
+          const { id: questionId4, prompt, type, options, scale, voiceCredits } = questionsById.get(id2);
+          return { id: questionId4, prompt, type, ...options?.length ? { options } : {}, ...scale ? { scale } : {}, ...voiceCredits ? { voiceCredits } : {} };
+        };
+        const analyseQuestion = async ({ topic, questionId: questionId4 }) => {
+          let room = settings.answerChars;
+          const questionResponses = [];
+          for (const { participantId, answer, additional = "" } of (allResponsesByQuestion.get(questionId4) || responsesByQuestion.get(questionId4)).slice(0, settings.answers)) {
+            if (room <= 0) break;
+            const kept = { participantId, answer: answer.slice(0, room) };
+            room -= kept.answer.length;
+            if (additional && room > 0) room -= (kept.additional = additional.slice(0, room)).length;
+            questionResponses.push(kept);
+          }
+          const result = await callAi(buildDebateAtlasQuestionPrompt({
+            topic: topic.label,
+            question: aiQuestion(questionId4),
+            responses: questionResponses,
+            settings
+          }), { callMs: settings.callSeconds * 1e3 });
+          return result.ok ? { analysis: normalizeDebateAtlasQuestion({ value: result.value, answeredBy: new Set(questionResponses.map((response3) => response3.participantId)), settings }) } : { outOfTime: result.status === 504 || /timed out/i.test(result.error || "") };
+        };
+        const questionJobs = topics.flatMap(({ topic }) => topic.questionIds.map((questionId4) => ({ topic, questionId: questionId4 })));
+        const mapJob = async ({ branch, topic, questionIds }) => {
           const topicResponses = questionIds.flatMap((id2) => responsesByQuestion.get(id2));
           const answeredBy = /* @__PURE__ */ new Map();
           topicResponses.forEach((response3) => answeredBy.set(response3.participantId, (answeredBy.get(response3.participantId) || 0) + 1));
@@ -81399,15 +81547,17 @@ ${JSON.stringify({ questions, responses, placeParticipants })}`;
           const result = await callAi(buildDebateAtlasTopicPrompt({
             branch: branch.label,
             topic: topic?.label || "",
-            questions: questionIds.map((id2) => {
-              const { id: questionId4, prompt, type, options, scale, voiceCredits } = questionsById.get(id2);
-              return { id: questionId4, prompt, type, ...options?.length ? { options } : {}, ...scale ? { scale } : {}, ...voiceCredits ? { voiceCredits } : {} };
-            }),
+            questions: questionIds.map(aiQuestion),
             responses: topicResponses.map(({ participantId, questionId: questionId4, answer, additional }) => ({ participantId, questionId: questionId4, answer, ...additional ? { additional } : {} })),
             placeParticipants
           }));
           return result.ok ? normalizeDebateAtlasTopic({ value: result.value, answeredBy, placeParticipants, participantAddresses: source.participantAddresses }) : null;
-        });
+        };
+        const mapJobs = [...topics, ...branchJobs];
+        const done = await runWithConcurrency([...mapJobs, ...questionJobs], DEBATE_ATLAS_LIMITS.concurrency, async (job, index) => index < mapJobs.length ? mapJob(job) : analyseQuestion(job));
+        const mapped = done.slice(0, mapJobs.length);
+        const analysisByQuestion = new Map(questionJobs.map(({ questionId: questionId4 }, index) => [questionId4, done[mapJobs.length + index]]));
+        const questionSummaries = { listed: 0, summarised: 0, outOfTime: 0 };
         let topicIndex = 0;
         const missingTopics = [];
         const branchMaps = new Map(branchJobs.map(({ branch }, index) => [branch.id, mapped[topics.length + index]]));
@@ -81423,10 +81573,22 @@ ${JSON.stringify({ questions, responses, placeParticipants })}`;
               id: topic.id,
               label: topic.label,
               ...result,
-              // What the atlas shows of each question: its words, and the choices it offers.
+              // What the atlas shows of each question: its words, the choices it offers, and its summary when it has one.
               questions: topic.questionIds.map((id2) => {
                 const { prompt, type, options, voiceCredits } = questionsById.get(id2);
-                return { id: id2, prompt: text7(prompt, 400), type, ...options?.length ? { options } : {}, ...voiceCredits ? { voiceCredits } : {} };
+                const job = analysisByQuestion.get(id2);
+                const analysis = job?.analysis;
+                questionSummaries.listed += 1;
+                if (analysis) questionSummaries.summarised += 1;
+                else if (job.outOfTime) questionSummaries.outOfTime += 1;
+                return {
+                  id: id2,
+                  prompt: text7(prompt, 400),
+                  type,
+                  ...options?.length ? { options } : {},
+                  ...voiceCredits ? { voiceCredits } : {},
+                  ...analysis ? { analysis } : {}
+                };
               })
             };
           }).filter(Boolean);
@@ -81441,7 +81603,7 @@ ${JSON.stringify({ questions, responses, placeParticipants })}`;
           };
         }).filter((branch) => branch.topics.length);
         if (!branches.length) return failure2(502, "No topic of the atlas could be mapped; try again.");
-        return { ok: true, build: { title: plan.title, missingTopics, branches } };
+        return { ok: true, build: { title: plan.title, missingTopics, questionSummaries, branches } };
       }
     });
     dispatchDebateAtlasReadRequest = (args = {}) => dispatchResultsBuildRead({
@@ -81711,8 +81873,8 @@ var init_sessionFeedback = __esm({
       const storage = coordinator.state.storage;
       const nowMs2 = Number(coordinator.now?.()) || Date.now();
       if (operation === "add") {
-        const record5 = payload.record;
-        if (!record5 || typeof record5 !== "object") return refuse3(400, "feedback_invalid");
+        const record6 = payload.record;
+        if (!record6 || typeof record6 !== "object") return refuse3(400, "feedback_invalid");
         return storage.transaction(async (transaction) => {
           const meta = await transaction.get(META_KEY2);
           const counts = countsOf(meta, nowMs2);
@@ -81720,7 +81882,7 @@ var init_sessionFeedback = __esm({
           if (counts.today >= SESSION_FEEDBACK_LIMITS.perSessionPerDay) return refuse3(429, "feedback_session_limit");
           const atMs = Math.max(nowMs2, (Number(meta?.lastMs) || 0) + 1);
           const createdAt = new Date(atMs).toISOString();
-          await transaction.put(`${PREFIX4}${createdAt}:${randomHex4(8)}`, { ...record5, createdAt });
+          await transaction.put(`${PREFIX4}${createdAt}:${randomHex4(8)}`, { ...record6, createdAt });
           await transaction.put(META_KEY2, { day: counts.day, stored: counts.stored + 1, today: counts.today + 1, lastMs: atMs });
           return json9({ ok: true });
         });
@@ -81732,7 +81894,7 @@ var init_sessionFeedback = __esm({
           return refuse3(400, "feedback_page_invalid");
         }
         const page = [...await storage.list({ prefix: PREFIX4, reverse: true, limit: limit + 1, ...cursor ? { end: PREFIX4 + cursor } : {} })];
-        const messages = page.slice(0, limit).map(([key, record5]) => ({ id: key.slice(PREFIX4.length), ...record5 }));
+        const messages = page.slice(0, limit).map(([key, record6]) => ({ id: key.slice(PREFIX4.length), ...record6 }));
         return json9({
           ok: true,
           messages,
@@ -83715,9 +83877,9 @@ var init_sessionLitAuthorizationCoordinator = __esm({
       if (signer == null && version2 == null) return;
       if (!hasExistingKey || version2 !== LIT_AUTHORIZATION_VERSION || typeof signer !== "string" || signer.toLowerCase() !== wallet.address.toLowerCase()) fail12();
     };
-    readSignerSecrets = async (record5, env, slug) => {
-      if (!isRecord7(record5) || record5.version !== 1 || record5.slug !== slug) fail12();
-      const secrets = await decryptSessionSecretsEnvelope(record5.envelope, { env, slug });
+    readSignerSecrets = async (record6, env, slug) => {
+      if (!isRecord7(record6) || record6.version !== 1 || record6.slug !== slug) fail12();
+      const secrets = await decryptSessionSecretsEnvelope(record6.envelope, { env, slug });
       if (!isRecord7(secrets) || Object.keys(secrets).some((key) => !SECRET_KEYS.includes(key)) || Object.values(secrets).some((value) => typeof value !== "string")) fail12();
       walletFor(secrets[PRIVATE_KEY]);
       return secrets;
@@ -83730,13 +83892,13 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         await coordinator.assertSessionAuthority(payload);
         await coordinator.repairPendingSessionConfigProjection();
         const privateKey = await coordinator.state.storage.transaction(async (transaction) => {
-          const record5 = await transaction.get(SIGNER_RECORD);
+          const record6 = await transaction.get(SIGNER_RECORD);
           const config = authorityConfig(await transaction.get(CONFIG_RECORD), payload.baseConfig, slug);
-          const secrets = record5 != null ? await readSignerSecrets(record5, coordinator.env, slug) : await readCommittedSessionSecrets(coordinator, transaction, slug);
+          const secrets = record6 != null ? await readSignerSecrets(record6, coordinator.env, slug) : await readCommittedSessionSecrets(coordinator, transaction, slug);
           const hasExistingKey = hasOwn7(secrets, PRIVATE_KEY);
           const chosen = hasExistingKey ? walletFor(secrets[PRIVATE_KEY]) : proposed;
           assertConfiguredSigner(config, chosen, hasExistingKey);
-          if (record5 == null) {
+          if (record6 == null) {
             const envelope = await buildEncryptedSessionSecretsEnvelope({ [PRIVATE_KEY]: chosen.privateKey }, { env: coordinator.env, slug });
             await transaction.put(SIGNER_RECORD, { version: 1, slug, envelope });
           }
@@ -83761,9 +83923,9 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         if (current?.revision === pending.revision) await transaction.delete(SETUP_RECORD);
       });
     };
-    readProvisioning = async (record5, env, slug) => {
-      if (!isRecord7(record5) || record5.version !== 1 || record5.slug !== slug) fail12();
-      const checkpoint = await decryptSessionSecretsEnvelope(record5.envelope, { env, slug });
+    readProvisioning = async (record6, env, slug) => {
+      if (!isRecord7(record6) || record6.version !== 1 || record6.slug !== slug) fail12();
+      const checkpoint = await decryptSessionSecretsEnvelope(record6.envelope, { env, slug });
       if (!isRecord7(checkpoint) || Object.keys(checkpoint).some((key) => !PROVISIONING_FIELDS.has(key)) || Object.values(checkpoint).some((value) => typeof value !== "string" && typeof value !== "boolean")) fail12();
       return checkpoint;
     };
@@ -83776,18 +83938,18 @@ var init_sessionLitAuthorizationCoordinator = __esm({
           await coordinator.repairPendingSessionConfigProjection();
         }
         const result = await coordinator.state.storage.transaction(async (transaction) => {
-          const record5 = await transaction.get(PROVISIONING_RECORD);
+          const record6 = await transaction.get(PROVISIONING_RECORD);
           const now = coordinator.now();
           if (operation === "begin" || operation === "preflight") {
-            if (record5?.leaseUntilMs > now) fail12();
-            const saved = record5 ? await readProvisioning(record5, coordinator.env, slug) : {};
+            if (record6?.leaseUntilMs > now) fail12();
+            const saved = record6 ? await readProvisioning(record6, coordinator.env, slug) : {};
             const resourceIds = Object.fromEntries(["litGroupId", "litPkpId", "litActionCid"].filter((key) => typeof saved[key] === "string" && saved[key].trim()).map((key) => [key, saved[key]]));
             const hasResources = !!saved.accountWalletAddress || Object.keys(resourceIds).length > 0;
             const suppliedKeys = Array.isArray(payload.accountApiKeys) ? payload.accountApiKeys : [];
             if (hasResources && saved.litAccountApiKey && suppliedKeys.some((key) => typeof key === "string" && key.trim() && key.trim() !== saved.litAccountApiKey)) {
               throw Object.assign(new Error(LIT_PROVISIONING_CREDENTIALS_CONFLICT), { status: 409, code: "lit_provisioning_credentials_conflict" });
             }
-            if (record5 && record5.freshAuthority !== (payload.freshAuthority === true) && Object.keys(resourceIds).length) {
+            if (record6 && record6.freshAuthority !== (payload.freshAuthority === true) && Object.keys(resourceIds).length) {
               const names2 = { litGroupId: "group", litPkpId: "PKP", litActionCid: "action" };
               const resources = Object.entries(resourceIds).map(([key, id2]) => `${names2[key]} ${id2}`).join(", ");
               throw Object.assign(
@@ -83810,23 +83972,23 @@ var init_sessionLitAuthorizationCoordinator = __esm({
             return { attemptId, checkpoint: checkpoint2 };
           }
           if (operation === "check") {
-            if (!record5 || record5.leaseUntilMs > now) fail12();
-            const checkpoint2 = await readProvisioning(record5, coordinator.env, slug);
+            if (!record6 || record6.leaseUntilMs > now) fail12();
+            const checkpoint2 = await readProvisioning(record6, coordinator.env, slug);
             const attemptId = crypto.randomUUID();
-            await transaction.put(PROVISIONING_RECORD, { ...record5, attemptId, leaseUntilMs: now + PROVISIONING_LEASE_MS });
+            await transaction.put(PROVISIONING_RECORD, { ...record6, attemptId, leaseUntilMs: now + PROVISIONING_LEASE_MS });
             return { attemptId, checkpoint: checkpoint2 };
           }
           if (operation === "release") {
-            if (record5?.slug === slug && record5.attemptId === payload.attemptId)
-              await transaction.put(PROVISIONING_RECORD, { ...record5, leaseUntilMs: 0 });
+            if (record6?.slug === slug && record6.attemptId === payload.attemptId)
+              await transaction.put(PROVISIONING_RECORD, { ...record6, leaseUntilMs: 0 });
             return {};
           }
-          if (!["checkpoint", "discard"].includes(operation) || !record5 || !payload.attemptId || record5.attemptId !== payload.attemptId) fail12();
-          const previous = await readProvisioning(record5, coordinator.env, slug);
+          if (!["checkpoint", "discard"].includes(operation) || !record6 || !payload.attemptId || record6.attemptId !== payload.attemptId) fail12();
+          const previous = await readProvisioning(record6, coordinator.env, slug);
           if (operation === "discard") {
             const kept = payload.keepAccount === true ? Object.fromEntries(ACCOUNT_FIELDS.filter((key) => hasOwn7(previous, key)).map((key) => [key, previous[key]])) : {};
             const envelope2 = await buildEncryptedSessionSecretsEnvelope(kept, { env: coordinator.env, slug });
-            await transaction.put(PROVISIONING_RECORD, { ...record5, envelope: envelope2 });
+            await transaction.put(PROVISIONING_RECORD, { ...record6, envelope: envelope2 });
             return {};
           }
           const checkpoint = payload.checkpoint;
@@ -83835,7 +83997,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
             if (key !== "litPkpId" && hasOwn7(checkpoint, key) && checkpoint[key] !== value) fail12();
           }
           const envelope = await buildEncryptedSessionSecretsEnvelope({ ...previous, ...checkpoint }, { env: coordinator.env, slug });
-          await transaction.put(PROVISIONING_RECORD, { ...record5, leaseUntilMs: now + PROVISIONING_LEASE_MS, envelope });
+          await transaction.put(PROVISIONING_RECORD, { ...record6, leaseUntilMs: now + PROVISIONING_LEASE_MS, envelope });
           return {};
         });
         return json10({ ok: true, ...result });
@@ -83865,8 +84027,8 @@ var init_sessionLitAuthorizationCoordinator = __esm({
           }
           if (hasOwn7(checkpoint, "litUsageApiKey") && checkpoint.litUsageApiKey !== outputs.litUsageApiKey) fail12();
           if (hasOwn7(checkpoint, "accountSecretOutput") && checkpoint.accountSecretOutput !== outputs.litAccountApiKey) fail12();
-          const record5 = await transaction.get(SIGNER_RECORD);
-          const signerSecrets = await readSignerSecrets(record5, coordinator.env, slug);
+          const record6 = await transaction.get(SIGNER_RECORD);
+          const signerSecrets = await readSignerSecrets(record6, coordinator.env, slug);
           const wallet = walletFor(signerSecrets[PRIVATE_KEY]);
           if (walletFor(outputs[PRIVATE_KEY]).privateKey !== wallet.privateKey) fail12();
           assertConfiguredSigner({ litCredentials: payload.litCredentials }, wallet, true);
@@ -83925,15 +84087,15 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         await coordinator.repairPendingSessionConfigProjection();
         await coordinator.state.storage.transaction(async (transaction) => {
           const existing = await readCommittedSessionSecrets(coordinator, transaction, slug);
-          const record5 = await transaction.get(SIGNER_RECORD);
-          const litSecrets = record5 == null ? null : await readSignerSecrets(record5, coordinator.env, slug);
+          const record6 = await transaction.get(SIGNER_RECORD);
+          const litSecrets = record6 == null ? null : await readSignerSecrets(record6, coordinator.env, slug);
           const nextSecrets = { ...existing, ...litSecrets };
           for (const [key, value] of Object.entries(patch)) {
             if (value.trim()) nextSecrets[key] = value.trim();
             else delete nextSecrets[key];
           }
           await commitSessionSecrets(coordinator, transaction, slug, nextSecrets);
-          if (record5 && Object.keys(patch).some((key) => SECRET_KEYS.includes(key))) {
+          if (record6 && Object.keys(patch).some((key) => SECRET_KEYS.includes(key))) {
             const nextLitSecrets = Object.fromEntries(SECRET_KEYS.filter((key) => hasOwn7(nextSecrets, key)).map((key) => [key, nextSecrets[key]]));
             const envelope = await buildEncryptedSessionSecretsEnvelope(nextLitSecrets, { env: coordinator.env, slug });
             await transaction.put(SIGNER_RECORD, { version: 1, slug, envelope });
@@ -84101,7 +84263,7 @@ var init_sessionWriteCoordinator = __esm({
     UPLOAD_RECEIPT_PREFIX = "upload-receipt-v1:";
     UPLOAD_RECEIPT_LEASE_MS = 12e4;
     UPLOAD_RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1e3;
-    uploadReceiptExpiresAt = (record5) => record5.state === "settled" ? record5.settledAt + UPLOAD_RECEIPT_RETENTION_MS : record5.state === "pending" ? record5.reservedAt + UPLOAD_RECEIPT_RETENTION_MS : 0;
+    uploadReceiptExpiresAt = (record6) => record6.state === "settled" ? record6.settledAt + UPLOAD_RECEIPT_RETENTION_MS : record6.state === "pending" ? record6.reservedAt + UPLOAD_RECEIPT_RETENTION_MS : 0;
     MAX_UPLOAD_RECEIPTS = 2e3;
     uploadCountKey = (person, questionKey = "", bundle = false) => `upload-count-v1:${person}:${questionKey ? `question:${questionKey}` : bundle ? "bundles" : "total"}`;
     MAX_ANSWER_VERSIONS = 20;
@@ -84146,8 +84308,8 @@ var init_sessionWriteCoordinator = __esm({
       if (!numeric || numeric <= nowMs2 || numeric > nowMs2 + maxAheadMs) return 0;
       return numeric;
     };
-    readActiveAuthNonces = (record5, nowMs2) => {
-      const entries = Array.isArray(record5?.entries) ? record5.entries : record5?.nonce ? [{ nonce: record5.nonce, expiresAtMs: record5.expiresAtMs }] : [];
+    readActiveAuthNonces = (record6, nowMs2) => {
+      const entries = Array.isArray(record6?.entries) ? record6.entries : record6?.nonce ? [{ nonce: record6.nonce, expiresAtMs: record6.expiresAtMs }] : [];
       return entries.map((entry2) => ({ nonce: toTrimmedString10(entry2?.nonce), expiresAtMs: Number(entry2?.expiresAtMs || 0) })).filter((entry2) => entry2.nonce && entry2.expiresAtMs > nowMs2);
     };
     putActiveAuthNonces = async (transaction, entries) => {
@@ -84414,16 +84576,16 @@ ${expiry}`);
       async pruneUploadReceipts(transaction, nowMs2) {
         const records = await transaction.list({ prefix: UPLOAD_RECEIPT_PREFIX });
         const retained = [];
-        for (const [key, record5] of records) {
-          const live = record5.state === "pending" && record5.leaseUntil > nowMs2;
-          const expiresAt = uploadReceiptExpiresAt(record5);
+        for (const [key, record6] of records) {
+          const live = record6.state === "pending" && record6.leaseUntil > nowMs2;
+          const expiresAt = uploadReceiptExpiresAt(record6);
           if (!live && !(expiresAt > nowMs2)) await transaction.delete(key);
-          else retained.push({ key, live, expiresAt: Math.max(expiresAt, live ? record5.leaseUntil : 0) });
+          else retained.push({ key, live, expiresAt: Math.max(expiresAt, live ? record6.leaseUntil : 0) });
         }
-        const removable = retained.filter((record5) => !record5.live).sort((a, b2) => a.expiresAt - b2.expiresAt);
-        const evicted = new Set(removable.slice(0, Math.max(0, retained.length - MAX_UPLOAD_RECEIPTS)).map((record5) => record5.key));
+        const removable = retained.filter((record6) => !record6.live).sort((a, b2) => a.expiresAt - b2.expiresAt);
+        const evicted = new Set(removable.slice(0, Math.max(0, retained.length - MAX_UPLOAD_RECEIPTS)).map((record6) => record6.key));
         for (const key of evicted) await transaction.delete(key);
-        return retained.reduce((next, record5) => evicted.has(record5.key) ? next : Math.min(next, record5.expiresAt), Infinity);
+        return retained.reduce((next, record6) => evicted.has(record6.key) ? next : Math.min(next, record6.expiresAt), Infinity);
       }
       async scheduleUploadReceiptCleanup() {
         const nextExpiry = await this.state.storage.transaction((transaction) => this.pruneUploadReceipts(transaction, Number(this.now()) || Date.now()));
@@ -84485,41 +84647,41 @@ ${expiry}`);
         const nowMs2 = Number(this.now()) || Date.now();
         const result = await this.state.storage.transaction(async (transaction) => {
           if (reserve) await this.pruneUploadReceipts(transaction, nowMs2);
-          const record5 = await transaction.get(key);
+          const record6 = await transaction.get(key);
           if (withdraw) {
-            const adopted = record5?.state === "settled" ? record5.storageRef?.id === storageId : record5?.storageId === storageId;
-            if (!record5 || adopted || record5.attemptId === payload.attemptId) {
+            const adopted = record6?.state === "settled" ? record6.storageRef?.id === storageId : record6?.storageId === storageId;
+            if (!record6 || adopted || record6.attemptId === payload.attemptId) {
               return { status: 409, error: "This upload target is still in use.", reason: "upload_target_in_use" };
             }
-            if (record5.priorStorageIds?.includes(storageId)) {
-              await transaction.put(key, { ...record5, priorStorageIds: record5.priorStorageIds.filter((id2) => id2 !== storageId) });
+            if (record6.priorStorageIds?.includes(storageId)) {
+              await transaction.put(key, { ...record6, priorStorageIds: record6.priorStorageIds.filter((id2) => id2 !== storageId) });
             }
             return { status: 200, ok: true };
           }
           if (settle) {
-            if (record5?.state !== "pending" || record5.attemptId !== payload.attemptId) {
+            if (record6?.state !== "pending" || record6.attemptId !== payload.attemptId) {
               return { status: 409, error: "Upload attempt no longer owns this receipt.", reason: "upload_attempt_superseded" };
             }
-            if (record5.storageId !== storageRef.id && !record5.priorStorageIds?.includes(storageRef.id)) {
+            if (record6.storageId !== storageRef.id && !record6.priorStorageIds?.includes(storageRef.id)) {
               return { status: 409, error: "Upload target does not match this receipt.", reason: "upload_receipt_target_mismatch" };
             }
-            await transaction.put(key, { state: "settled", payloadDigest: record5.payloadDigest, storageRef, settledAt: nowMs2 });
-            const countKeys = record5.person ? [
-              uploadCountKey(record5.person, "", record5.bundle === true),
-              ...(record5.questionKeys || []).map((questionKey) => uploadCountKey(record5.person, questionKey))
+            await transaction.put(key, { state: "settled", payloadDigest: record6.payloadDigest, storageRef, settledAt: nowMs2 });
+            const countKeys = record6.person ? [
+              uploadCountKey(record6.person, "", record6.bundle === true),
+              ...(record6.questionKeys || []).map((questionKey) => uploadCountKey(record6.person, questionKey))
             ] : [];
             for (const countKey of countKeys) await transaction.put(countKey, (await transaction.get(countKey) || 0) + 1);
             await this.pruneUploadReceipts(transaction, nowMs2);
             return { status: 200, ok: true };
           }
-          if (record5?.state === "settled" && nowMs2 - record5.settledAt < UPLOAD_RECEIPT_RETENTION_MS) {
-            return equalText(record5.payloadDigest, payloadDigest) ? { status: 200, kind: "replay", storageRef: record5.storageRef } : { status: 409, error: "This upload request id already stored different content.", reason: "upload_request_conflict" };
+          if (record6?.state === "settled" && nowMs2 - record6.settledAt < UPLOAD_RECEIPT_RETENTION_MS) {
+            return equalText(record6.payloadDigest, payloadDigest) ? { status: 200, kind: "replay", storageRef: record6.storageRef } : { status: 409, error: "This upload request id already stored different content.", reason: "upload_request_conflict" };
           }
-          if (record5?.state === "pending" && record5.leaseUntil > nowMs2) {
+          if (record6?.state === "pending" && record6.leaseUntil > nowMs2) {
             return { status: 503, error: "This upload is still in progress; retry shortly.", reason: "upload_in_progress" };
           }
-          const resumed = record5?.state === "pending" && uploadReceiptExpiresAt(record5) > nowMs2;
-          if (resumed && !equalText(record5.payloadDigest, payloadDigest)) {
+          const resumed = record6?.state === "pending" && uploadReceiptExpiresAt(record6) > nowMs2;
+          if (resumed && !equalText(record6.payloadDigest, payloadDigest)) {
             return { status: 409, error: "This upload request id already reserved different content.", reason: "upload_request_conflict" };
           }
           const records = await transaction.list({ prefix: UPLOAD_RECEIPT_PREFIX });
@@ -84540,9 +84702,9 @@ ${expiry}`);
           }
           const target = resumed ? {
             storageId,
-            createdAt: record5.createdAt,
-            reservedAt: record5.reservedAt,
-            priorStorageIds: [...record5.priorStorageIds || [], record5.storageId].slice(-MAX_PRIOR_UPLOAD_TARGETS)
+            createdAt: record6.createdAt,
+            reservedAt: record6.reservedAt,
+            priorStorageIds: [...record6.priorStorageIds || [], record6.storageId].slice(-MAX_PRIOR_UPLOAD_TARGETS)
           } : { storageId, createdAt, reservedAt: nowMs2 };
           const attemptId = createAttemptId(this.crypto);
           await transaction.put(key, {
@@ -84577,12 +84739,12 @@ ${expiry}`);
         let cursor = "";
         for (; ; ) {
           const records = await this.state.storage.list({ prefix: UPLOAD_RECEIPT_PREFIX, ...cursor ? { startAfter: cursor } : {}, limit: 500 });
-          for (const record5 of records.values()) {
-            if (record5.state === "pending" && record5.leaseUntil > nowMs2) {
+          for (const record6 of records.values()) {
+            if (record6.state === "pending" && record6.leaseUntil > nowMs2) {
               pendingLeases += 1;
-              oldestPendingAgeMs = Math.max(oldestPendingAgeMs ?? 0, nowMs2 - (record5.leaseUntil - UPLOAD_RECEIPT_LEASE_MS));
+              oldestPendingAgeMs = Math.max(oldestPendingAgeMs ?? 0, nowMs2 - (record6.leaseUntil - UPLOAD_RECEIPT_LEASE_MS));
             }
-            if (record5.state === "settled" && nowMs2 - record5.settledAt < UPLOAD_RECEIPT_RETENTION_MS) settledCount += 1;
+            if (record6.state === "settled" && nowMs2 - record6.settledAt < UPLOAD_RECEIPT_RETENTION_MS) settledCount += 1;
           }
           if (records.size < 500) break;
           cursor = [...records.keys()].at(-1);
@@ -84661,8 +84823,8 @@ ${expiry}`);
         this.resultsAnalysisTail = run.catch(() => void 0);
         return run;
       }
-      normalizeResultsAnalysisRecord(record5) {
-        const source = isObjectRecord(record5) && record5.version === 1 ? record5 : {};
+      normalizeResultsAnalysisRecord(record6) {
+        const source = isObjectRecord(record6) && record6.version === 1 ? record6 : {};
         const requests = isObjectRecord(source.requests) ? source.requests : {};
         return {
           version: 1,
@@ -84687,9 +84849,9 @@ ${expiry}`);
         }
       }
       async readResultsAnalysisDraft(storage = this.state.storage) {
-        const record5 = await storage.get(RESULTS_ANALYSIS_DRAFT_KEY);
-        if (!isObjectRecord(record5) || record5.chunked !== true) return record5;
-        const chunkCount = Number(record5.chunkCount || 0) || 0;
+        const record6 = await storage.get(RESULTS_ANALYSIS_DRAFT_KEY);
+        if (!isObjectRecord(record6) || record6.chunked !== true) return record6;
+        const chunkCount = Number(record6.chunkCount || 0) || 0;
         if (!chunkCount || chunkCount > RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS) return null;
         let serialized = "";
         for (let index = 0; index < chunkCount; index += 1) {
@@ -84858,9 +85020,9 @@ ${expiry}`);
             limit: RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE
           });
           let next = Number(cursor?.next) || Infinity;
-          for (const [key, record5] of page) {
-            if (record5.expiresAt <= nowMs2) await transaction.delete(key);
-            else next = Math.min(next, record5.expiresAt);
+          for (const [key, record6] of page) {
+            if (record6.expiresAt <= nowMs2) await transaction.delete(key);
+            else next = Math.min(next, record6.expiresAt);
           }
           if (page.size >= RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE) {
             await transaction.put(RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY, { after: [...page.keys()].at(-1), next });
@@ -84877,13 +85039,13 @@ ${expiry}`);
         const nowMs2 = Number(this.now()) || Date.now();
         const retryDelayMs = await this.state.storage.transaction(async (transaction) => {
           const queued = await transaction.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-          const record5 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+          const record6 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
           const sameJob = !job || queued?.queuedAtMs === job.queuedAtMs;
           const retryable = error?.retryable !== false && RESULTS_ANALYSIS_RETRYABLE_STATUSES.has(Number(error?.status));
           const retryAttempt = (Number(queued?.retryAttempt) || 0) + 1;
           const scheduledDelay = retryable && sameJob && isObjectRecord(queued) ? RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS[retryAttempt - 1] : void 0;
           const delayMs = scheduledDelay ? Math.min(Math.max(scheduledDelay, Number(error?.retryAfterMs) || 0), 30 * 6e4) : void 0;
-          record5.lastFailure = {
+          record6.lastFailure = {
             ok: false,
             error: error?.message || error?.error || toTrimmedString10(error) || "Automatic results analysis job failed.",
             status: Number(error?.status) >= 400 && Number(error?.status) <= 599 ? Number(error.status) : 502,
@@ -84900,7 +85062,7 @@ ${expiry}`);
           } else if (sameJob) {
             await transaction.delete(RESULTS_ANALYSIS_AUTO_JOB_KEY);
           }
-          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record5);
+          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record6);
           return delayMs;
         });
         if (retryDelayMs) await this.scheduleResultsAnalysisAlarm(retryDelayMs);
@@ -85006,8 +85168,8 @@ ${expiry}`);
       async releaseResultsAnalysisRequest(requestId, failure4 = null) {
         const id2 = toTrimmedString10(requestId);
         if (!id2) return;
-        const record5 = this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY));
-        const active = record5.active;
+        const record6 = this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY));
+        const active = record6.active;
         if (active?.requestId === id2 && failure4) {
           await this.finalizeResultsAnalysis({
             requestId: id2,
@@ -85028,18 +85190,18 @@ ${expiry}`);
       }
       async readResultsAnalysisStatus() {
         const existing = await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY);
-        const record5 = this.normalizeResultsAnalysisRecord(existing);
+        const record6 = this.normalizeResultsAnalysisRecord(existing);
         const latestDraft = await this.readResultsAnalysisDraft();
         const queued = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-        const lastGood = record5.lastGood && latestDraft?.draftId === record5.lastGood.draftId ? { ...record5.lastGood, ...latestDraft } : record5.lastGood;
+        const lastGood = record6.lastGood && latestDraft?.draftId === record6.lastGood.draftId ? { ...record6.lastGood, ...latestDraft } : record6.lastGood;
         const nowMs2 = Number(this.now()) || Date.now();
         return {
           version: 1,
-          jobState: this.isResultsAnalysisActiveFresh(record5.active, nowMs2) ? "running" : isObjectRecord(queued) ? "queued" : record5.lastFailure ? "failed" : lastGood ? "succeeded" : "idle",
+          jobState: this.isResultsAnalysisActiveFresh(record6.active, nowMs2) ? "running" : isObjectRecord(queued) ? "queued" : record6.lastFailure ? "failed" : lastGood ? "succeeded" : "idle",
           queued: isObjectRecord(queued) ? { requestId: toTrimmedString10(queued.requestId), queuedAtMs: Number(queued.queuedAtMs || 0) || 0 } : null,
-          active: this.isResultsAnalysisActiveFresh(record5.active, nowMs2) ? record5.active : null,
+          active: this.isResultsAnalysisActiveFresh(record6.active, nowMs2) ? record6.active : null,
           lastGood,
-          lastFailure: record5.lastFailure
+          lastFailure: record6.lastFailure
         };
       }
       async reserveResultsAnalysis(payload = {}) {
@@ -85055,9 +85217,9 @@ ${expiry}`);
         }
         const nowMs2 = Number(this.now()) || Date.now();
         return this.state.storage.transaction(async (transaction) => {
-          const record5 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+          const record6 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
           const latestDraft = await this.readResultsAnalysisDraft(transaction);
-          const prior = requestId ? record5.requests[requestId] : null;
+          const prior = requestId ? record6.requests[requestId] : null;
           if (prior?.state === "succeeded" && prior.draftId) {
             if (latestDraft?.draftId === prior.draftId) {
               return { kind: "terminal", draft: latestDraft, draftId: prior.draftId };
@@ -85067,30 +85229,30 @@ ${expiry}`);
           if (prior?.state === "failed") {
             return { kind: "failed", status: prior.status || 502, error: prior.error || "Results analysis generation failed." };
           }
-          if (prior?.state === "running" && record5.active?.requestId === requestId && this.isResultsAnalysisActiveFresh(record5.active, nowMs2)) {
+          if (prior?.state === "running" && record6.active?.requestId === requestId && this.isResultsAnalysisActiveFresh(record6.active, nowMs2)) {
             return { kind: "pending" };
           }
-          if (!refresh && record5.lastGood?.sourceSignature === sourceSignature && record5.lastGood?.viewSignature === viewSignature && latestDraft?.draftId === record5.lastGood.draftId) {
+          if (!refresh && record6.lastGood?.sourceSignature === sourceSignature && record6.lastGood?.viewSignature === viewSignature && latestDraft?.draftId === record6.lastGood.draftId) {
             if (requestId) {
-              record5.requests[requestId] = { state: "succeeded", draftId: latestDraft.draftId, updatedAtMs: nowMs2 };
-              record5.requests = this.pruneResultsAnalysisRequests(record5.requests);
-              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record5);
+              record6.requests[requestId] = { state: "succeeded", draftId: latestDraft.draftId, updatedAtMs: nowMs2 };
+              record6.requests = this.pruneResultsAnalysisRequests(record6.requests);
+              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record6);
             }
             return { kind: "terminal", draft: latestDraft, draftId: latestDraft.draftId };
           }
-          if (trigger === "automatic" && record5.lastFailure?.sourceSignature === sourceSignature && record5.lastFailure?.viewSignature === viewSignature) {
-            return { kind: "failed", status: record5.lastFailure.status || 502, error: record5.lastFailure.error || "Results analysis generation failed." };
+          if (trigger === "automatic" && record6.lastFailure?.sourceSignature === sourceSignature && record6.lastFailure?.viewSignature === viewSignature) {
+            return { kind: "failed", status: record6.lastFailure.status || 502, error: record6.lastFailure.error || "Results analysis generation failed." };
           }
-          if (this.isResultsAnalysisActiveFresh(record5.active, nowMs2)) {
-            if (requestId && !record5.requests[requestId]) {
-              record5.requests[requestId] = { state: "running", updatedAtMs: nowMs2 };
-              record5.requests = this.pruneResultsAnalysisRequests(record5.requests);
-              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record5);
+          if (this.isResultsAnalysisActiveFresh(record6.active, nowMs2)) {
+            if (requestId && !record6.requests[requestId]) {
+              record6.requests[requestId] = { state: "running", updatedAtMs: nowMs2 };
+              record6.requests = this.pruneResultsAnalysisRequests(record6.requests);
+              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record6);
             }
             return { kind: "pending" };
           }
           const attemptId = createAttemptId(this.crypto);
-          record5.active = {
+          record6.active = {
             reservationKey,
             requestId,
             attemptId,
@@ -85100,9 +85262,9 @@ ${expiry}`);
             trigger,
             startedAtMs: nowMs2
           };
-          if (requestId) record5.requests[requestId] = { state: "running", updatedAtMs: nowMs2 };
-          record5.requests = this.pruneResultsAnalysisRequests(record5.requests);
-          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record5);
+          if (requestId) record6.requests[requestId] = { state: "running", updatedAtMs: nowMs2 };
+          record6.requests = this.pruneResultsAnalysisRequests(record6.requests);
+          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record6);
           return { kind: "execute", attemptId };
         });
       }
@@ -85115,12 +85277,12 @@ ${expiry}`);
         if (!reservationKey || !attemptId || !receipt) return { ok: false, status: 400 };
         const nowMs2 = Number(this.now()) || Date.now();
         return this.state.storage.transaction(async (transaction) => {
-          const record5 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
-          if (record5.active?.reservationKey !== reservationKey || record5.active?.attemptId !== attemptId) {
+          const record6 = this.normalizeResultsAnalysisRecord(await transaction.get(RESULTS_ANALYSIS_RECORD_KEY));
+          if (record6.active?.reservationKey !== reservationKey || record6.active?.attemptId !== attemptId) {
             return { ok: false, status: 409 };
           }
-          const active = record5.active;
-          record5.active = null;
+          const active = record6.active;
+          record6.active = null;
           if (success) {
             const draft = receipt.draft && isObjectRecord(receipt.draft) ? receipt.draft : receipt;
             const draftId = toTrimmedString10(draft.draftId);
@@ -85128,7 +85290,7 @@ ${expiry}`);
             try {
               await this.putResultsAnalysisDraft(transaction, draft);
             } catch (error) {
-              record5.lastFailure = {
+              record6.lastFailure = {
                 ok: false,
                 error: error?.message || "Results analysis draft exceeds durable storage limits.",
                 status: Number(error?.status || 0) || 413,
@@ -85139,17 +85301,17 @@ ${expiry}`);
                 trigger: active.trigger,
                 failedAtMs: nowMs2
               };
-              if (requestId) record5.requests[requestId] = {
+              if (requestId) record6.requests[requestId] = {
                 state: "failed",
-                error: record5.lastFailure.error,
-                status: record5.lastFailure.status,
+                error: record6.lastFailure.error,
+                status: record6.lastFailure.status,
                 updatedAtMs: nowMs2
               };
-              record5.requests = this.pruneResultsAnalysisRequests(record5.requests);
-              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record5);
-              return { ok: false, status: record5.lastFailure.status, error: record5.lastFailure.error };
+              record6.requests = this.pruneResultsAnalysisRequests(record6.requests);
+              await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record6);
+              return { ok: false, status: record6.lastFailure.status, error: record6.lastFailure.error };
             }
-            record5.lastGood = {
+            record6.lastGood = {
               draftId,
               generatedAt: draft.generatedAt,
               requestId,
@@ -85161,11 +85323,11 @@ ${expiry}`);
               sections: Array.isArray(draft.sections) ? draft.sections : [],
               completedAtMs: nowMs2
             };
-            if (active.trigger === "automatic") record5.lastAutomaticSuccessAtMs = nowMs2;
-            record5.lastFailure = null;
-            if (requestId) record5.requests[requestId] = { state: "succeeded", draftId, updatedAtMs: nowMs2 };
+            if (active.trigger === "automatic") record6.lastAutomaticSuccessAtMs = nowMs2;
+            record6.lastFailure = null;
+            if (requestId) record6.requests[requestId] = { state: "succeeded", draftId, updatedAtMs: nowMs2 };
           } else {
-            record5.lastFailure = {
+            record6.lastFailure = {
               ok: false,
               error: toTrimmedString10(receipt.error) || "Results analysis generation failed.",
               status: Number(receipt.status || 0) || 502,
@@ -85176,15 +85338,15 @@ ${expiry}`);
               trigger: active.trigger,
               failedAtMs: nowMs2
             };
-            if (requestId) record5.requests[requestId] = {
+            if (requestId) record6.requests[requestId] = {
               state: "failed",
-              error: record5.lastFailure.error,
-              status: record5.lastFailure.status,
+              error: record6.lastFailure.error,
+              status: record6.lastFailure.status,
               updatedAtMs: nowMs2
             };
           }
-          record5.requests = this.pruneResultsAnalysisRequests(record5.requests);
-          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record5);
+          record6.requests = this.pruneResultsAnalysisRequests(record6.requests);
+          await transaction.put(RESULTS_ANALYSIS_RECORD_KEY, record6);
           return { ok: true, status: 200 };
         });
       }
@@ -86152,10 +86314,10 @@ ${expiry}`);
           const counts = workerGroupInviteCounts(state2);
           let revoked = 0;
           for (const key of keys) {
-            const record5 = await transaction.get(key);
-            if (record5?.state === "used" && !all) await transaction.put(key, { ...record5, revokeOnRestore: true });
-            if (record5?.state !== "unused") continue;
-            await transaction.put(key, { ...record5, state: "revoked", revokedAt: nowIso4 });
+            const record6 = await transaction.get(key);
+            if (record6?.state === "used" && !all) await transaction.put(key, { ...record6, revokeOnRestore: true });
+            if (record6?.state !== "unused") continue;
+            await transaction.put(key, { ...record6, state: "revoked", revokedAt: nowIso4 });
             counts.unused = Math.max(0, counts.unused - 1);
             counts.revoked += 1;
             revoked += 1;
@@ -86173,7 +86335,7 @@ ${expiry}`);
         do {
           const page = [...await this.state.storage.list({ prefix, startAfter: after, limit: WORKER_GROUP_REVOKE_BATCH })];
           after = page.length === WORKER_GROUP_REVOKE_BATCH ? page.at(-1)[0] : "";
-          const keys = page.filter(([, record5]) => record5?.state === "unused").map(([key]) => key);
+          const keys = page.filter(([, record6]) => record6?.state === "unused").map(([key]) => key);
           const batch = await this.revokeWorkerGroupInvites(groupId, keys, { nowIso: nowIso4, all: true });
           revoked += batch.revoked;
           counts = batch.counts;
@@ -86253,12 +86415,12 @@ ${expiry}`);
             limit: limit + 1
           });
           const entries = [...page].slice(0, limit);
-          const invites = entries.map(([key, record5]) => ({
+          const invites = entries.map(([key, record6]) => ({
             hash: key.slice(prefix.length),
-            state: record5?.state,
-            createdAt: record5?.createdAt,
-            ...record5?.expiresAt ? { expiresAt: record5.expiresAt } : {},
-            ...record5?.usedAt ? { usedAt: record5.usedAt } : {}
+            state: record6?.state,
+            createdAt: record6?.createdAt,
+            ...record6?.expiresAt ? { expiresAt: record6.expiresAt } : {},
+            ...record6?.usedAt ? { usedAt: record6.usedAt } : {}
           }));
           return jsonResponse2({
             ok: true,
@@ -86362,15 +86524,15 @@ ${expiry}`);
         const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
         if (!slug) return jsonResponse2({ error: "Invalid session slug." }, 400);
         const authority = await this.readSessionConfigAuthority(slug);
-        const record5 = this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY));
+        const record6 = this.normalizeResultsAnalysisRecord(await this.state.storage.get(RESULTS_ANALYSIS_RECORD_KEY));
         const queued = await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY);
-        const failure4 = record5.lastFailure?.trigger === "automatic" ? record5.lastFailure : null;
+        const failure4 = record6.lastFailure?.trigger === "automatic" ? record6.lastFailure : null;
         return jsonResponse2({
           ok: true,
           config: authority?.config ?? null,
           revision: authority?.revision ?? 0,
           analysis: {
-            lastSuccessAtMs: record5.lastAutomaticSuccessAtMs,
+            lastSuccessAtMs: record6.lastAutomaticSuccessAtMs,
             retryAttempt: Number(queued?.retryAttempt ?? failure4?.retryAttempt) || 0,
             nextAttemptAtMs: queued ? Number(failure4?.nextAttemptAtMs) || null : null,
             retriesExhausted: failure4?.retriesExhausted === true
@@ -86665,13 +86827,13 @@ ${expiry}`);
         const existing = await this.state.storage.get(AUTH_NONCE_MAC_KEY);
         if (/^[0-9a-f]{64}$/.test(toTrimmedString10(existing?.key)) || !create2) return toTrimmedString10(existing?.key);
         const candidate = { version: 1, key: bytesToHex3(this.crypto.getRandomValues(new Uint8Array(32))) };
-        const record5 = await this.state.storage.transaction(async (transaction) => {
+        const record6 = await this.state.storage.transaction(async (transaction) => {
           const current = await transaction.get(AUTH_NONCE_MAC_KEY);
           if (/^[0-9a-f]{64}$/.test(toTrimmedString10(current?.key))) return current;
           await transaction.put(AUTH_NONCE_MAC_KEY, candidate);
           return candidate;
         });
-        return record5.key;
+        return record6.key;
       }
       async executeAuthNonceIssue(payload) {
         const nowMs2 = Number(this.now()) || Date.now();
@@ -96696,13 +96858,13 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
     const ok = !!ctx.address && !ctx.auth?.delegation?.sourceParticipant && await deps.validateAdmin({ env, slug: ctx.slug, address: ctx.address, config: ctx.config });
     return { ok: !!ok, accountAddress: ctx.address };
   };
-  const submitJournal = async (operation, record5) => {
-    if (record5.sessionId !== ctx.sessionId || record5.sessionSlug !== ctx.slug || record5.workerOrigin !== ctx.origin) throw authorityError("submit_outcome_identity_mismatch");
+  const submitJournal = async (operation, record6) => {
+    if (record6.sessionId !== ctx.sessionId || record6.sessionSlug !== ctx.slug || record6.workerOrigin !== ctx.origin) throw authorityError("submit_outcome_identity_mismatch");
     const result = await callSessionConfigCoordinator({
       env,
       slug: ctx.slug,
       path: `agent-submit/${operation}`,
-      record: record5,
+      record: record6,
       ...["begin", "claim"].includes(operation) ? { expectedAuthority: expectedAuthority() } : {}
     });
     if (!result.ok) return { ok: false, retryable: true, reason: result.body?.reason || "submit_coordinator_unavailable" };
@@ -96710,32 +96872,32 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
   };
   return Object.freeze({
     current,
-    async commitWrappedResearch(record5) {
+    async commitWrappedResearch(record6) {
       await current();
       const result = await callSessionConfigCoordinator({
         env,
         slug: ctx.slug,
         path: "agent-wrapped/commit",
         expectedAuthority: expectedAuthority(),
-        record: { ...record5, sessionId: ctx.sessionId, sessionSlug: ctx.slug }
+        record: { ...record6, sessionId: ctx.sessionId, sessionSlug: ctx.slug }
       });
       return result.body || { ok: false, status: 503, reason: "wrapped_coordinator_unavailable", retryable: true };
     },
-    claimAnswerSubmission: (record5) => submitJournal("claim", record5),
-    readSubmitRecord: (record5) => submitJournal("read", record5),
-    readAnswerHead: (record5) => submitJournal("head", record5),
-    async persistSubmitIntent(record5) {
+    claimAnswerSubmission: (record6) => submitJournal("claim", record6),
+    readSubmitRecord: (record6) => submitJournal("read", record6),
+    readAnswerHead: (record6) => submitJournal("head", record6),
+    async persistSubmitIntent(record6) {
       await current();
-      return submitJournal("begin", record5);
+      return submitJournal("begin", record6);
     },
-    recoverSubmitOutcome: (record5) => submitJournal("finish", record5),
-    async persistSubmitOutcome(record5) {
-      if (record5.sessionId !== ctx.sessionId || record5.sessionSlug !== ctx.slug || record5.workerOrigin !== ctx.origin || record5.accountAddress !== ctx.address || record5.sourceCredentialHash !== ctx.auth?.delegation?.tokenHash) {
+    recoverSubmitOutcome: (record6) => submitJournal("finish", record6),
+    async persistSubmitOutcome(record6) {
+      if (record6.sessionId !== ctx.sessionId || record6.sessionSlug !== ctx.slug || record6.workerOrigin !== ctx.origin || record6.accountAddress !== ctx.address || record6.sourceCredentialHash !== ctx.auth?.delegation?.tokenHash) {
         throw authorityError("submit_outcome_identity_mismatch");
       }
       const persistenceEnv = { ...agentEnv, AGENT_ACTION_KV: createAgentStorage({ kv: env.GROUP_KV, sessionId: ctx.sessionId, cursorSecret: env.TOKEN_HMAC_SECRET }) };
-      const result = record5.submissionJournal === true ? await submitJournal("finish", record5) : await persistRecoveryMessage({ env: persistenceEnv, body: { requestId: record5.requestId, record: record5 }, requireExisting: true });
-      return result.ok || result.replayed ? result : retainOutcomeForRecovery(persistenceEnv, record5, new Error(result.reason));
+      const result = record6.submissionJournal === true ? await submitJournal("finish", record6) : await persistRecoveryMessage({ env: persistenceEnv, body: { requestId: record6.requestId, record: record6 }, requireExisting: true });
+      return result.ok || result.replayed ? result : retainOutcomeForRecovery(persistenceEnv, record6, new Error(result.reason));
     },
     paginate: createAgentPagination(env.TOKEN_HMAC_SECRET, ctx),
     admin,
@@ -96913,18 +97075,18 @@ init_agentSubmitQueue();
 var dispatchSessionAgentQueue = async ({ batch, env, deps }) => {
   const results = [];
   for (const message of batch.messages || []) {
-    const record5 = message.body?.record;
-    if (message.body?.type !== AGENT_SUBMIT_QUEUE_MESSAGE_TYPE || !record5 || !validateInboundWorkerSessionSlug(record5.sessionSlug).ok || !record5.sessionSlug || !/^0x[0-9a-f]{32}$/.test(record5.sessionId || "")) {
+    const record6 = message.body?.record;
+    if (message.body?.type !== AGENT_SUBMIT_QUEUE_MESSAGE_TYPE || !record6 || !validateInboundWorkerSessionSlug(record6.sessionSlug).ok || !record6.sessionSlug || !/^0x[0-9a-f]{32}$/.test(record6.sessionId || "")) {
       message.ack?.();
       results.push({ ok: false, reason: "unsupported_queue_message" });
       continue;
     }
     try {
-      const { config, revision } = await (deps.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug: record5.sessionSlug });
+      const { config, revision } = await (deps.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug: record6.sessionSlug });
       const origin = new URL(config.corsWorkerUrl).origin;
-      const agentEnv = createAgentEnvironment({ env, config, revision, slug: record5.sessionSlug, origin, now: deps.now, persistenceOnly: true, fetchImpl: deps.fetch });
+      const agentEnv = createAgentEnvironment({ env, config, revision, slug: record6.sessionSlug, origin, now: deps.now, persistenceOnly: true, fetchImpl: deps.fetch });
       const ctx = agentEnv.AGENT_CONTEXT;
-      if (ctx.sessionId !== record5.sessionId || origin !== record5.workerOrigin) {
+      if (ctx.sessionId !== record6.sessionId || origin !== record6.workerOrigin) {
         message.ack?.();
         results.push({ ok: false, reason: "queue_session_mismatch" });
         continue;
@@ -97605,7 +97767,7 @@ async function saveAgentOnlyModeConfig({
   const loaded = await loadAgentOnlyModeConfig({ env, sessionSlug: slug });
   const normalized = normalizeAgentOnlyModeConfigPatch(patch, loaded.config);
   const timestamp = nowIsoOrCurrent(createdAt);
-  const record5 = {
+  const record6 = {
     ...defaultAgentOnlyModeConfig(slug),
     ...loaded.config,
     ...normalized,
@@ -97614,11 +97776,11 @@ async function saveAgentOnlyModeConfig({
     updatedAt: timestamp,
     updatedBy: safeString(updatedBy) || "service"
   };
-  assertNoSecretShape(record5, "Agent-only config records must not serialize secrets.");
-  await kv.put(key, JSON.stringify(record5), {
-    metadata: { v: 1, t: "ao_config", sg: slug, q: record5.enabledQuestionIds.length }
+  assertNoSecretShape(record6, "Agent-only config records must not serialize secrets.");
+  await kv.put(key, JSON.stringify(record6), {
+    metadata: { v: 1, t: "ao_config", sg: slug, q: record6.enabledQuestionIds.length }
   });
-  return { ok: true, source: "kv", config: record5 };
+  return { ok: true, source: "kv", config: record6 };
 }
 
 // workers/sessionCorsWorker/agent/wrappedStatements.mjs
@@ -98655,7 +98817,7 @@ async function submitAgentOnlyAnswersBulk({
     const isSkip = row.skipped === true;
     const key = `${answerEventPrefix(slug, userPart)}${kvKeySafePart(requestId)}:${kvKeySafePart(row.statementId)}`;
     const semanticFingerprint = isSkip ? "" : await semanticFingerprintForAgentOnlyAnswer(row.answer, row.answerSchema);
-    const record5 = {
+    const record6 = {
       type: "telegram_agent_only_answer_event",
       version: 1,
       sessionSlug: slug,
@@ -98676,8 +98838,8 @@ async function submitAgentOnlyAnswersBulk({
       semanticFingerprint,
       createdAt
     };
-    assertNoSecretShape(record5, "Agent-only answer events must not serialize secrets.");
-    events.push({ key, value: record5, metadata: { v: 1, t: "ao_evt", sg: slug, k: isSkip ? "s" : "a", src: "agent_autofill" } });
+    assertNoSecretShape(record6, "Agent-only answer events must not serialize secrets.");
+    events.push({ key, value: record6, metadata: { v: 1, t: "ao_evt", sg: slug, k: isSkip ? "s" : "a", src: "agent_autofill" } });
     const current = state2.byStatement[row.statementId] && typeof state2.byStatement[row.statementId] === "object" ? state2.byStatement[row.statementId] : {};
     changes[row.statementId] = isSkip ? {
       ...current,
@@ -98765,7 +98927,7 @@ async function recordAgentOnlyAttemptEvent({
   const ok = result?.ok === false ? false : httpStatus >= 200 && httpStatus < 400;
   const normalizedStage = normalizeAttemptStage(stage);
   const reason = attemptReasonFromResult(result);
-  const record5 = {
+  const record6 = {
     type: "telegram_agent_only_attempt_event",
     version: 1,
     sessionSlug: slug,
@@ -98781,9 +98943,9 @@ async function recordAgentOnlyAttemptEvent({
     counts: attemptCountsFromResult(result),
     createdAt: nowIsoOrCurrent(now)
   };
-  assertNoSecretShape(record5, "Agent-only attempt events must not serialize secrets.");
+  assertNoSecretShape(record6, "Agent-only attempt events must not serialize secrets.");
   const key = `${prefix}${eventId()}`;
-  await kv.put(key, JSON.stringify(record5), {
+  await kv.put(key, JSON.stringify(record6), {
     metadata: {
       v: 1,
       t: "ao_attempt",
@@ -98791,9 +98953,9 @@ async function recordAgentOnlyAttemptEvent({
       st: normalizedStage.slice(0, 16),
       ok: ok ? 1 : 0,
       r: reason.slice(0, 48),
-      u: record5.telegramUserId,
-      run: record5.runId,
-      at: record5.createdAt
+      u: record6.telegramUserId,
+      run: record6.runId,
+      at: record6.createdAt
     }
   });
   return { ok: true, key };
@@ -99039,7 +99201,7 @@ async function saveAgentOnlyWrappedImage({
   const key = `${prefix}${imageId}`;
   const viewKey = wrappedImageViewKey(imageViewId);
   const runKey = wrappedImageRunKey(sessionSlug, telegramUserId, mode, normalizedRunId);
-  const record5 = {
+  const record6 = {
     type: "telegram_agent_only_wrapped_image",
     version: 1,
     sessionId,
@@ -99065,7 +99227,7 @@ async function saveAgentOnlyWrappedImage({
     createdAt
   };
   assertNoSecretShape({
-    ...record5,
+    ...record6,
     imageBase64: "[image omitted]"
   }, "Agent-only wrapped image metadata must not serialize secrets.");
   const viewRecord = {
@@ -99075,14 +99237,14 @@ async function saveAgentOnlyWrappedImage({
     expiresAt,
     imageViewId,
     imageKey: key,
-    sessionSlug: record5.sessionSlug,
-    runId: record5.runId,
-    mode: record5.mode,
-    mediaKind: record5.mediaKind,
-    frameCount: record5.frameCount,
-    storyDurationSeconds: record5.storyDurationSeconds,
-    frameKeys: record5.frameKeys,
-    imageContentType: record5.imageContentType,
+    sessionSlug: record6.sessionSlug,
+    runId: record6.runId,
+    mode: record6.mode,
+    mediaKind: record6.mediaKind,
+    frameCount: record6.frameCount,
+    storyDurationSeconds: record6.storyDurationSeconds,
+    frameKeys: record6.frameKeys,
+    imageContentType: record6.imageContentType,
     createdAt
   };
   const runRecord = {
@@ -99090,14 +99252,14 @@ async function saveAgentOnlyWrappedImage({
     version: 1,
     sessionId,
     expiresAt,
-    sessionSlug: record5.sessionSlug,
-    telegramUserId: record5.telegramUserId,
-    runId: record5.runId,
-    mode: record5.mode,
-    mediaKind: record5.mediaKind,
-    frameCount: record5.frameCount,
-    storyDurationSeconds: record5.storyDurationSeconds,
-    frameKeys: record5.frameKeys,
+    sessionSlug: record6.sessionSlug,
+    telegramUserId: record6.telegramUserId,
+    runId: record6.runId,
+    mode: record6.mode,
+    mediaKind: record6.mediaKind,
+    frameCount: record6.frameCount,
+    storyDurationSeconds: record6.storyDurationSeconds,
+    frameKeys: record6.frameKeys,
     imageKey: key,
     imageId,
     imageViewId,
@@ -99106,13 +99268,13 @@ async function saveAgentOnlyWrappedImage({
   };
   assertNoSecretShape(viewRecord, "Agent-only wrapped image view metadata must not serialize secrets.");
   assertNoSecretShape(runRecord, "Agent-only wrapped image run metadata must not serialize secrets.");
-  await kv.put(key, JSON.stringify(record5), {
+  await kv.put(key, JSON.stringify(record6), {
     expirationTtl: 7 * 86400,
     metadata: {
       v: 1,
       t: "ao_img",
       m: wrappedImageModeMetadata(mode),
-      b: record5.imageByteLengthApprox
+      b: record6.imageByteLengthApprox
     }
   });
   await kv.put(viewKey, JSON.stringify(viewRecord), {
@@ -99120,7 +99282,7 @@ async function saveAgentOnlyWrappedImage({
     metadata: {
       v: 1,
       t: "ao_img_view",
-      m: wrappedImageModeMetadata(record5.mode)
+      m: wrappedImageModeMetadata(record6.mode)
     }
   });
   if (runKey) {
@@ -99129,7 +99291,7 @@ async function saveAgentOnlyWrappedImage({
       metadata: {
         v: 1,
         t: "ao_img_run",
-        m: wrappedImageModeMetadata(record5.mode)
+        m: wrappedImageModeMetadata(record6.mode)
       }
     });
   }
@@ -99901,13 +100063,13 @@ async function exportAgentOnlyData({
   const answerKey = (user, question) => JSON.stringify([safeString(user), safeString(question)]);
   if (view === "gold" || view === "wide" && !compactExport) {
     const records = await loadSubmittedResultRecords(env, slug, { includeRawAnswer: true });
-    for (const record5 of records) {
-      const key = answerKey(record5.telegramUserId, record5.questionId);
+    for (const record6 of records) {
+      const key = answerKey(record6.telegramUserId, record6.questionId);
       if (!submittedHistory.has(key)) submittedHistory.set(key, []);
-      submittedHistory.get(key).push(record5);
+      submittedHistory.get(key).push(record6);
     }
-    for (const record5 of selectCurrentSubmittedAnswers(records)) {
-      currentSubmitted.set(answerKey(record5.telegramUserId, record5.questionId), record5);
+    for (const record6 of selectCurrentSubmittedAnswers(records)) {
+      currentSubmitted.set(answerKey(record6.telegramUserId, record6.questionId), record6);
     }
   }
   if (["answers", "wide", "calibration", "gold"].includes(view)) {
@@ -99964,54 +100126,54 @@ async function exportAgentOnlyData({
       const eventEntries = listed.entries;
       nextCursor = listed.nextCursor;
       for (const entry2 of eventEntries) {
-        const record5 = await readKvJson2(env, entry2.key);
-        if (!record5) continue;
-        if (!readable.has(record5.questionId)) continue;
-        const principalId = await agentOnlyPrincipalId(env, record5.telegramUserId);
+        const record6 = await readKvJson2(env, entry2.key);
+        if (!record6) continue;
+        if (!readable.has(record6.questionId)) continue;
+        const principalId = await agentOnlyPrincipalId(env, record6.telegramUserId);
         if (view === "answers") {
           rows.push({
             principal_id: principalId,
-            statement_id: safeString(record5.questionId),
-            statement: record5.statement || null,
-            run_id: safeString(record5.runId),
-            source: safeString(record5.source),
-            event_kind: safeString(record5.eventKind),
-            answer: record5.answer || null,
-            confidence: record5.confidence ?? null,
-            rationale: safeString(record5.eventKind) === "privacy_protective_skip" ? null : safeString(record5.rationale),
-            agent_initialized_at: safeString(record5.agentMetadata?.agentInitializedAt),
-            model: safeString(record5.agentMetadata?.model),
-            scaffold_version: safeString(record5.agentMetadata?.scaffoldVersion),
-            token_current_run_total: normalizeTokenCount(record5.agentMetadata?.tokenUsage?.currentRunTotalTokens),
-            token_recent_sessions_total: normalizeTokenCount(record5.agentMetadata?.tokenUsage?.recentSessionsTotalTokens),
-            token_input: normalizeTokenCount(record5.agentMetadata?.tokenUsage?.inputTokens),
-            token_output: normalizeTokenCount(record5.agentMetadata?.tokenUsage?.outputTokens),
-            token_daily_usage_30d: normalizeDailyTokenUsage(record5.agentMetadata?.tokenUsage?.dailyUsage30d),
-            token_edge_in_person_dates: normalizeTokenUsageDates(record5.agentMetadata?.tokenUsage?.edgeInPersonDates),
-            token_usage_source: safeString(record5.agentMetadata?.tokenUsage?.source),
-            instructions_version: safeString(record5.instructionsVersion),
-            request_id: safeString(record5.requestId),
-            created_at: safeString(record5.createdAt)
+            statement_id: safeString(record6.questionId),
+            statement: record6.statement || null,
+            run_id: safeString(record6.runId),
+            source: safeString(record6.source),
+            event_kind: safeString(record6.eventKind),
+            answer: record6.answer || null,
+            confidence: record6.confidence ?? null,
+            rationale: safeString(record6.eventKind) === "privacy_protective_skip" ? null : safeString(record6.rationale),
+            agent_initialized_at: safeString(record6.agentMetadata?.agentInitializedAt),
+            model: safeString(record6.agentMetadata?.model),
+            scaffold_version: safeString(record6.agentMetadata?.scaffoldVersion),
+            token_current_run_total: normalizeTokenCount(record6.agentMetadata?.tokenUsage?.currentRunTotalTokens),
+            token_recent_sessions_total: normalizeTokenCount(record6.agentMetadata?.tokenUsage?.recentSessionsTotalTokens),
+            token_input: normalizeTokenCount(record6.agentMetadata?.tokenUsage?.inputTokens),
+            token_output: normalizeTokenCount(record6.agentMetadata?.tokenUsage?.outputTokens),
+            token_daily_usage_30d: normalizeDailyTokenUsage(record6.agentMetadata?.tokenUsage?.dailyUsage30d),
+            token_edge_in_person_dates: normalizeTokenUsageDates(record6.agentMetadata?.tokenUsage?.edgeInPersonDates),
+            token_usage_source: safeString(record6.agentMetadata?.tokenUsage?.source),
+            instructions_version: safeString(record6.instructionsVersion),
+            request_id: safeString(record6.requestId),
+            created_at: safeString(record6.createdAt)
           });
-        } else if (safeString(record5.source) === "agent_autofill" && record5.eventKind === "answer") {
-          const beforeMs = Date.parse(record5.createdAt);
-          const history = submittedHistory.get(answerKey(record5.telegramUserId, record5.questionId)) || [];
+        } else if (safeString(record6.source) === "agent_autofill" && record6.eventKind === "answer") {
+          const beforeMs = Date.parse(record6.createdAt);
+          const history = submittedHistory.get(answerKey(record6.telegramUserId, record6.questionId)) || [];
           const [prior] = selectCurrentSubmittedAnswers(history.filter((answer) => Date.parse(answer.createdAt) < beforeMs));
           if (!prior) continue;
           rows.push({
             principal_id: principalId,
-            statement_id: safeString(record5.questionId),
-            statement: record5.statement || null,
-            run_id: safeString(record5.runId),
+            statement_id: safeString(record6.questionId),
+            statement: record6.statement || null,
+            run_id: safeString(record6.runId),
             prior_human_answer: prior.answer || null,
             prior_human_created_at: safeString(prior.createdAt),
-            agent_prediction: record5.answer || null,
-            agent_confidence: record5.confidence ?? null,
-            model: safeString(record5.agentMetadata?.model),
-            scaffold_version: safeString(record5.agentMetadata?.scaffoldVersion),
-            instructions_version: safeString(record5.instructionsVersion),
-            eval_type: compactExport ? "" : safeString(record5.evalType),
-            created_at: safeString(record5.createdAt)
+            agent_prediction: record6.answer || null,
+            agent_confidence: record6.confidence ?? null,
+            model: safeString(record6.agentMetadata?.model),
+            scaffold_version: safeString(record6.agentMetadata?.scaffoldVersion),
+            instructions_version: safeString(record6.instructionsVersion),
+            eval_type: compactExport ? "" : safeString(record6.evalType),
+            created_at: safeString(record6.createdAt)
           });
         }
       }
@@ -100056,24 +100218,24 @@ async function exportAgentOnlyData({
     for (const prefix of prefixes2) {
       const entries = await listKvEntriesByPrefix(env, prefix);
       for (const entry2 of entries) {
-        const record5 = await readKvJson2(env, entry2.key);
-        if (!record5) continue;
-        const principalId = await agentOnlyPrincipalId(env, record5.telegramUserId);
-        const votes = record5.votes || record5.nets || {};
+        const record6 = await readKvJson2(env, entry2.key);
+        if (!record6) continue;
+        const principalId = await agentOnlyPrincipalId(env, record6.telegramUserId);
+        const votes = record6.votes || record6.nets || {};
         Object.entries(votes).forEach(([statementId, votesValue]) => {
           if (!readable.has(statementId)) return;
           rows.push({
             principal_id: principalId,
             statement_id: statementId,
-            statement: record5.statements?.[statementId] || null,
-            run_id: safeString(record5.runId),
-            source: safeString(record5.source),
-            mode: safeString(record5.mode),
+            statement: record6.statements?.[statementId] || null,
+            run_id: safeString(record6.runId),
+            source: safeString(record6.source),
+            mode: safeString(record6.mode),
             votes: Number(votesValue) || 0,
-            budget_used: Number(record5.budgetUsed) || 0,
-            request_id: safeString(record5.requestId),
-            created_at: safeString(record5.createdAt),
-            updated_at: safeString(record5.updatedAt || record5.createdAt)
+            budget_used: Number(record6.budgetUsed) || 0,
+            request_id: safeString(record6.requestId),
+            created_at: safeString(record6.createdAt),
+            updated_at: safeString(record6.updatedAt || record6.createdAt)
           });
         });
       }
@@ -100083,26 +100245,26 @@ async function exportAgentOnlyData({
     const entries = listed.entries;
     nextCursor = listed.nextCursor;
     for (const entry2 of entries) {
-      const record5 = await readKvJson2(env, entry2.key);
-      if (!record5) continue;
+      const record6 = await readKvJson2(env, entry2.key);
+      if (!record6) continue;
       rows.push({
-        principal_id: await agentOnlyPrincipalId(env, record5.telegramUserId),
-        run_id: safeString(record5.runId),
-        stage: safeString(record5.stage),
-        mode: safeString(record5.mode),
-        ok: record5.ok === true,
-        status: Number(record5.status) || 0,
-        reason: safeString(record5.reason),
-        request_id: safeString(record5.requestId),
-        replay: record5.replay === true,
-        accepted: record5.counts?.accepted ?? null,
-        skips_recorded: record5.counts?.skipsRecorded ?? null,
-        budget_used: record5.counts?.budgetUsed ?? null,
-        statement_count: record5.counts?.statementCount ?? null,
-        agent_prediction_count: record5.counts?.agentPredictionCount ?? null,
-        agent_response_count: record5.counts?.agentResponseCount ?? null,
-        privacy_skip_count: record5.counts?.privacySkipCount ?? null,
-        created_at: safeString(record5.createdAt)
+        principal_id: await agentOnlyPrincipalId(env, record6.telegramUserId),
+        run_id: safeString(record6.runId),
+        stage: safeString(record6.stage),
+        mode: safeString(record6.mode),
+        ok: record6.ok === true,
+        status: Number(record6.status) || 0,
+        reason: safeString(record6.reason),
+        request_id: safeString(record6.requestId),
+        replay: record6.replay === true,
+        accepted: record6.counts?.accepted ?? null,
+        skips_recorded: record6.counts?.skipsRecorded ?? null,
+        budget_used: record6.counts?.budgetUsed ?? null,
+        statement_count: record6.counts?.statementCount ?? null,
+        agent_prediction_count: record6.counts?.agentPredictionCount ?? null,
+        agent_response_count: record6.counts?.agentResponseCount ?? null,
+        privacy_skip_count: record6.counts?.privacySkipCount ?? null,
+        created_at: safeString(record6.createdAt)
       });
     }
   } else if (view === "summary") {
@@ -100122,7 +100284,7 @@ async function exportAgentOnlyData({
         unreadableAttemptEventCount += 1;
         continue;
       }
-      const record5 = {
+      const record6 = {
         telegramUserId: metadata.u,
         runId: metadata.run,
         createdAt: metadata.at,
@@ -100130,10 +100292,10 @@ async function exportAgentOnlyData({
         ok: metadata.ok === 1
       };
       includedAttemptEventCount += 1;
-      const createdAt = safeString(record5.createdAt);
+      const createdAt = safeString(record6.createdAt);
       if (createdAt && (!firstAttemptAt || createdAt < firstAttemptAt)) firstAttemptAt = createdAt;
       if (createdAt && (!latestAttemptAt || createdAt > latestAttemptAt)) latestAttemptAt = createdAt;
-      const principalId = await agentOnlyPrincipalId(env, record5.telegramUserId);
+      const principalId = await agentOnlyPrincipalId(env, record6.telegramUserId);
       if (!principalRows.has(principalId)) {
         principalRows.set(principalId, {
           principal_id: principalId,
@@ -100150,7 +100312,7 @@ async function exportAgentOnlyData({
       principal.attempt_event_count += 1;
       if (createdAt && (!principal.first_attempt_at || createdAt < principal.first_attempt_at)) principal.first_attempt_at = createdAt;
       if (createdAt && (!principal.latest_attempt_at || createdAt > principal.latest_attempt_at)) principal.latest_attempt_at = createdAt;
-      const runId = normalizeAgentOnlyRunId(record5.runId) || "unknown";
+      const runId = normalizeAgentOnlyRunId(record6.runId) || "unknown";
       const runKey = `${principalId}	${runId}`;
       if (!runRows.has(runKey)) {
         runRows.set(runKey, {
@@ -100170,8 +100332,8 @@ async function exportAgentOnlyData({
       run.attempt_event_count += 1;
       if (createdAt && (!run.first_attempt_at || createdAt < run.first_attempt_at)) run.first_attempt_at = createdAt;
       if (createdAt && (!run.latest_attempt_at || createdAt > run.latest_attempt_at)) run.latest_attempt_at = createdAt;
-      const stage = safeString(record5.stage);
-      if (stage === "wrapped_image" && record5.ok === true) run.wrapped_image_ok = true;
+      const stage = safeString(record6.stage);
+      if (stage === "wrapped_image" && record6.ok === true) run.wrapped_image_ok = true;
     }
     const coverageByRun = /* @__PURE__ */ new Map();
     const stateEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_STATE_KV_PREFIX}${slug}:`);
@@ -100252,27 +100414,27 @@ async function exportAgentOnlyData({
     const entries = listed.entries;
     nextCursor = listed.nextCursor;
     for (const entry2 of entries) {
-      const record5 = await readKvJson2(env, entry2.key);
-      if (!record5) continue;
+      const record6 = await readKvJson2(env, entry2.key);
+      if (!record6) continue;
       rows.push({
-        principal_id: await agentOnlyPrincipalId(env, record5.telegramUserId),
-        image_id: safeString(record5.imageId) || safeString(entry2.key).split(":").pop() || "",
-        image_view_id: safeString(record5.imageViewId),
-        run_id: safeString(record5.runId),
-        mode: safeString(record5.mode),
-        model: safeString(record5.model),
-        size: safeString(record5.size),
-        quality: safeString(record5.quality),
-        reference_image: safeString(record5.referenceImage),
-        media_kind: safeString(record5.mediaKind),
-        frame_count: Number(record5.frameCount || 0) || 0,
-        story_duration_seconds: Number(record5.storyDurationSeconds || 0) || 0,
-        frame_keys: Array.isArray(record5.frameKeys) ? record5.frameKeys.join(",") : "",
-        image_content_type: safeString(record5.imageContentType),
-        image_byte_length_approx: Number(record5.imageByteLengthApprox || 0) || 0,
-        prompt_hash: safeString(record5.promptHash),
-        created_at: safeString(record5.createdAt),
-        ...includeImageBase64 ? { image_base64: safeString(record5.imageBase64) } : {}
+        principal_id: await agentOnlyPrincipalId(env, record6.telegramUserId),
+        image_id: safeString(record6.imageId) || safeString(entry2.key).split(":").pop() || "",
+        image_view_id: safeString(record6.imageViewId),
+        run_id: safeString(record6.runId),
+        mode: safeString(record6.mode),
+        model: safeString(record6.model),
+        size: safeString(record6.size),
+        quality: safeString(record6.quality),
+        reference_image: safeString(record6.referenceImage),
+        media_kind: safeString(record6.mediaKind),
+        frame_count: Number(record6.frameCount || 0) || 0,
+        story_duration_seconds: Number(record6.storyDurationSeconds || 0) || 0,
+        frame_keys: Array.isArray(record6.frameKeys) ? record6.frameKeys.join(",") : "",
+        image_content_type: safeString(record6.imageContentType),
+        image_byte_length_approx: Number(record6.imageByteLengthApprox || 0) || 0,
+        prompt_hash: safeString(record6.promptHash),
+        created_at: safeString(record6.createdAt),
+        ...includeImageBase64 ? { image_base64: safeString(record6.imageBase64) } : {}
       });
     }
   } else {
@@ -100478,21 +100640,21 @@ function delegationScopeForRequest(pathname = "", method = "GET") {
   return "";
 }
 function applyDelegationToInput(auth = {}, input = {}, pathname = "", method = "GET") {
-  const record5 = auth.delegation;
-  if (record5) {
+  const record6 = auth.delegation;
+  if (record6) {
     const scope = delegationScopeForRequest(pathname, method);
-    if (!scope || !agentCredentialHasScope(record5, scope)) return { ok: false, status: 403, reason: "agent_token_scope_denied", requiredScope: scope };
-    if (input.sessionSlug && sanitizeSessionSlug(input.sessionSlug) !== record5.sessionSlug) return { ok: false, status: 403, reason: "agent_token_session_mismatch" };
+    if (!scope || !agentCredentialHasScope(record6, scope)) return { ok: false, status: 403, reason: "agent_token_scope_denied", requiredScope: scope };
+    if (input.sessionSlug && sanitizeSessionSlug(input.sessionSlug) !== record6.sessionSlug) return { ok: false, status: 403, reason: "agent_token_session_mismatch" };
   }
-  const principal = record5?.principal || auth.principal;
+  const principal = record6?.principal || auth.principal;
   if (!principal?.principalId) return { ok: false, status: 401, reason: "agent_principal_required" };
   return { ok: true, input: {
     ...input,
     principalId: principal.principalId,
     principalAdapter: principal.adapter,
     username: principal.label || "",
-    accountAddress: record5?.accountAddress || auth.address,
-    sessionSlug: record5?.sessionSlug || auth.slug
+    accountAddress: record6?.accountAddress || auth.address,
+    sessionSlug: record6?.sessionSlug || auth.slug
   } };
 }
 async function resolveHandoffContext({ env, auth = env.AGENT_CONTEXT.auth, input = {} }) {
@@ -100777,15 +100939,15 @@ async function listMetricKvEntriesByPrefix(env = {}, prefix = "", { limit = 1e4 
 async function readMetricRecord(env = {}, key = "") {
   const kv = env?.AGENT_ACTION_KV;
   if (!key || !kv || typeof kv.get !== "function") return null;
-  const record5 = safeJsonParse(await kv.get(key).catch(() => null), null);
-  return record5 && typeof record5 === "object" && !Array.isArray(record5) ? record5 : null;
+  const record6 = safeJsonParse(await kv.get(key).catch(() => null), null);
+  return record6 && typeof record6 === "object" && !Array.isArray(record6) ? record6 : null;
 }
 async function listHandoffKvRecordsByPrefix(env = {}, prefix = "", { limit = 1e4 } = {}) {
   const entries = await listMetricKvEntriesByPrefix(env, prefix, { limit });
   const records = [];
   for (const entry2 of entries) {
-    const record5 = await readMetricRecord(env, entry2.key);
-    if (record5) records.push({ ...record5, key: entry2.key });
+    const record6 = await readMetricRecord(env, entry2.key);
+    if (record6) records.push({ ...record6, key: entry2.key });
   }
   return records;
 }
@@ -100944,24 +101106,24 @@ function agentQuestionAnswerRef(sessionSlug = "", questionId4 = "") {
 function firstAnswerValue2(...values) {
   return values.find((value) => safeAnswerString2(value) !== "");
 }
-function submitRecordAnswerForAgent(record5 = {}) {
-  const answer = record5.answer && typeof record5.answer === "object" && !Array.isArray(record5.answer) ? record5.answer : {};
-  const parsed = safeJsonParse(answer.value || record5.answerValue, null);
+function submitRecordAnswerForAgent(record6 = {}) {
+  const answer = record6.answer && typeof record6.answer === "object" && !Array.isArray(record6.answer) ? record6.answer : {};
+  const parsed = safeJsonParse(answer.value || record6.answerValue, null);
   const structured = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
   const questionType = safeString(
-    firstAnswerValue2(structured.questionType, record5.questionType, answer.questionType, record5.controlType)
+    firstAnswerValue2(structured.questionType, record6.questionType, answer.questionType, record6.controlType)
   );
-  const label = safeAnswerString2(firstAnswerValue2(answer.label, structured.label, record5.answerLabel));
+  const label = safeAnswerString2(firstAnswerValue2(answer.label, structured.label, record6.answerLabel));
   const base = {
-    requestId: safeString(record5.requestId),
-    answeredAt: safeString(record5.createdAt),
-    status: safeString(record5.status),
+    requestId: safeString(record6.requestId),
+    answeredAt: safeString(record6.createdAt),
+    status: safeString(record6.status),
     questionType,
     ...label ? { label } : {}
   };
   if (questionType === "quadratic") return { ...base, value: structured.value ?? answer.value, comments: safeString(structured.comments || answer.comments) };
   if (questionType === "multichoice") {
-    const values = Array.isArray(structured.values) ? structured.values.map(safeAnswerString2).filter(Boolean) : [firstAnswerValue2(structured.value, answer.value, record5.answerValue)].map(safeAnswerString2).filter(Boolean);
+    const values = Array.isArray(structured.values) ? structured.values.map(safeAnswerString2).filter(Boolean) : [firstAnswerValue2(structured.value, answer.value, record6.answerValue)].map(safeAnswerString2).filter(Boolean);
     return {
       ...base,
       values,
@@ -100972,12 +101134,12 @@ function submitRecordAnswerForAgent(record5 = {}) {
     return {
       ...base,
       text: safeAnswerString2(
-        firstAnswerValue2(structured.text, structured.value, answer.text, answer.value, record5.answerText)
+        firstAnswerValue2(structured.text, structured.value, answer.text, answer.value, record6.answerText)
       ),
       ...safeAnswerString2(structured.comments) ? { comments: safeAnswerString2(structured.comments) } : {}
     };
   }
-  const value = Object.hasOwn(structured, "value") ? structured.value : firstAnswerValue2(answer.value, record5.answerValue);
+  const value = Object.hasOwn(structured, "value") ? structured.value : firstAnswerValue2(answer.value, record6.answerValue);
   return {
     ...base,
     value,
@@ -101011,21 +101173,21 @@ async function loadAgentQuestionAnswerState({ env = {}, context = {}, questions 
     [...sessionSlugs].flatMap((sessionSlug) => indexes.map(async ([prefixOf, statuses]) => {
       const prefix = prefixOf({ sessionSlug, telegramUserId });
       const listed = prefix ? await listHandoffKvRecordsByPrefix(env, prefix, { limit: ADMIN_METRICS_SUBMIT_ENTRY_LIMIT }) : [];
-      return listed.filter((record5) => statuses.has(safeString(record5.status)));
+      return listed.filter((record6) => statuses.has(safeString(record6.status)));
     }))
   );
-  const records = selectCurrentSubmittedAnswers(indexedRecordGroups.flat().filter((record5) => safeString(record5.telegramUserId) === telegramUserId));
+  const records = selectCurrentSubmittedAnswers(indexedRecordGroups.flat().filter((record6) => safeString(record6.telegramUserId) === telegramUserId));
   const answeredByRef = /* @__PURE__ */ new Map();
-  records.forEach((record5) => {
-    if (safeString(record5.telegramUserId) !== telegramUserId) return;
-    if (!submittedStatuses.has(safeString(record5.status))) return;
-    const ref = agentQuestionAnswerRef(record5.sessionSlug, record5.questionId);
+  records.forEach((record6) => {
+    if (safeString(record6.telegramUserId) !== telegramUserId) return;
+    if (!submittedStatuses.has(safeString(record6.status))) return;
+    const ref = agentQuestionAnswerRef(record6.sessionSlug, record6.questionId);
     if (!questionByRef.has(ref)) return;
     answeredByRef.set(ref, {
       answeredByUser: true,
-      answeredAt: safeString(record5.createdAt),
-      answerStatus: safeString(record5.status),
-      myAnswer: submitRecordAnswerForAgent(record5)
+      answeredAt: safeString(record6.createdAt),
+      answerStatus: safeString(record6.status),
+      myAnswer: submitRecordAnswerForAgent(record6)
     });
   });
   return {
@@ -102177,9 +102339,9 @@ async function buildAdminMetricsSnapshot({
     let tokenSessionSlug = sanitizeSessionSlug(metadata?.sg);
     let telegramUserId = safeString(metadata?.p || metadata?.u);
     if (!tokenSessionSlug || !telegramUserId) {
-      const record5 = await readMetricRecord(env, entry2.key);
-      tokenSessionSlug = sanitizeSessionSlug(record5?.sessionSlug);
-      telegramUserId = safeString(record5?.principal?.principalId || record5?.telegramUserId);
+      const record6 = await readMetricRecord(env, entry2.key);
+      tokenSessionSlug = sanitizeSessionSlug(record6?.sessionSlug);
+      telegramUserId = safeString(record6?.principal?.principalId || record6?.telegramUserId);
     }
     if (!tokenSessionSlug || !inScope(tokenSessionSlug)) continue;
     totals.agentsOnboarded += 1;
@@ -102241,10 +102403,10 @@ async function buildAdminMetricsSnapshot({
     let slug = sanitizeSessionSlug(meta?.sg);
     let telegramUserId = safeString(meta?.u);
     if (!status || !slug) {
-      const record5 = await readMetricRecord(env, entry2.key);
-      status = status || safeString(record5?.status);
-      slug = slug || sanitizeSessionSlug(record5?.sessionSlug);
-      telegramUserId = telegramUserId || safeString(record5?.telegramUserId);
+      const record6 = await readMetricRecord(env, entry2.key);
+      status = status || safeString(record6?.status);
+      slug = slug || sanitizeSessionSlug(record6?.sessionSlug);
+      telegramUserId = telegramUserId || safeString(record6?.telegramUserId);
     }
     slug = slug || scopedSessionSlug || sessionFromSessionFirstKey(entry2.key, SUBMIT_REQUEST_SESSION_KV_PREFIX);
     if (!slug || !inScope(slug)) continue;
@@ -102694,15 +102856,15 @@ async function writeCustomGroupConfig(env = {}, sessionSlug = "", categories = [
     ...category,
     source: "cloudflare_custom"
   })));
-  const record5 = {
+  const record6 = {
     version: 1,
     sessionSlug: sanitizeSessionSlug(sessionSlug),
     categories: merged,
     updatedBy: safeString(updatedBy) || null,
     updatedAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
   };
-  assertNoSecretShape(record5, "Agent lightweight group config must not serialize secrets.");
-  await kv.put(key, JSON.stringify(record5));
+  assertNoSecretShape(record6, "Agent lightweight group config must not serialize secrets.");
+  await kv.put(key, JSON.stringify(record6));
   return { ok: true, categories: merged };
 }
 async function readMembership(env = {}, {
@@ -102869,7 +103031,7 @@ async function saveAgentLightweightGroupMembership({
   const bucketKey = bucketMembershipKey({ sessionSlug, accountAddress });
   const kv = env?.AGENT_ACTION_KV;
   if (!key && !bucketKey || !kv || typeof kv.put !== "function") return { ok: false, reason: "action_kv_unavailable" };
-  const record5 = {
+  const record6 = {
     version: 1,
     sessionSlug,
     telegramUserId: safeString(telegramUserId),
@@ -102877,9 +103039,9 @@ async function saveAgentLightweightGroupMembership({
     details: normalizedDetails,
     updatedAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
   };
-  assertNoSecretShape(record5, "Agent lightweight group memberships must not serialize secrets.");
+  assertNoSecretShape(record6, "Agent lightweight group memberships must not serialize secrets.");
   if (key) {
-    await kv.put(key, JSON.stringify(record5));
+    await kv.put(key, JSON.stringify(record6));
   }
   if (bucketKey) {
     const bucketRecord = {
@@ -102889,7 +103051,7 @@ async function saveAgentLightweightGroupMembership({
       accountAddress: normalizeAddress3(accountAddress),
       selections: normalizedSelections,
       details: normalizedDetails,
-      updatedAt: record5.updatedAt
+      updatedAt: record6.updatedAt
     };
     assertNoSecretShape(bucketRecord, "Agent KV bucket memberships must not serialize secrets.");
     await kv.put(bucketKey, JSON.stringify(bucketRecord));
@@ -102901,7 +103063,7 @@ async function saveAgentLightweightGroupMembership({
       selections: normalizedSelections,
       details: normalizedDetails,
       membershipSource: key ? "agent_principal" : "managed_wallet",
-      updatedAt: record5.updatedAt
+      updatedAt: record6.updatedAt
     }
   };
 }
@@ -102941,7 +103103,7 @@ async function persistAgentLightweightGroupProposal({
     targetTelegramUserId: input.targetTelegramUserId,
     createdAt
   })}`;
-  const record5 = {
+  const record6 = {
     version: 1,
     proposalId,
     sessionSlug,
@@ -102954,26 +103116,26 @@ async function persistAgentLightweightGroupProposal({
     createdAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
   };
   if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
-    record5.actionMetadata = { ...metadata };
+    record6.actionMetadata = { ...metadata };
   }
-  assertNoSecretShape(record5, "Agent lightweight group proposals must not serialize secrets.");
+  assertNoSecretShape(record6, "Agent lightweight group proposals must not serialize secrets.");
   const activityMetadata = buildAgentActivityMetadata({
     type: "group_proposal",
-    status: record5.status,
-    createdAt: record5.createdAt,
+    status: record6.status,
+    createdAt: record6.createdAt,
     pendingAction: "review_group_proposal",
-    sessionSlug: record5.sessionSlug,
-    telegramUserId: record5.proposedBy,
-    targetTelegramUserId: record5.targetTelegramUserId
+    sessionSlug: record6.sessionSlug,
+    telegramUserId: record6.proposedBy,
+    targetTelegramUserId: record6.targetTelegramUserId
   });
-  await kv.put(`${proposalPrefix(sessionSlug)}${proposalId}`, JSON.stringify(record5), {
+  await kv.put(`${proposalPrefix(sessionSlug)}${proposalId}`, JSON.stringify(record6), {
     metadata: activityMetadata
   });
   return {
     ok: true,
     sessionSlug,
     category,
-    proposal: record5,
+    proposal: record6,
     requiresUserApproval: true
   };
 }
@@ -102992,7 +103154,7 @@ async function persistAgentChildSession({
     return { ok: false, reason: "action_kv_unavailable" };
   }
   const groups = normalizeAgentGroupCategories(input.groups || input.lightweightGroups || []);
-  const record5 = {
+  const record6 = {
     version: 1,
     sessionSlug: childSessionSlug,
     parentSessionSlug,
@@ -103005,8 +103167,8 @@ async function persistAgentChildSession({
     createdByTelegramUserId: safeString(normalized.user?.telegramUserId) || null,
     createdAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
   };
-  assertNoSecretShape(record5, "Agent child session records must not serialize secrets.");
-  await kv.put(childSessionKey(childSessionSlug), JSON.stringify(record5));
+  assertNoSecretShape(record6, "Agent child session records must not serialize secrets.");
+  await kv.put(childSessionKey(childSessionSlug), JSON.stringify(record6));
   if (groups.length) {
     await writeCustomGroupConfig(env, childSessionSlug, groups, {
       createdAt,
@@ -103015,7 +103177,7 @@ async function persistAgentChildSession({
   }
   return {
     ok: true,
-    session: record5,
+    session: record6,
     canonicalStatus: "worker_local_until_session_registry_parity"
   };
 }
@@ -103213,10 +103375,10 @@ async function loadAgentSettings({
   const defaults = defaultAgentSettings(env);
   const key = agentSettingsKey({ sessionSlug, telegramUserId });
   if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.get !== "function") return defaults;
-  const record5 = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
-  if (!record5 || typeof record5 !== "object" || Array.isArray(record5)) return defaults;
-  assertNoSecretShape(record5, "Agent settings records must not serialize secrets.");
-  const settings = record5.settings && typeof record5.settings === "object" && !Array.isArray(record5.settings) ? record5.settings : record5;
+  const record6 = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
+  if (!record6 || typeof record6 !== "object" || Array.isArray(record6)) return defaults;
+  assertNoSecretShape(record6, "Agent settings records must not serialize secrets.");
+  const settings = record6.settings && typeof record6.settings === "object" && !Array.isArray(record6.settings) ? record6.settings : record6;
   return {
     draftStyle: normalizeDraftStyle(settings.draftStyle || defaults.draftStyle),
     showUnansweredFirst: normalizeBoolean4(settings.showUnansweredFirst, defaults.showUnansweredFirst),
@@ -103258,7 +103420,7 @@ async function saveAgentSettingsPatch({
     ...normalized.publicSummary
   };
   const existing = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
-  const record5 = {
+  const record6 = {
     type: "telegram_agent_settings",
     version: 1,
     sessionSlug: sanitizeSessionSlug(sessionSlug) || "global",
@@ -103267,8 +103429,8 @@ async function saveAgentSettingsPatch({
     createdAt: safeString(existing?.createdAt) || createdAt,
     updatedAt: createdAt
   };
-  assertNoSecretShape(record5, "Agent settings records must not serialize secrets.");
-  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record5));
+  assertNoSecretShape(record6, "Agent settings records must not serialize secrets.");
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record6));
   return {
     ok: true,
     key,
@@ -104678,8 +104840,8 @@ function topicForQuestion(question = {}, session = {}) {
 }
 function recordsByQuestion(records = []) {
   const byQuestion = /* @__PURE__ */ new Map();
-  for (const record5 of Array.isArray(records) ? records : []) {
-    const qid = safeString(record5.questionId);
+  for (const record6 of Array.isArray(records) ? records : []) {
+    const qid = safeString(record6.questionId);
     if (!qid) continue;
     if (!byQuestion.has(qid)) {
       byQuestion.set(qid, {
@@ -104690,8 +104852,8 @@ function recordsByQuestion(records = []) {
     }
     const item = byQuestion.get(qid);
     item.responseCount += 1;
-    if (record5.telegramUserId) item.participants.add(safeString(record5.telegramUserId));
-    const createdAt = safeString(record5.createdAt);
+    if (record6.telegramUserId) item.participants.add(safeString(record6.telegramUserId));
+    const createdAt = safeString(record6.createdAt);
     if (createdAt && createdAt > item.latestCreatedAt) item.latestCreatedAt = createdAt;
   }
   return byQuestion;
@@ -104747,7 +104909,7 @@ function buildAgentTopicMapSignature({
     participantCount: item.participants.size,
     latestCreatedAt: item.latestCreatedAt
   })).sort((left, right) => left.questionId.localeCompare(right.questionId));
-  const participantIds = new Set((Array.isArray(records) ? records : []).map((record5) => safeString(record5.telegramUserId)).filter(Boolean));
+  const participantIds = new Set((Array.isArray(records) ? records : []).map((record6) => safeString(record6.telegramUserId)).filter(Boolean));
   return {
     questionCount: questionParts.length,
     responseCount: responseParts.reduce((sum, item) => sum + item.responseCount, 0),
@@ -105278,18 +105440,18 @@ function buildAgentPolisDataset({ sessionSlug = "", sourceRecords = [], sourceQu
     binaryQuestions.map((question) => safeString(question.questionId || question.id)).filter(Boolean)
   );
   const records = (Array.isArray(sourceRecords) ? sourceRecords : []).filter(
-    (record5) => binaryQuestionIds.has(safeString(record5.questionId)) && AGENT_POLIS_BINARY_LABELS.has(safeString(record5.label)) && safeString(record5.telegramUserId)
+    (record6) => binaryQuestionIds.has(safeString(record6.questionId)) && AGENT_POLIS_BINARY_LABELS.has(safeString(record6.label)) && safeString(record6.telegramUserId)
   );
   const latestRecords = demo ? records : selectCurrentSubmittedAnswers(records);
-  const participants = Array.from(new Set(latestRecords.map((record5) => safeString(record5.telegramUserId))));
+  const participants = Array.from(new Set(latestRecords.map((record6) => safeString(record6.telegramUserId))));
   const aliasById = new Map(participants.map((id2, index) => [id2, `P${index + 1}`]));
   const responses = {};
-  for (const record5 of latestRecords) {
-    const questionIdValue = safeString(record5.questionId);
+  for (const record6 of latestRecords) {
+    const questionIdValue = safeString(record6.questionId);
     if (!responses[questionIdValue]) responses[questionIdValue] = [];
     responses[questionIdValue].push({
-      responder: aliasById.get(safeString(record5.telegramUserId)),
-      value: safeString(record5.label)
+      responder: aliasById.get(safeString(record6.telegramUserId)),
+      value: safeString(record6.label)
     });
   }
   const questions = binaryQuestions.map((question) => ({
@@ -105318,7 +105480,7 @@ function aggregateQuestionRows(records = [], questions = [], view = "consensus")
   const consensusQuestionIds = new Set(
     consensusQuestions.map((question) => safeString(question.questionId || question.id)).filter(Boolean)
   );
-  const consensusRecords = records.filter((record5) => consensusQuestionIds.has(safeString(record5.questionId)));
+  const consensusRecords = records.filter((record6) => consensusQuestionIds.has(safeString(record6.questionId)));
   const rows = summarizeQuestionResults(consensusRecords, consensusQuestions).map((summary) => {
     const counts = summary.counts.map(([label, count2]) => ({ label, count: count2 }));
     const maxCount = counts.reduce((max, item) => Math.max(max, Number(item.count || 0)), 0);
@@ -106007,7 +106169,7 @@ async function persistAgentQuestionVoteRecommendations({
   const requestId = safeString(input.requestId || input.idempotencyKey) || buildOpaqueActionId(
     `agent_question_vote_recommendations|${sessionSlug}|${telegramUserId}|${stableFingerprint(recommendations)}|${createdAt}`
   );
-  const record5 = {
+  const record6 = {
     type: "telegram_agent_question_vote_recommendation",
     version: 1,
     requestId,
@@ -106025,12 +106187,12 @@ async function persistAgentQuestionVoteRecommendations({
     })),
     createdAt
   };
-  assertNoSecretShape(record5, "Agent question vote recommendation records must not serialize secrets.");
+  assertNoSecretShape(record6, "Agent question vote recommendation records must not serialize secrets.");
   await kv.put(
     `${AGENT_QUESTION_VOTE_RECOMMENDATION_KV_PREFIX}${sessionSlug}:${kvKeySafePart(telegramUserId)}:${requestId}`,
-    JSON.stringify(record5)
+    JSON.stringify(record6)
   );
-  return { ok: true, requestId, record: record5 };
+  return { ok: true, requestId, record: record6 };
 }
 var SECRETISH_METADATA_KEY_RE = /(?:secret|token|api.?key|private.?key|password|authorization|bearer|signature|mnemonic|seed)/i;
 function sanitizeResearchMetadata(value, { depth = 0, maxString = 600 } = {}) {
@@ -106691,7 +106853,7 @@ function isSessionWrappedOnboardingRequest(body = {}) {
 function trustedOnboardingInviteRecords(env = {}) {
   const ctx = env.AGENT_CONTEXT;
   const configured = ctx.config.agentHttp?.invites;
-  return (Array.isArray(configured) ? configured : []).filter((record5) => record5 && /^[a-f0-9]{64}$/.test(record5.tokenHash || "") && record5.enabled !== false).map((record5) => ({ tokenHash: record5.tokenHash, sessionSlug: ctx.slug, label: safeString(record5.label).slice(0, 120), source: safeString(record5.source).slice(0, 160) }));
+  return (Array.isArray(configured) ? configured : []).filter((record6) => record6 && /^[a-f0-9]{64}$/.test(record6.tokenHash || "") && record6.enabled !== false).map((record6) => ({ tokenHash: record6.tokenHash, sessionSlug: ctx.slug, label: safeString(record6.label).slice(0, 120), source: safeString(record6.source).slice(0, 160) }));
 }
 async function resolveTrustedOnboardingInvite(env = {}, inviteToken = "") {
   const supplied = safeString(inviteToken);
@@ -106704,16 +106866,16 @@ async function resolveTrustedOnboardingInvite(env = {}, inviteToken = "") {
       reason: "invite_onboarding_not_configured"
     };
   const suppliedHash = await sha256Hex2(supplied);
-  for (const record5 of records) {
-    const recordHash = /^[0-9a-f]{64}$/.test(safeString(record5.tokenHash)) ? safeString(record5.tokenHash).toLowerCase() : record5.token ? await sha256Hex2(record5.token) : "";
+  for (const record6 of records) {
+    const recordHash = /^[0-9a-f]{64}$/.test(safeString(record6.tokenHash)) ? safeString(record6.tokenHash).toLowerCase() : record6.token ? await sha256Hex2(record6.token) : "";
     if (recordHash && timingSafeEqualString(recordHash, suppliedHash)) {
       return {
         ok: true,
         tokenHash: suppliedHash,
         invite: {
-          sessionSlug: sanitizeSessionSlug(record5.sessionSlug),
-          label: safeString(record5.label),
-          source: safeString(record5.source)
+          sessionSlug: sanitizeSessionSlug(record6.sessionSlug),
+          label: safeString(record6.label),
+          source: safeString(record6.source)
         }
       };
     }
@@ -107380,6 +107542,7 @@ var normalizePublicInterviewQuestions = (input = [], limit = Infinity) => {
 init_storageResourceOwnership();
 init_blockedQuestionIds();
 init_workerGroupJoin();
+init_storageRefNormalization();
 var QUESTIONS_ADDED_TOPIC02 = "0x3b584fb360a325f39352e75bd13458807d8e31735ef4dadaeff99fc3e59b517a";
 var GET_QUESTION_HASH_SELECTOR = "0x24b9f713";
 var ZERO_BYTES322 = `0x${"00".repeat(32)}`;
@@ -107391,6 +107554,7 @@ var MAX_SCAN_BLOCKS = 2e6;
 var RPC_CHUNK_SIZE = 1e5;
 var MAX_LOG_CHUNKS = MAX_SCAN_BLOCKS / RPC_CHUNK_SIZE;
 var MAX_POINTER_READS = 200;
+var READ_BATCH_IDS = 100;
 var MAX_CANDIDATES = 2e3;
 var catalog = (questions = [], incomplete = false, refused2 = false) => ({ questions, incomplete, refused: refused2 });
 var retryableReadStatus = (status) => !status || status === 408 || status === 429 || status >= 500;
@@ -107442,11 +107606,16 @@ var listQuestionRows = async (callStorage) => {
 var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageRoute2, reader, readInvite, workerOrigin: workerOrigin2 }) => {
   if (typeof storageRoute2 !== "function") return catalog();
   const origin = trim24(readInvite) && trim24(workerOrigin2) ? trim24(workerOrigin2) : "https://session-worker.invalid";
-  const inviteHeaders = trim24(readInvite) ? { [WORKER_GROUP_READ_INVITE_HEADER]: trim24(readInvite) } : void 0;
-  const callStorage = (path, query) => storageRoute2({
+  const requestHeaders = (json12) => {
+    const headers2 = new Headers();
+    if (json12) headers2.set("content-type", "application/json");
+    if (trim24(readInvite)) headers2.set(WORKER_GROUP_READ_INVITE_HEADER, trim24(readInvite));
+    return headers2;
+  };
+  const callStorage = (path, query, body) => storageRoute2({
     path,
-    method: "GET",
-    request: new Request(`${origin}${path}?${query}`, inviteHeaders ? { headers: inviteHeaders } : void 0),
+    method: body ? "POST" : "GET",
+    request: new Request(`${origin}${path}${query ? `?${query}` : ""}`, body ? { method: "POST", headers: requestHeaders(true), body: JSON.stringify(body) } : { headers: requestHeaders(false) }),
     env,
     config,
     slug,
@@ -107461,13 +107630,50 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   const readPayload = async (storageRefId) => {
     try {
       const response3 = await callStorage("/storage/read", `id=${encodeURIComponent(storageRefId)}`);
-      if (retryableReadStatus(response3?.status)) incomplete = true;
       const payload = await readJsonResponse(response3);
-      return isObj30(payload) ? payload : null;
+      return { payload: isObj30(payload) ? payload : null, retryable: retryableReadStatus(response3?.status) };
     } catch {
-      incomplete = true;
-      return null;
+      return { payload: null, retryable: true };
     }
+  };
+  const readPayloads = async (storageRefIds) => {
+    const reads = /* @__PURE__ */ new Map();
+    const ids = [];
+    for (const id2 of new Set(storageRefIds)) {
+      if (isSafeCloudflareStorageRefId(id2)) ids.push(id2);
+      else reads.set(id2, await readPayload(id2));
+    }
+    for (let start = 0; start < ids.length; start += READ_BATCH_IDS) {
+      const group = ids.slice(start, start + READ_BATCH_IDS);
+      let items2 = null;
+      try {
+        items2 = (await readJsonResponse(await callStorage("/storage/read-batch", "", { ids: group })))?.items;
+      } catch {
+        items2 = null;
+      }
+      const byId = new Map(Array.isArray(items2) ? items2.filter(isObj30).map((item) => [item.id, item]) : []);
+      for (const id2 of group) {
+        const item = byId.get(id2);
+        if (!item || [413, 415].includes(item.status)) {
+          reads.set(id2, await readPayload(id2));
+        } else if (item.status !== 200) {
+          reads.set(id2, { payload: null, retryable: retryableReadStatus(item.status) });
+        } else {
+          let payload = null;
+          try {
+            payload = JSON.parse(item.text);
+          } catch {
+            payload = null;
+          }
+          reads.set(id2, { payload: isObj30(payload) ? payload : null, retryable: false });
+        }
+      }
+    }
+    return reads;
+  };
+  const use = (read) => {
+    if (read?.retryable) incomplete = true;
+    return read?.payload || null;
   };
   const versions = [];
   const legacyVersions = [];
@@ -107485,18 +107691,24 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   }
   legacyVersions.sort((left, right) => left.createdAtMs - right.createdAtMs);
   const legacyReads = legacyVersions.slice(0, MAX_PAYLOAD_READS - MAX_QUESTIONS);
+  const legacyPayloads = await readPayloads(legacyReads.map((version2) => version2.storageRefId));
   for (const version2 of legacyReads) {
-    const payload = await readPayload(version2.storageRefId);
+    const payload = use(legacyPayloads.get(version2.storageRefId));
     const resourceId = payloadQuestionId(payload);
     if (resourceId) versions.push({ ...version2, resourceId, payload });
   }
   const candidates = selectCanonicalStorageVersions(versions).filter((version2) => !hiddenIds.has(version2.resourceId));
   const chosen = candidates.slice(0, MAX_PAYLOAD_READS - legacyReads.length);
   const questions = [];
-  for (const version2 of chosen) {
-    if (questions.length >= MAX_QUESTIONS) break;
-    const payload = version2.payload || await readPayload(version2.storageRefId);
-    if (payloadQuestionId(payload) === version2.resourceId && normalizeQuestion(payload)) questions.push(payload);
+  for (let start = 0; start < chosen.length && questions.length < MAX_QUESTIONS; ) {
+    const group = chosen.slice(start, start + Math.min(READ_BATCH_IDS, MAX_QUESTIONS - questions.length));
+    start += group.length;
+    const payloads = await readPayloads(group.filter((version2) => !version2.payload).map((version2) => version2.storageRefId));
+    for (const version2 of group) {
+      if (questions.length >= MAX_QUESTIONS) break;
+      const payload = version2.payload || use(payloads.get(version2.storageRefId));
+      if (payloadQuestionId(payload) === version2.resourceId && normalizeQuestion(payload)) questions.push(payload);
+    }
   }
   return catalog(
     dedupeQuestions(questions),
@@ -108006,7 +108218,7 @@ var VOTE_ITEMS_MAX = 40;
 var VOTE_ITEM_MAX = 120;
 var VOTE_MORE_MAX = 40;
 var VOTE_SHOWN = 3;
-var record4 = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+var record5 = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
 var flat = (value) => typeof value === "string" || typeof value === "number" ? String(value).normalize("NFC").replace(/\s+/g, " ").trim() : "";
 var capped = (value, max) => [...flat(value)].slice(0, max).join("").trim();
 var atWord = (value, max) => {
@@ -108018,35 +108230,35 @@ var atWord = (value, max) => {
   return `${(space > max / 2 ? cut2.slice(0, space) : cut2).trim()}\u2026`;
 };
 var work = (value) => {
-  const pick = record4(value);
+  const pick = record5(value);
   const title = capped(pick.title, WORK_MAX);
   return title ? { title, by: capped(pick.by, WORK_MAX) } : null;
 };
 var yesNoOf = (value) => {
-  const answer = record4(value);
+  const answer = record5(value);
   const prompt = atWord(answer.prompt, PROMPT_MAX);
   const text9 = capped(answer.text, STANCE_MAX);
   return prompt && text9 ? { prompt, text: text9 } : null;
 };
 var ownWordsOf = (value) => {
-  const answer = record4(value);
+  const answer = record5(value);
   const prompt = atWord(answer.prompt, PROMPT_MAX);
   const text9 = atWord(answer.text, ANSWER_MAX);
   return prompt && text9 ? { prompt, text: text9, stance: capped(answer.stance, STANCE_MAX), trimmed: answer.trimmed === true } : null;
 };
 var voteOf = (value) => {
-  const answer = record4(value);
+  const answer = record5(value);
   const prompt = atWord(answer.prompt, PROMPT_MAX);
   const items = (Array.isArray(answer.items) ? answer.items : []).map((item) => flat(item)).filter(Boolean).slice(0, VOTE_ITEMS_MAX).map((item, index) => atWord(item, index < VOTE_SHOWN ? VOTE_ITEM_MAX : VOTE_MORE_MAX));
   return prompt && items.length ? { prompt, kind: answer.kind === "votes" ? "votes" : "chose", items } : null;
 };
 var normalizeSavedAnalysisCard = (value) => {
-  const card = record4(value);
+  const card = record5(value);
   const figure = parseAnalysisCardFigure(card.figure)?.figure;
   const title = capped(card.title, TITLE_MAX);
   if (!figure || !title) return null;
-  const tastes = record4(card.tastes);
-  const answers = record4(card.answers);
+  const tastes = record5(card.tastes);
+  const answers = record5(card.answers);
   const saved = {
     title,
     matchNote: capped(card.matchNote, MATCH_NOTE_MAX),
@@ -108086,7 +108298,7 @@ var normalizeAnalysisCardDrawing = (value) => {
   if (!Array.isArray(value) || !value.length || value.length > ANALYSIS_CARD_DRAWING_PAGES_MAX) return null;
   const pages = [];
   for (const entry2 of value) {
-    const page = record4(entry2);
+    const page = record5(entry2);
     if (!isAnalysisCardPicture(page.mime, page.base64, { maxBytes: ANALYSIS_CARD_DRAWING_PAGE_MAX_BYTES, types: ["image/jpeg"] })) return null;
     pages.push({ mime: page.mime, base64: page.base64 });
   }
@@ -108129,6 +108341,8 @@ var FEATURES = Object.freeze([
   "interview_data_note_v1",
   // interviewMode.realtimeModel may be gpt-live-1.1; older Workers refuse it on save.
   GPT_LIVE_1_1_FEATURE,
+  // interviewMode.voiceSessionContext gives the voice interviewer the session's context; older Workers reject the key.
+  INTERVIEW_VOICE_CONTEXT_FEATURE,
   "participant_context_links_v1",
   "participant_context_v1",
   "recovery_key_export",
@@ -108147,7 +108361,7 @@ var FEATURES = Object.freeze([
   "worker_groups"
 ]);
 var WORKERS_AI_FEATURE = "workers_ai_v1";
-var workerRelease = () => "0.9.25" ? "0.9.25" : null;
+var workerRelease = () => "0.9.26" ? "0.9.26" : null;
 var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 = {} }) => {
   const deployed = FEATURES.filter((feature) => feature !== WORKER_GROUP_READ_CODE_FEATURE || workerGroupCodeReadsOn(env));
   const body = {
@@ -112633,8 +112847,8 @@ var recordAbuseEventBestEffort = async ({
   now
 } = {}) => {
   try {
-    const record5 = deps?.recordAbuseEvent || recordAbuseEvent;
-    await record5({ env, type, now });
+    const record6 = deps?.recordAbuseEvent || recordAbuseEvent;
+    await record6({ env, type, now });
   } catch {
   }
 };
@@ -112906,8 +113120,8 @@ init_deployHelperCore();
 init_sessionWriteCoordinator();
 var INVALID_GRANT_ERROR = "Invalid, expired, or already used sponsored bootstrap grant.";
 var toTrimmedString19 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-var isExpiredGrant = (record5 = {}, nowMs2 = Date.now()) => {
-  const expiresAt = toTrimmedString19(record5?.expiresAt);
+var isExpiredGrant = (record6 = {}, nowMs2 = Date.now()) => {
+  const expiresAt = toTrimmedString19(record6?.expiresAt);
   if (!expiresAt) return false;
   const expirationMs = Date.parse(expiresAt);
   if (!Number.isFinite(expirationMs)) return false;
@@ -113581,9 +113795,9 @@ var verifyInterviewCatalogTicket = async ({ env, ticket, config, slug, deps } = 
     return UNAVAILABLE4;
   }
   if (!timingSafeEqual(expected, mac)) return REFUSED;
-  let record5;
+  let record6;
   try {
-    record5 = await (deps?.validateAuthTokenRecord || validateAuthTokenRecord)({
+    record6 = await (deps?.validateAuthTokenRecord || validateAuthTokenRecord)({
       env,
       payload: { sub, jti: parent },
       slug
@@ -113591,7 +113805,7 @@ var verifyInterviewCatalogTicket = async ({ env, ticket, config, slug, deps } = 
   } catch {
     return UNAVAILABLE4;
   }
-  if (!record5?.ok) return REFUSED;
+  if (!record6?.ok) return REFUSED;
   let scopes = null;
   try {
     scopes = await deps?.computeScopesForLogin?.({ env, slug, address: sub, config, requestedScopes: READ_SCOPES });

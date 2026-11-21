@@ -30,7 +30,9 @@ test('capabilities is public even without config authority and advertises sorted
     // Settings offers interviewMode.dataNote only to a Worker that says it accepts it.
     'interview_data_note_v1',
     // ...and gpt-live-1.1 only to a Worker that says it takes it.
-    'interview_gpt_live_1_1_v1']) {
+    'interview_gpt_live_1_1_v1',
+    // ...and the voice interview's context switch only to one that takes the key.
+    'interview_voice_context_v1']) {
     assert.ok(body.features.includes(feature));
   }
   assert.equal(body.session, undefined);

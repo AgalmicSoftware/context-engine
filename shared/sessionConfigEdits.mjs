@@ -36,6 +36,7 @@ export const WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
   'adminAddress',
   'adminAddresses',
   'resultsAdminAddresses',
+  'atlasQuestionSummaries',
   'corsWorkerUrl',
   'allowOrigins',
   'sessionModeProfile',
@@ -98,6 +99,8 @@ const CONTENT_FIELDS = new Set([
   // Checked on each atlas build and read and never held in a sign-in, so
   // changing it signs no one out either.
   'resultsAdminAddresses',
+  // Read on each atlas build only, the same way.
+  'atlasQuestionSummaries',
   // Read on each interview request and never held in a sign-in, so changing
   // any interview setting, even turning interviews off, signs no one out.
   'interviewModeEnabled', 'interviewMode',
@@ -187,6 +190,11 @@ const authorityView = (config, additiveInvites) => {
   if (record(result.agentHttp) && additiveInvites) {
     result.agentHttp = without(result.agentHttp, new Set(['invites']));
     if (!Object.keys(result.agentHttp).length) delete result.agentHttp;
+  }
+  // The AI provider's processing tier changes speed and price, not who may do what.
+  if (record(result.ai) && Object.hasOwn(result.ai, 'serviceTier')) {
+    result.ai = without(result.ai, new Set(['serviceTier']));
+    if (!Object.keys(result.ai).length) delete result.ai;
   }
   return result;
 };

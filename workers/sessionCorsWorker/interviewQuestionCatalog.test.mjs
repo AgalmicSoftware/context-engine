@@ -234,17 +234,28 @@ const createQuestionStore = () => {
       payloadBase64url: Buffer.from(JSON.stringify(payload)).toString('base64url'),
     }));
   };
+  // Payload ids read, one at a time or in a batch; `sequential` refuses the
+  // batch route, so every payload is read on its own as before batching.
   const reads = [];
-  const load = (sessionConfig = config) => loadPublicInterviewQuestions({
+  const batches = [];
+  const loadFull = (sessionConfig = config, { sequential = false, reader } = {}) => loadPublicInterviewQuestions({
     env: { CE_STORAGE_INDEX_KV: kv },
     config: sessionConfig,
     slug: 'session-a',
-    storageRoute: (args) => {
+    ...(reader ? { reader } : {}),
+    storageRoute: async (args) => {
       if (args.path === '/storage/read') reads.push(new URL(args.request.url).searchParams.get('id'));
+      if (args.path === '/storage/read-batch') {
+        if (sequential) return new Response('', { status: 404 });
+        const response = await storageRoute(args);
+        batches.push((await response.clone().json()).items);
+        return response;
+      }
       return storageRoute(args);
     },
-  }).then(result => result.questions);
-  return { kv, put, load, reads };
+  });
+  const load = (sessionConfig = config) => loadFull(sessionConfig).then(result => result.questions);
+  return { kv, put, load, loadFull, reads, batches };
 };
 
 test('Cloudflare catalog keeps the first or admin version of each question and skips hidden ids', async () => {
@@ -291,7 +302,7 @@ test('Cloudflare catalog leaves out questions on the session blocklist before re
 });
 
 test('Cloudflare catalog chooses from every list page and reads only the chosen payload', async () => {
-  const { put, load, reads } = createQuestionStore();
+  const { put, load, reads, batches } = createQuestionStore();
   // 201 revisions of one question; the admin correction lists last, on page three.
   for (let index = 0; index < 200; index += 1) {
     const createdAt = new Date(Date.UTC(2026, 9, 1, 0, 0, index)).toISOString();
@@ -300,7 +311,186 @@ test('Cloudflare catalog chooses from every list page and reads only the chosen 
   await put('rev-zzz-admin', '2026-10-02T00:00:00.000Z', { uploader: admin, resourceId: 'q1', uploadAuthority: 'admin' }, question('q1', 'Admin correction'));
 
   assert.deepEqual(prompts(await load()), [{ id: 'q1', prompt: 'Admin correction' }]);
-  assert.deepEqual(reads, ['rev-zzz-admin']);
+  assert.deepEqual(batches.flat().map((item) => item.id), ['rev-zzz-admin']);
+  assert.deepEqual(reads, []);
+});
+
+// A bank a signed-out visitor may read only part of, as the storage route judges each row.
+const adminsOnly = { match: 'any', conditions: [{ kind: 'worker_role', role: 'admin' }] };
+const putMixedBank = async (put) => {
+  await put('row-open-q1', '2026-10-01T00:00:00.000Z', { uploader: author, resourceId: 'q1' }, question('q1', 'Open question'));
+  await put('row-group-q2', '2026-10-01T00:00:00.000Z', { uploader: author, resourceId: 'q2', groupIds: ['group-1'] }, question('q2', 'SECRET group question'));
+  await put('row-admins-q3', '2026-10-01T00:00:00.000Z', { uploader: author, resourceId: 'q3', accessConditions: adminsOnly }, question('q3', 'SECRET admins question'));
+  await put('row-sealed-q4', '2026-10-01T00:00:00.000Z', { uploader: author, resourceId: 'q4', accessConditions: adminsOnly, payloadAccessControl: { gate: 'none', encryption: 'worker_envelope' } }, question('q4', 'SECRET encrypted question'));
+  await put('row-sealed-q5', '2026-10-01T00:00:00.000Z', { uploader: author, resourceId: 'q5', payloadAccessControl: { gate: 'none', encryption: 'worker_envelope' } }, question('q5', 'SECRET unreadable envelope'));
+  await put('row-hidden-q6', '2026-10-01T00:00:00.000Z', { uploader: author, resourceId: 'q6', hidden: true }, question('q6', 'SECRET hidden question'));
+  await put('row-blocked-q7', '2026-10-01T00:00:00.000Z', { uploader: author, resourceId: 'q7' }, question('q7', 'SECRET blocked question'));
+  await put('row-legacy-q8', '2026-09-01T00:00:00.000Z', {}, question('q8', 'Legacy open question'));
+  await put('row-legacy-q9', '2026-09-02T00:00:00.000Z', { groupIds: ['group-1'] }, question('q9', 'SECRET legacy group question'));
+};
+const blocked = { ...config, BLOCKED_QUESTION_IDS: ['q7'] };
+
+test('Cloudflare catalog reads in a batch, and the storage route still refuses each restricted row', async () => {
+  const { kv, put, loadFull, reads, batches } = createQuestionStore();
+  await putMixedBank(put);
+  const open = [{ id: 'q1', prompt: 'Open question' }, { id: 'q8', prompt: 'Legacy open question' }];
+  const sorted = (questions) => prompts(questions).sort((a, b) => a.id.localeCompare(b.id));
+  const result = await loadFull(blocked);
+  assert.deepEqual(sorted(result.questions), open);
+  assert.equal(JSON.stringify(result).includes('SECRET'), false);
+  // The listing refuses most restricted rows first; the rest come in two
+  // batches (legacy rows, then chosen versions), none read one at a time,
+  // and the read refuses an envelope it cannot open.
+  assert.deepEqual(reads, []);
+  assert.deepEqual(batches.map((items) => items.map((item) => [item.id, item.status]).sort()), [
+    [['row-legacy-q8', 200]],
+    [['row-open-q1', 200], ['row-sealed-q5', 403]],
+  ]);
+  assert.equal(result.incomplete, false);
+
+  // Had the listing named every row, the batch refuses each restricted one itself.
+  const listed = ['row-open-q1', 'row-group-q2', 'row-admins-q3', 'row-sealed-q4', 'row-sealed-q5', 'row-blocked-q7', 'row-legacy-q8', 'row-legacy-q9']
+    .map((id) => ({ storageRef: { id }, metadata: { resourceId: { 'row-legacy-q8': '', 'row-legacy-q9': '' }[id] ?? `q${id.at(-1)}` } }));
+  const items = [];
+  const direct = await loadPublicInterviewQuestions({
+    env: { CE_STORAGE_INDEX_KV: kv },
+    config: blocked,
+    slug: 'session-a',
+    storageRoute: async (args) => {
+      if (args.path === '/storage/list') return Response.json({ items: listed, listComplete: true });
+      assert.equal(args.path, '/storage/read-batch');
+      const response = await storageRoute(args);
+      items.push(...(await response.clone().json()).items);
+      return response;
+    },
+  });
+  assert.deepEqual(sorted(direct.questions), open);
+  assert.equal(JSON.stringify(direct).includes('SECRET'), false);
+  assert.deepEqual(Object.fromEntries(items.map((item) => [item.id, item.status])), {
+    'row-legacy-q8': 200, 'row-legacy-q9': 403,
+    'row-open-q1': 200, 'row-group-q2': 403, 'row-admins-q3': 403, 'row-sealed-q4': 403, 'row-sealed-q5': 403,
+  });
+  // A blocked question is left out before any read.
+  assert.equal(items.some((item) => item.id === 'row-blocked-q7'), false);
+});
+
+test('Cloudflare catalog read in batches is the one read one at a time, for a mixed bank of more than a batch', async () => {
+  const { put, loadFull, reads, batches } = createQuestionStore();
+  await putMixedBank(put);
+  await put('aa-attacker-q10', '2026-10-02T00:00:00.000Z', { uploader: attacker, resourceId: 'q10' }, question('q10', 'ATTACKER prompt'));
+  await put('zz-official-q10', '2026-10-01T00:00:00.000Z', { uploader: author, resourceId: 'q10' }, question('q10', 'Official prompt'));
+  await put('nn-admin-q11', '2026-10-03T00:00:00.000Z', { uploader: admin, resourceId: 'q11', uploadAuthority: 'admin' }, question('q11', 'Admin correction'));
+  await put('mm-draft-q11', '2026-10-01T00:00:00.000Z', {}, question('q11', 'Participant draft'));
+  await put('bb-listed-q12', '2026-08-01T00:00:00.000Z', { uploader: attacker, resourceId: 'q12' }, question('q13', 'Mismatched payload'));
+  await put('cc-not-a-question', '2026-10-01T00:00:00.000Z', { uploader: author, resourceId: 'q14' }, { note: 'no prompt' });
+  // More chosen versions than one batch, and than the catalog holds.
+  for (let index = 0; index < 150; index += 1) {
+    const id = `f-${String(index).padStart(3, '0')}`;
+    await put(`row-${id}`, new Date(Date.UTC(2026, 9, 6, 0, 0, index)).toISOString(), { uploader: author, resourceId: id }, question(id, `Filler ${index}?`));
+  }
+  for (const sessionConfig of [blocked, { ...blocked, adminAddress: '' }]) {
+    reads.length = 0;
+    batches.length = 0;
+    const batched = await loadFull(sessionConfig);
+    assert.deepEqual(reads, []);
+    assert.ok(batches.length >= 3, `${batches.length} batches`);
+    const sequential = await loadFull(sessionConfig, { sequential: true });
+    assert.ok(reads.length > 100);
+    assert.deepEqual(batched, sequential);
+    assert.equal(batched.questions.length, 100);
+    assert.equal(JSON.stringify(batched).includes('SECRET'), false);
+  }
+});
+
+test('Cloudflare catalog batches what a ticket reader may see, and only that', async () => {
+  const { put, loadFull, reads } = createQuestionStore();
+  await putMixedBank(put);
+  const reader = { address: admin, scopes: ['read'] };
+  const batched = await loadFull(blocked, { reader });
+  assert.deepEqual(reads, []);
+  assert.deepEqual(batched, await loadFull(blocked, { reader, sequential: true }));
+  const ids = batched.questions.map((entry) => entry.id).sort();
+  // The admin reads the admins-only question a signed-out visitor may not.
+  assert.ok(ids.includes('q3') && ids.includes('q1') && ids.includes('q8'), ids.join());
+  for (const id of ['q6', 'q7']) assert.equal(ids.includes(id), false, id);
+});
+
+test('Cloudflare catalog reads nothing past its last question, so a later failure leaves it complete', async () => {
+  const rows = Array.from({ length: 150 }, (_, index) => ({ storageRef: { id: `ref-${String(index).padStart(3, '0')}` }, metadata: { resourceId: `q-${String(index).padStart(3, '0')}` } }));
+  for (const [failAt, incomplete, requestedCount] of [[105, true, 111], [120, false, 110]]) {
+    const requested = [];
+    const result = await loadPublicInterviewQuestions({
+      slug: 'fixture',
+      config,
+      storageRoute: async ({ path, request }) => {
+        if (path === '/storage/list') return Response.json({ items: rows, listComplete: true });
+        assert.equal(path, '/storage/read-batch');
+        const { ids } = await request.json();
+        // Ten refusals in the first batch put the catalog's 100th question in a later one.
+        return Response.json({ items: ids.map((id) => {
+          const position = requested.push(id) - 1;
+          if (position < 10) return { id, status: 403 };
+          if (position === failAt) return { id, status: 503 };
+          return { id, status: 200, text: JSON.stringify(question(`q-${id.slice(4)}`, `Question ${id}?`)) };
+        }) });
+      },
+      fetch: () => assert.fail('A Worker-only fixture must not call RPC'),
+    });
+    assert.equal(result.questions.length, 100);
+    assert.equal(requested.length, requestedCount, `failAt ${failAt}`);
+    assert.equal(result.incomplete, incomplete, `failAt ${failAt}`);
+  }
+});
+
+test('Cloudflare catalog reads on its own what a batch could not carry, and counts only reads it used', async () => {
+  const row = (id) => ({ storageRef: { id: `ref-${id}` }, metadata: { resourceId: id } });
+  for (const [batchReply, expected] of [
+    // A failed batch: each read on its own, as before.
+    [() => new Response('', { status: 503 }), { ids: ['q1', 'q2'], incomplete: false, single: 2 }],
+    // An item over the batch's size or not text: read on its own.
+    [(ids) => Response.json({ items: ids.map((id) => (id === 'ref-q2' ? { id, status: 413 } : { id, status: 200, text: JSON.stringify(question(id.slice(4), 'From batch')) })) }), { ids: ['q1', 'q2'], incomplete: false, single: 1 }],
+    // A temporary failure of one item marks the catalog incomplete; a refusal does not.
+    [(ids) => Response.json({ items: ids.map((id) => (id === 'ref-q2' ? { id, status: 503 } : { id, status: 403 })) }), { ids: [], incomplete: true, single: 0 }],
+  ]) {
+    let single = 0;
+    const result = await loadPublicInterviewQuestions({
+      slug: 'fixture',
+      config,
+      storageRoute: async ({ path, request }) => {
+        if (path === '/storage/list') return Response.json({ items: [row('q1'), row('q2')], listComplete: true });
+        if (path === '/storage/read-batch') return batchReply((await request.json()).ids);
+        single += 1;
+        const id = new URL(request.url).searchParams.get('id').slice(4);
+        return Response.json(question(id, 'Read alone'));
+      },
+      fetch: () => assert.fail('A Worker-only fixture must not call RPC'),
+    });
+    assert.deepEqual(result.questions.map((entry) => entry.id), expected.ids);
+    assert.equal(result.incomplete, expected.incomplete);
+    assert.equal(single, expected.single);
+  }
+  // An id the batch would refuse is read on its own; the rest still go in one batch.
+  const batched = [];
+  let single = 0;
+  const odd = await loadPublicInterviewQuestions({
+    slug: 'fixture',
+    config,
+    storageRoute: async ({ path, request }) => {
+      if (path === '/storage/list') return Response.json({ items: [row('q1'), { storageRef: { id: 'not a/safe id' }, metadata: { resourceId: 'q2' } }, row('q3')], listComplete: true });
+      if (path === '/storage/read-batch') {
+        const { ids } = await request.json();
+        batched.push(ids);
+        return Response.json({ items: ids.map((id) => ({ id, status: 200, text: JSON.stringify(question(id.slice(4), 'From batch')) })) });
+      }
+      single += 1;
+      return Response.json({ error: 'Invalid storage id.' }, { status: 400 });
+    },
+    fetch: () => assert.fail('A Worker-only fixture must not call RPC'),
+  });
+  assert.deepEqual(batched, [['ref-q1', 'ref-q3']]);
+  assert.equal(single, 1);
+  assert.deepEqual(odd.questions.map((entry) => entry.id).sort(), ['q1', 'q3']);
+  assert.equal(odd.incomplete, false);
 });
 
 test('Cloudflare catalog continues past a list page that filtering left empty', async () => {
