@@ -845,7 +845,7 @@ it.each([
       predictionCondition: 'shown',
       draftOrigin: 'voice_interview',
       voiceModel: 'gpt-live-1.1',
-      voiceBriefRevision: 'ce-voice-brief-4',
+      voiceBriefRevision: 'ce-voice-brief-5',
       mappingPromptVersion: 'ce-interview-mapping-v3',
     });
     expect(rows[0].interviewProvenance.unselectedPredictions?.map((entry) => entry.questionId)).toEqual(unselected);

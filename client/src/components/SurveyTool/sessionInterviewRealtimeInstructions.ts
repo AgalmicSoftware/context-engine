@@ -7,7 +7,8 @@ import {
 
 // Kept on voice-made records, so research can tell what the interviewer was told; absent means 1.
 // 4: rows carry question ids only where drafts name them, and statements share one options line.
-export const VOICE_BRIEF_REVISION = 'ce-voice-brief-4';
+// 5: without the fixed line against inventing answers, pressing the responder or claiming a submission.
+export const VOICE_BRIEF_REVISION = 'ce-voice-brief-5';
 
 const LIMIT = 31_500; // Leave headroom below the Worker's 32,000-character transport boundary.
 // The session's context gets this share of the voice instructions; questions keep the rest.
@@ -163,7 +164,6 @@ export const buildRealtimeInterviewInstructions = ({
     drafted.size
       ? 'The questions listed as already drafted have answers drafted by the responder’s AI, which the responder reviews themselves. Never ask them or about their drafts, even to confirm or correct one, unless the responder brings one up; use the drafts only to choose related questions from the question bank and to dig deeper into what they leave open.'
       : '',
-    'Do not invent answers or pressure the responder. Do not claim that responses have been submitted.',
     'Never ask where the responder lives more precisely than their country, or repeat a smaller place they mention. Skip session questions that ask for one.',
     // Asked for the session's question drafts, the only use of their answers, so a session without drafts skips them.
     suggestQuestions

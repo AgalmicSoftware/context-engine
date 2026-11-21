@@ -1,5 +1,6 @@
 import { readRealtimeCallRequestPayload } from '../../../../workers/sessionCorsWorker/realtimeCallExecution';
 import { buildRealtimeInterviewInstructions, type InterviewQuestion } from './sessionInterview';
+import { VOICE_BRIEF_REVISION } from './sessionInterviewRealtimeInstructions';
 
 const question = {
   id: 'q1',
@@ -280,4 +281,14 @@ describe('after an AI prefill', () => {
     expect(instructions).toContain('Continue the prior interview');
     expect(instructions).not.toContain('I see your drafts');
   });
+});
+
+it('no longer carries the fixed line about inventing answers, pressure or claimed submissions', () => {
+  const instructions = buildRealtimeInterviewInstructions({ questions: [question] });
+  expect(instructions).not.toMatch(/Do not invent answers/);
+  expect(instructions).not.toMatch(/pressure the responder/);
+  expect(instructions).not.toMatch(/responses have been submitted/);
+  // The rule that follows it stays, and the records say which instructions made them.
+  expect(instructions).toContain('Never ask where the responder lives more precisely than their country');
+  expect(VOICE_BRIEF_REVISION).toBe('ce-voice-brief-5');
 });
