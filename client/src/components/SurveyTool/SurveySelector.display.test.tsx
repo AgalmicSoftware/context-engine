@@ -493,6 +493,31 @@ describe('SurveySelector display guards', () => {
     subject.handlePendingStatsChange(stats);
     expect(subject.state.headerSubmitFailure).toBe('');
   });
+
+  it('does not keep a press that changed nothing for a later message', () => {
+    jest.useFakeTimers();
+    try {
+      const subject = new SurveySelector({
+        filterState: {},
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+        network: { id: 84532 },
+        activeSessionSlug: 'edge',
+      });
+      syncClassSetState(subject);
+      subject.state = { ...subject.state, loading: false, viewMode: 'questions', showLongLoading: false };
+      const stats = { total: 1, encrypted: 0, submittedSinceLastEdit: false, isSubmitting: false };
+      subject.handlePendingStatsChange(stats);
+      // The list refuses this press and reports nothing, as its stats did not change.
+      Object.assign(subject, { surveyQuestionsRef: { current: { state: {}, handlePrimarySubmitClick: () => {} } } });
+      subject.handleHeaderSubmitClick();
+      jest.runOnlyPendingTimers();
+      subject.handlePendingStatsChange({ ...stats, submitError: 'Some answers could not be decrypted.' });
+      expect(subject.state.headerSubmitFailure).toBe('');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });
 
 it.each([{ showSpinner: true }, { showCacheError: true }])(

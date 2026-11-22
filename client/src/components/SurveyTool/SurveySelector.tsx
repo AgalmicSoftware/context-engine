@@ -327,6 +327,7 @@ export class SurveySelector extends Component<any, any> {
   _filterStateSig: string;
   // From a press of the bar's Submit until the list next reports: a Submit it refuses at once never starts.
   _headerSubmitPressed: boolean = false;
+  _headerSubmitPressTimer: ReturnType<typeof setTimeout> | null = null;
   _filteredQuestionCountEpoch: number = 0;
   _surveySelectorFetchEpoch: number = 0;
   _lastFetchSurveysSlug: string = '';
@@ -516,6 +517,7 @@ export class SurveySelector extends Component<any, any> {
     if (this.loadingTimeout) {
       clearTimeout(this.loadingTimeout);
     }
+    if (this._headerSubmitPressTimer) clearTimeout(this._headerSubmitPressTimer);
   }
 
   componentDidUpdate(prevProps: SurveySelectorLifecycleProps, prevState: SurveySelectorRecord) {
@@ -948,6 +950,14 @@ export class SurveySelector extends Component<any, any> {
     if (target.state?.isSubmitting) return;
     this._headerSubmitPressed = true;
     target.handlePrimarySubmitClick();
+    // The list reports what a press changed while the click is handled (React flushes a click's render and
+    // effects before the click ends). A press that changed nothing reports nothing, so the flag ends with the
+    // click; otherwise a later message with no Submit behind it would show as this Submit's failure.
+    if (this._headerSubmitPressTimer) clearTimeout(this._headerSubmitPressTimer);
+    this._headerSubmitPressTimer = setTimeout(() => {
+      this._headerSubmitPressed = false;
+      this._headerSubmitPressTimer = null;
+    });
   };
 
   handleHeaderRevertClick = (): void => {
