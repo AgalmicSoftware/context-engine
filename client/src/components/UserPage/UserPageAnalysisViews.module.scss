@@ -16,9 +16,15 @@
   color: var(--ce-document-text);
   cursor: pointer;
 
+  // The view shown, in the accent the Compare view switch uses: the primary action colour is pink in one theme.
+  // Bold, underlined words mark it too, as in one theme the accent is as light as the others (the themes' own
+  // button shadows would cover a ring).
   &[aria-pressed='true'] {
-    background: var(--ce-action-primary);
-    color: var(--ce-action-primary-text);
+    background: var(--ce-action-accent);
+    color: var(--ce-action-accent-text);
+    font-weight: 800;
+    text-decoration: underline 2px;
+    text-underline-offset: 4px;
   }
 }
 
