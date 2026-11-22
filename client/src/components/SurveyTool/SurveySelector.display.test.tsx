@@ -424,11 +424,10 @@ describe('SurveySelector display guards', () => {
       expect(view.container).toHaveTextContent('Saving 13 of 40 · 3s');
       subject.handlePendingStatsChange({ ...stats, isSubmitting: false, submitCountText: '13 of 40' });
       view.rerender(submitButton());
-      // As on the pile: the count is its own part, which a phone sets in the corner without its brackets, and the
-      // button's name keeps them.
+      // As on every Submit that sends answers: the count is its own part, set in the corner without its brackets,
+      // and the button's name keeps them.
       expect(view.getByRole('button', { name: 'Submit (40)' })).toBeInTheDocument();
-      expect(view.container.querySelector('.pileSubmitButtonCount')).toHaveTextContent(/^\(40\)$/);
-      expect(view.container.querySelectorAll('.pileSubmitButtonCountBracket')).toHaveLength(2);
+      expect(view.container.querySelector('.pileSubmitButtonCount')).toHaveTextContent(/^40$/);
     } finally {
       jest.useRealTimers();
     }

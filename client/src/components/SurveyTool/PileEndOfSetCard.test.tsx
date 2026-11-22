@@ -10,7 +10,10 @@ describe('PileEndOfSetCard', () => {
     expect(screen.getByRole('group', { name: 'That was the last question.' })).toHaveTextContent(
       "You answered 5 of 8. 1 isn't submitted yet.",
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Submit 1 answer' }));
+    // As on every Submit that sends answers: the count in the corner without its brackets, which the name keeps.
+    const submit = screen.getByRole('button', { name: 'Submit (1)' });
+    expect(submit.querySelector('.pileSubmitButtonCount')).toHaveTextContent(/^1$/);
+    fireEvent.click(submit);
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
@@ -59,6 +62,6 @@ describe('PileEndOfSetCard', () => {
         onSubmit={jest.fn()}
       />,
     );
-    expect(screen.getByRole('button', { name: 'Submit 2 answers' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Submit (2)' })).toBeEnabled();
   });
 });

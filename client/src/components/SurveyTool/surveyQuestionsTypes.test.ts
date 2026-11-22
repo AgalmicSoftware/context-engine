@@ -834,8 +834,6 @@ describe('surveyQuestionsTypes', () => {
   it('builds SurveyQuestions submit footer affordance display state', () => {
     expect(
       buildSurveyQuestionsSubmitFooterDisplayState({
-        currentStep: 1,
-        hasEncryptedAnswers: true,
         isDirty: true,
         isSubmitting: true,
         pendingEditCount: 3,
@@ -845,7 +843,7 @@ describe('surveyQuestionsTypes', () => {
       submittedIndicatorActive: false,
       singleQuestionSubmittedIndicatorActive: false,
       showSubmitAux: false,
-      uploadStatusText: 'Encrypting...',
+      uploadStatusText: 'Saving',
       submitDisabled: true,
       canEditQuestions: true,
       hasPendingEdits: true,
@@ -866,7 +864,7 @@ describe('surveyQuestionsTypes', () => {
       submittedIndicatorActive: true,
       singleQuestionSubmittedIndicatorActive: true,
       showSubmitAux: true,
-      uploadStatusText: 'Uploading...',
+      uploadStatusText: 'Saving',
       canEditQuestions: false,
       hasPendingEdits: false,
       genericShowInlineSubmit: true,
@@ -961,7 +959,7 @@ describe('surveyQuestionsTypes', () => {
       submittedIndicatorActive: true,
       singleQuestionSubmittedIndicatorActive: false,
       showSubmitAux: false,
-      uploadStatusText: 'Uploading...',
+      uploadStatusText: 'Saving',
       submitDisabled: true,
       canEditQuestions: false,
       hasPendingEdits: true,
@@ -2053,8 +2051,8 @@ it('counts a Submit that saves several answers', () => {
   expect(
     buildSurveyQuestionsSubmitFooterDisplayState({ isSubmitting: true, currentStep: 2, submitCountText: '12 of 40' })
       .uploadStatusText,
-  ).toBe('Saving 12 of 40...');
+  ).toBe('Saving 12 of 40');
   expect(buildSurveyQuestionsSubmitFooterDisplayState({ isSubmitting: true, currentStep: 2 }).uploadStatusText).toBe(
-    'Uploading...',
+    'Saving',
   );
 });

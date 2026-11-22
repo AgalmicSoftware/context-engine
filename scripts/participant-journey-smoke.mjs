@@ -253,9 +253,10 @@ const runJourney = async (engineName, phoneName) => {
     net.failResponseUploadAt = 7;
     const submit = submitButton(page);
     await assertReachable(submit, 'Submit');
-    // Watch from before the tap: the count is on screen only while the answers are being stored.
+    // Watch from before the tap: the count is on screen only while the answers are being stored. The page shows it
+    // in the button's capitals ("SAVING 3 OF 12").
     const sawCount = page
-      .waitForFunction((total) => new RegExp(`Saving \\d+ of ${total}`).test(document.body.innerText), TOTAL, { timeout: 30000 })
+      .waitForFunction((total) => new RegExp(`Saving \\d+ of ${total}`, 'i').test(document.body.innerText), TOTAL, { timeout: 30000 })
       .then(() => true, () => false);
     await submit.click();
     assert.ok(await sawCount, `Submit never showed its count ("Saving n of ${TOTAL}")`);

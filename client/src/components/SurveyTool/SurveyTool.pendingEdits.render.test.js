@@ -48,7 +48,7 @@ const baseSubmitDisplayState = {
   submittedIndicatorActive: false,
   singleQuestionSubmittedIndicatorActive: false,
   showSubmitAux: false,
-  uploadStatusText: 'Uploading...',
+  uploadStatusText: 'Saving',
   submitDisabled: false,
   canEditQuestions: true,
   hasPendingEdits: false,

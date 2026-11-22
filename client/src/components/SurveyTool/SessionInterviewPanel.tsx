@@ -19,6 +19,8 @@ import SessionInterviewReviewSection from './SessionInterviewReviewSection';
 import SessionInterviewModalHeader from './SessionInterviewModalHeader';
 import { formatSessionRecordingElapsed } from './sessionElapsedTime';
 import { useWaitSeconds } from './useWaitSeconds';
+import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
+import { SubmitCountLabel } from './SubmitCountLabel';
 import SessionInterviewResearchConsent, { SessionInterviewResearchShare } from './SessionInterviewResearchConsent';
 import {
   useSessionInterviewGroupRecommendations,
@@ -460,6 +462,16 @@ export default function SessionInterviewPanel({
     prepareSubmit: prepareHiddenDraftSubmit,
   } = hiddenDrafts;
   const submittableSelection = hiddenDrafts.submittable(selected);
+  // The answers a Submit sends: the number in its corner and in the submission info.
+  const submittableCount = drafts.filter((draft) => submittableSelection[draft.questionId]).length;
+  const submitWord =
+    pendingSubmitAfterLogin && !authenticatedForSubmit
+      ? 'Submit after login'
+      : groupsTicked
+        ? 'Submit and join'
+        : 'Submit';
+  // "Submit (3)", as on every Submit that sends answers; the button takes its name from it.
+  const submitText = submittableCount > 0 ? `${submitWord} (${submittableCount})` : submitWord;
   useEffect(() => {
     setConsentOverrides({});
   }, [activeSubmitContextToken]);
@@ -1170,9 +1182,10 @@ export default function SessionInterviewPanel({
     readiness: readiness.state,
     openingLoading: interviewOpening.loading,
   });
-  // A full set can make either wait long, so each shows how long it has run.
-  const waitSeconds = useWaitSeconds(mapping ? 'drafting' : applying ? 'submitting' : '');
-  const waitTime = mapping || applying ? formatSessionRecordingElapsed(waitSeconds) : '';
+  // A full set can make either wait long, so each shows how long it has run: drafting in the header, and a Submit
+  // on its button, counting seconds as every Submit's running label does.
+  const waitSeconds = useWaitSeconds(mapping ? 'drafting' : '');
+  const waitTime = mapping ? formatSessionRecordingElapsed(waitSeconds) : '';
   const hasUnsavedReview =
     isInterviewBusy ||
     mapping ||
@@ -1229,7 +1242,7 @@ export default function SessionInterviewPanel({
         statusTone={statusTone}
         statusRef={statusRef}
         // While responses upload the time is on the Submit button, so a phone's header keeps "Submitting" whole.
-        waitTime={mapping ? waitTime : ''}
+        waitTime={waitTime}
       />
       <ModalBody>
         <div
@@ -1470,8 +1483,8 @@ export default function SessionInterviewPanel({
                             setConsentOverrides((prev) => ({ ...prev, includeAiProvenance: included }));
                           }}
                           coverageDetails={researchCoverageDetails}
-                          selectedCount={drafts.filter((draft) => submittableSelection[draft.questionId]).length}
-                          unselectedCount={drafts.filter((draft) => !submittableSelection[draft.questionId]).length}
+                          selectedCount={submittableCount}
+                          unselectedCount={drafts.length - submittableCount}
                           disabled={applying}
                           researchDetail={shownResearchDetail}
                           draftText={draftTextShown ? draftTextChoice : null}
@@ -1516,7 +1529,7 @@ export default function SessionInterviewPanel({
                   mapping ||
                   isInterviewBusy ||
                   (submitSucceeded && (!showViewResults || !onViewResults)) ||
-                  !drafts.some((draft) => submittableSelection[draft.questionId])
+                  submittableCount === 0
                 }
                 className={styles.sessionInterviewSubmitButton}
                 data-testid={
@@ -1524,6 +1537,7 @@ export default function SessionInterviewPanel({
                     ? E2E_TESTIDS.SESSION_INTERVIEW_VIEW_RESULTS
                     : E2E_TESTIDS.SESSION_INTERVIEW_APPLY
                 }
+                aria-label={submitSucceeded || applying ? undefined : submitText}
               >
                 {submitSucceeded && showViewResults && onViewResults ? (
                   'View results'
@@ -1532,16 +1546,10 @@ export default function SessionInterviewPanel({
                     <FontAwesomeIcon icon={faCheck} /> Responses submitted
                   </>
                 ) : applying ? (
-                  // One span, so the button's flex layout keeps the space before the time.
-                  <span>
-                    Submitting… <span aria-hidden="true">{waitTime}</span>
-                  </span>
-                ) : pendingSubmitAfterLogin && !authenticatedForSubmit ? (
-                  'Submit after login'
-                ) : groupsTicked ? (
-                  'Submit and join'
+                  // Counts seconds from the Submit's start, as every Submit's running label does.
+                  <ElapsedLoadingLabel label="Saving" />
                 ) : (
-                  'Submit responses'
+                  <SubmitCountLabel text={submitText} />
                 )}
               </Button>
             </div>

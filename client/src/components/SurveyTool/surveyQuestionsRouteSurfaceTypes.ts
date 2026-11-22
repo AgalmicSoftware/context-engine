@@ -75,7 +75,7 @@ export type SurveyQuestionsRouteSubmitFooterProps = {
   onRevertPendingChanges?: () => void;
   pendingEditCount?: number;
   responseUrl?: string;
-  submitButtonText?: React.ReactNode;
+  submitButtonText?: string;
   submissionError?: string;
   draftPersistenceError?: string;
 };

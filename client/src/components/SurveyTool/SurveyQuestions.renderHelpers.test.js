@@ -327,7 +327,7 @@ describe('SurveyQuestions render helpers', () => {
     expect(copyJsonToClipboard).toHaveBeenCalledWith(surveyJson, 'survey');
   });
 
-  it('derives encrypted submit status from pending edit stats during render', () => {
+  it('says Saving while encrypted answers are prepared, as the pile does', () => {
     const readiness = buildSurveyQuestionsSubmitReadinessDescriptor({
       currentStep: 1,
       isSubmitting: true,
@@ -335,15 +335,14 @@ describe('SurveyQuestions render helpers', () => {
       singleQuestionMode: false,
     });
     const displayState = buildSurveyQuestionsSubmitFooterDisplayState({
-      currentStep: readiness.currentStep,
-      hasEncryptedAnswers: readiness.hasEncryptedAnswers,
       isDirty: true,
       isSubmitting: true,
       pendingEditCount: readiness.pendingEditCount,
     });
 
     expect(readiness.pendingEditCount).toBe(2);
-    expect(displayState.uploadStatusText).toBe('Encrypting...');
+    expect(readiness.hasEncryptedAnswers).toBe(true);
+    expect(displayState.uploadStatusText).toBe('Saving');
   });
 
   it('renders masked full-question prompts as gated prompt cards without answer editors', () => {

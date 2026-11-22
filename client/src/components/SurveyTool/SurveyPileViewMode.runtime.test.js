@@ -603,7 +603,8 @@ describe('SurveyPileViewMode runtime surface', () => {
 
   it('keeps focus on the end of the set when its Submit goes after a submit', async () => {
     const engine = await openEndWithUnsentAnswer();
-    const submit = screen.getByRole('button', { name: 'Submit 1 answer' });
+    // The rail's Submit, hidden behind the end of the set, has the same name.
+    const submit = within(screen.getByTestId('ce-pile-end-of-set')).getByRole('button', { name: 'Submit (1)' });
     // Once nothing is unsent the button goes, which drops focus to the page.
     let submits = 0;
     engine.handlePileSubmitClick = async () => {

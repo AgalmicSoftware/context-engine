@@ -460,7 +460,7 @@ const renderPileFooterControls = ({
               endOfSetShown ? ` ${styles.pileFooterControlAway}` : ''
             }`}
             disabled={isSubmitting || activePromptMasked}
-            // A narrow phone row hides the count; the name keeps it.
+            // The count shows in the corner without its brackets; the name keeps them.
             aria-label={isSubmitting ? undefined : finalSubmitText}
           >
             {isSubmitting ? (

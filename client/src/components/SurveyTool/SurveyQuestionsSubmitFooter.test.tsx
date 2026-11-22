@@ -10,7 +10,7 @@ describe('SurveyQuestionsSubmitFooter', () => {
   const baseProps = {
     onPrimarySubmitClick: jest.fn(),
     onRevertPendingChanges: jest.fn(),
-    submitButtonText: 'Submit 2 Responses',
+    submitButtonText: 'Submit (2)',
   };
 
   beforeEach(() => {
@@ -21,8 +21,10 @@ describe('SurveyQuestionsSubmitFooter', () => {
   it('renders the submit button contract and forwards submit clicks', () => {
     render(<SurveyQuestionsSubmitFooter {...baseProps} />);
 
-    const submitButton = screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT);
-    expect(submitButton).toHaveTextContent('Submit 2 Responses');
+    // As on every Submit that sends answers: the count in the corner without its brackets, which the name keeps.
+    const submitButton = screen.getByRole('button', { name: 'Submit (2)' });
+    expect(submitButton).toHaveAttribute('data-testid', E2E_TESTIDS.SURVEY_SUBMIT);
+    expect(submitButton.querySelector('.pileSubmitButtonCount')).toHaveTextContent(/^2$/);
 
     fireEvent.click(submitButton);
 
@@ -46,7 +48,7 @@ describe('SurveyQuestionsSubmitFooter', () => {
         {...baseProps}
         displayState={{
           submitDisabled: true,
-          uploadStatusText: 'Encrypting...',
+          uploadStatusText: 'Saving',
         }}
         isSubmitting
       />,
@@ -54,7 +56,9 @@ describe('SurveyQuestionsSubmitFooter', () => {
 
     const submitButton = screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT);
     expect(submitButton).toBeDisabled();
-    expect(screen.getByText('Encrypting...')).toBeInTheDocument();
+    expect(screen.getByText('Saving')).toBeInTheDocument();
+    // With the seconds since the Submit began, as every Submit shows them while it runs.
+    expect(submitButton).toHaveTextContent('Saving · 0s');
 
     rerender(
       <SurveyQuestionsSubmitFooter
@@ -82,10 +86,13 @@ describe('SurveyQuestionsSubmitFooter', () => {
 
     expect(screen.getByText('This failure message is intentionally long enou...')).toBeInTheDocument();
 
-    rerender(<SurveyQuestionsSubmitFooter {...baseProps} isSingleQuestionView submitButtonText="SUBMIT" />);
+    rerender(<SurveyQuestionsSubmitFooter {...baseProps} isSingleQuestionView submitButtonText="Submit (1)" />);
 
-    expect(screen.getByText('SUBMIT')).toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveClass('singleQuestionSubmitButton');
+    // The one-question page's Submit looks like every other: its count in the corner, and no arrow.
+    const singleSubmit = screen.getByRole('button', { name: 'Submit (1)' });
+    expect(singleSubmit).toHaveClass('singleQuestionSubmitButton');
+    expect(singleSubmit.querySelector('.pileSubmitButtonCount')).toHaveTextContent(/^1$/);
+    expect(singleSubmit.querySelector('svg')).toBeNull();
   });
 
   // "Still saving" must read whole on the button, or it looks like a cut-off failure. A partial Submit names the
@@ -110,14 +117,14 @@ describe('SurveyQuestionsSubmitFooter', () => {
         {...baseProps}
         displayState={{
           showSubmitAux: true,
-          uploadStatusText: 'Uploading...',
+          uploadStatusText: 'Saving',
         }}
         isSubmitting
         pendingEditCount={3}
       />,
     );
 
-    expect(screen.getByText('Uploading...')).toBeInTheDocument();
+    expect(screen.getByText('Saving')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveClass('submitGlow');
     expect(screen.queryByRole('button', { name: 'Clear pending changes' })).toBeNull();
     expect(baseProps.onRevertPendingChanges).not.toHaveBeenCalled();
@@ -134,13 +141,12 @@ describe('SurveyQuestionsSubmitFooter', () => {
         isSingleQuestionView
         pendingEditCount={1}
         responseUrl="https://example.test/question-response"
-        submitButtonText="SUBMIT"
+        submitButtonText="Submit (1)"
       />,
     );
 
-    const submitButton = screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT);
+    const submitButton = screen.getByRole('button', { name: 'Submit (1)' });
     expect(submitButton).toHaveClass('singleQuestionSubmitButton');
-    expect(submitButton).toHaveTextContent('SUBMIT');
     expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toBeNull();
     expect(screen.queryByTitle('View submitted response')).toBeNull();
     expect(screen.getByRole('button', { name: 'Clear pending changes' })).toBeInTheDocument();

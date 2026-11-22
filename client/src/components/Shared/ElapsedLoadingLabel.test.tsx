@@ -26,7 +26,8 @@ it('counts from the start it is given, for a task that began before it appeared'
   try {
     jest.setSystemTime(50_000);
     render(<ElapsedLoadingLabel label="Building" since={20_000} />);
-    expect(screen.getByText(/· 30s/)).toBeInTheDocument();
+    // In lower case, as the symbol for seconds, on a button that sets its words in capitals too.
+    expect(screen.getByText(/· 30s/)).toHaveStyle({ textTransform: 'none' });
     act(() => {
       jest.advanceTimersByTime(2000);
     });

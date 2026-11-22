@@ -221,12 +221,14 @@ const expectReadableInStates = async (page, target, region, label) => {
   return Math.min(...lowest);
 };
 
-// The label follows the ticks a render later, so wait for it rather than read it once.
+// The label follows the ticks a render later, so wait for it rather than read it once. The button's name carries
+// its count, as in "Submit and join (2)"; the words before it are what the ticks change.
 const expectSubmitLabel = (page, label) =>
   page.waitForFunction(
     (expected) =>
-      document.querySelector('[data-testid="ce-session-interview-apply"]')?.textContent.trim().toLowerCase() ===
-      expected,
+      (document.querySelector('[data-testid="ce-session-interview-apply"]')?.getAttribute('aria-label') || '')
+        .replace(/ \(\d+\)$/, '')
+        .toLowerCase() === expected,
     label,
   );
 
@@ -322,7 +324,7 @@ try {
         );
         await section.getByText('Your AI: Lives in the UK').waitFor();
         const submit = page.getByTestId('ce-session-interview-apply');
-        await expectSubmitLabel(page, 'submit responses');
+        await expectSubmitLabel(page, 'submit');
         const rows = section.locator('label');
         let lowest = Infinity;
         for (let index = 0; index < (await rows.count()); index += 1) {
@@ -338,7 +340,7 @@ try {
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
         await box(/Builders/).check();
         await box(/Builders/).uncheck();
-        await expectSubmitLabel(page, 'submit responses');
+        await expectSubmitLabel(page, 'submit');
         await box(/d\/acc/).check();
         await box(/UK residents/).check();
         await expectSubmitLabel(page, 'submit and join');

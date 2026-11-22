@@ -179,14 +179,8 @@ export const createSurveyQuestionsRouteRuntime = (
     const isSingleQuestionView = !!routeViewDisplayState.isSingleQuestionView;
 
     const pendingStats: SurveyQuestionsSubmitPendingStats = getPendingStatsSnapshot();
-    const suffix = pendingStats.total === 1 ? 'Response' : 'Responses';
-
-    const submitButtonText = isSingleQuestionView
-      ? 'SUBMIT'
-      : (propsRef.current.computeSubmitLabel || computeSubmitLabel)(engine, {
-          suffix,
-          pendingStats,
-        });
+    // "Submit (2)", as on every Submit that sends answers.
+    const submitButtonText = (propsRef.current.computeSubmitLabel || computeSubmitLabel)(engine, { pendingStats });
     const submitReadiness: SurveyQuestionsSubmitReadinessDescriptor = buildSurveyQuestionsSubmitReadinessDescriptor({
       currentStep: stateRef.current.currentStep,
       isSubmitting: stateRef.current.isSubmitting,
@@ -196,8 +190,6 @@ export const createSurveyQuestionsRouteRuntime = (
     });
     const submitFooterDisplayState: SurveyQuestionsSubmitFooterDisplayState =
       buildSurveyQuestionsSubmitFooterDisplayState({
-        currentStep: stateRef.current.currentStep,
-        hasEncryptedAnswers: submitReadiness.hasEncryptedAnswers,
         hasMaskedCurrentQuestionPayload: submitReadiness.hasMaskedCurrentQuestionPayload,
         isDirty: stateRef.current.isDirty,
         isEditing: stateRef.current.isEditing,

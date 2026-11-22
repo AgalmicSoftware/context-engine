@@ -188,7 +188,7 @@ export const describeInterviewStatus = ({
       : isStarting
         ? 'Connecting your microphone and voice session. Close this dialog to cancel.'
         : hasDrafts
-          ? 'Review and edit your answers and privacy settings, then select Submit responses. You will be asked to sign in if needed.'
+          ? 'Review and edit your answers and privacy settings, then select Submit. You will be asked to sign in if needed.'
           : 'Speak with an AI interviewer. Stopping prepares drafts for your review. You choose when to submit responses.';
   const idle = recordingState === 'idle' && !mapping && !applying;
   // A review opened to paste an AI's packet is waiting on the person, not failing.

@@ -1402,7 +1402,7 @@ export class SurveySelector extends Component<any, any> {
               title="Submit responses"
               data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
               disabled={!!pendingSubmitStats.isSubmitting}
-              // A phone shows the count in the corner without its brackets; the name keeps them.
+              // The count shows in the corner without its brackets; the name keeps them.
               aria-label={pendingSubmitStats.isSubmitting ? undefined : headerSubmitLabel}
             >
               {/* Counts seconds from the Submit's start, as the AI flows' progress labels do. */}

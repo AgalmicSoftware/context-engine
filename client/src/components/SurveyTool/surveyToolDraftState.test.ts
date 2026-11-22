@@ -60,26 +60,9 @@ describe('surveyToolDraftState', () => {
   });
 
   it('builds submit labels from provided stats, callback stats, and state fallbacks', () => {
-    expect(
-      computeSubmitLabel(
-        {},
-        {
-          suffix: 'Responses',
-          pendingStats: { total: 2, encrypted: 1 },
-        },
-      ),
-    ).toBe('Submit Responses (2)');
+    expect(computeSubmitLabel({}, { pendingStats: { total: 2, encrypted: 1 } })).toBe('Submit (2)');
 
-    expect(
-      computeSubmitLabel(
-        {
-          getPendingEditStats: () => ({ total: 1, encrypted: 0 }),
-        },
-        {
-          suffix: 'Response',
-        },
-      ),
-    ).toBe('Submit Response (1)');
+    expect(computeSubmitLabel({ getPendingEditStats: () => ({ total: 1, encrypted: 0 }) })).toBe('Submit (1)');
 
     expect(
       computeSubmitLabel({

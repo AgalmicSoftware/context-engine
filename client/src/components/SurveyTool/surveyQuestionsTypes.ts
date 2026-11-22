@@ -2052,8 +2052,6 @@ export const buildSurveyQuestionsRouteViewDisplayState = ({
 };
 
 export const buildSurveyQuestionsSubmitFooterDisplayState = ({
-  currentStep = 0,
-  hasEncryptedAnswers = false,
   hasMaskedCurrentQuestionPayload = false,
   isDirty = false,
   isEditing = false,
@@ -2070,8 +2068,6 @@ export const buildSurveyQuestionsSubmitFooterDisplayState = ({
   useHeaderSubmit = false,
   userHasResponse = false,
 }: {
-  currentStep?: unknown;
-  hasEncryptedAnswers?: unknown;
   hasMaskedCurrentQuestionPayload?: unknown;
   isDirty?: unknown;
   isEditing?: unknown;
@@ -2097,12 +2093,9 @@ export const buildSurveyQuestionsSubmitFooterDisplayState = ({
     !isSingle &&
     ((pendingCount > 0 && !isSubmitting && !singleQuestionSubmittedIndicatorActive) ||
       (singleQuestionSubmittedIndicatorActive && !!responseUrl));
-  const uploadStatusText =
-    isSubmitting && Number(currentStep || 0) === 1 && !!hasEncryptedAnswers
-      ? 'Encrypting...'
-      : submitCountText
-        ? `Saving ${String(submitCountText)}...`
-        : 'Uploading...';
+  // Shown with its seconds, as every Submit's running label is, so it ends without dots. Saving while answers are
+  // encrypted too, as the pile says.
+  const uploadStatusText = submitCountText ? `Saving ${String(submitCountText)}` : 'Saving';
   const submitDisabled = !!(isSubmitting || (singleQuestionMode && hasMaskedCurrentQuestionPayload));
   const canEditQuestions = !userHasResponse || !!startFresh || !!isEditing;
   const hasPendingEdits = !!isDirty || pendingCount > 0;
