@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import LoginModalDisplayBody, { SlowFallback, isPasskeyProblem } from './LoginModalDisplayBody';
 
 // The profile, as the dialog's lazy chunk: it puts the dialog's rows in its own list.
@@ -100,16 +100,18 @@ describe('Copy my answers after a failed sign-in', () => {
   } as Partial<Props>;
   afterEach(() => sessionStorage.clear());
 
-  it('offers the answers with one line on what to do, and copies a link that holds them', async () => {
+  it('offers the answers in one sentence that starts with its button, and copies a link that holds them', async () => {
     sessionStorage.setItem(
       'dg:surveyDraft:meadow-forum:84532:anon:all',
       JSON.stringify({ answers: { q1: { value: 'Agree' } } }),
     );
     const prompt = jest.spyOn(window, 'prompt').mockReturnValue(null);
     renderBody(failed);
-    const button = await screen.findByRole('button', { name: 'Copy my answers link' });
-    expect(screen.getByTestId('ce-passkey-copy-answers')).toHaveTextContent(
-      'Copy this and open it on your phone to sign in and submit.',
+    const button = await screen.findByRole('button', { name: 'Copy this link' });
+    const line = screen.getByTestId('ce-passkey-copy-answers');
+    expect(line.querySelector('button')).toBe(button);
+    expect(line).toHaveTextContent(
+      /^Copy this link and open it on your phone to recover and submit responses\.(?: |$)/,
     );
     expect(screen.getByRole('button', { name: 'About copying your answers' })).toHaveAccessibleDescription(
       /not sent to us/,
@@ -119,10 +121,39 @@ describe('Copy my answers after a failed sign-in', () => {
       fireEvent.click(button);
     });
     expect(prompt).toHaveBeenCalledWith('Copy this', expect.stringMatching(/#answers=[A-Za-z0-9_-]+$/));
+    expect(line).toHaveTextContent("Copying isn't allowed here, so the answers could not be copied.");
+    expect(button.querySelector('[data-icon="check"]')).toBeNull();
     prompt.mockRestore();
     // The sign-in buttons and the error text are as they were.
     expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent('Login failed: This passkey');
     expect(screen.getByTestId('ce-passkey-wallet-sign-in')).toBeInTheDocument();
+  });
+
+  it('marks a copy that worked with a check and tells screen readers, the sentence unchanged', async () => {
+    sessionStorage.setItem(
+      'dg:surveyDraft:meadow-forum:84532:anon:all',
+      JSON.stringify({ answers: { q1: { value: 'Agree' } } }),
+    );
+    const writeText = jest.fn(async (_text: string) => {});
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    try {
+      renderBody(failed);
+      const button = await screen.findByRole('button', { name: 'Copy this link' });
+      expect(button.querySelector('[data-icon="check"]')).toBeNull();
+      await act(async () => {
+        fireEvent.click(button);
+      });
+      expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/#answers=[A-Za-z0-9_-]+$/));
+      // The button keeps its words, so the line still reads as one sentence.
+      expect(screen.getByRole('button', { name: 'Copy this link' })).toBe(button);
+      expect(button.querySelector('[data-icon="check"]')).not.toBeNull();
+      expect(screen.getByTestId('ce-passkey-copy-answers')).toHaveTextContent(
+        /^Copy this link and open it on your phone to recover and submit responses\.(?: |$)/,
+      );
+      expect(within(screen.getByRole('status')).getByText('Link copied.')).toBeInTheDocument();
+    } finally {
+      Reflect.deleteProperty(navigator, 'clipboard');
+    }
   });
 
   it('offers a long set on one line by hand, the short link and the code apart', async () => {
@@ -136,7 +167,7 @@ describe('Copy my answers after a failed sign-in', () => {
     sessionStorage.setItem('dg:surveyDraft:meadow-forum:84532:anon:all', JSON.stringify({ answers }));
     const prompt = jest.spyOn(window, 'prompt').mockReturnValue(null);
     renderBody(failed);
-    const button = await screen.findByRole('button', { name: 'Copy my answers link' });
+    const button = await screen.findByRole('button', { name: 'Copy this link' });
     await act(async () => {
       fireEvent.click(button);
     });
@@ -205,7 +236,7 @@ describe('Copy my answers after a failed sign-in', () => {
       passkeyWalletStatusTone: 'error',
     });
     expect(await screen.findByTestId('ce-passkey-copy-answers')).toHaveTextContent(
-      'Copy this and open it in Safari or Chrome to sign in and submit.',
+      /^Copy this link and open it in Safari or Chrome to recover and submit responses\.(?: |$)/,
     );
     expect(screen.queryByTestId('ce-passkey-copy-link')).not.toBeInTheDocument();
   });

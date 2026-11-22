@@ -2308,12 +2308,46 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   margin: 8px auto 0;
 }
 
+// One sentence that starts with its button: one line where the box is wide enough, wrapping like text on a phone.
 .passkeyCopyAnswers {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
   margin-top: 8px;
+}
+
+// A word of the sentence: its label sits on the sentence's baseline.
+.passkeyCopyAnswersButton {
+  position: relative;
+  vertical-align: baseline;
+
+  // A tap area at least 44px tall, centred on the button, that leaves the line's height alone.
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 0;
+    left: 0;
+    height: max(100%, 44px);
+    transform: translateY(-50%);
+  }
+}
+
+.passkeyCopyAnswersUnbroken {
+  white-space: nowrap;
+}
+
+.passkeyCopiedMark {
+  margin-inline-end: 0.35em;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .passkeyWalletStatus {
@@ -2327,6 +2361,12 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   font-size: 0.9rem;
   line-height: 1.4;
   text-align: center;
+}
+
+// Room on a computer for the copy line to stay on one line, also once its button carries the check and in its
+// longer Safari-or-Chrome wording. In em, so it grows with the text.
+.passkeyWalletStatus:has(.passkeyCopyAnswers) {
+  max-width: min(48em, 100%);
 }
 
 .passkeyWalletStatusError {

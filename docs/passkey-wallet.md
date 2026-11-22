@@ -256,9 +256,10 @@ Forbidden fallback behavior:
 
 A failed sign-in changes nothing about sign-in itself. When the passkey itself is
 the problem and the browser holds unsaved answers (typed on the page, or drafted
-in an interview), the status under the buttons adds **Copy my answers link** and one
-line: "Copy this and open it on your phone to sign in and submit." (In a browser
-without passkeys the line names Safari or Chrome instead.)
+in an interview), the status under the buttons adds one sentence that starts with a
+**Copy this link** button: "Copy this link and open it on your phone to recover and
+submit responses." (In a browser without passkeys it names Safari or Chrome
+instead.) A copy that worked puts a check on the button.
 
 A passkey problem is: no passkeys in this browser, no PRF support, or any other
 create or unlock the device or browser refused. Errors fixed in the same browser

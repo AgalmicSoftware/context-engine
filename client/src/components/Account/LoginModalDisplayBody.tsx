@@ -3,6 +3,7 @@ import { Button, CardBody, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBookmark,
+  faCheck,
   faFingerprint,
   faQuestionCircle,
   faSignOutAlt,
@@ -59,7 +60,8 @@ const COPY_ANSWERS_HELP =
 
 // For a browser where sign-in failed after answers were drafted: the answers, to open on another device. The text
 // is made ready as this shows, because a copy has to happen inside the tap itself. `where` names the place to open
-// it; `otherwise` shows where this browser cannot pack the answers.
+// it; `otherwise` shows where this browser cannot pack the answers. The button is the first words of its sentence,
+// so a copy that worked marks the button with a check rather than changing its words, and says so to screen readers.
 const CopyMyAnswers = ({ where, otherwise }: { where: string; otherwise: React.ReactNode }) => {
   const [text, setText] = useState<string | null | undefined>(undefined);
   const [copied, setCopied] = useState<boolean | null>(null);
@@ -74,23 +76,29 @@ const CopyMyAnswers = ({ where, otherwise }: { where: string; otherwise: React.R
   if (!text) return <>{otherwise}</>;
   return (
     <div className={styles.passkeyCopyAnswers} data-testid="ce-passkey-copy-answers">
-      <Button
-        type="button"
-        size="sm"
-        color="primary"
-        className={styles.passkeyCopyLink}
-        data-testid="ce-passkey-copy-answers-button"
-        onClick={async () => {
-          const done = await copyText(text);
-          setCopied(done);
-          // Offers the text to copy by hand, where the browser shows prompts. Its box holds one line.
-          if (!done) window.prompt('Copy this', answersCopyTextOnOneLine(text));
-        }}
-      >
-        {copied ? 'Link copied' : 'Copy my answers link'}
-      </Button>
-      <span>
-        Copy this and open it {where} to sign in and submit.{' '}
+      {/* Unbroken, the button keeps the sentence's first word and the (?) its last as the sentence wraps. */}
+      <span className={styles.passkeyCopyAnswersUnbroken}>
+        <Button
+          type="button"
+          size="sm"
+          color="primary"
+          className={styles.passkeyCopyAnswersButton}
+          data-testid="ce-passkey-copy-answers-button"
+          onClick={async () => {
+            const done = await copyText(text);
+            setCopied(done);
+            // Offers the text to copy by hand, where the browser shows prompts. Its box holds one line.
+            if (!done) window.prompt('Copy this', answersCopyTextOnOneLine(text));
+          }}
+        >
+          {copied ? <FontAwesomeIcon icon={faCheck} className={styles.passkeyCopiedMark} /> : null}
+          Copy this link
+        </Button>{' '}
+        and
+      </span>{' '}
+      open it {where} to recover and submit{' '}
+      <span className={styles.passkeyCopyAnswersUnbroken}>
+        responses.{' '}
         <button
           type="button"
           id="ce-passkey-copy-answers-help"
@@ -101,20 +109,21 @@ const CopyMyAnswers = ({ where, otherwise }: { where: string; otherwise: React.R
         >
           <FontAwesomeIcon icon={faQuestionCircle} />
         </button>
-        <span id="ce-passkey-copy-answers-about" hidden>
-          {COPY_ANSWERS_HELP}
-        </span>
-        <UncontrolledTooltip
-          target="ce-passkey-copy-answers-help"
-          placement="top"
-          trigger="hover focus"
-          autohide={false}
-          className={styles.networkTooltip}
-        >
-          {COPY_ANSWERS_HELP}
-        </UncontrolledTooltip>
       </span>
-      {copied === false ? <span> Copying isn&apos;t allowed here, so the answers could not be copied.</span> : null}
+      <span id="ce-passkey-copy-answers-about" hidden>
+        {COPY_ANSWERS_HELP}
+      </span>
+      <UncontrolledTooltip
+        target="ce-passkey-copy-answers-help"
+        placement="top"
+        trigger="hover focus"
+        autohide={false}
+        className={styles.networkTooltip}
+      >
+        {COPY_ANSWERS_HELP}
+      </UncontrolledTooltip>
+      {copied === false ? <div>Copying isn&apos;t allowed here, so the answers could not be copied.</div> : null}
+      {copied ? <span className={styles.srOnly}>Link copied.</span> : null}
     </div>
   );
 };

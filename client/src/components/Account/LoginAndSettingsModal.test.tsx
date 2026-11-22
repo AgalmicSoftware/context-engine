@@ -927,7 +927,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       const status = screen.getByTestId('ce-passkey-wallet-status');
       expect(status).toHaveTextContent(`${word} failed: This passkey can't be used here.`);
       expect(status).not.toHaveTextContent('WebAuthn');
-      expect(await screen.findByRole('button', { name: 'Copy my answers link' })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Copy this link' })).toBeInTheDocument();
       sessionStorage.clear();
     },
   );
