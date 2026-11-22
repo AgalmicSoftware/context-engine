@@ -1,5 +1,6 @@
 import {
   ANSWERS_LINK_MAX_CHARS,
+  answersCopyTextOnOneLine,
   buildAnswersCopyText,
   countUnsavedAnswers,
   loadCopiedAnswers,
@@ -91,6 +92,19 @@ describe('copying unsaved answers out of a browser', () => {
     expect(link.length).toBeLessThan(ANSWERS_LINK_MAX_CHARS);
     expect(code.length).toBeGreaterThan(ANSWERS_LINK_MAX_CHARS);
     expect(await loadCopiedAnswers(`Here you go:\n${message}\n`)).toMatchObject({ kind: 'loaded', typed: 60 });
+
+    // Copied by hand from a one-line box: the space keeps the short link apart from the code.
+    const oneLine = answersCopyTextOnOneLine(message);
+    expect(oneLine).toBe(`${link} ${code}`);
+    sessionStorage.clear();
+    expect(await loadCopiedAnswers(oneLine)).toMatchObject({ kind: 'loaded', typed: 60 });
+    // A box that dropped the line break outright joins them; the link still reads, pasted or opened.
+    sessionStorage.clear();
+    expect(await loadCopiedAnswers(`${link}${code}`)).toMatchObject({ kind: 'loaded', typed: 60 });
+    sessionStorage.clear();
+    go(`${link}${code}`.replace('http://localhost', ''));
+    await takeAnswersFromAddress();
+    expect(takeAnswersHandoffNote()).toMatchObject({ kind: 'loaded', typed: 60 });
   });
 
   it('keeps the invite and drafts the page arrived with beside the answers', async () => {

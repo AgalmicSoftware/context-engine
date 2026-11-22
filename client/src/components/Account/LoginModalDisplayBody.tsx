@@ -11,7 +11,7 @@ import {
 import { MetaMaskLoginButton } from '../../app/runtime/walletUiRuntime.js';
 import { copyText } from '../../utilities/ui/copyText';
 import { buildCopyPageLink } from '../../utilities/ui/arrivalLink';
-import { buildAnswersCopyText, countUnsavedAnswers } from '../../utilities/ui/answersHandoff';
+import { answersCopyTextOnOneLine, buildAnswersCopyText, countUnsavedAnswers } from '../../utilities/ui/answersHandoff';
 import styles from './Account.module.scss';
 import { AccountMenu, AccountMenuRow } from './AccountMenu';
 import { countUnsentAnswers } from 'components/UserPage/userPageAnalyzeLink';
@@ -83,8 +83,8 @@ const CopyMyAnswers = ({ where, otherwise }: { where: string; otherwise: React.R
         onClick={async () => {
           const done = await copyText(text);
           setCopied(done);
-          // Offers the text to copy by hand, where the browser shows prompts.
-          if (!done) window.prompt('Copy this', text);
+          // Offers the text to copy by hand, where the browser shows prompts. Its box holds one line.
+          if (!done) window.prompt('Copy this', answersCopyTextOnOneLine(text));
         }}
       >
         {copied ? 'Answers copied' : 'Copy my answers'}

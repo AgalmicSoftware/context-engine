@@ -275,6 +275,9 @@ the other button ("Use Login.", "Sign in, or delete it first", "Use Create…").
 - A set too long for one link (over about 2,000 characters) copies as two lines:
   a short link ending `#answers=paste`, then a code. The short link opens a box
   to paste the whole message into. A link that arrives cut off opens the same box.
+  Where the browser refuses the clipboard, the copy is offered in its one-line
+  box with a space between the link and the code; a link and code joined with no
+  break at all still read.
 - The opening browser loads the answers into its own signed-out records and says
   how many. Answers it already holds are kept, and it says how many copied ones
   stayed out. An interview's review is asked about before it shows, as any review

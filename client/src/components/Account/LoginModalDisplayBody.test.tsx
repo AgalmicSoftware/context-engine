@@ -125,6 +125,25 @@ describe('Copy my answers after a failed sign-in', () => {
     expect(screen.getByTestId('ce-passkey-wallet-sign-in')).toBeInTheDocument();
   });
 
+  it('offers a long set on one line by hand, the short link and the code apart', async () => {
+    // Text that does not pack down into one link.
+    const answers = Object.fromEntries(
+      Array.from({ length: 60 }, (_, index) => [
+        `q${index}`,
+        { value: Array.from({ length: 6 }, (_unused, part) => Math.sin(index * 7 + part)).join(' ') },
+      ]),
+    );
+    sessionStorage.setItem('dg:surveyDraft:meadow-forum:84532:anon:all', JSON.stringify({ answers }));
+    const prompt = jest.spyOn(window, 'prompt').mockReturnValue(null);
+    renderBody(failed);
+    const button = await screen.findByRole('button', { name: 'Copy my answers' });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    expect(prompt).toHaveBeenCalledWith('Copy this', expect.stringMatching(/#answers=paste [A-Za-z0-9_-]+$/));
+    prompt.mockRestore();
+  });
+
   it('leaves the sign-in screen as it was with no unsaved answers, or before any failure', async () => {
     renderBody(failed);
     await act(async () => {});

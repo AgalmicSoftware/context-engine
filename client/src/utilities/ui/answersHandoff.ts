@@ -137,6 +137,12 @@ export const buildAnswersCopyText = async (): Promise<string | null> => {
   }
 };
 
+/**
+ * The copy text for a one-line box, such as the browser's own prompt when the clipboard is refused: the two-line
+ * form with a space for its line break, so the short link still ends before the code.
+ */
+export const answersCopyTextOnOneLine = (text: string): string => text.replace(/\s*\n\s*/g, ' ');
+
 // The code out of whatever was pasted: a whole link, the two-line message, or the code alone. A link's own
 // `answers=` part comes first, then a code on a line of its own; the link may also carry an AI's drafts, which are
 // a code of another kind and can be the longer one.
@@ -185,7 +191,10 @@ const unpack = async (code: string): Promise<Packet | null> => {
 export const loadCopiedAnswers = async (pasted: string, now = Date.now()): Promise<AnswersHandoffNote> => {
   const failed: AnswersHandoffNote = { kind: 'paste', error: UNREADABLE };
   const code = codeIn(pasted);
-  const packet = code ? await unpack(code) : null;
+  // A box that dropped the line break joins the short link's `paste` to the code; the code read whole comes first.
+  const packet = code
+    ? ((await unpack(code)) ?? (code.startsWith(PASTE_VALUE) ? await unpack(code.slice(PASTE_VALUE.length)) : null))
+    : null;
   const held = stores();
   if (!packet || !held || !countOf(packet)) return failed;
   const note = { kind: 'loaded' as const, typed: 0, interview: 0, kept: 0 };
