@@ -2199,6 +2199,53 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Responses submitted');
   });
 
+  it('says Submitting in the status, and on the button with how long it has run, seen but not read out', async () => {
+    jest.useFakeTimers();
+    try {
+      let finish!: (value: unknown) => void;
+      const onSubmitResponses = jest.fn().mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      );
+      render(
+        <SessionVoiceModeModal
+          {...baseProps}
+          mode="interview"
+          isResponsesCacheReady
+          onSubmitResponses={onSubmitResponses}
+          prefillPacket={{
+            version: 1,
+            sessionSlug: 'demo',
+            responderContext: { summary: 'My own context' },
+            source: { platform: 'other', modelId: 'direct-user-context', verification: 'self_reported' },
+            responses: [{ questionId: 'q1', answer: 'A reviewed answer', confidence: 0.8 }],
+          }}
+        />,
+      );
+      await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+      const button = screen.getByRole('button', { name: 'Submitting…' });
+      const statusRegion = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS);
+      expect(button).toHaveTextContent('Submitting… 0:00');
+      expect(within(button).getByText('0:00')).toHaveAttribute('aria-hidden', 'true');
+      // The time is on the button only, so a phone's header keeps the word whole.
+      expect(screen.getByRole('button', { name: 'Interview status: Submitting' })).toHaveTextContent(/^Submitting$/);
+      expect(statusRegion.nextElementSibling).toBeNull();
+      await act(async () => {
+        jest.advanceTimersByTime(2_000);
+      });
+      expect(button).toHaveTextContent('Submitting… 0:02');
+      expect(statusRegion.nextElementSibling).toBeNull();
+      await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
+      await act(async () => finish({ status: 'submitted' }));
+      expect(await screen.findByRole('button', { name: 'Responses submitted' })).not.toHaveTextContent('0:');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('asks the Groups area to join nothing when a submit fails', async () => {
     mockedUseSessionInterviewGroupRecommendations.mockReturnValue({ availability: 'available', recommendations: [] });
     const onSubmitResponses = jest.fn().mockResolvedValue({ status: 'failed', message: 'Storage unavailable' });
@@ -3822,8 +3869,14 @@ describe('Interview cancellation and recovery', () => {
     const pill = screen.getByRole('button', { name: 'Interview status: Preparing responses…' });
     expect(pill).toHaveAttribute('data-tone', 'busy');
     expect(pill.querySelector('svg.fa-spinner.fa-spin')).toHaveAttribute('aria-hidden', 'true');
+    // How long drafting has run shows beside the status, outside what is read out.
+    const statusRegion = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS);
+    expect(statusRegion).not.toHaveTextContent('0:00');
+    expect(statusRegion.nextElementSibling).toHaveTextContent(/^0:00$/);
+    expect(statusRegion.nextElementSibling).toHaveAttribute('aria-hidden', 'true');
     await act(async () => finish([{ questionId: 'q1', answer: 'New evidence' }]));
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS).querySelector('svg.fa-spinner')).toBeNull();
+    expect(statusRegion.nextElementSibling).toBeNull();
     expect(screen.getByRole('heading', { name: 'Review proposed responses' }).closest('summary')).toHaveFocus();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Review drafts');
     expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();

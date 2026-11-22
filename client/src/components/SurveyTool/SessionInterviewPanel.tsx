@@ -17,6 +17,8 @@ import SessionInterviewSuggestions from './SessionInterviewSuggestions';
 import SessionInterviewRecommendedGroups from './SessionInterviewRecommendedGroups';
 import SessionInterviewReviewSection from './SessionInterviewReviewSection';
 import SessionInterviewModalHeader from './SessionInterviewModalHeader';
+import { formatSessionRecordingElapsed } from './sessionElapsedTime';
+import { useWaitSeconds } from './useWaitSeconds';
 import SessionInterviewResearchConsent, { SessionInterviewResearchShare } from './SessionInterviewResearchConsent';
 import {
   useSessionInterviewGroupRecommendations,
@@ -1168,6 +1170,9 @@ export default function SessionInterviewPanel({
     readiness: readiness.state,
     openingLoading: interviewOpening.loading,
   });
+  // A full set can make either wait long, so each shows how long it has run.
+  const waitSeconds = useWaitSeconds(mapping ? 'drafting' : applying ? 'submitting' : '');
+  const waitTime = mapping || applying ? formatSessionRecordingElapsed(waitSeconds) : '';
   const hasUnsavedReview =
     isInterviewBusy ||
     mapping ||
@@ -1223,6 +1228,8 @@ export default function SessionInterviewPanel({
         statusLabel={statusLabel}
         statusTone={statusTone}
         statusRef={statusRef}
+        // While responses upload the time is on the Submit button, so a phone's header keeps "Submitting" whole.
+        waitTime={mapping ? waitTime : ''}
       />
       <ModalBody>
         <div
@@ -1525,7 +1532,10 @@ export default function SessionInterviewPanel({
                     <FontAwesomeIcon icon={faCheck} /> Responses submitted
                   </>
                 ) : applying ? (
-                  'Preparing submission…'
+                  // One span, so the button's flex layout keeps the space before the time.
+                  <span>
+                    Submitting… <span aria-hidden="true">{waitTime}</span>
+                  </span>
                 ) : pendingSubmitAfterLogin && !authenticatedForSubmit ? (
                   'Submit after login'
                 ) : groupsTicked ? (

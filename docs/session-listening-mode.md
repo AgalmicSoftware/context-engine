@@ -254,7 +254,11 @@ one longer than 120 characters is cut at a word with **Show all**, and a locked 
 is only mentioned. **Submit responses** saves reviewed values and enters the
 normal submission flow, opening sign-in when necessary. Drafts survive sign-in,
 and the modal resumes the normal response upload after the authenticated
-response state has rehydrated. Canceling sign-in leaves the review open without
+response state has rehydrated. While drafts are prepared, the interview shows
+how long the wait has run (m:ss) beside its status; while responses upload, the
+status reads **Submitting** and the button **Submitting…** with that time.
+Screen readers hear the status and the button without the ticking time. Canceling sign-in
+leaves the review open without
 submitting; after a successful submit the submit button changes to
 **Responses submitted**, and a **View results** action appears after five seconds
 when a results handler is available. The modal remains open so suggested
