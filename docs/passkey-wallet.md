@@ -278,7 +278,10 @@ the other button ("Use Login.", "Sign in, or delete it first", "Use Create…").
 - The opening browser loads the answers into its own signed-out records and says
   how many. Answers it already holds are kept, and it says how many copied ones
   stayed out. An interview's review is asked about before it shows, as any review
-  kept signed out is.
+  kept signed out is. It is marked as copied, so a phone that is already signed
+  in offers it too while the account has no review of its own; continued there,
+  it becomes the account's. An ordinary signed-out review is never offered after
+  sign-in, as the phone may be shared.
 - With no unsaved answers the sign-in screen is unchanged; a browser without
   passkeys keeps its **Copy link**.
 

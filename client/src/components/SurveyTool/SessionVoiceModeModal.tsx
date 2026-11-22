@@ -100,9 +100,15 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   // Whether a kept review belongs with what is open now: a code, or a link with other evidence, is a new interview.
   const fitsLink = (kept: RestoredReview) =>
     !claim && (!prefillPacket || JSON.stringify(kept.review.packet) === JSON.stringify(prefillPacket));
+  // Answers copied from a browser where sign-in failed arrive as a signed-out review. On a phone already signed in
+  // it is still offered, asking first, while the account has none of its own; an ordinary signed-out review is not.
+  const copiedReview = () => {
+    const found = owner === 'browser' ? null : readKeptReview(sessionSlug, 'browser');
+    return found?.copied ? found : null;
+  };
   const readKept = () => {
     if (!sessionSlug) return null;
-    const kept = claim ? null : readKeptReview(sessionSlug, owner);
+    const kept = claim ? null : readKeptReview(sessionSlug, owner) || copiedReview();
     if (kept && fitsLink(kept)) return kept;
     // A phone may be shared: a new interview from a link or a code ends the one kept signed out on it.
     if (owner === 'browser' && (claim || prefillPacket)) clearKeptReview(sessionSlug, 'browser');
@@ -169,6 +175,8 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   const leaveInterview = () => {
     clearKeptReview(sessionSlug, owner);
     if (keptForRef.current) clearKeptReview(sessionSlug, keptForRef.current);
+    // A copied review discarded while signed in, before it was continued, is held for this browser.
+    if (keptReview?.copied) clearKeptReview(sessionSlug, keptReview.owner);
     keptForRef.current = '';
     setKeptReview(null);
     setHasUnsavedReview(false);

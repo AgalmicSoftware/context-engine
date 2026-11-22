@@ -179,7 +179,8 @@ const unpack = async (code: string): Promise<Packet | null> => {
 /**
  * Loads copied answers into this browser's own signed-out records, where the page already looks for them.
  * Answers this browser holds for the same record are kept, and counted. An interview's review starts its hour
- * afresh here, and is asked about before it shows, like every review kept signed out.
+ * afresh here, and is asked about before it shows, like every review kept signed out; it is marked as copied,
+ * so it is offered on a phone that is already signed in too.
  */
 export const loadCopiedAnswers = async (pasted: string, now = Date.now()): Promise<AnswersHandoffNote> => {
   const failed: AnswersHandoffNote = { kind: 'paste', error: UNREADABLE };
@@ -199,7 +200,8 @@ export const loadCopiedAnswers = async (pasted: string, now = Date.now()): Promi
     Object.entries(packet.reviews).forEach(([key, record]) => {
       if (reviewCount(readRecord(held.browser, key))) note.kept += reviewCount(record);
       else {
-        held.browser.setItem(key, JSON.stringify({ ...record, v: 1, owner: 'browser', savedAt: now }));
+        // Marked as copied, so a phone already signed in still offers it (asking first), as no account owns it.
+        held.browser.setItem(key, JSON.stringify({ ...record, v: 1, owner: 'browser', savedAt: now, copied: true }));
         note.interview += reviewCount(record);
       }
     });

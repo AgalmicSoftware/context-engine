@@ -327,6 +327,51 @@ describe('a review kept signed out, on a phone that may be shared', () => {
     expect(screen.queryByRole('button', { name: 'Continue it' })).not.toBeInTheDocument();
   });
 
+  // Answers copied from a browser where sign-in failed, opened on a phone that is already signed in.
+  describe('copied from another browser', () => {
+    const copy = async () => {
+      await keptSignedOut();
+      const record = JSON.parse(kept('browser')!);
+      window.localStorage.setItem(keyFor('browser'), JSON.stringify({ ...record, copied: true }));
+    };
+
+    it('is offered, asking first, to an account with no review of its own', async () => {
+      await copy();
+      render(modal());
+      expect(screen.getByText('This device has an unsubmitted interview review.')).toBeInTheDocument();
+      expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Continue it' }));
+      await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+      expect(answer('b1')).toHaveValue('Disagree');
+      // Continued signed in, it becomes the account's own.
+      fireEvent.change(answer('b2'), { target: { value: 'Disagree' } });
+      await waitFor(() => expect(kept(`account:${alice}`)).toContain('Disagree'));
+      expect(kept('browser')).toBeNull();
+    });
+
+    it('is still offered when the sign-in comes back after the page opens', async () => {
+      await copy();
+      const view = render(modal({ loginComplete: false }));
+      view.rerender(modal());
+      expect(await screen.findByRole('button', { name: 'Continue it' })).toBeInTheDocument();
+    });
+
+    it('is cleared from this browser when discarded', async () => {
+      await copy();
+      render(modal());
+      fireEvent.click(screen.getByRole('button', { name: 'Discard and start fresh' }));
+      expect(kept('browser')).toBeNull();
+    });
+
+    it("gives way to the account's own review", async () => {
+      (await startReview()).unmount();
+      await copy();
+      render(modal());
+      await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+      expect(screen.queryByRole('button', { name: 'Continue it' })).not.toBeInTheDocument();
+    });
+  });
+
   it('never offers it to someone who signs in before choosing', async () => {
     await keptSignedOut();
     const view = render(modal(signedOut));

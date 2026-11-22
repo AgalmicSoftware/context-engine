@@ -116,6 +116,8 @@ describe('loading copied answers into another browser', () => {
     const kept = readKeptReview('meadow-forum', keptReviewOwner('', false));
     expect(kept?.review.drafts.map((draft) => draft.questionId)).toEqual(['q7', 'q8']);
     expect(kept?.review.researchSharingChoice).toEqual({ contextToken: 'ctx', included: false });
+    // Marked as copied, so a phone already signed in still offers it.
+    expect(kept?.copied).toBe(true);
   });
 
   it('reads the answers code, not a longer AI-drafts code the same link carries', async () => {
