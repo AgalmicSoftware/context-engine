@@ -23,6 +23,7 @@ describe('withCoordinatorRetry', () => {
   });
   afterEach(() => {
     jest.useRealTimers();
+    jest.restoreAllMocks();
   });
 
   it('retries a busy coordinator for reads, voice starts, group joins, draft text, nonces and answers with a request id', async () => {
@@ -69,6 +70,85 @@ describe('withCoordinatorRetry', () => {
     const { response, calls } = await run([busy, busy, busy, busy, busy], `${worker}/storage/list`);
     expect(response.status).toBe(503);
     expect(calls).toBe(4);
+  });
+
+  // The Worker stored the answer and its reply was lost: the page said it failed though the answer was saved.
+  describe('an answer upload whose reply was lost', () => {
+    const answer = { method: 'POST', body: JSON.stringify({ resource: 'responses', requestId: 'answer:v1:op:q1:0' }) };
+    const lost = () => {
+      throw new TypeError('Load failed');
+    };
+    const status =
+      (code: number, body: object = {}) =>
+      () =>
+        new Response(JSON.stringify(body), { status: code });
+    // Settled whether it resolves or rejects, so a rejection is never left unhandled while the timers run.
+    const settle = async (replies: Array<() => Response>, url: string, init: RequestInit) => {
+      const fetchImpl = jest.fn(async () => (replies.shift() || ok)());
+      const pending = withCoordinatorRetry(fetchImpl as unknown as typeof fetch)(url, init).then(
+        (response) => ({ response, error: null }),
+        (error: unknown) => ({ response: null, error }),
+      );
+      await jest.runAllTimersAsync();
+      return { ...(await pending), calls: fetchImpl.mock.calls.length };
+    };
+
+    it('is sent again, as the Worker answers a repeat with the copy it stored', async () => {
+      for (const reply of [lost, status(502), status(504), status(503, { reason: 'upload_in_progress' })]) {
+        const { response, calls } = await settle([reply], `${worker}/storage/upload`, answer);
+        expect(response?.status).toBe(200);
+        expect(calls).toBe(2);
+      }
+    });
+
+    it('waits about half a minute for an answer the Worker is still storing, then passes on its answer', async () => {
+      jest.spyOn(Math, 'random').mockReturnValue(0.5);
+      const inProgress = status(503, { reason: 'upload_in_progress' });
+      const started = Date.now();
+      const stored = await settle([lost, inProgress, inProgress, inProgress], `${worker}/storage/upload`, answer);
+      expect(stored.response?.status).toBe(200);
+      expect(stored.calls).toBe(5);
+
+      const waited = Date.now();
+      const still = await settle(
+        Array.from({ length: 8 }, () => inProgress),
+        `${worker}/storage/upload`,
+        answer,
+      );
+      expect(Date.now() - waited).toBe(29000);
+      expect(still.calls).toBe(7);
+      expect(still.response?.status).toBe(503);
+      expect(await still.response?.json()).toEqual({ reason: 'upload_in_progress' });
+      expect(waited - started).toBe(400 + 1000 + 2000 + 4000);
+    });
+
+    it('gives up after three retries with what the last try got', async () => {
+      const failed = await settle([lost, lost, lost, lost], `${worker}/storage/upload`, answer);
+      expect(failed.error).toBeInstanceOf(TypeError);
+      expect(failed.calls).toBe(4);
+      const gateway = await settle(
+        [status(502), status(502), status(502), status(502)],
+        `${worker}/storage/upload`,
+        answer,
+      );
+      expect(gateway.response?.status).toBe(502);
+      expect(gateway.calls).toBe(4);
+    });
+
+    it('is not sent again when the page cancelled it, or it is no answer with a request id', async () => {
+      const controller = new AbortController();
+      controller.abort();
+      const cancelled = await settle([lost], `${worker}/storage/upload`, { ...answer, signal: controller.signal });
+      expect(cancelled.error).toBeInstanceOf(TypeError);
+      expect(cancelled.calls).toBe(1);
+      const question = { method: 'POST', body: JSON.stringify({ resource: 'questions', data: {} }) };
+      for (const reply of [lost, status(502), status(503, { reason: 'upload_in_progress' })]) {
+        expect((await settle([reply], `${worker}/storage/upload`, question)).calls).toBe(1);
+      }
+      // Reads keep their own rule: only a busy coordinator is retried.
+      expect((await settle([lost], `${worker}/storage/list`, {})).calls).toBe(1);
+      expect((await settle([status(502)], `${worker}/storage/list`, {})).calls).toBe(1);
+    });
   });
 });
 

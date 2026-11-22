@@ -1742,6 +1742,17 @@ busy nonce request (`503`) is marked `retryable: true` too. A busy sign-in (`/au
 is marked `retryable: false`, since its nonce may already be spent: signing in
 starts again from a new nonce instead.
 
+The website also sends an answer upload that carries a `requestId` again, up to
+three more times, when no reply reached it (the connection dropped, or a gateway
+answered `502` or `504`). While the Worker answers `503` with
+`reason: 'upload_in_progress'` (it is still storing an earlier send, or holds too
+many uploads at once), the website keeps asking for about half a minute, then
+shows that reply as the upload's failure. A Worker with the `CE_SESSION_COORDINATOR`
+binding, which every Worker deployed by the deploy helper or from the template
+has, answers a repeat of the same upload with the copy it stored, never a second
+row, so an answer it stored is not shown as failed because its reply was lost. An
+older Worker without the binding may store a repeat as a second copy.
+
 Member reads and roster pages use only canonical session-identity keys. Legacy
 slug-only or case-folded membership rows are ignored and never migrated during
 reads. Roster pagination does not write membership records or indexes, so a
