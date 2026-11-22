@@ -143,7 +143,15 @@ describe('UserPageAnalysisModal', () => {
     expect(screen.getByText('Profile synthesis')).toBeTruthy();
     expect(screen.queryByRole('status')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Card' }));
-    expect(screen.getByRole('status').textContent).toContain('Making the card…');
+    expect(screen.getByRole('status').textContent).toBe('Making the card…');
+    // In outline, with every heading a card can have, until the card says which guesses it has.
+    expect(screen.getByText('Historical match').closest('[aria-hidden="true"]')).toBeTruthy();
+    expect(screen.getAllByText(/ guess$/).map((node) => node.textContent)).toEqual([
+      'book guess',
+      'game guess',
+      'film guess',
+      'song guess',
+    ]);
     expect(screen.queryByText('Profile synthesis')).toBeNull();
 
     // One card, seen in the Card view only, and no second button for it anywhere.

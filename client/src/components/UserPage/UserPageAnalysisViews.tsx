@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { UncontrolledTooltip } from 'reactstrap';
 
 import type { UserAnalysisBreakdown } from 'utilities/ai/userAnalysisBreakdown';
@@ -11,6 +11,7 @@ import styles from './UserPage.module.scss';
 import cardStyles from './UserPageAnalysisCard.module.scss';
 import viewStyles from './UserPageAnalysisViews.module.scss';
 import UserPageAnalysisCard, { type UserPageAnalysisCardPicture } from './UserPageAnalysisCard';
+import UserPageAnalysisCardSkeleton from './UserPageAnalysisCardSkeleton';
 import type { UserAnalysisGeneration } from './userPageAnalysisStateHelpers';
 
 // On my own page: whether my card is shown on it, while a change is being saved, and why one failed.
@@ -184,9 +185,12 @@ const UserPageAnalysisViews = ({
           ) : null}
         </div>
       ) : view === 'card' ? (
-        <p className={styles.placeholderNote} role="status">
-          <FontAwesomeIcon icon={faSpinner} spin /> Making the card…
-        </p>
+        <>
+          <p className={cardStyles.skeletonStatus} role="status">
+            Making the card…
+          </p>
+          <UserPageAnalysisCardSkeleton />
+        </>
       ) : null}
 
       <p className={viewStyles.model}>
