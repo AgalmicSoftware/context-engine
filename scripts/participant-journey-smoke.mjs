@@ -243,7 +243,9 @@ const runJourney = async (engineName, phoneName) => {
     // 4. A reload before Submit keeps the unsent answers.
     await submitButton(page).waitFor();
     await reload();
-    await submitButton(page).filter({ hasText: `(${typedQuestions.length})` }).waitFor();
+    // The count sits in Submit's corner without brackets; the button's name keeps "Submit (n)".
+    const submitName = `Submit (${typedQuestions.length})`;
+    await submitButton(page).and(page.getByRole('button', { name: submitName, exact: true })).waitFor();
     assert.equal((await personClient.listAll('responses', { mine: true })).items.length, 0, 'Nothing is stored before Submit');
     console.log(`[${label}] The unsent answers survived a reload.`);
 
