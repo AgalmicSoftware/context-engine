@@ -249,8 +249,10 @@ update of 24H2 and 25H2. On Windows 10, an older Windows 11 or an older browser,
 Windows Hello saves the passkey and the site cannot use it. A passkey app
 without PRF, set as a phone's passkey provider, ends the same way.
 
-After such a Create, the status under the buttons offers **Use your phone**
-"instead". It runs Create again with `authenticatorAttachment: 'cross-platform'`
+After such a Create, the status under the buttons reads "**Scan QR with phone**
+to login or **Copy this link** to paste your responses on a different device."
+(the second half only where the browser holds unsaved answers). The first button
+runs Create again with `authenticatorAttachment: 'cross-platform'`
 and `hints: ['hybrid']`, so the browser shows a QR code to scan with a phone.
 Everything else in the request, the PRF salt included, is unchanged, and the
 wallet is derived the same way. The passkey then lives on the phone: each later

@@ -66,7 +66,16 @@ const COPY_ANSWERS_HELP =
 // is made ready as this shows, because a copy has to happen inside the tap itself. `where` names the place to open
 // it; `otherwise` shows where this browser cannot pack the answers. The button is the first words of its sentence,
 // so a copy that worked marks the button with a check rather than changing its words, and says so to screen readers.
-const CopyMyAnswers = ({ where, otherwise }: { where: string; otherwise: React.ReactNode }) => {
+// `afterPhoneOffer` makes it the second half of the sentence the phone offer starts.
+const CopyMyAnswers = ({
+  where,
+  otherwise,
+  afterPhoneOffer = false,
+}: {
+  where: string;
+  otherwise: React.ReactNode;
+  afterPhoneOffer?: boolean;
+}) => {
   const [text, setText] = useState<string | null | undefined>(undefined);
   const [copied, setCopied] = useState<boolean | null>(null);
   useEffect(() => {
@@ -82,6 +91,7 @@ const CopyMyAnswers = ({ where, otherwise }: { where: string; otherwise: React.R
     <div className={styles.passkeyCopyAnswers} data-testid="ce-passkey-copy-answers">
       {/* Unbroken, the button keeps the sentence's first word and the (?) its last as the sentence wraps. */}
       <span className={styles.passkeyCopyAnswersUnbroken}>
+        {afterPhoneOffer ? 'or ' : null}
         <Button
           type="button"
           size="sm"
@@ -98,11 +108,11 @@ const CopyMyAnswers = ({ where, otherwise }: { where: string; otherwise: React.R
           {copied ? <FontAwesomeIcon icon={faCheck} className={styles.passkeyCopiedMark} /> : null}
           Copy this link
         </Button>{' '}
-        and
+        {afterPhoneOffer ? 'to' : 'and'}
       </span>{' '}
-      open it {where} to recover and submit{' '}
+      {afterPhoneOffer ? 'paste your responses on a different' : `open it ${where} to recover and submit`}{' '}
       <span className={styles.passkeyCopyAnswersUnbroken}>
-        responses.{' '}
+        {afterPhoneOffer ? 'device.' : 'responses.'}{' '}
         <button
           type="button"
           id="ce-passkey-copy-answers-help"
@@ -137,8 +147,9 @@ const ANOTHER_DEVICE_HELP =
   'After that, your phone signs you in on this device.';
 
 // After a Create whose passkey this site cannot use (Windows Hello on a Windows without PRF, or a passkey app
-// without it): the same Create, asked of a phone. It comes before the copy line, which is for when this fails too.
-const UseAnotherDevice = ({ onClick }: { onClick: () => void }) => (
+// without it): the same Create, asked of a phone. It starts the sentence the copy line ends: "Scan QR with phone to
+// login or Copy this link to paste your responses on a different device." `alone` ends it where no copy line follows.
+const UseAnotherDevice = ({ onClick, alone }: { onClick: () => void; alone: boolean }) => (
   <div
     className={`${styles.passkeyCopyAnswers} ${styles.passkeyAnotherDevice}`}
     data-testid="ce-passkey-another-device"
@@ -152,15 +163,15 @@ const UseAnotherDevice = ({ onClick }: { onClick: () => void }) => (
         data-testid="ce-passkey-another-device-button"
         onClick={() => onClick()}
       >
-        Use your phone
+        Scan QR with phone
       </Button>{' '}
-      instead.{' '}
+      to login{alone ? '.' : ''}{' '}
       <button
         type="button"
         id="ce-passkey-another-device-help"
         className={styles.passkeyWalletStatusHelp}
         data-ce-control-appearance="frameless"
-        aria-label="About using your phone"
+        aria-label="About scanning with your phone"
         aria-describedby="ce-passkey-another-device-about"
       >
         <FontAwesomeIcon icon={faQuestionCircle} />
@@ -321,7 +332,10 @@ const LoginModalDisplayBody = ({
             >
               {passkeyWalletStatusMessage}
               {passkeyWalletStatusMessage === PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE ? (
-                <UseAnotherDevice onClick={handlePasskeyWalletCreateOnAnotherDevice} />
+                <UseAnotherDevice
+                  onClick={handlePasskeyWalletCreateOnAnotherDevice}
+                  alone={countUnsavedAnswers() === 0}
+                />
               ) : null}
               {/* When the passkey itself is the problem, unsaved answers can leave with the person; the plain link
                   stays for a browser without passkeys that holds none. */}
@@ -329,6 +343,7 @@ const LoginModalDisplayBody = ({
               isPasskeyProblem(passkeyWalletStatusMessage) &&
               countUnsavedAnswers() > 0 ? (
                 <CopyMyAnswers
+                  afterPhoneOffer={passkeyWalletStatusMessage === PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE}
                   where={passkeysUnavailable ? 'in Safari or Chrome' : 'on your phone'}
                   otherwise={passkeysUnavailable ? <CopyPageLink /> : null}
                 />

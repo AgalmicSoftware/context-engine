@@ -929,7 +929,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       expect(status).not.toHaveTextContent('WebAuthn');
       expect(await screen.findByRole('button', { name: 'Copy this link' })).toBeInTheDocument();
       // Only a Create can be made again on a phone; a Login's passkey already exists.
-      expect(screen.queryAllByRole('button', { name: 'Use your phone' })).toHaveLength(word === 'Create' ? 1 : 0);
+      expect(screen.queryAllByRole('button', { name: 'Scan QR with phone' })).toHaveLength(word === 'Create' ? 1 : 0);
       sessionStorage.clear();
     },
   );
@@ -944,9 +944,9 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     const view = render(subject.getModalDisplay());
     // The offer comes before the copy line, which is the last resort.
     expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
-      "Create failed: This passkey can't be used here.Use your phone instead.",
+      "Create failed: This passkey can't be used here.Scan QR with phone to login.",
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Use your phone' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Scan QR with phone' }));
     await act(async () => {});
     expect(mockedPasskeyWallet.createPasskeyWallet).toHaveBeenLastCalledWith({ anotherDevice: true });
     expect(subject.props.changeAccount).toHaveBeenCalledWith(
@@ -973,8 +973,13 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
       "Create failed: This passkey can't be used here.",
     );
-    expect(screen.getByRole('button', { name: 'Use your phone' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Scan QR with phone' })).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Copy this link' })).toBeInTheDocument();
+    // One sentence across the two lines: the phone line has no full stop while the copy line follows.
+    expect(screen.getByTestId('ce-passkey-another-device')).toHaveTextContent(/^Scan QR with phone to login (?!\.)/);
+    expect(screen.getByTestId('ce-passkey-copy-answers')).toHaveTextContent(
+      /^or Copy this link to paste your responses on a different device\./,
+    );
     sessionStorage.clear();
   });
 
