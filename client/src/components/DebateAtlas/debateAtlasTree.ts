@@ -3,6 +3,7 @@ import { generateBlockieDataUrl } from '../../utilities/ui/blockieAvatars.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import { parseSessionWorkerDiscoveryOrigin } from '../../utilities/session/sessionWorkerDiscovery';
+import { analysisComments } from '../DebateMap/analysisComments';
 import type { DebateNode, HistoricalCompassPoint } from '../DebateMap/debateMapTypes';
 import type {
   DebateAtlasBuild,
@@ -222,20 +223,6 @@ const cleanAnalysis = (analysis: DebateAtlasQuestionAnalysis | undefined) => {
     .filter((category) => category.label);
   return { summary, answered, categories };
 };
-
-// A question circle's window leads with the analysis as a topic's does with its summary: the summary, then each
-// category with how many of those who answered fall in it.
-const analysisComments = (id: string, analysis: NonNullable<ReturnType<typeof cleanAnalysis>>) => [
-  { id: `${id}:analysis`, comment: analysis.summary },
-  ...analysis.categories.map((category, index) => ({
-    id: `${id}:category:${index}`,
-    kind: 'category',
-    comment: category.summary,
-    label: category.label,
-    participantCount: category.participantCount,
-    ...(analysis.answered ? { participantTotal: analysis.answered } : {}),
-  })),
-];
 
 // Branches, then topics, then each topic's questions as the smallest circles. A branch maps all its topics'
 // questions on a compass of its own; a topic opens its summary, positions, questions and compass; a question

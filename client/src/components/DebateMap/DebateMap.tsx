@@ -2151,7 +2151,10 @@ const Modal = ({
               <div className={`${styles.collapseContent} ${styles.questionsSection}`}>
                 {/* A topic's only question has no circle of its own, so its analysis shows here, above its card. */}
                 {!content.isQuestion && questions.length === 1 && (
-                  <QuestionAnalysisNote analysis={questions[0].analysis} />
+                  <QuestionAnalysisNote
+                    key={String(questions[0].id || 'lone-question')}
+                    analysis={questions[0].analysis}
+                  />
                 )}
                 {questions.map((q, i) => {
                   const questionType = normalizeQuestionType(q.questionType || q.type);

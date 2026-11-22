@@ -128,3 +128,14 @@ it("lists a question's kinds of answer as categories, not positions", () => {
   expect(within(categories).getByText('4 of 8 participants')).toBeInTheDocument();
   expect(screen.queryByRole('region', { name: 'Positions' })).not.toBeInTheDocument();
 });
+
+it('uses an optional label for both the summary region and its eyebrow', () => {
+  const label = 'AI summary of 9 participants’ answers';
+  const { rerender } = render(<DebateMapGeneratedSummary entries={[{ id: 's', comment: first }]} label={label} />);
+  const summary = screen.getByRole('region', { name: label });
+  expect(within(summary).getByText(label)).toBeInTheDocument();
+
+  rerender(<DebateMapGeneratedSummary entries={[{ id: 's', comment: first }]} />);
+  const defaultSummary = screen.getByRole('region', { name: 'AI-generated summary' });
+  expect(within(defaultSummary).getByText('AI-generated summary')).toBeInTheDocument();
+});

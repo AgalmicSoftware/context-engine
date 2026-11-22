@@ -1634,15 +1634,14 @@ describe('DebateMap', () => {
       expect(await screen.findByRole('region', { name: 'AI-generated summary' })).toHaveTextContent('A topic summary.');
       fireEvent.click(screen.getByText('Questions').closest('[role="button"]') as HTMLElement);
       // The question has no circle of its own, so its topic shows the analysis: above its card, not on it.
-      const note = screen.getByRole('region', { name: 'AI summary of 7 participants’ answers' });
+      const whole = screen.getByTestId('ce-atlas-question-analysis');
+      const note = within(whole).getByRole('region', { name: 'AI summary of 7 participants’ answers' });
       const card = screen.getByRole('link', { name: /^Answer: Should pilots start local\?/ });
       expect(note).toHaveTextContent('Most would start locally.');
-      expect(
-        within(note)
-          .getAllByRole('listitem')
-          .map((item) => item.textContent),
-      ).toEqual(['Start small5 of 7']);
-      expect(follows(note, card)).toBe(true);
+      const categories = within(whole).getByRole('region', { name: 'Categories' });
+      expect(categories).toHaveTextContent(/^Categories 1/);
+      expect(within(categories).getByRole('listitem')).toHaveTextContent('Start small5 of 7 participants');
+      expect(follows(whole, card)).toBe(true);
       expect(card).not.toHaveTextContent(/AI summary|Most would start locally|Start small/);
       unmount();
       // A question's own window already leads with its analysis, so it does not repeat it over the card.
