@@ -1582,7 +1582,7 @@ describe('DebateMap', () => {
       expect(follows(positions, screen.getByText('Where participants stand'))).toBe(true);
     });
 
-    it("notes the AI's analysis on a question's card in its topic, as the link's description", async () => {
+    it("shows a question's card in its topic without the AI's analysis, even when the question has one", async () => {
       const analysis = {
         summary: 'Most would start locally.',
         answered: 7,
@@ -1606,15 +1606,14 @@ describe('DebateMap', () => {
       });
       // A topic with a summary but no chart still opens with its questions folded.
       expect(await screen.findByRole('region', { name: 'AI-generated summary' })).toHaveTextContent('A topic summary.');
-      expect(screen.queryByTestId('ce-atlas-question-analysis')).not.toBeInTheDocument();
       fireEvent.click(screen.getByText('Questions').closest('[role="button"]') as HTMLElement);
-      const notes = screen.getAllByTestId('ce-atlas-question-analysis');
-      expect(notes).toHaveLength(1);
-      expect(notes[0]).toHaveTextContent('AI summary of 7 participants’ answers');
-      expect(notes[0]).toHaveTextContent('Start small5 of 7');
-      const [first, second] = screen.getAllByRole('link', { name: /^Answer:/ });
-      expect(first).toHaveAccessibleDescription(/Most would start locally\./);
-      expect(second).not.toHaveAttribute('aria-describedby');
+      const cards = screen.getAllByRole('link', { name: /^Answer:/ });
+      expect(cards).toHaveLength(2);
+      // The analysis leads the question's own window; its card in the topic is the question alone.
+      expect(cards[0]).toHaveTextContent('Should pilots start local?');
+      expect(cards[0]).not.toHaveTextContent(/AI summary|Most would start locally|Start small/);
+      cards.forEach((card) => expect(card).not.toHaveAttribute('aria-describedby'));
+      expect(screen.queryByText(/Most would start locally|Start small/)).not.toBeInTheDocument();
     });
 
     it('keeps the demo atlas four levels when none are named', () => {
