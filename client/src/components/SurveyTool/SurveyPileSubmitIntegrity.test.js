@@ -9,6 +9,8 @@ import {
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as storageClient from '../../utilities/storage/storageClient';
+import { UPLOAD_IN_PROGRESS_MESSAGE } from '../../utilities/storage/storageClient';
+import { PARTIAL_UPLOAD_IN_PROGRESS_MESSAGE } from './surveyQuestionsRuntimeMethods';
 import { surveyQuestionReadsPort } from '../../domains/surveys/surveyQuestionReadsPort.js';
 import { cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import { hydrateWorkerCanonicalQuestionCache } from '../../utilities/survey/workerCanonicalCacheHydration';
@@ -324,6 +326,43 @@ it('keeps a single-question payload byte-identical after a lost reply', async ()
   await h.click();
   await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(2));
   expect(JSON.stringify(h.submitResponses.mock.calls[1][2])).toBe(JSON.stringify(h.submitResponses.mock.calls[0][2]));
+});
+
+// The Worker was still storing the second answer when the page stopped asking: it has not failed.
+it('says answers are still saving, not that they failed, when the Worker is still storing one', async () => {
+  const h = await fixture();
+  await act(async () => h.sync());
+  await h.mount();
+  const engine = () => h.engine();
+  await act(async () => engine().handleAnswerPile(BINARY_QID, 'Yes'));
+  await act(async () => engine().handleAnswerPile(FREEFORM_QID, 'Free answer'));
+  await settle();
+  h.submitResponses.mockImplementationOnce(async (_provider, ids, responses) => {
+    const storageRef = h.add('responses', responses[0]);
+    const stillStoring = Object.assign(new Error(UPLOAD_IN_PROGRESS_MESSAGE), {
+      status: 503,
+      reason: 'upload_in_progress',
+    });
+    throw Object.assign(new Error(stillStoring.message), {
+      cause: stillStoring,
+      partialReceipt: {
+        workerCanonicalSubmission: true,
+        questionResponseRefs: [{ questionId: ids[0], storageRef }],
+        sessionSlug: SLUG,
+        storageRefs: [storageRef],
+      },
+    });
+  });
+
+  await h.click();
+  await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
+  await settle();
+
+  const said = engine().state.submissionError;
+  expect(said.startsWith(`${PARTIAL_UPLOAD_IN_PROGRESS_MESSAGE} `)).toBe(true);
+  expect(said).toMatch(/wasn't saved yet; submit again to send it\.$/);
+  expect(said).not.toMatch(/didn't save/);
+  expect(engine().getPendingEditStats().total).toBe(1);
 });
 
 // Answers upload a few at a time, so the stored one may be either answer, not only the first.
