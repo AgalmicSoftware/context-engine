@@ -3,7 +3,7 @@ import { generateBlockieDataUrl } from '../../utilities/ui/blockieAvatars.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import { parseSessionWorkerDiscoveryOrigin } from '../../utilities/session/sessionWorkerDiscovery';
-import type { DebateNode, DebateSplit, HistoricalCompassPoint } from '../DebateMap/debateMapTypes';
+import type { DebateNode, HistoricalCompassPoint } from '../DebateMap/debateMapTypes';
 import type {
   DebateAtlasBuild,
   DebateAtlasMapping,
@@ -173,37 +173,6 @@ const summaryComments = (id: string, mapping: DebateAtlasMapping) => {
   ];
 };
 
-// How far from the middle of the axis (0.5) a position must sit to count as at one end.
-const SPLIT_MARGIN = 0.05;
-
-// Where people split on a node: its positions at the left end of the compass's first axis against those at the
-// right end, under the axis's own end labels. Only when both ends hold a position; one in the middle joins
-// neither. The ends are the AI's main disagreement for the node, not "for" and "against" a stated motion.
-const splitByAxis = (id: string, mapping: DebateAtlasMapping): DebateSplit | null => {
-  const axis = mapping.compass?.x;
-  if (!axis?.left || !axis?.right) return null;
-  const answered = Number(mapping.answered) || 0;
-  const side = (atEnd: (x: number) => boolean) =>
-    (mapping.positions || [])
-      .map((position, index) => ({ position, index }))
-      .filter(({ position }) => Number.isFinite(position.x) && atEnd(Number(position.x)))
-      .map(({ position, index }) => ({
-        id: `${id}:split:${index}`,
-        comment: position.summary || '',
-        label: position.label,
-        participantCount: position.participantCount,
-        ...(answered ? { participantTotal: answered } : {}),
-      }));
-  const left = side((x) => x < 0.5 - SPLIT_MARGIN);
-  const right = side((x) => x > 0.5 + SPLIT_MARGIN);
-  if (!left.length || !right.length) return null;
-  return {
-    axis: axis.label || '',
-    left: { label: axis.left, positions: left },
-    right: { label: axis.right, positions: right },
-  };
-};
-
 // A circle's name for a question: its first words, since a whole prompt does not fit a circle.
 const QUESTION_NAME_CHARS = 48;
 const questionName = (prompt: string): string => {
@@ -218,10 +187,8 @@ const questionName = (prompt: string): string => {
 // A branch or topic's summary, positions and compass.
 const mappedNode = (id: string, mapping: DebateAtlasMapping, sessionSlug: string) => {
   const points = mapping.compass ? compassPoints(mapping, sessionSlug) : [];
-  const split = splitByAxis(id, mapping);
   return {
     comments: summaryComments(id, mapping),
-    ...(split ? { split } : {}),
     ...(mapping.compass
       ? {
           compass: {

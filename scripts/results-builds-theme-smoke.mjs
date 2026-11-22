@@ -349,15 +349,6 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', t
       .evaluateAll((items) => items.filter((item) => item.scrollWidth > item.clientWidth + 1).map((item) => item.textContent));
     assert.deepEqual(overflowing, [], 'A position overflows its card');
   });
-  // Where its positions sit at both ends of the first axis, they are set side by side under the axis's own words.
-  await step('where people split', async () => {
-    const split = panel.getByRole('region', { name: 'Where people split' });
-    await split.waitFor();
-    const ends = await split.getByRole('heading', { level: 4 }).allTextContents();
-    assert.deepEqual(ends, ['Slow and careful', 'Fast and bold']);
-    assert.equal(await split.getByRole('listitem').count(), 3);
-    await assertReadable(split);
-  });
   if (screenshotDir) await panel.screenshot({ path: `${screenshotDir}/debate-atlas-node-top-${tag}.png` });
   const more = panel.getByRole('button', { name: 'See more' });
   if (await more.count()) {

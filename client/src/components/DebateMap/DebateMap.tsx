@@ -82,7 +82,6 @@ import type {
 export { buildExpandedHistoricalCaseBriefMap, buildHistoricalCaseBrief, buildHistoricalCompassPoints };
 
 import DebateMapGeneratedSummary from './DebateMapGeneratedSummary';
-import DebateMapSplit from './DebateMapSplit';
 
 import { createTextMeasurer, fitPackedAtlasCirclesToBox, fitPackedAtlasLabel } from './packedAtlasFit';
 import { QuadraticQuestionPreview } from './QuadraticQuestionPreview';
@@ -2057,7 +2056,6 @@ const Modal = ({
             afterSummary={chartFollowsSummary ? chartSection : null}
           />
         )}
-        {readOnly && content.split && <DebateMapSplit split={content.split} />}
 
         {!chartFollowsSummary && chartSection}
 

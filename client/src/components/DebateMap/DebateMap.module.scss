@@ -2065,37 +2065,6 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       }
     }
 
-    // The two ends of the compass's first axis, side by side; one under the other on a phone.
-    .splitColumns {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-top: 10px;
-
-      @media (max-width: 640px) {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .splitSide {
-      min-width: 0;
-
-      > h4 {
-        margin: 0;
-        font-size: 1.0625rem;
-        font-weight: 800;
-      }
-
-      .generatedSummaryPositions {
-        margin-top: 8px;
-      }
-    }
-
-    .generatedSummarySection .splitAxis {
-      margin-top: 2px;
-      font-size: 0.9375rem;
-    }
-
     .argumentClaim {
       font-size: 1.0625rem;
       line-height: 1.45;
