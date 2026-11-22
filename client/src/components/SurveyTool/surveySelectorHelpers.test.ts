@@ -23,6 +23,7 @@ import {
   getSurveyDocumentUrls,
   resolveSelectedSurveyIndex,
   resolveSurveyIdToCopy,
+  resolveSurveySelectorHeaderSubmitFailure,
 } from './surveySelectorHelpers.js';
 
 describe('surveySelectorHelpers document URLs', () => {
@@ -139,6 +140,7 @@ describe('surveySelectorHelpers pending submit stats', () => {
       submittedSinceLastEdit: false,
       isSubmitting: false,
       submitCountText: '',
+      submitError: '',
     });
     expect(first).not.toBe(second);
   });
@@ -151,6 +153,7 @@ describe('surveySelectorHelpers pending submit stats', () => {
         submittedSinceLastEdit: 'yes' as any,
         isSubmitting: 0 as any,
         submitCountText: '3 of 9',
+        submitError: 'Offline.',
       }),
     ).toEqual({
       pendingSubmitStats: {
@@ -159,11 +162,33 @@ describe('surveySelectorHelpers pending submit stats', () => {
         submittedSinceLastEdit: true,
         isSubmitting: false,
         submitCountText: '3 of 9',
+        submitError: 'Offline.',
       },
     });
     expect(buildSurveySelectorPendingSubmitStatsPatch(null)).toEqual({
       pendingSubmitStats: getDefaultSurveySelectorPendingSubmitStats(),
     });
+  });
+
+  it("shows under the bar's Submit only that Submit's failure", () => {
+    const idle = { ...getDefaultSurveySelectorPendingSubmitStats(), total: 2 };
+    const failed = { ...idle, submitError: 'Offline.' };
+    const submitting = { ...idle, isSubmitting: true };
+    const resolve = resolveSurveySelectorHeaderSubmitFailure;
+
+    // As a Submit ends, or straight after the bar's Submit is pressed (one refused at once never starts).
+    expect(resolve({ prev: submitting, next: failed })).toBe('Offline.');
+    expect(resolve({ prev: idle, next: failed, pressed: true })).toBe('Offline.');
+    // It stands while the list's message does and answers remain to send.
+    expect(resolve({ prev: failed, next: { ...failed, total: 3 }, shown: 'Offline.' })).toBe('Offline.');
+    expect(resolve({ prev: failed, next: { ...failed, total: 0 }, shown: 'Offline.' })).toBe('');
+    expect(resolve({ prev: failed, next: idle, shown: 'Offline.' })).toBe('');
+    expect(resolve({ prev: failed, next: submitting, shown: 'Offline.' })).toBe('');
+    // Another message the list gives, with no Submit behind it, is not shown as one that failed.
+    expect(resolve({ prev: idle, next: failed })).toBe('');
+    expect(resolve({ prev: failed, next: { ...failed, submitError: 'Decryption failed.' }, shown: 'Offline.' })).toBe(
+      '',
+    );
   });
 });
 
@@ -229,10 +254,12 @@ describe('surveySelectorHelpers simple state patches', () => {
       viewMode: 'survey',
       showResults: false,
       pendingSubmitStats: getDefaultSurveySelectorPendingSubmitStats(),
+      headerSubmitFailure: '',
     });
     expect(viewPatch).toEqual({
       viewMode: 'questions',
       pendingSubmitStats: getDefaultSurveySelectorPendingSubmitStats(),
+      headerSubmitFailure: '',
     });
     expect(selectPatch.pendingSubmitStats).not.toBe(viewPatch.pendingSubmitStats);
   });

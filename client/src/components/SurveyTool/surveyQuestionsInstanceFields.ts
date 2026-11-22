@@ -68,6 +68,8 @@ type SurveyQuestionsPendingStatsSnapshot = {
   isSubmitting: boolean;
   // "12 of 40" while a Submit saves several answers.
   submitCountText: string;
+  // The list's message, such as why a Submit did not save every answer, for the bar's Submit outside the list.
+  submitError: string;
 };
 export type SurveyQuestionsPendingStatsInput =
   Partial<Pick<SurveyQuestionsPendingStatsSnapshot, 'total' | 'encrypted'>> | null | undefined;

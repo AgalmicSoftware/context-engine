@@ -433,6 +433,66 @@ describe('SurveySelector display guards', () => {
       jest.useRealTimers();
     }
   });
+
+  // The list draws no Submit of its own beside the bar's, so a Submit that failed said nothing: Submit simply came
+  // back. Why it failed is said in the bar, out loud too, until the next Submit starts.
+  it('says in the bar why a Submit failed', () => {
+    const subject = new SurveySelector({
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+      embeddedSessionToolbar: true,
+    });
+    syncClassSetState(subject);
+    subject.state = { ...subject.state, loading: false, viewMode: 'questions', showLongLoading: false };
+    const alert = () => findElement(subject.render(), (element) => element?.props?.role === 'alert');
+    const stats = { total: 1, encrypted: 0, submittedSinceLastEdit: false, isSubmitting: false };
+    subject.handlePendingStatsChange(stats);
+    subject.handlePendingStatsChange({ ...stats, isSubmitting: true });
+    expect(alert()).toBeFalsy();
+    subject.handlePendingStatsChange({ ...stats, submitError: 'Storage upload failed (502).' });
+    const view = render(alert());
+    expect(view.getByRole('alert')).toHaveTextContent(/^\s*Storage upload failed \(502\)\.$/);
+    expect(view.container.firstElementChild?.classList.contains(styles.headerSubmitError)).toBe(true);
+    // Gone while the next Submit runs, and once nothing is left to send.
+    subject.handlePendingStatsChange({ ...stats, isSubmitting: true });
+    expect(alert()).toBeFalsy();
+    subject.handlePendingStatsChange({ ...stats, submitError: 'Offline.' });
+    expect(alert()).toBeTruthy();
+    subject.handlePendingStatsChange({ ...stats, total: 0, submitError: 'Offline.' });
+    expect(alert()).toBeFalsy();
+    // A message the list gives with no Submit behind it (here, a notice left from an earlier Submit that saved
+    // everything) is not shown as a failed Submit once there are answers to send again.
+    subject.handlePendingStatsChange({ ...stats, submitError: 'The AI draft text could not be updated.' });
+    expect(alert()).toBeFalsy();
+  });
+
+  it('says why a Submit the list refused at once failed, though it never started', () => {
+    const subject = new SurveySelector({
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+    });
+    syncClassSetState(subject);
+    subject.state = { ...subject.state, loading: false, viewMode: 'questions', showLongLoading: false };
+    const stats = { total: 1, encrypted: 0, submittedSinceLastEdit: false, isSubmitting: false };
+    subject.handlePendingStatsChange(stats);
+    const refused = { ...stats, submitError: 'No responses to submit.' };
+    Object.assign(subject, {
+      surveyQuestionsRef: {
+        current: { state: {}, handlePrimarySubmitClick: () => subject.handlePendingStatsChange(refused) },
+      },
+    });
+    subject.handleHeaderSubmitClick();
+    expect(subject.state.headerSubmitFailure).toBe('No responses to submit.');
+    // Cleared when the list clears its message.
+    subject.handlePendingStatsChange(stats);
+    expect(subject.state.headerSubmitFailure).toBe('');
+  });
 });
 
 it.each([{ showSpinner: true }, { showCacheError: true }])(

@@ -1484,6 +1484,23 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   white-space: nowrap;
 }
 
+// Why the bar's Submit did not save: a line of its own across the bar, under its buttons, so it stays in sight
+// with the bar.
+.headerSubmitError {
+  flex: 1 0 100%;
+  margin: 0;
+  color: var(--ce-status-danger-text);
+  font-size: 1.15em;
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+// A wide screen keeps the bar to one row; with this line it wraps, so the line takes a row of its own.
+#surveysRow:has(> .headerSubmitError) {
+  flex-wrap: wrap;
+}
+
 .headerSubmitButton {
   background-color: var(--ce-action-submit);
   border: 1px solid var(--ce-action-submit);

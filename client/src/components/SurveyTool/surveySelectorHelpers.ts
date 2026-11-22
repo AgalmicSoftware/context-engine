@@ -25,6 +25,7 @@ type SurveySelectorPendingSubmitStats = {
   submittedSinceLastEdit: boolean;
   isSubmitting: boolean;
   submitCountText: string;
+  submitError: string;
 };
 
 type SurveySelectorPendingSubmitStatsSource = Partial<SurveySelectorPendingSubmitStats> | null | undefined;
@@ -56,6 +57,7 @@ export const getDefaultSurveySelectorPendingSubmitStats = (): SurveySelectorPend
   submittedSinceLastEdit: false,
   isSubmitting: false,
   submitCountText: '',
+  submitError: '',
 });
 
 export const buildSurveySelectorPendingSubmitStatsPatch = (stats: SurveySelectorPendingSubmitStatsSource = {}) => {
@@ -67,8 +69,29 @@ export const buildSurveySelectorPendingSubmitStatsPatch = (stats: SurveySelector
       submittedSinceLastEdit: !!source.submittedSinceLastEdit,
       isSubmitting: !!source.isSubmitting,
       submitCountText: String(source.submitCountText || ''),
+      submitError: String(source.submitError || ''),
     },
   };
+};
+
+// What the bar says under its Submit: the list's message as a Submit ends, or as the list answers the bar's Submit
+// at once (one it refuses straight away never starts). It stands while that message does and answers remain to
+// send. A message the list gives at any other time, such as a notice after a Submit that saved everything or a
+// decryption fault, is not the bar's to show as a failed Submit.
+export const resolveSurveySelectorHeaderSubmitFailure = ({
+  prev,
+  next,
+  shown = '',
+  pressed = false,
+}: {
+  prev: SurveySelectorPendingSubmitStatsSource;
+  next: SurveySelectorPendingSubmitStats;
+  shown?: string;
+  pressed?: boolean;
+}): string => {
+  if (next.isSubmitting || !next.total || !next.submitError) return '';
+  if (prev?.isSubmitting || pressed) return next.submitError;
+  return next.submitError === shown ? shown : '';
 };
 
 export const buildSurveySelectorPubKeyPatch = (pubKey: unknown) => ({
@@ -152,11 +175,13 @@ export const buildSurveySelectorSelectSurveyPatch = (selectedSurveyIndex: unknow
   viewMode: 'survey',
   showResults: false,
   pendingSubmitStats: getDefaultSurveySelectorPendingSubmitStats(),
+  headerSubmitFailure: '',
 });
 
 export const buildSurveySelectorViewModePatch = (viewMode: unknown) => ({
   viewMode,
   pendingSubmitStats: getDefaultSurveySelectorPendingSubmitStats(),
+  headerSubmitFailure: '',
 });
 
 export const buildQuestionsDashboardFilterLoadingPatch = (filterLoading: unknown) => ({
