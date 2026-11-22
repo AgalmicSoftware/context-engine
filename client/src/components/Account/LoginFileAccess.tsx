@@ -73,15 +73,13 @@ type LoginFileAccessProps = {
   savedName: string;
   /** Leaves the notice, back to the choices. */
   onBack: () => void;
-  /** Whether "Create login file" is already offered above, under a failed passkey. */
-  createOfferedAbove: boolean;
 };
 
 // Sign-in for someone whose device cannot use a passkey here: a file they keep, and choose again to sign in.
 // Creating one never signs in by itself: choosing the file to sign in shows that the person has it.
 // Three states, one box at most: the "Other options" button; its two choices; and, once a file was saved, a notice
 // that says how to sign in with it, with a way back.
-const LoginFileAccess = ({ onCreate, onSignIn, savedName, onBack, createOfferedAbove }: LoginFileAccessProps) => {
+const LoginFileAccess = ({ onCreate, onSignIn, savedName, onBack }: LoginFileAccessProps) => {
   const [opened, setOpened] = useState(false);
   const [unreadable, setUnreadable] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -197,11 +195,10 @@ const LoginFileAccess = ({ onCreate, onSignIn, savedName, onBack, createOfferedA
   }
   return (
     <div className={styles.passkeyWalletStatus} data-testid="ce-login-file">
-      {createOfferedAbove ? null : <CreateLoginFileLine onClick={onCreate} testId="ce-login-file-create" help={help} />}
-      <div className={createOfferedAbove ? undefined : styles.passkeyCopyAnswers}>
-        {createOfferedAbove ? null : <OrLine />}
-        <span className={styles.passkeyCopyAnswersUnbroken}>{chooseFile} if</span> you have{' '}
-        <span className={styles.passkeyCopyAnswersUnbroken}>one.{createOfferedAbove ? <> {help}</> : null}</span>
+      <CreateLoginFileLine onClick={onCreate} testId="ce-login-file-create" help={help} />
+      <div className={styles.passkeyCopyAnswers}>
+        <OrLine />
+        <span className={styles.passkeyCopyAnswersUnbroken}>{chooseFile} if</span> you have one.
       </div>
       {fileInput}
     </div>

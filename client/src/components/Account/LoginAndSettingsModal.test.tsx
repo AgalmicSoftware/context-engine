@@ -1039,8 +1039,8 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       expect(screen.getByTestId('ce-passkey-copy-answers')).toHaveTextContent(
         /^orCopy this link to paste your responses on a different device\./,
       );
-      // Until a file is made, the choices under the buttons stay closed.
-      expect(screen.getByRole('button', { name: 'Other options' })).toBeInTheDocument();
+      // This box is the other options: no "Other options" button beside it.
+      expect(screen.queryByRole('button', { name: 'Other options' })).not.toBeInTheDocument();
 
       // Creating saves a file and signs no one in. The notice about it stands in place of the failed passkey's
       // box and of "Other options": one box, and nothing else to choose from.
@@ -1068,10 +1068,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       expect(screen.getByRole('button', { name: 'Scan QR with phone' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Create login file' })).toBeInTheDocument();
       expect(await screen.findByRole('button', { name: 'Copy this link' })).toBeInTheDocument();
-      // "Other options" there holds only the sign-in: creating is offered above.
-      fireEvent.click(screen.getByRole('button', { name: 'Other options' }));
-      expect(screen.getAllByRole('button', { name: 'Create login file' })).toHaveLength(1);
-      expect(screen.getByRole('button', { name: 'Login with file' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Other options' })).not.toBeInTheDocument();
     } finally {
       click.mockRestore();
       delete urls.createObjectURL;

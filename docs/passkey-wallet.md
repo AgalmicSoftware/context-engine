@@ -279,8 +279,9 @@ that is closed, returns to the same message, so the offer stays.
 For someone whose device cannot use a passkey here at all. Under the log-in
 window's passkey buttons, **Other options** opens two buttons: **Create login
 file** and **Login with file**. After a Create whose passkey has no PRF, the
-status also offers it, between the phone and the copy link, with an "or" between
-the three: "Scan QR with phone to login", "Create login file to login without a
+status box is itself the other options, so "Other options" is not shown beside
+it; the box offers the login file between the phone and the copy link, with an
+"or" between the three: "Scan QR with phone to login", "Create login file to login without a
 passkey", "Copy this link to paste your responses on a different device."
 
 - The file (`context-engine-login-<6 hex>.json`) holds a standard 12-word

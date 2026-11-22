@@ -4,19 +4,11 @@ import LoginFileAccess, { saveLoginFile } from './LoginFileAccess';
 
 const file = { name: 'context-engine-login-ab12cd.json', text: '{"type":"context-engine-login-file"}' };
 
-const renderAccess = ({ savedName = '', createOfferedAbove = false } = {}) => {
+const renderAccess = ({ savedName = '' } = {}) => {
   const onCreate = jest.fn();
   const onSignIn = jest.fn();
   const onBack = jest.fn();
-  render(
-    <LoginFileAccess
-      onCreate={onCreate}
-      onSignIn={onSignIn}
-      onBack={onBack}
-      savedName={savedName}
-      createOfferedAbove={createOfferedAbove}
-    />,
-  );
+  render(<LoginFileAccess onCreate={onCreate} onSignIn={onSignIn} onBack={onBack} savedName={savedName} />);
   return { onCreate, onSignIn, onBack };
 };
 
@@ -65,13 +57,6 @@ describe('LoginFileAccess', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create login file' }));
     expect(onCreate).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId('ce-login-file-saved')).not.toBeInTheDocument();
-  });
-
-  it('offers only "Login with file" where creating one is already offered above', () => {
-    renderAccess({ createOfferedAbove: true });
-    fireEvent.click(screen.getByRole('button', { name: 'Other options' }));
-    expect(screen.queryByRole('button', { name: 'Create login file' })).not.toBeInTheDocument();
-    expect(screen.getByTestId('ce-login-file')).toHaveTextContent(/^Login with file if you have one\./);
   });
 
   it('is a notice once a login file was saved: what was saved, how to login with it, and a way back', () => {

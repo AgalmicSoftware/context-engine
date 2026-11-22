@@ -397,13 +397,15 @@ const LoginModalDisplayBody = ({
             </div>
           )}
 
-          <LoginFileAccess
-            onCreate={handleLoginFileCreate}
-            onSignIn={handleLoginFileSignIn}
-            savedName={loginFileSavedName}
-            onBack={handleLoginFileBack}
-            createOfferedAbove={passkeyLacksPrf}
-          />
+          {/* A failed passkey's box is the other options, so "Other options" is not shown beside it. */}
+          {passkeyLacksPrf && !loginFileSavedName ? null : (
+            <LoginFileAccess
+              onCreate={handleLoginFileCreate}
+              onSignIn={handleLoginFileSignIn}
+              savedName={loginFileSavedName}
+              onBack={handleLoginFileBack}
+            />
+          )}
 
           {renderAgentTokenLoginPanel()}
 
