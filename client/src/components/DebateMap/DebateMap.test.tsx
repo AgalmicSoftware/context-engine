@@ -1616,6 +1616,53 @@ describe('DebateMap', () => {
       expect(screen.queryByText(/Most would start locally|Start small/)).not.toBeInTheDocument();
     });
 
+    it("shows the AI's analysis of a topic's only question above its card", async () => {
+      const follows = (earlier: Element, later: Element) =>
+        Boolean(earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING);
+      const question = { id: '0xq1', question: 'Should pilots start local?', questionType: 'binary' };
+      const analysis = {
+        summary: 'Most would start locally.',
+        answered: 7,
+        categories: [{ label: 'Start small', summary: '', participantCount: 5 }],
+      };
+      const topic = { id: 't1', name: 'Pilots', comments: [{ id: 's', comment: 'A topic summary.' }] };
+      const { unmount } = renderSessionAtlas({
+        treeData: [{ ...topic, questions: [{ ...question, analysis }] }],
+        requestedModalNodeId: 't1',
+        buildQuestionLink: (id: string) => `/q/${id}`,
+      });
+      expect(await screen.findByRole('region', { name: 'AI-generated summary' })).toHaveTextContent('A topic summary.');
+      fireEvent.click(screen.getByText('Questions').closest('[role="button"]') as HTMLElement);
+      // The question has no circle of its own, so its topic shows the analysis: above its card, not on it.
+      const note = screen.getByRole('region', { name: 'AI summary of 7 participants’ answers' });
+      const card = screen.getByRole('link', { name: /^Answer: Should pilots start local\?/ });
+      expect(note).toHaveTextContent('Most would start locally.');
+      expect(
+        within(note)
+          .getAllByRole('listitem')
+          .map((item) => item.textContent),
+      ).toEqual(['Start small5 of 7']);
+      expect(follows(note, card)).toBe(true);
+      expect(card).not.toHaveTextContent(/AI summary|Most would start locally|Start small/);
+      unmount();
+      // A question's own window already leads with its analysis, so it does not repeat it over the card.
+      const circle = { id: 't1-q1', name: question.question, depth: 2, isQuestion: true };
+      renderSessionAtlas({
+        treeData: [
+          {
+            ...topic,
+            children: [
+              { ...circle, questions: [{ ...question, analysis }], comments: [{ id: 'a', comment: analysis.summary }] },
+            ],
+          },
+        ],
+        requestedModalNodeId: 't1-q1',
+      });
+      expect(await screen.findByRole('region', { name: 'AI-generated summary' })).toHaveTextContent(analysis.summary);
+      expect(screen.getByText('Agree')).toBeInTheDocument();
+      expect(screen.queryByTestId('ce-atlas-question-analysis')).not.toBeInTheDocument();
+    });
+
     it('keeps the demo atlas four levels when none are named', () => {
       render(
         <MemoryRouter>

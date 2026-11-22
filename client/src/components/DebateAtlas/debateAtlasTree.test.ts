@@ -394,7 +394,7 @@ it('leads a question circle with the saved analysis, and leaves a build without 
   // An analysis without a summary is none.
   expect(second.comments).toBeUndefined();
   expect(openness.questions?.[1].analysis).toBeUndefined();
-  // A lone question has no circle of its own: its card in the topic carries the analysis.
+  // A lone question has no circle of its own: its topic shows the analysis above its card.
   expect(lone.children).toBeUndefined();
   expect(lone.questions?.[0].analysis).toMatchObject({
     summary: 'Most want contracts published; a few fear the cost.',

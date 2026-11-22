@@ -85,6 +85,7 @@ import DebateMapGeneratedSummary from './DebateMapGeneratedSummary';
 
 import { createTextMeasurer, fitPackedAtlasCirclesToBox, fitPackedAtlasLabel } from './packedAtlasFit';
 import { QuadraticQuestionPreview } from './QuadraticQuestionPreview';
+import { QuestionAnalysisNote } from './QuestionAnalysisNote';
 
 const StandalonePoliticalCompass = React.lazy(() =>
   import('../DemoViews/DebateHUD/PoliticalCompassView').then((module) => ({
@@ -2148,6 +2149,10 @@ const Modal = ({
             )}
             {questionsOpen && (
               <div className={`${styles.collapseContent} ${styles.questionsSection}`}>
+                {/* A topic's only question has no circle of its own, so its analysis shows here, above its card. */}
+                {!content.isQuestion && questions.length === 1 && (
+                  <QuestionAnalysisNote analysis={questions[0].analysis} />
+                )}
                 {questions.map((q, i) => {
                   const questionType = normalizeQuestionType(q.questionType || q.type);
                   const questionText = q.question || q.prompt || 'Untitled question';
