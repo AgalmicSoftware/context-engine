@@ -485,7 +485,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     render(tree);
 
     expect(screen.getByTestId('ce-session-identity-unavailable')).toHaveTextContent(
-      /capability profile is unavailable or invalid/i,
+      "This session's settings didn't load. Reload the page, then sign in.",
     );
     expect(screen.queryByRole('link', { name: 'Ethereum wallet' })).not.toBeInTheDocument();
     expect(screen.queryByText('test network only')).not.toBeInTheDocument();

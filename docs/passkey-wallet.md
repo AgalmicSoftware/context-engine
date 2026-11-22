@@ -256,7 +256,7 @@ Forbidden fallback behavior:
 
 A failed sign-in changes nothing about sign-in itself. When the passkey itself is
 the problem and the browser holds unsaved answers (typed on the page, or drafted
-in an interview), the status under the buttons adds **Copy my answers** and one
+in an interview), the status under the buttons adds **Copy my answers link** and one
 line: "Copy this and open it on your phone to sign in and submit." (In a browser
 without passkeys the line names Safari or Chrome instead.)
 

@@ -95,7 +95,7 @@ it('shows the rows on their own only once the profile is slow', () => {
 
 describe('Copy my answers after a failed sign-in', () => {
   const failed = {
-    passkeyWalletStatusMessage: 'Login failed: This passkey does not advertise WebAuthn PRF support.',
+    passkeyWalletStatusMessage: "Login failed: This passkey can't be used here.",
     passkeyWalletStatusTone: 'error',
   } as Partial<Props>;
   afterEach(() => sessionStorage.clear());
@@ -107,7 +107,7 @@ describe('Copy my answers after a failed sign-in', () => {
     );
     const prompt = jest.spyOn(window, 'prompt').mockReturnValue(null);
     renderBody(failed);
-    const button = await screen.findByRole('button', { name: 'Copy my answers' });
+    const button = await screen.findByRole('button', { name: 'Copy my answers link' });
     expect(screen.getByTestId('ce-passkey-copy-answers')).toHaveTextContent(
       'Copy this and open it on your phone to sign in and submit.',
     );
@@ -136,7 +136,7 @@ describe('Copy my answers after a failed sign-in', () => {
     sessionStorage.setItem('dg:surveyDraft:meadow-forum:84532:anon:all', JSON.stringify({ answers }));
     const prompt = jest.spyOn(window, 'prompt').mockReturnValue(null);
     renderBody(failed);
-    const button = await screen.findByRole('button', { name: 'Copy my answers' });
+    const button = await screen.findByRole('button', { name: 'Copy my answers link' });
     await act(async () => {
       fireEvent.click(button);
     });
@@ -161,6 +161,8 @@ describe('Copy my answers after a failed sign-in', () => {
     expect(
       [
         'Open this link in Safari or Chrome to sign in.',
+        "Login failed: This passkey can't be used here.",
+        "Create failed: This passkey can't be used here.",
         'Create failed: This passkey does not advertise WebAuthn PRF support.',
         'Login failed: WebAuthn PRF is required for the embedded wallet on this browser/authenticator.',
         'Create failed: No passkey credential was created.',
@@ -168,7 +170,7 @@ describe('Copy my answers after a failed sign-in', () => {
         'Login failed: Passkey assertion does not match the stored wallet credential.',
         'Create failed: The operation is insecure.',
       ].map(isPasskeyProblem),
-    ).toEqual(Array(7).fill(true));
+    ).toEqual(Array(9).fill(true));
     expect(
       [
         'Login failed: Passkey prompt closed or timed out. Try again.',

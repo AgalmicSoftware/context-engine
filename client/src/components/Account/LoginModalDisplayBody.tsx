@@ -87,7 +87,7 @@ const CopyMyAnswers = ({ where, otherwise }: { where: string; otherwise: React.R
           if (!done) window.prompt('Copy this', answersCopyTextOnOneLine(text));
         }}
       >
-        {copied ? 'Answers copied' : 'Copy my answers'}
+        {copied ? 'Link copied' : 'Copy my answers link'}
       </Button>
       <span>
         Copy this and open it {where} to sign in and submit.{' '}
@@ -205,8 +205,7 @@ const LoginModalDisplayBody = ({
           <div className={styles.accountWarningMessage}>
             {sessionIdentityUnavailable ? (
               <p data-testid="ce-session-identity-unavailable">
-                This session&apos;s capability profile is unavailable or invalid. Reload or repair the canonical session
-                configuration before using session-specific access.
+                This session&apos;s settings didn&apos;t load. Reload the page, then sign in.
               </p>
             ) : null}
             {showWalletIdentity ? (

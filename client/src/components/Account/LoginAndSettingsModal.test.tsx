@@ -898,6 +898,40 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(screen.queryByRole('button', { name: 'What does this mean?' })).not.toBeInTheDocument();
   });
 
+  it.each([
+    [
+      'Login',
+      'handlePasskeyWalletSignIn',
+      'unlockPasskeyWallet',
+      'WebAuthn PRF is required for the embedded wallet on this browser/authenticator.',
+    ],
+    [
+      'Create',
+      'handlePasskeyWalletCreate',
+      'createPasskeyWallet',
+      'This passkey does not advertise WebAuthn PRF support.',
+    ],
+  ] as const)(
+    'a %s without PRF says plainly the passkey cannot be used, and offers the answers',
+    async (word, handler, call, thrown) => {
+      sessionStorage.setItem(
+        'dg:surveyDraft:meadow-forum:84532:anon:all',
+        JSON.stringify({ answers: { q1: { value: 'Agree' } } }),
+      );
+      mockedPasskeyWallet[call].mockRejectedValueOnce(new Error(thrown));
+      const subject = mountClassSubject(
+        new LoginAndSettingsModalSubject(buildProps({ activeSessionSlug: 'meadow-forum' })),
+      );
+      await subject[handler]();
+      render(subject.getModalDisplay());
+      const status = screen.getByTestId('ce-passkey-wallet-status');
+      expect(status).toHaveTextContent(`${word} failed: This passkey can't be used here.`);
+      expect(status).not.toHaveTextContent('WebAuthn');
+      expect(await screen.findByRole('button', { name: 'Copy my answers link' })).toBeInTheDocument();
+      sessionStorage.clear();
+    },
+  );
+
   it('sends someone in a browser without passkeys to Safari or Chrome, with the link to copy', async () => {
     const { PasskeysUnavailableError } = jest.requireActual<typeof import('../../wallet/passkey/unavailable')>(
       '../../wallet/passkey/unavailable',
