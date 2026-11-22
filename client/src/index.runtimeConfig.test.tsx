@@ -92,4 +92,18 @@ describe('browser runtime config entrypoint', () => {
     expect(addressAtRender).toBe('?joinGroup=g1#prefill=x');
     expect(held).toBe('gp:river stone');
   });
+
+  it('loads copied answers out of the address before the application renders', async () => {
+    window.history.replaceState({}, '', '/session/meadow-forum#answers=paste&groupInvite=kept');
+    jest.isolateModules(() => {
+      require('./index');
+    });
+    // The answers part has left the address at once; the render waits for the load.
+    expect(window.location.hash).not.toContain('answers=');
+    expect(mockRender).not.toHaveBeenCalled();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mockRender).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(sessionStorage.getItem('ce:answersHandoff:note') || '')).toEqual({ kind: 'paste', error: '' });
+    sessionStorage.clear();
+  });
 });

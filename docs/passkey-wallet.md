@@ -252,6 +252,36 @@ Forbidden fallback behavior:
 - plaintext private key in IndexedDB
 - passkey prompt as a UI-only gate
 
+## When Sign-In Fails After Answers Were Drafted
+
+A failed sign-in changes nothing about sign-in itself. When the passkey itself is
+the problem and the browser holds unsaved answers (typed on the page, or drafted
+in an interview), the status under the buttons adds **Copy my answers** and one
+line: "Copy this and open it on your phone to sign in and submit." (In a browser
+without passkeys the line names Safari or Chrome instead.)
+
+A passkey problem is: no passkeys in this browser, no PRF support, or any other
+create or unlock the device or browser refused. Errors fixed in the same browser
+do not count: a prompt that was closed or timed out, and the ones that point at
+the other button ("Use Login.", "Sign in, or delete it first", "Use Create…").
+
+- The copy is a link ending `#answers=…`. The answers are in the link's fragment,
+  which browsers do not send; the page that opens it takes the part out of the
+  address before anything is fetched. Anyone given the link can read the answers.
+- It carries the browser's own signed-out records as they are: typed answers with
+  their importance and conviction, and an interview's review with its edits and
+  research choices. Nothing is relabelled; this is not `#prefill=`, which holds
+  an AI's drafts.
+- A set too long for one link (over about 2,000 characters) copies as two lines:
+  a short link ending `#answers=paste`, then a code. The short link opens a box
+  to paste the whole message into. A link that arrives cut off opens the same box.
+- The opening browser loads the answers into its own signed-out records and says
+  how many. Answers it already holds are kept, and it says how many copied ones
+  stayed out. An interview's review is asked about before it shows, as any review
+  kept signed out is.
+- With no unsaved answers the sign-in screen is unchanged; a browser without
+  passkeys keeps its **Copy link**.
+
 ## Wallet Client API
 
 `PasskeyEoaWalletClient` supports:

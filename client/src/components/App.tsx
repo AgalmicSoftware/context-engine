@@ -6,6 +6,7 @@ import store from '../store.js';
 import { createLogger } from '../utilities/logging';
 import { syncPublicPageHead } from '../utilities/ui/publicPageHead.js';
 import CEToaster from './Shared/CEToaster';
+import AnswersHandoffArrival from './Shared/AnswersHandoffArrival';
 
 import 'assets/css/contextEngine.scss';
 
@@ -239,6 +240,7 @@ class App extends React.Component<AppProps> {
             <Provider store={store}>
               <AppErrorBoundary>
                 <CEToaster position="bottom-right" toastOptions={{ style: toastTheme }} />
+                <AnswersHandoffArrival />
                 <Routes>
                   <Route
                     path="*"

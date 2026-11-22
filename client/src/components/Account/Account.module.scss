@@ -2308,6 +2308,14 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   margin: 8px auto 0;
 }
 
+.passkeyCopyAnswers {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
 .passkeyWalletStatus {
   max-width: min(520px, 100%);
   margin: 14px auto 0;

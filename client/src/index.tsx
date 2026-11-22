@@ -6,6 +6,7 @@ import App from 'components/App';
 import { removeGroupInviteFromAddress } from './domains/worker/workerGroupAutoJoinIntent';
 import { removeAgentSignInCodeFromAddress, watchAddressForAgentSignInCode } from './utilities/session/agentSignIn';
 import { rememberArrivalDrafts } from './utilities/ui/arrivalLink';
+import { hasAnswersInAddress, takeAnswersFromAddress, watchAddressForAnswers } from './utilities/ui/answersHandoff';
 
 // A link's group invite, and a sign-in code from a person's AI agent, leave the address before the router reads
 // it and before anything is fetched.
@@ -25,8 +26,20 @@ if (!container) {
 
 const root = createRoot(container);
 
-root.render(
-  <BrowserRouter>
-    <App />
-  </BrowserRouter>,
-);
+const render = () =>
+  root.render(
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>,
+  );
+
+// Answers copied from a browser where sign-in failed are loaded before the page looks for its drafts. Any other
+// address renders at once, as it always has.
+watchAddressForAnswers();
+if (hasAnswersInAddress()) {
+  void takeAnswersFromAddress()
+    .catch(() => undefined)
+    .then(render);
+} else {
+  render();
+}
