@@ -52,6 +52,7 @@ import contractScripts, {
 } from '../../utilities/web3/chainGateway.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import * as passkeyWallet from '../../wallet/passkeyWallet.js';
+import { saveLoginFile } from './LoginFileAccess';
 import {
   getSessionAiSettings,
   getLocalAiSettings,
@@ -180,6 +181,8 @@ interface LoginAndSettingsModalState {
   passkeyWalletStatusTone: string;
   // Explanation behind the status's "?" button; any new status clears it.
   passkeyWalletStatusHelp: string;
+  // The name of the login file this window last saved to the person's downloads.
+  loginFileSavedName: string;
   passkeyMode: PasskeyWalletActionMode;
   autoRequestTestnetFundsEnabled: boolean;
   autoSendTriggered: boolean;
@@ -341,6 +344,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       passkeyWalletStatusMessage: '',
       passkeyWalletStatusTone: '',
       passkeyWalletStatusHelp: '',
+      loginFileSavedName: '',
       passkeyMode: '',
       autoRequestTestnetFundsEnabled: DEFAULT_AUTO_REQUEST_TESTNET_FUNDS,
       autoSendTriggered: false,
@@ -415,6 +419,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   handlePasskeyWalletCreate = this._passkeyActions.handlePasskeyWalletCreate;
   handlePasskeyWalletCreateOnAnotherDevice = this._passkeyActions.handlePasskeyWalletCreateOnAnotherDevice;
   handlePasskeyWalletSignIn = this._passkeyActions.handlePasskeyWalletSignIn;
+  handleLoginFileSignIn = this._passkeyActions.handleLoginFileSignIn;
+  // Makes a login file and saves it to the person's downloads. It signs no one in: choosing the file does.
+  handleLoginFileCreate = () => {
+    const file = passkeyWallet.createLoginFile();
+    saveLoginFile(file);
+    this.setStateIfMounted({ loginFileSavedName: file.name });
+  };
   _finalizePasskeyWalletLogin = this._passkeyActions._finalizePasskeyWalletLogin;
   _agentTokenActions = createLoginAgentActions({
     changeAccount: (payload) => this.props.changeAccount(payload),
@@ -2579,6 +2590,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       handlePasskeyWalletCreate: this.handlePasskeyWalletCreate,
       handlePasskeyWalletCreateOnAnotherDevice: this.handlePasskeyWalletCreateOnAnotherDevice,
       handlePasskeyWalletSignIn: this.handlePasskeyWalletSignIn,
+      handleLoginFileSignIn: this.handleLoginFileSignIn,
+      handleLoginFileCreate: this.handleLoginFileCreate,
+      loginFileSavedName: this.state.loginFileSavedName,
       loginComplete: this.props.loginComplete,
       loginInProgress: this.props.loginInProgress,
       network: this.props.network,

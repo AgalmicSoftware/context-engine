@@ -8,6 +8,7 @@ import type {
   PasskeyDerivedWalletRecord,
   PasskeyWalletCapabilities,
   PasskeyWalletConfig,
+  LoginFileWalletRecord,
   PasskeyWalletRecord,
   PasskeyWalletStorage,
   SignTypedDataPayload,
@@ -28,6 +29,15 @@ import {
 } from './keystore/derivePrivateKey.js';
 import { encryptPrivateKey } from './keystore/encryptPrivateKey.js';
 import { indexedDbWalletStorage } from './keystore/storage.js';
+import {
+  LoginFileExpiredError,
+  createLoginFile,
+  isLoginFileKeyUsable,
+  openLoginFileKey,
+  wipeLoginFileKey,
+  readLoginFileKey,
+  sealLoginFileKey,
+} from './keystore/loginFile.js';
 import { createSoftSessionPolicy } from './session/sessionPolicy.js';
 import { createWorkerSoftSessionClient, type SoftSessionClient } from './session/sessionWorkerClient.js';
 import { createLogger } from '../utilities/logging.js';
@@ -199,7 +209,10 @@ const normalizeTypedData = (payload: unknown): SignTypedDataPayload => {
 const toHexString = (value: unknown): HexString => String(value || '') as HexString;
 
 const isEncryptedWalletRecord = (record: PasskeyWalletRecord): record is EncryptedWalletRecord =>
-  record.keyMode !== 'passkey-derived' && 'encryptedPrivateKey' in record;
+  record.keyMode !== 'passkey-derived' && record.keyMode !== 'login-file' && 'encryptedPrivateKey' in record;
+
+const isLoginFileRecord = (record: PasskeyWalletRecord): record is LoginFileWalletRecord =>
+  record.keyMode === 'login-file';
 
 const isPasskeyDerivedWalletRecord = (record: PasskeyWalletRecord): record is PasskeyDerivedWalletRecord =>
   record.keyMode === 'passkey-derived';
@@ -242,6 +255,7 @@ export class PasskeyEoaWalletClient {
   private unlockMaxExpiresAt = 0;
   private activeChain: ChainLike = defaultChain();
   private lockTimer: ReturnType<typeof setTimeout> | null = null;
+  private wipeTimer: ReturnType<typeof setTimeout> | null = null;
   private transitionInProgress = false;
   private sessionChainId = 0;
   // Bumped on every chain change; a request that sees it move never retries.
@@ -344,7 +358,7 @@ export class PasskeyEoaWalletClient {
       const salt = randomBase64Url(32);
       const saltBytes = new Uint8Array(base64URLToBuffer(salt));
       // This record holds the only copy of the encrypted wallet key.
-      const savedRecord = await this.storage.read();
+      const savedRecord = await this.readPasskeyRecord();
       this.assertCurrentOperation(generation);
       if (savedRecord?.rpId === this.config.rpId && isEncryptedWalletRecord(savedRecord)) {
         throw new Error('A passkey wallet already exists in this browser. Sign in, or delete it first.');
@@ -381,7 +395,7 @@ export class PasskeyEoaWalletClient {
       this.assertCurrentOperation(generation);
       await this.mutateWallet(async () => {
         // The authenticator prompt can remain open while another client saves a wallet.
-        const currentRecord = await this.storage.read();
+        const currentRecord = await this.readPasskeyRecord();
         this.assertCurrentOperation(generation);
         if (currentRecord?.rpId === this.config.rpId && isEncryptedWalletRecord(currentRecord)) {
           throw new Error('A passkey wallet already exists in this browser. Sign in, or delete it first.');
@@ -407,8 +421,25 @@ export class PasskeyEoaWalletClient {
     this.transitionInProgress = true;
     let privateKey: HexString | null = null;
     try {
+      // An account signed in from a login file re-unlocks from its sealed key, with no prompt, until the file is
+      // due again. Login with a passkey (selectCredential) is a choice of another account, and goes past it.
+      const fileRecord = options.selectCredential === true ? null : await this.readLoginFileRecord();
+      this.assertCurrentOperation(generation);
+      if (fileRecord) {
+        assertExpectedAccount(options.expectedAddress, fileRecord.evmAddress);
+        if (!isLoginFileKeyUsable(fileRecord, this.now())) {
+          await this.wipeLoginFileKeyIfDue();
+          this.assertCurrentOperation(generation);
+          throw new LoginFileExpiredError();
+        }
+        privateKey = await openLoginFileKey(fileRecord);
+        this.assertCurrentOperation(generation);
+        await this.activate(fileRecord, privateKey, generation);
+        this.assertCurrentOperation(generation);
+        return fileRecord.evmAddress;
+      }
       if (this.config.walletKeyMode === 'passkey-derived') {
-        const storedRecord = await this.storage.read();
+        const storedRecord = await this.readPasskeyRecord();
         this.assertCurrentOperation(generation);
         if (storedRecord && storedRecord.rpId !== this.config.rpId) {
           throw new Error(`Stored wallet belongs to RP ID "${storedRecord.rpId}", not "${this.config.rpId}".`);
@@ -453,7 +484,7 @@ export class PasskeyEoaWalletClient {
         return address;
       }
 
-      const record = await this.storage.read();
+      const record = await this.readPasskeyRecord();
       this.assertCurrentOperation(generation);
       if (!record) throw new MissingPasskeyWalletRecordError();
       if (record.rpId !== this.config.rpId) {
@@ -491,6 +522,54 @@ export class PasskeyEoaWalletClient {
     }
   }
 
+  /** Signs in from a login file's text (or its 12 words): the same account on every device that has the file. */
+  async signInWithLoginFile(text: string): Promise<HexString> {
+    const generation = ++this.operationGeneration;
+    this.transitionInProgress = true;
+    let privateKey: HexString | null = null;
+    try {
+      // Read first: a file that is not a login file leaves the signed-in account as it was.
+      const key = readLoginFileKey(text);
+      privateKey = key.privateKey;
+      const saved = await this.storage.read();
+      this.assertCurrentOperation(generation);
+      // An encrypted wallet's record holds its only key, so it is never written over, whatever site it names.
+      if (saved && isEncryptedWalletRecord(saved)) {
+        throw new Error('A passkey wallet already exists in this browser. Sign in, or delete it first.');
+      }
+      if (this.activeAddress) {
+        await this.mutateWallet(() => this.lock(), generation);
+        this.assertCurrentOperation(generation);
+      }
+      const record = await sealLoginFileKey({
+        privateKey,
+        address: key.address,
+        config: this.config,
+        now: this.now(),
+      });
+      this.assertCurrentOperation(generation);
+      await this.mutateWallet(async () => {
+        const existing = await this.storage.read();
+        this.assertCurrentOperation(generation);
+        // The check again, now that nothing else can write: another tab may have saved a wallet meanwhile.
+        if (existing && isEncryptedWalletRecord(existing)) {
+          throw new Error('A passkey wallet already exists in this browser. Sign in, or delete it first.');
+        }
+        await this.storage.write(record);
+        this.assertCurrentOperation(generation);
+      }, generation);
+      await this.activate(record, privateKey, generation);
+      this.assertCurrentOperation(generation);
+      return record.evmAddress;
+    } catch (error) {
+      this.assertCurrentOperation(generation);
+      throw error;
+    } finally {
+      privateKey = null;
+      if (this.operationGeneration === generation) this.transitionInProgress = false;
+    }
+  }
+
   async restoreSession(options: RestoreOptions = {}): Promise<HexString | null> {
     const generation = this.operationGeneration;
     if (this.transitionInProgress) return null;
@@ -499,8 +578,17 @@ export class PasskeyEoaWalletClient {
     this.assertCurrentOperation(generation);
     if (!record || (record.disconnected === true && options.requireSigner !== true)) return null;
     if (record.rpId !== this.config.rpId) return null;
-    if (this.config.walletKeyMode === 'passkey-derived' && !isPasskeyDerivedWalletRecord(record)) return null;
-    if (this.config.walletKeyMode === 'encrypted-private-key' && !isEncryptedWalletRecord(record)) return null;
+    if (isLoginFileRecord(record)) {
+      // Past its hours the file is needed again: the key is wiped and the page shows signed out.
+      if (!isLoginFileKeyUsable(record, this.now())) {
+        await this.wipeLoginFileKeyIfDue();
+        this.assertCurrentOperation(generation);
+        return null;
+      }
+    } else {
+      if (this.config.walletKeyMode === 'passkey-derived' && !isPasskeyDerivedWalletRecord(record)) return null;
+      if (this.config.walletKeyMode === 'encrypted-private-key' && !isEncryptedWalletRecord(record)) return null;
+    }
     if (options.requireSigner === false) {
       this.activeAddress = record.evmAddress;
       this.unlockExpiresAt = 0;
@@ -634,9 +722,47 @@ export class PasskeyEoaWalletClient {
         await this.storage.clear();
       } else {
         const record = await this.storage.read();
-        if (record) await this.storage.write({ ...record, disconnected: true });
+        // A login file's sealed key does not outlive a sign-out; the file itself signs in again. What is left
+        // tells another tab on this account to ask for the file, not for a passkey.
+        if (record && isLoginFileRecord(record)) await this.storage.write(wipeLoginFileKey(record, this.now()));
+        else if (record) await this.storage.write({ ...record, disconnected: true });
       }
     });
+  }
+
+  // The saved record as the passkey flows know it: a login file's record is not a passkey's.
+  private async readPasskeyRecord(): Promise<EncryptedWalletRecord | PasskeyDerivedWalletRecord | null> {
+    const record = await this.storage.read();
+    return record && !isLoginFileRecord(record) ? record : null;
+  }
+
+  // Wipes a login file's key once its hours are over, wherever that is noticed: at the next page load, at the
+  // next signature, or by the timer set when it was unlocked. A browser that never opens the site again keeps
+  // the sealed key until it does.
+  private async wipeLoginFileKeyIfDue(): Promise<void> {
+    await this.mutateWallet(async () => {
+      const record = await this.storage.read();
+      if (!record || !isLoginFileRecord(record) || !record.sealKey) return;
+      if (record.expiresAt > this.now()) return;
+      await this.storage.write(wipeLoginFileKey(record, this.now()));
+    });
+  }
+
+  private scheduleLoginFileWipe(record: LoginFileWalletRecord): void {
+    if (this.wipeTimer) clearTimeout(this.wipeTimer);
+    this.wipeTimer = setTimeout(
+      () => {
+        void this.wipeLoginFileKeyIfDue().catch((error) => walletLog.warn('Login file wipe failed:', error));
+      },
+      Math.max(0, record.expiresAt - this.now()) + 1000,
+    );
+    // A pending wipe never keeps a Node process (a test run) alive.
+    (this.wipeTimer as { unref?: () => void }).unref?.();
+  }
+
+  private async readLoginFileRecord(): Promise<LoginFileWalletRecord | null> {
+    const record = await this.storage.read();
+    return record && isLoginFileRecord(record) && record.rpId === this.config.rpId ? record : null;
   }
 
   private assertCurrentOperation(generation: number): void {
@@ -661,7 +787,9 @@ export class PasskeyEoaWalletClient {
     await this.mutateWallet(async () => {
       const existing = await this.storage.read();
       this.assertCurrentOperation(generation);
-      if (existing && !isPasskeyDerivedWalletRecord(existing)) return;
+      // A passkey sign-in replaces a login file's record. Any other record that is not a derived wallet's is
+      // left alone: an encrypted wallet's holds its only key.
+      if (existing && !isPasskeyDerivedWalletRecord(existing) && !isLoginFileRecord(existing)) return;
       await this.storage.write(record);
       this.assertCurrentOperation(generation);
     }, generation);
@@ -672,11 +800,16 @@ export class PasskeyEoaWalletClient {
       const chainId = chainIdOf(this.activeChain);
       const rpcUrl = resolveRpcUrl(this.activeChain);
       if (!rpcUrl) throw new Error('No RPC URL is configured for the passkey wallet chain.');
-      const expiresAt = this.now() + this.config.unlockTtlSeconds * 1000;
+      // A login file's unlock never runs past the time its file is due again.
+      const leftSeconds = isLoginFileRecord(record)
+        ? Math.max(1, Math.floor((record.expiresAt - this.now()) / 1000))
+        : Infinity;
+      const ttlSeconds = Math.min(this.config.unlockTtlSeconds, leftSeconds);
+      const expiresAt = this.now() + ttlSeconds * 1000;
       const policy = createSoftSessionPolicy({
         address: record.evmAddress,
-        ttlSeconds: this.config.unlockTtlSeconds,
-        maxTtlSeconds: MAX_UNLOCK_SECONDS,
+        ttlSeconds,
+        maxTtlSeconds: Math.min(MAX_UNLOCK_SECONDS, leftSeconds),
         now: this.now(),
         allowedChainIds: chainId ? [chainId] : undefined,
         maxTransactionValueWei: '0',
@@ -702,6 +835,7 @@ export class PasskeyEoaWalletClient {
       this.unlockMaxExpiresAt = Number(policy.maxExpiresAt) || expiresAt;
       this.sessionChainId = chainId;
       this.scheduleLock();
+      if (isLoginFileRecord(record)) this.scheduleLoginFileWipe(record);
     }, generation);
     this.assertCurrentOperation(generation);
   }
@@ -912,6 +1046,9 @@ export const createPasskeyWallet = (options: CreateOptions = {}): Promise<HexStr
   getPasskeyWalletClient().createWallet(options);
 export const unlockPasskeyWallet = (options: UnlockOptions = {}): Promise<HexString> =>
   getPasskeyWalletClient().unlockWallet(options);
+export const signInWithLoginFile = (text: string): Promise<HexString> =>
+  getPasskeyWalletClient().signInWithLoginFile(text);
+export { createLoginFile };
 export const restorePasskeyWalletSession = (options: RestoreOptions = {}): Promise<HexString | null> =>
   getPasskeyWalletClient().restoreSession(options);
 export const logoutPasskeyWallet = (): Promise<void> => getPasskeyWalletClient().disconnect();

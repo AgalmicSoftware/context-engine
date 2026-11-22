@@ -249,10 +249,10 @@ update of 24H2 and 25H2. On Windows 10, an older Windows 11 or an older browser,
 Windows Hello saves the passkey and the site cannot use it. A passkey app
 without PRF, set as a phone's passkey provider, ends the same way.
 
-After such a Create, the status under the buttons reads "**Scan QR with phone**
-to login or **Copy this link** to paste your responses on a different device."
-(the second half only where the browser holds unsaved answers). The first button
-runs Create again with `authenticatorAttachment: 'cross-platform'`
+After such a Create, the status under the buttons offers "**Scan QR with phone**
+to login", then a login file (below), then, where the browser holds unsaved
+answers, "**Copy this link** to paste your responses on a different device."
+The first button runs Create again with `authenticatorAttachment: 'cross-platform'`
 and `hints: ['hybrid']`, so the browser shows a QR code to scan with a phone.
 Everything else in the request, the PRF salt included, is unchanged, and the
 wallet is derived the same way. The passkey then lives on the phone: each later
@@ -273,6 +273,41 @@ that is closed, returns to the same message, so the offer stays.
   sign-ins name the saved passkey with the `internal` and `hybrid` transports
   only, so a key may not be asked for.
 - The copy line below stays as the last resort.
+
+### Login file: sign-in without a passkey
+
+For someone whose device cannot use a passkey here at all. Under the log-in
+window's passkey buttons, **Other options** opens two buttons: **Create login
+file** and **Login with file**. After a Create whose passkey has no PRF, the
+status also offers it, between the phone and the copy link, with an "or" between
+the three: "Scan QR with phone to login", "Create login file to login without a
+passkey", "Copy this link to paste your responses on a different device."
+
+- The file (`context-engine-login-<6 hex>.json`) holds a standard 12-word
+  recovery phrase; the account is that phrase's first Ethereum address
+  (`m/44'/60'/0'/0/0`). It is made in the browser and sent nowhere. Whoever holds
+  the file holds the account, and a lost file cannot be replaced. It has no
+  password.
+- Creating never signs in by itself. The person signs in by choosing the file,
+  which shows that they have it. The 12 words alone, in a text file, sign in too.
+- The account is a `passkey_eoa` account like any other from there on: the same
+  provider, session, signatures and transactions, none of which asks again while
+  the file is loaded. No Worker or contract knows the difference. It is a
+  different account from any passkey's.
+- The file stays loaded for 6 hours from the moment it is chosen, across reloads;
+  use of the page does not extend that. In that time the key rests in the
+  wallet's IndexedDB record (`keyMode: 'login-file'`), encrypted with AES-GCM
+  under a non-extractable WebCrypto key kept in the same record. Page scripts
+  cannot read it as text. It is no guard against a script running in the site's
+  origin while it lasts, nor against a copy of the browser's profile.
+- After 6 hours, and on Disconnect, the key is wiped from the record: by a timer
+  on an open page, and otherwise at the next page load or signature. What is left
+  names the account and holds no key, so another tab on that account is told
+  "Your login file is needed again." rather than asked for a passkey. A browser
+  that never opens the site again keeps the sealed key until it does.
+- A passkey Login or Create replaces a login file's record, and the reverse. An
+  `encrypted-private-key` wallet's record is never written over. A file that is
+  not a login file leaves the signed-in account as it was.
 
 Allowed fallback behavior:
 

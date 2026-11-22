@@ -21,6 +21,9 @@ const renderBody = (props: Partial<Props>) => {
         handleLogout: jest.fn(),
         handlePasskeyWalletCreate: jest.fn(),
         handlePasskeyWalletCreateOnAnotherDevice: jest.fn(),
+        handleLoginFileSignIn: jest.fn(),
+        handleLoginFileCreate: jest.fn(),
+        loginFileSavedName: '',
         handlePasskeyWalletSignIn: jest.fn(),
         loginComplete: false,
         loginInProgress: false,
@@ -211,9 +214,10 @@ describe('Copy my answers after a failed sign-in', () => {
         'Create failed: A passkey wallet already exists in this browser. Sign in, or delete it first.',
         'No passkey wallet is saved in this browser for this app. Use Create to make one under this RP ID.',
         'Signed out here, but the saved wallet could not be disconnected.',
+        'Login failed: That is not a Context Engine login file.',
         '',
       ].map(isPasskeyProblem),
-    ).toEqual(Array(7).fill(false));
+    ).toEqual(Array(8).fill(false));
 
     sessionStorage.setItem(
       'dg:surveyDraft:meadow-forum:84532:anon:all',

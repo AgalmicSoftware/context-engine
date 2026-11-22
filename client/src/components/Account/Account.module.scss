@@ -2313,9 +2313,53 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   margin-top: 8px;
 }
 
-// The line above the copy line: apart enough that the two buttons' 44px tap areas do not meet.
+// One quiet line under the log-in buttons; a tap area at least 44px tall.
+.loginFileToggle {
+  display: block;
+  min-height: 44px;
+  margin: -10px auto;
+  padding: 0 8px;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  color: inherit !important;
+  font-size: 0.9rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+// The line above another line with a button: apart enough that the two buttons' 44px tap areas do not meet.
 .passkeyAnotherDevice {
   margin-bottom: 14px;
+}
+
+// "or", between the ways out under a failed passkey: a line of its own, larger than the text around it.
+.passkeyOr {
+  margin: 10px 0 8px;
+  font-size: 1.25em;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+// What was just saved to the person's downloads: news, on the theme's success colour, not part of the choices.
+// It carries its own background, so it reads on the box in every theme.
+.loginFileSaved {
+  margin-top: 12px;
+  padding: 6px 10px;
+  border-radius: var(--ce-radius-6);
+  background: var(--ce-status-success);
+  color: var(--ce-status-success-contrast);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+
+  &:empty {
+    display: none;
+  }
 }
 
 // A word of the sentence: its label sits on the sentence's baseline.

@@ -54,6 +54,8 @@ jest.mock('../../wallet/passkeyWallet.js', () => ({
   restorePasskeyWalletSession: jest.fn(async () => null),
   createPasskeyWallet: jest.fn(async () => '0x1111111111111111111111111111111111111111'),
   unlockPasskeyWallet: jest.fn(async () => '0x1111111111111111111111111111111111111111'),
+  signInWithLoginFile: jest.fn(async () => '0x2222222222222222222222222222222222222222'),
+  createLoginFile: jest.fn(() => ({ name: 'context-engine-login-ab12cd.json', text: '{}' })),
   logoutPasskeyWallet: jest.fn(),
 }));
 
@@ -944,7 +946,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     const view = render(subject.getModalDisplay());
     // The offer comes before the copy line, which is the last resort.
     expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
-      "Create failed: This passkey can't be used here.Scan QR with phone to login.",
+      "Create failed: This passkey can't be used here.Scan QR with phone to login",
     );
     fireEvent.click(screen.getByRole('button', { name: 'Scan QR with phone' }));
     await act(async () => {});
@@ -954,6 +956,108 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     );
     view.rerender(subject.getModalDisplay());
     expect(screen.queryByTestId('ce-passkey-wallet-status')).not.toBeInTheDocument();
+  });
+
+  it('signs in from a login file as a passkey account does, and says so when the file is not one', async () => {
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
+    const view = render(subject.getModalDisplay());
+    // One button under the passkey buttons until it is asked for.
+    expect(screen.getByRole('button', { name: 'Other options' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Login with file' })).not.toBeInTheDocument();
+
+    await subject.handleLoginFileSignIn('the file text');
+    expect(mockedPasskeyWallet.signInWithLoginFile).toHaveBeenLastCalledWith('the file text');
+    expect(subject.props.changeAccount).toHaveBeenCalledWith(
+      expect.objectContaining({ account: '0x2222222222222222222222222222222222222222', provider: 'passkey_eoa' }),
+    );
+    expect(subject.props.updateLoginInfo).toHaveBeenLastCalledWith({
+      loginInProgress: false,
+      loginComplete: true,
+      provider: 'passkey_eoa',
+    });
+
+    mockedPasskeyWallet.signInWithLoginFile.mockRejectedValueOnce(
+      new Error('That is not a Context Engine login file.'),
+    );
+    await subject.handleLoginFileSignIn('something else');
+    view.rerender(subject.getModalDisplay());
+    expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
+      'Login failed: That is not a Context Engine login file.',
+    );
+  });
+
+  it('offers a login file under a failed passkey, after the phone and before the copy link', async () => {
+    sessionStorage.setItem(
+      'dg:surveyDraft:meadow-forum:84532:anon:all',
+      JSON.stringify({ answers: { q1: { value: 'Agree' } } }),
+    );
+    const urls = URL as unknown as { createObjectURL?: unknown; revokeObjectURL?: unknown };
+    urls.createObjectURL = jest.fn(() => 'blob:login-file');
+    urls.revokeObjectURL = jest.fn();
+    const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    try {
+      mockedPasskeyWallet.createPasskeyWallet.mockRejectedValueOnce(
+        new Error('This passkey does not advertise WebAuthn PRF support.'),
+      );
+      const subject = mountClassSubject(
+        new LoginAndSettingsModalSubject(buildProps({ activeSessionSlug: 'meadow-forum' })),
+      );
+      await subject.handlePasskeyWalletCreate();
+      const view = render(subject.getModalDisplay());
+      await screen.findByRole('button', { name: 'Copy this link' });
+      // Three ways out, in this order, an "or" between them.
+      const status = screen.getByTestId('ce-passkey-wallet-status');
+      expect(
+        within(status)
+          .getAllByRole('button')
+          .map((button) => button.textContent?.trim() || button.getAttribute('aria-label')),
+      ).toEqual([
+        'Scan QR with phone',
+        'About scanning with your phone',
+        'Create login file',
+        'Copy this link',
+        'About copying your answers',
+      ]);
+      expect(screen.getByTestId('ce-passkey-create-login-file')).toHaveTextContent(
+        /^orCreate login file to login without a passkey$/,
+      );
+      expect(screen.getByTestId('ce-passkey-copy-answers')).toHaveTextContent(
+        /^orCopy this link to paste your responses on a different device\./,
+      );
+      // Until a file is made, the choices under the buttons stay closed.
+      expect(screen.getByRole('button', { name: 'Other options' })).toBeInTheDocument();
+
+      // Creating saves a file and signs no one in; the choices open on what to do next.
+      fireEvent.click(within(status).getByRole('button', { name: 'Create login file' }));
+      expect(mockedPasskeyWallet.createLoginFile).toHaveBeenCalledTimes(1);
+      expect(click).toHaveBeenCalledTimes(1);
+      expect(mockedPasskeyWallet.signInWithLoginFile).not.toHaveBeenCalled();
+      view.rerender(subject.getModalDisplay());
+      expect(screen.getByTestId('ce-login-file-saved')).toHaveTextContent(
+        'Saved context-engine-login-ab12cd.json to your downloads. Now login with it.',
+      );
+      expect(screen.getByRole('button', { name: 'Login with file' })).toBeInTheDocument();
+      // The failed passkey's own options are still there.
+      expect(screen.getByRole('button', { name: 'Scan QR with phone' })).toBeInTheDocument();
+    } finally {
+      click.mockRestore();
+      delete urls.createObjectURL;
+      delete urls.revokeObjectURL;
+      sessionStorage.clear();
+    }
+  });
+
+  it('ends the login file line with a full stop where no answers wait to be copied', async () => {
+    mockedPasskeyWallet.createPasskeyWallet.mockRejectedValueOnce(
+      new Error('This passkey does not advertise WebAuthn PRF support.'),
+    );
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
+    await subject.handlePasskeyWalletCreate();
+    render(subject.getModalDisplay());
+    expect(screen.getByTestId('ce-passkey-create-login-file')).toHaveTextContent(
+      /^orCreate login file to login without a passkey\.$/,
+    );
+    expect(screen.queryByRole('button', { name: 'Copy this link' })).not.toBeInTheDocument();
   });
 
   it('keeps the phone offer and the copy line when the try on the phone fails or is closed', async () => {
@@ -975,10 +1079,9 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     );
     expect(screen.getByRole('button', { name: 'Scan QR with phone' })).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Copy this link' })).toBeInTheDocument();
-    // One sentence across the two lines: the phone line has no full stop while the copy line follows.
-    expect(screen.getByTestId('ce-passkey-another-device')).toHaveTextContent(/^Scan QR with phone to login (?!\.)/);
+    expect(screen.getByTestId('ce-passkey-another-device')).toHaveTextContent(/^Scan QR with phone to login/);
     expect(screen.getByTestId('ce-passkey-copy-answers')).toHaveTextContent(
-      /^or Copy this link to paste your responses on a different device\./,
+      /^orCopy this link to paste your responses on a different device\./,
     );
     sessionStorage.clear();
   });

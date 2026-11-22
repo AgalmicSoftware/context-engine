@@ -33,7 +33,28 @@ export interface PasskeyDerivedWalletRecord {
   updatedAt: string;
 }
 
-export type PasskeyWalletRecord = EncryptedWalletRecord | PasskeyDerivedWalletRecord;
+/**
+ * An account signed in from a login file: its key, sealed in this browser until `expiresAt`. No passkey.
+ * Once the key is wiped (after its hours, or on sign-out) `sealKey`, `sealedKey` and `iv` are gone and the
+ * record only says that this browser's account was a login file's.
+ */
+export interface LoginFileWalletRecord {
+  id: string;
+  userId?: string;
+  disconnected?: boolean;
+  rpId: string;
+  credentialId: '';
+  evmAddress: HexString;
+  keyMode: 'login-file';
+  sealKey?: CryptoKey;
+  sealedKey?: string;
+  iv?: string;
+  expiresAt: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PasskeyWalletRecord = EncryptedWalletRecord | PasskeyDerivedWalletRecord | LoginFileWalletRecord;
 
 export interface PasskeyWalletConfig {
   rpId: string;

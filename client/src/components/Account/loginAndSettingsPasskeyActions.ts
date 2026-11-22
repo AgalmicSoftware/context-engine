@@ -17,6 +17,7 @@ export type PasskeyWalletActionMode = '' | 'create' | 'sign-in';
 
 export type LoginPasskeyWalletPort = {
   createPasskeyWallet: (options?: { anotherDevice?: boolean }) => Promise<unknown>;
+  signInWithLoginFile: (text: string) => Promise<unknown>;
   getPasskeyWalletChain?: () => unknown;
   isMissingPasskeyWalletRecordError?: (error: unknown) => boolean;
   isPasskeyWalletOperationCancelledError?: (error: unknown) => boolean;
@@ -48,6 +49,7 @@ export type LoginPasskeyActions = {
   handlePasskeyWalletCreate: () => Promise<void>;
   handlePasskeyWalletCreateOnAnotherDevice: () => Promise<void>;
   handlePasskeyWalletSignIn: () => Promise<void>;
+  handleLoginFileSignIn: (text: string) => Promise<void>;
   syncPasskeyWalletChain: (targetNetwork?: unknown) => unknown;
 };
 
@@ -199,6 +201,13 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
     handlePasskeyWalletSignIn: () =>
       runPasskeyWalletAction({
         action: () => deps.passkeyWallet.unlockPasskeyWallet({ selectCredential: true }),
+        mode: 'sign-in',
+      }),
+    // A login file's account is the same kind as a passkey's from here on: the same provider, signatures and
+    // transactions. Only the way its key is reached differs.
+    handleLoginFileSignIn: (text: string) =>
+      runPasskeyWalletAction({
+        action: () => deps.passkeyWallet.signInWithLoginFile(text),
         mode: 'sign-in',
       }),
     syncPasskeyWalletChain,

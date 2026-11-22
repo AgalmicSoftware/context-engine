@@ -4,7 +4,8 @@ import { chromium, webkit } from 'playwright';
 import {
   PHONES, THEMES, WORKER_ORIGIN,
   assertNoHiddenFaults, assertNoSidewaysScroll, assertReachable, assertReadableText,
-  chooseTheme, createJourneySession, createPasskey, maxAtOnce, openLoginDialog, openPersonContext, outage, passkeyFixture, settled,
+  chooseTheme, createJourneySession, createPasskey, loginFileFixture, maxAtOnce, openLoginDialog, openPersonContext, outage, passkeyFixture, settled,
+  signInWithLoginFile,
 } from './lib/session-journey-harness.mjs';
 
 // A participant's whole visit on a phone, in the built client against the real Session Worker code:
@@ -28,6 +29,8 @@ const engineNames = (process.env.JOURNEY_ENGINES || 'webkit,chromium').split(','
 for (const name of engineNames) assert.ok(engines[name], `Unknown browser engine: ${name}`);
 await mkdir(outputDir, { recursive: true });
 const startedAt = performance.now();
+// JOURNEY_LOGIN=file: the visit's person has no passkey and signs in with a login file, both times.
+const withLoginFile = process.env.JOURNEY_LOGIN === 'file';
 
 const TOTAL = 40;
 const UPLOADS_AT_ONCE = 4;
@@ -179,7 +182,7 @@ const runJourney = async (engineName, phoneName) => {
   const inviteCode = 'a1b2c3d4'.repeat(4);
   const groupId = await session.createCodeGroup({ groupId: 'salon', label: 'Salon', description: 'Everyone at the salon.', codes: [inviteCode] });
 
-  const person = passkeyFixture(`person-${engineName}`);
+  const person = withLoginFile ? loginFileFixture() : passkeyFixture(`person-${engineName}`);
   const personClient = session.clientFor(person.wallet);
   const browser = await engines[engineName].launch({ headless: true });
   let page;
@@ -223,8 +226,9 @@ const runJourney = async (engineName, phoneName) => {
     await assertReachable(page.getByTestId('ce-passkey-wallet-create'), 'Create passkey, in the log-in dialog,');
     await assertReachable(page.getByTestId('ce-passkey-wallet-sign-in'), 'Sign in, in the log-in dialog,');
     await readText(engineName, dialog, 'The log-in dialog');
-    await createPasskey(page, person.wallet);
-    console.log(`[${label}] Opened the invite link and made a passkey.`);
+    if (withLoginFile) await signInWithLoginFile(page, person);
+    else await createPasskey(page, person.wallet);
+    console.log(`[${label}] Opened the invite link and ${withLoginFile ? 'signed in with a login file' : 'made a passkey'}.`);
 
     // 2. The link's group, joined once.
     const joined = () => session.groupsOf(person.wallet);
@@ -317,9 +321,13 @@ const runJourney = async (engineName, phoneName) => {
     await page.getByRole('dialog').waitFor({ state: 'hidden' });
     assert.equal(await firstAnswer(), false, 'A signed-out page shows no saved answer');
     await page.getByTestId('ce-account-login-button').click();
-    await page.getByTestId('ce-passkey-wallet-sign-in').click();
-    await page.getByTestId('ce-wallet-display').waitFor().catch(() => assert.fail('Signing in with the passkey did not sign the person in'));
-    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    if (withLoginFile) {
+      await signInWithLoginFile(page, person);
+    } else {
+      await page.getByTestId('ce-passkey-wallet-sign-in').click();
+      await page.getByTestId('ce-wallet-display').waitFor().catch(() => assert.fail('Signing in with the passkey did not sign the person in'));
+      await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    }
     await page.waitForFunction(() => !/saved answers/.test(document.body.innerText));
     const backDeadline = Date.now() + 20000;
     while (!(await firstAnswer()) && Date.now() < backDeadline) await page.waitForTimeout(250);

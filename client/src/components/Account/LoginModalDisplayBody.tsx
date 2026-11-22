@@ -17,6 +17,7 @@ import styles from './Account.module.scss';
 import { AccountMenu, AccountMenuRow } from './AccountMenu';
 import { countUnsentAnswers } from 'components/UserPage/userPageAnalyzeLink';
 const AgentAccountAccessPanel = React.lazy(() => import('./AgentAccountAccessPanel'));
+import LoginFileAccess from './LoginFileAccess';
 import {
   PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE,
   PASSKEYS_UNAVAILABLE_MESSAGE,
@@ -53,7 +54,8 @@ const CopyPageLink = () => {
 // Sign-in errors that mean the passkey itself cannot be made or used in this browser, so trying again here will
 // not help: no passkeys at all, no PRF, or a create or unlock the device or browser refused. A prompt that was
 // closed or timed out, and the errors that point at the other button, are left out: those are fixed here.
-const FIXED_HERE = /prompt closed or timed out|try the passkey again|Use Login\.|Sign in, or delete it first/;
+const FIXED_HERE =
+  /prompt closed or timed out|try the passkey again|Use Login\.|Sign in, or delete it first|not a Context Engine login file/;
 export const isPasskeyProblem = (message: string): boolean =>
   message === PASSKEYS_UNAVAILABLE_MESSAGE || (/^(Create|Login) failed: /.test(message) && !FIXED_HERE.test(message));
 
@@ -66,7 +68,7 @@ const COPY_ANSWERS_HELP =
 // is made ready as this shows, because a copy has to happen inside the tap itself. `where` names the place to open
 // it; `otherwise` shows where this browser cannot pack the answers. The button is the first words of its sentence,
 // so a copy that worked marks the button with a check rather than changing its words, and says so to screen readers.
-// `afterPhoneOffer` makes it the second half of the sentence the phone offer starts.
+// `afterPhoneOffer` makes it the last of the options the phone offer starts, after an "or".
 const CopyMyAnswers = ({
   where,
   otherwise,
@@ -89,9 +91,9 @@ const CopyMyAnswers = ({
   if (!text) return <>{otherwise}</>;
   return (
     <div className={styles.passkeyCopyAnswers} data-testid="ce-passkey-copy-answers">
+      {afterPhoneOffer ? <OrLine /> : null}
       {/* Unbroken, the button keeps the sentence's first word and the (?) its last as the sentence wraps. */}
       <span className={styles.passkeyCopyAnswersUnbroken}>
-        {afterPhoneOffer ? 'or ' : null}
         <Button
           type="button"
           size="sm"
@@ -147,13 +149,11 @@ const ANOTHER_DEVICE_HELP =
   'After that, your phone signs you in on this device.';
 
 // After a Create whose passkey this site cannot use (Windows Hello on a Windows without PRF, or a passkey app
-// without it): the same Create, asked of a phone. It starts the sentence the copy line ends: "Scan QR with phone to
-// login or Copy this link to paste your responses on a different device." `alone` ends it where no copy line follows.
-const UseAnotherDevice = ({ onClick, alone }: { onClick: () => void; alone: boolean }) => (
-  <div
-    className={`${styles.passkeyCopyAnswers} ${styles.passkeyAnotherDevice}`}
-    data-testid="ce-passkey-another-device"
-  >
+// without it): the same Create, asked of a phone. It is the first of up to three options, an "or" between them:
+// "Scan QR with phone to login", "Create login file to login without a passkey", and, where answers are unsaved,
+// "Copy this link to paste your responses on a different device."
+const UseAnotherDevice = ({ onClick }: { onClick: () => void }) => (
+  <div className={styles.passkeyCopyAnswers} data-testid="ce-passkey-another-device">
     <span className={styles.passkeyCopyAnswersUnbroken}>
       <Button
         type="button"
@@ -165,7 +165,7 @@ const UseAnotherDevice = ({ onClick, alone }: { onClick: () => void; alone: bool
       >
         Scan QR with phone
       </Button>{' '}
-      to login{alone ? '.' : ''}{' '}
+      to login{' '}
       <button
         type="button"
         id="ce-passkey-another-device-help"
@@ -192,6 +192,31 @@ const UseAnotherDevice = ({ onClick, alone }: { onClick: () => void; alone: bool
   </div>
 );
 
+// Between the options under a failed passkey: larger than the text, so each option reads as its own way out.
+const OrLine = () => <div className={styles.passkeyOr}>or</div>;
+
+// The second option under a failed passkey: a login file, made here; "Other options" then holds its sign-in.
+// `last` ends the sentence where no copy line follows.
+const CreateLoginFileLine = ({ onClick, last }: { onClick: () => void; last: boolean }) => (
+  <div className={styles.passkeyCopyAnswers} data-testid="ce-passkey-create-login-file">
+    <OrLine />
+    <span className={styles.passkeyCopyAnswersUnbroken}>
+      <Button
+        type="button"
+        size="sm"
+        color="primary"
+        className={styles.passkeyCopyAnswersButton}
+        data-testid="ce-passkey-create-login-file-button"
+        onClick={() => onClick()}
+      >
+        Create login file
+      </Button>{' '}
+      to
+    </span>{' '}
+    login without a passkey{last ? '.' : ''}
+  </div>
+);
+
 type AccountUserPageProps = {
   viewAddress?: string;
   account?: string;
@@ -213,6 +238,9 @@ type LoginModalDisplayBodyProps = {
   handlePasskeyWalletCreate: () => void;
   handlePasskeyWalletCreateOnAnotherDevice: () => void;
   handlePasskeyWalletSignIn: () => void;
+  handleLoginFileSignIn: (text: string) => void;
+  handleLoginFileCreate: () => void;
+  loginFileSavedName: string;
   loginComplete: boolean;
   loginInProgress: boolean;
   network: unknown;
@@ -255,6 +283,9 @@ const LoginModalDisplayBody = ({
   handlePasskeyWalletCreate,
   handlePasskeyWalletCreateOnAnotherDevice,
   handlePasskeyWalletSignIn,
+  handleLoginFileSignIn,
+  handleLoginFileCreate,
+  loginFileSavedName,
   loginComplete,
   loginInProgress,
   network,
@@ -332,10 +363,10 @@ const LoginModalDisplayBody = ({
             >
               {passkeyWalletStatusMessage}
               {passkeyWalletStatusMessage === PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE ? (
-                <UseAnotherDevice
-                  onClick={handlePasskeyWalletCreateOnAnotherDevice}
-                  alone={countUnsavedAnswers() === 0}
-                />
+                <>
+                  <UseAnotherDevice onClick={handlePasskeyWalletCreateOnAnotherDevice} />
+                  <CreateLoginFileLine onClick={handleLoginFileCreate} last={countUnsavedAnswers() === 0} />
+                </>
               ) : null}
               {/* When the passkey itself is the problem, unsaved answers can leave with the person; the plain link
                   stays for a browser without passkeys that holds none. */}
@@ -379,6 +410,12 @@ const LoginModalDisplayBody = ({
               ) : null}
             </div>
           )}
+
+          <LoginFileAccess
+            onCreate={handleLoginFileCreate}
+            onSignIn={handleLoginFileSignIn}
+            savedName={loginFileSavedName}
+          />
 
           {renderAgentTokenLoginPanel()}
 
