@@ -23,6 +23,7 @@ const renderBody = (props: Partial<Props>) => {
         handlePasskeyWalletCreateOnAnotherDevice: jest.fn(),
         handleLoginFileSignIn: jest.fn(),
         handleLoginFileCreate: jest.fn(),
+        handleLoginFileBack: jest.fn(),
         loginFileSavedName: '',
         handlePasskeyWalletSignIn: jest.fn(),
         loginComplete: false,

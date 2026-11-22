@@ -986,6 +986,21 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     );
   });
 
+  it('keeps a wrong file\u2019s message in view beside the notice of a saved login file', async () => {
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
+    subject.setState({ loginFileSavedName: 'context-engine-login-ab12cd.json' });
+    mockedPasskeyWallet.signInWithLoginFile.mockRejectedValueOnce(
+      new Error('That is not a Context Engine login file.'),
+    );
+    await subject.handleLoginFileSignIn('something else');
+    render(subject.getModalDisplay());
+    expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
+      'Login failed: That is not a Context Engine login file.',
+    );
+    expect(screen.getByTestId('ce-login-file-saved')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Login with file' })).toBeInTheDocument();
+  });
+
   it('offers a login file under a failed passkey, after the phone and before the copy link', async () => {
     sessionStorage.setItem(
       'dg:surveyDraft:meadow-forum:84532:anon:all',
@@ -1027,18 +1042,36 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       // Until a file is made, the choices under the buttons stay closed.
       expect(screen.getByRole('button', { name: 'Other options' })).toBeInTheDocument();
 
-      // Creating saves a file and signs no one in; the choices open on what to do next.
+      // Creating saves a file and signs no one in. The notice about it stands in place of the failed passkey's
+      // box and of "Other options": one box, and nothing else to choose from.
       fireEvent.click(within(status).getByRole('button', { name: 'Create login file' }));
       expect(mockedPasskeyWallet.createLoginFile).toHaveBeenCalledTimes(1);
       expect(click).toHaveBeenCalledTimes(1);
       expect(mockedPasskeyWallet.signInWithLoginFile).not.toHaveBeenCalled();
       view.rerender(subject.getModalDisplay());
       expect(screen.getByTestId('ce-login-file-saved')).toHaveTextContent(
-        'Saved context-engine-login-ab12cd.json to your downloads. Now login with it.',
+        'Saved context-engine-login-ab12cd.json to your downloads.',
       );
       expect(screen.getByRole('button', { name: 'Login with file' })).toBeInTheDocument();
-      // The failed passkey's own options are still there.
+      expect(screen.queryByTestId('ce-passkey-wallet-status')).not.toBeInTheDocument();
+      for (const gone of ['Scan QR with phone', 'Create login file', 'Copy this link', 'Other options']) {
+        expect(screen.queryByRole('button', { name: gone })).not.toBeInTheDocument();
+      }
+
+      // Back returns to the failed passkey's three ways out.
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+      view.rerender(subject.getModalDisplay());
+      expect(screen.queryByTestId('ce-login-file-saved')).not.toBeInTheDocument();
+      expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
+        "Create failed: This passkey can't be used here.",
+      );
       expect(screen.getByRole('button', { name: 'Scan QR with phone' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Create login file' })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Copy this link' })).toBeInTheDocument();
+      // "Other options" there holds only the sign-in: creating is offered above.
+      fireEvent.click(screen.getByRole('button', { name: 'Other options' }));
+      expect(screen.getAllByRole('button', { name: 'Create login file' })).toHaveLength(1);
+      expect(screen.getByRole('button', { name: 'Login with file' })).toBeInTheDocument();
     } finally {
       click.mockRestore();
       delete urls.createObjectURL;

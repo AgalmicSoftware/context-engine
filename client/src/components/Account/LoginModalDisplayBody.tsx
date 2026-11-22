@@ -17,7 +17,7 @@ import styles from './Account.module.scss';
 import { AccountMenu, AccountMenuRow } from './AccountMenu';
 import { countUnsentAnswers } from 'components/UserPage/userPageAnalyzeLink';
 const AgentAccountAccessPanel = React.lazy(() => import('./AgentAccountAccessPanel'));
-import LoginFileAccess from './LoginFileAccess';
+import LoginFileAccess, { CreateLoginFileLine, OrLine } from './LoginFileAccess';
 import {
   PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE,
   PASSKEYS_UNAVAILABLE_MESSAGE,
@@ -192,31 +192,6 @@ const UseAnotherDevice = ({ onClick }: { onClick: () => void }) => (
   </div>
 );
 
-// Between the options under a failed passkey: larger than the text, so each option reads as its own way out.
-const OrLine = () => <div className={styles.passkeyOr}>or</div>;
-
-// The second option under a failed passkey: a login file, made here; "Other options" then holds its sign-in.
-// `last` ends the sentence where no copy line follows.
-const CreateLoginFileLine = ({ onClick, last }: { onClick: () => void; last: boolean }) => (
-  <div className={styles.passkeyCopyAnswers} data-testid="ce-passkey-create-login-file">
-    <OrLine />
-    <span className={styles.passkeyCopyAnswersUnbroken}>
-      <Button
-        type="button"
-        size="sm"
-        color="primary"
-        className={styles.passkeyCopyAnswersButton}
-        data-testid="ce-passkey-create-login-file-button"
-        onClick={() => onClick()}
-      >
-        Create login file
-      </Button>{' '}
-      to
-    </span>{' '}
-    login without a passkey{last ? '.' : ''}
-  </div>
-);
-
 type AccountUserPageProps = {
   viewAddress?: string;
   account?: string;
@@ -240,6 +215,7 @@ type LoginModalDisplayBodyProps = {
   handlePasskeyWalletSignIn: () => void;
   handleLoginFileSignIn: (text: string) => void;
   handleLoginFileCreate: () => void;
+  handleLoginFileBack: () => void;
   loginFileSavedName: string;
   loginComplete: boolean;
   loginInProgress: boolean;
@@ -285,6 +261,7 @@ const LoginModalDisplayBody = ({
   handlePasskeyWalletSignIn,
   handleLoginFileSignIn,
   handleLoginFileCreate,
+  handleLoginFileBack,
   loginFileSavedName,
   loginComplete,
   loginInProgress,
@@ -304,6 +281,10 @@ const LoginModalDisplayBody = ({
   showWalletIdentity,
 }: LoginModalDisplayBodyProps) => {
   const passkeysUnavailable = passkeyWalletStatusMessage === PASSKEYS_UNAVAILABLE_MESSAGE;
+  const passkeyLacksPrf = passkeyWalletStatusMessage === PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE;
+  // Once a login file was saved from under a failed passkey, the notice about it stands in place of that
+  // status and its other ways out; Back brings them back.
+  const noticeReplacesStatus = passkeyLacksPrf && !!loginFileSavedName;
   if (!loginComplete && !loginInProgress) {
     return (
       <CardBody>
@@ -353,7 +334,7 @@ const LoginModalDisplayBody = ({
               <span> Login</span>
             </Button>
           </div>
-          {passkeyWalletStatusMessage && (
+          {passkeyWalletStatusMessage && !noticeReplacesStatus && (
             <div
               className={`${styles.passkeyWalletStatus} ${
                 passkeyWalletStatusTone === 'error' ? styles.passkeyWalletStatusError : ''
@@ -362,10 +343,15 @@ const LoginModalDisplayBody = ({
               data-testid="ce-passkey-wallet-status"
             >
               {passkeyWalletStatusMessage}
-              {passkeyWalletStatusMessage === PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE ? (
+              {passkeyLacksPrf ? (
                 <>
                   <UseAnotherDevice onClick={handlePasskeyWalletCreateOnAnotherDevice} />
-                  <CreateLoginFileLine onClick={handleLoginFileCreate} last={countUnsavedAnswers() === 0} />
+                  <CreateLoginFileLine
+                    onClick={handleLoginFileCreate}
+                    testId="ce-passkey-create-login-file"
+                    withOr
+                    last={countUnsavedAnswers() === 0}
+                  />
                 </>
               ) : null}
               {/* When the passkey itself is the problem, unsaved answers can leave with the person; the plain link
@@ -374,7 +360,7 @@ const LoginModalDisplayBody = ({
               isPasskeyProblem(passkeyWalletStatusMessage) &&
               countUnsavedAnswers() > 0 ? (
                 <CopyMyAnswers
-                  afterPhoneOffer={passkeyWalletStatusMessage === PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE}
+                  afterPhoneOffer={passkeyLacksPrf}
                   where={passkeysUnavailable ? 'in Safari or Chrome' : 'on your phone'}
                   otherwise={passkeysUnavailable ? <CopyPageLink /> : null}
                 />
@@ -415,6 +401,8 @@ const LoginModalDisplayBody = ({
             onCreate={handleLoginFileCreate}
             onSignIn={handleLoginFileSignIn}
             savedName={loginFileSavedName}
+            onBack={handleLoginFileBack}
+            createOfferedAbove={passkeyLacksPrf}
           />
 
           {renderAgentTokenLoginPanel()}

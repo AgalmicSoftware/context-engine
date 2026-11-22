@@ -426,6 +426,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     saveLoginFile(file);
     this.setStateIfMounted({ loginFileSavedName: file.name });
   };
+  handleLoginFileBack = () => this.setStateIfMounted({ loginFileSavedName: '' });
   _finalizePasskeyWalletLogin = this._passkeyActions._finalizePasskeyWalletLogin;
   _agentTokenActions = createLoginAgentActions({
     changeAccount: (payload) => this.props.changeAccount(payload),
@@ -2592,6 +2593,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       handlePasskeyWalletSignIn: this.handlePasskeyWalletSignIn,
       handleLoginFileSignIn: this.handleLoginFileSignIn,
       handleLoginFileCreate: this.handleLoginFileCreate,
+      handleLoginFileBack: this.handleLoginFileBack,
       loginFileSavedName: this.state.loginFileSavedName,
       loginComplete: this.props.loginComplete,
       loginInProgress: this.props.loginInProgress,

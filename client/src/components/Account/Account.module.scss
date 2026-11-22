@@ -2346,20 +2346,40 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   line-height: 1.2;
 }
 
+// The notice after a login file was saved: Back on a row of its own, in the box's top-left corner.
+.loginFileBackRow {
+  display: flex;
+  justify-content: flex-start;
+  margin: -10px -12px 4px;
+}
+
+.loginFileBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  color: inherit !important;
+  font-weight: 600;
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
 // What was just saved to the person's downloads: news, on the theme's success colour, not part of the choices.
 // It carries its own background, so it reads on the box in every theme.
 .loginFileSaved {
-  margin-top: 12px;
   padding: 6px 10px;
   border-radius: var(--ce-radius-6);
   background: var(--ce-status-success);
   color: var(--ce-status-success-contrast);
   font-weight: 600;
   overflow-wrap: anywhere;
-
-  &:empty {
-    display: none;
-  }
 }
 
 // A word of the sentence: its label sits on the sentence's baseline.

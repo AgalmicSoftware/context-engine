@@ -288,8 +288,12 @@ passkey", "Copy this link to paste your responses on a different device."
   (`m/44'/60'/0'/0/0`). It is made in the browser and sent nowhere. Whoever holds
   the file holds the account, and a lost file cannot be replaced. It has no
   password.
-- Creating never signs in by itself. The person signs in by choosing the file,
-  which shows that they have it. The 12 words alone, in a text file, sign in too.
+- Creating never signs in by itself. It saves the file, and one notice then
+  stands in place of every other choice (the failed passkey's box and "Other
+  options"): Back in its top-left corner, what was saved, and **Login with
+  file**. The person signs in by choosing the file, which shows that they have
+  it. Back returns to the choices. The 12 words alone, in a text file, sign in
+  too.
 - The account is a `passkey_eoa` account like any other from there on: the same
   provider, session, signatures and transactions, none of which asks again while
   the file is loaded. No Worker or contract knows the difference. It is a
