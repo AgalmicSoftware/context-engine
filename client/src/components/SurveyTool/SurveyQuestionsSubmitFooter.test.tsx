@@ -3,6 +3,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SurveyQuestionsSubmitFooter from './SurveyQuestionsSubmitFooter';
+import { UPLOAD_IN_PROGRESS_MESSAGE } from '../../utilities/storage/storageClient';
+import { PARTIAL_UPLOAD_IN_PROGRESS_MESSAGE } from './surveyQuestionsRuntimeMethods';
 
 describe('SurveyQuestionsSubmitFooter', () => {
   const baseProps = {
@@ -84,6 +86,22 @@ describe('SurveyQuestionsSubmitFooter', () => {
 
     expect(screen.getByText('SUBMIT')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveClass('singleQuestionSubmitButton');
+  });
+
+  // "Still saving" must read whole on the button, or it looks like a cut-off failure. A partial Submit names the
+  // answers left after it, so only its first sentence, before the ellipsis, has to fit.
+  it('shows the still-saving messages whole on the button', () => {
+    const { rerender } = render(
+      <SurveyQuestionsSubmitFooter {...baseProps} submissionError={UPLOAD_IN_PROGRESS_MESSAGE} />,
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveTextContent(UPLOAD_IN_PROGRESS_MESSAGE);
+    rerender(
+      <SurveyQuestionsSubmitFooter
+        {...baseProps}
+        submissionError={`${PARTIAL_UPLOAD_IN_PROGRESS_MESSAGE} “Binary question” wasn't saved yet; submit again to send it.`}
+      />,
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveTextContent(PARTIAL_UPLOAD_IN_PROGRESS_MESSAGE);
   });
 
   it('keeps submit aux inert while uploading pending survey edits', () => {

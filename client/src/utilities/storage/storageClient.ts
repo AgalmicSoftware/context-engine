@@ -210,8 +210,8 @@ const resolveStorageWorkerUrl = async ({
 };
 
 // The Worker is still storing this answer from an earlier send, so it has not failed. Submit sends the same request
-// id again, which the Worker replays rather than storing twice.
-export const UPLOAD_IN_PROGRESS_MESSAGE = 'Still saving. Press Submit again in a minute to check.';
+// id again, which the Worker replays rather than storing twice. Short enough for the Submit button to hold whole.
+export const UPLOAD_IN_PROGRESS_MESSAGE = 'Still saving. Press Submit again in a minute.';
 
 const parseStorageUploadResponse = async (response: Response): Promise<UnknownRecord> => {
   const body = (await response.json().catch(() => ({}))) as UnknownRecord;

@@ -30,8 +30,14 @@ type SurveyQuestionsSubmitFooterProps = {
   submissionError?: string;
 };
 
+// The Submit button holds a short message whole; a longer one shows its start, then an ellipsis.
+export const SUBMIT_BUTTON_MESSAGE_MAX_CHARS = 50;
+const ELLIPSIS = '...';
+
 const renderSubmissionErrorText = (submissionError: string): string =>
-  submissionError.length > 50 ? `${submissionError.substring(0, 47)}...` : submissionError;
+  submissionError.length > SUBMIT_BUTTON_MESSAGE_MAX_CHARS
+    ? `${submissionError.substring(0, SUBMIT_BUTTON_MESSAGE_MAX_CHARS - ELLIPSIS.length)}${ELLIPSIS}`
+    : submissionError;
 
 const SurveyQuestionsSubmitFooter = ({
   displayState = {},
