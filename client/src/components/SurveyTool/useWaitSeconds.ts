@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+const MS_PER_SECOND = 1000;
+
 /**
  * Whole seconds the current wait has run, ticking once a second; 0 while `wait` is empty.
  * A new wait, or the same one started again, counts from 0. Each tick reads the clock, so a
@@ -10,7 +12,10 @@ export const useWaitSeconds = (wait: string): number => {
   useEffect(() => {
     if (!wait) return undefined;
     const startedAt = Date.now();
-    const timer = setInterval(() => setCount({ wait, seconds: Math.floor((Date.now() - startedAt) / 1000) }), 1000);
+    const timer = setInterval(
+      () => setCount({ wait, seconds: Math.floor((Date.now() - startedAt) / MS_PER_SECOND) }),
+      MS_PER_SECOND,
+    );
     return () => {
       clearInterval(timer);
       setCount({ wait: '', seconds: 0 });

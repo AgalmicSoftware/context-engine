@@ -60,8 +60,13 @@ const NO_REPLY_STATUSES = new Set([502, 504]);
 // upload parser says so plainly, and Submit pressed again sends the same request id, so it replays.
 export const UPLOAD_IN_PROGRESS = 'upload_in_progress';
 const UPLOAD_IN_PROGRESS_DELAYS_MS = [1000, 2000, 4000, 6000, 8000, 8000];
+// Each wait runs from 75% to 125% of its planned length, so a crowd does not return in step.
+const WAIT_JITTER_MIN = 0.75;
+const WAIT_JITTER_SPAN = 0.5;
 const uploadInProgressDelayMs = (waits: number): number | null =>
-  waits < UPLOAD_IN_PROGRESS_DELAYS_MS.length ? UPLOAD_IN_PROGRESS_DELAYS_MS[waits] * (0.75 + Math.random() / 2) : null;
+  waits < UPLOAD_IN_PROGRESS_DELAYS_MS.length
+    ? UPLOAD_IN_PROGRESS_DELAYS_MS[waits] * (WAIT_JITTER_MIN + Math.random() * WAIT_JITTER_SPAN)
+    : null;
 
 export const withCoordinatorRetry =
   (fetchImpl: typeof fetch = fetch) =>

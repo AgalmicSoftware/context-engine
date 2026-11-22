@@ -4,6 +4,10 @@ import { ANALYSIS_CARD_TASTES, type AnalysisCardTaste } from 'utilities/analysis
 
 import styles from './UserPageAnalysisCard.module.scss';
 
+// Full-width bars for the historical match's paragraph, before its short last line.
+const MATCH_PARAGRAPH_LINES = 4;
+const MATCH_LINE_KEYS = Array.from({ length: MATCH_PARAGRAPH_LINES }, (_, line) => line);
+
 type UserPageAnalysisCardSkeletonProps = {
   // The guesses the card has, once it is known; until then, every kind a card can have.
   tastes?: ReadonlyArray<AnalysisCardTaste>;
@@ -27,7 +31,7 @@ const UserPageAnalysisCardSkeleton = ({
       <div className={`${styles.skeletonGroup} ${styles.skeletonMatch}`}>
         <span className={styles.skeletonLabel}>Historical match</span>
         <span className={`${styles.skeletonBar} ${styles.skeletonName}`} />
-        {[1, 2, 3, 4].map((line) => (
+        {MATCH_LINE_KEYS.map((line) => (
           <span key={line} className={styles.skeletonBar} />
         ))}
         <span className={`${styles.skeletonBar} ${styles.skeletonShort}`} />
