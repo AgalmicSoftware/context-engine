@@ -55,6 +55,7 @@ export const removeNamespaceLocalEntries = (namespace: string): boolean => {
 };
 
 export const createStore = idb.createStore;
+export const IDB_STALL_MS = idb.IDB_STALL_MS;
 type Store = Parameters<typeof idb.get>[1];
 
 export const get = async (key: string, store: Store): Promise<unknown> => {

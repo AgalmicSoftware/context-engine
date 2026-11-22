@@ -11,6 +11,8 @@ const makeLogger = () => ({
   debug: jest.fn(),
 });
 
+const { installFakeWebLocks } = require('../audio/webLocks.testUtils');
+
 const BROADCAST_CHANNEL_NAME = 'ce_dg_cache_updates_v1';
 const BASELINE_BROADCAST_CHANNEL = global.BroadcastChannel;
 
@@ -1227,7 +1229,7 @@ describe('cacheScripts', () => {
       Object.defineProperty(global.navigator, 'locks', {
         configurable: true,
         value: {
-          request: (name, task) => {
+          request: (name, _options, task) => {
             const run = (tails.get(name) || Promise.resolve()).then(() => task());
             tails.set(
               name,
@@ -1310,6 +1312,135 @@ describe('cacheScripts', () => {
       await settle();
       expect(saved()).toEqual({ questions: ['q1', 'q2'] });
       tabs.forEach((tab) => expect(tab.peekCacheSync('bookmarksCache', 's')).toEqual({ questions: ['q1', 'q2'] }));
+    });
+  });
+
+  // A phone can suspend a background tab in the middle of a cache write, and what that tab holds stays held while it
+  // sleeps. The other tabs carry on after a wait instead of loading nothing.
+  describe('another tab that never lets go', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => {
+      jest.useRealTimers();
+      delete globalThis.indexedDB;
+    });
+    // Another tab's hold on a cache key's lock, until it lets go.
+    const holdLock = (key) => {
+      let release;
+      void navigator.locks.request(
+        `ce-cache:${key}`,
+        {},
+        () =>
+          new Promise((resolve) => {
+            release = resolve;
+          }),
+      );
+      return release;
+    };
+
+    it('loads on the fallback when another tab holds the cache store', async () => {
+      const key = 'dg:questionsCache:held-store';
+      const stalled = [];
+      // The real IndexedDB helper, over a store another tab's write holds: no transaction here ever ends.
+      const db = {
+        objectStoreNames: { contains: () => true },
+        transaction: () => {
+          const tx = { objectStore: () => ({ put: () => ({}) }), abort: () => setTimeout(() => tx.onabort(), 0) };
+          stalled.push(tx);
+          return tx;
+        },
+      };
+      Object.defineProperty(globalThis, 'indexedDB', {
+        configurable: true,
+        writable: true,
+        value: {
+          open: () => {
+            const request = { result: db };
+            setTimeout(() => request.onsuccess(), 0);
+            return request;
+          },
+        },
+      });
+      jest.resetModules();
+      jest.dontMock('./cacheScripts.idb.impl.js');
+      jest.doMock('../logging.js', () => ({ createLogger: () => makeLogger() }));
+      const cacheScripts = require('./cacheScripts.js');
+      const { IDB_STALL_MS } = require('./cacheScripts.idb.impl.js');
+
+      const ready = jest.fn();
+      const init = cacheScripts.initCacheManager().then(ready);
+      await jest.advanceTimersByTimeAsync(IDB_STALL_MS - 1);
+      expect(ready).not.toHaveBeenCalled();
+      await jest.advanceTimersByTimeAsync(1);
+      await init;
+      expect(stalled).toHaveLength(1);
+      expect(cacheScripts.getCacheBackendDiagnostics()).toEqual(
+        expect.objectContaining({ persistentBackend: 'localstorage', idbAvailable: false }),
+      );
+
+      // The page's own writes and reads now go ahead at once, without trying the held store again.
+      await expect(cacheScripts.writeCache('questionsCache', 'held-store', { answers: 1 })).resolves.toBe(true);
+      expect(JSON.parse(localStorage.getItem(key))).toEqual({ answers: 1 });
+      await expect(cacheScripts.readCache('questionsCache', 'held-store')).resolves.toEqual({ answers: 1 });
+      expect(stalled).toHaveLength(1);
+      localStorage.removeItem(key);
+    });
+
+    it('writes a key another tab has held past the wait, and does not wait for it again', async () => {
+      const uninstall = installFakeWebLocks();
+      try {
+        const { cacheScripts, idbState } = loadCacheScripts();
+        await cacheScripts.initCacheManager();
+        const release = holdLock('dg:questionsCache:held-lock');
+        const saved = jest.fn();
+        const write = cacheScripts.writeCache('questionsCache', 'held-lock', { answers: 1 }).then(saved);
+        await jest.advanceTimersByTimeAsync(cacheScripts.CROSS_TAB_LOCK_WAIT_MS - 1);
+        expect(saved).not.toHaveBeenCalled();
+        await jest.advanceTimersByTimeAsync(1);
+        await write;
+        expect(saved).toHaveBeenCalledWith(true);
+        expect(idbState.get('dg:questionsCache:held-lock')).toEqual({ answers: 1 });
+
+        // Still held: the next write goes ahead without waiting again.
+        await expect(cacheScripts.writeCache('questionsCache', 'held-lock', { answers: 2 })).resolves.toBe(true);
+        expect(idbState.get('dg:questionsCache:held-lock')).toEqual({ answers: 2 });
+
+        // The other tab wakes and lets go: from the next write, the key waits its turn again.
+        release();
+        await expect(cacheScripts.writeCache('questionsCache', 'held-lock', { answers: 3 })).resolves.toBe(true);
+        const releaseAgain = holdLock('dg:questionsCache:held-lock');
+        const savedAgain = jest.fn();
+        const writeAgain = cacheScripts.writeCache('questionsCache', 'held-lock', { answers: 4 }).then(savedAgain);
+        await jest.advanceTimersByTimeAsync(cacheScripts.CROSS_TAB_LOCK_WAIT_MS / 2);
+        expect(savedAgain).not.toHaveBeenCalled();
+        releaseAgain();
+        await jest.advanceTimersByTimeAsync(1);
+        await writeAgain;
+        expect(idbState.get('dg:questionsCache:held-lock')).toEqual({ answers: 4 });
+      } finally {
+        uninstall();
+      }
+    });
+
+    it('waits its turn, every time, behind a tab that lets go in time', async () => {
+      const uninstall = installFakeWebLocks();
+      try {
+        const { cacheScripts, idbState } = loadCacheScripts();
+        await cacheScripts.initCacheManager();
+        const key = 'dg:questionsCache:busy-lock';
+        for (const answers of [1, 2]) {
+          const release = holdLock(key);
+          const saved = jest.fn();
+          const write = cacheScripts.writeCache('questionsCache', 'busy-lock', { answers }).then(saved);
+          await jest.advanceTimersByTimeAsync(cacheScripts.CROSS_TAB_LOCK_WAIT_MS / 2);
+          expect(saved).not.toHaveBeenCalled();
+          release();
+          await jest.advanceTimersByTimeAsync(1);
+          await write;
+          expect(idbState.get(key)).toEqual({ answers });
+        }
+      } finally {
+        uninstall();
+      }
     });
   });
 });

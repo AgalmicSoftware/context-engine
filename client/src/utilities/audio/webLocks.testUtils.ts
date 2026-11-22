@@ -1,15 +1,20 @@
-type Grant = (lock: { name: string }) => unknown;
+type Grant = (lock: { name: string } | null) => unknown;
 
 /**
  * Installs a fake Web Locks manager on `navigator`: one holder per lock name, with later requests waiting in
- * order until it lets go, and an aborted wait leaving the queue. Returns the uninstaller.
+ * order until it lets go, an aborted wait leaving the queue, and an `ifAvailable` request given null while the
+ * lock is held. Returns the uninstaller.
  */
 export function installFakeWebLocks(): () => void {
   const queues = new Map<string, Array<() => void>>();
-  const request = (name: string, options: { signal?: AbortSignal }, callback: Grant) =>
+  const request = (name: string, options: { signal?: AbortSignal; ifAvailable?: boolean }, callback: Grant) =>
     new Promise((resolve, reject) => {
       const queue = queues.get(name) || [];
       queues.set(name, queue);
+      if (options.ifAvailable && queue.length > 0) {
+        Promise.resolve(callback(null)).then(resolve, reject);
+        return;
+      }
       const grant = () => {
         void Promise.resolve(callback({ name })).then((result) => {
           queue.shift();
