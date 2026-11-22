@@ -47,8 +47,9 @@ const replaySafe = (url: string, init: RequestInit) => {
 const NO_REPLY_STATUSES = new Set([502, 504]);
 // The Worker holds a send it is still storing for up to two minutes, and answers a repeat sent meanwhile with
 // 'upload_in_progress', changing nothing. So a repeat that hears this asks again for about half a minute, while
-// Submit counts the seconds, before the page passes on the Worker's answer.
-const UPLOAD_IN_PROGRESS = 'upload_in_progress';
+// Submit counts the seconds, before the page passes on the Worker's answer. That answer is not a failure: the
+// upload parser says so plainly, and Submit pressed again sends the same request id, so it replays.
+export const UPLOAD_IN_PROGRESS = 'upload_in_progress';
 const UPLOAD_IN_PROGRESS_DELAYS_MS = [1000, 2000, 4000, 6000, 8000, 8000];
 const uploadInProgressDelayMs = (waits: number): number | null =>
   waits < UPLOAD_IN_PROGRESS_DELAYS_MS.length ? UPLOAD_IN_PROGRESS_DELAYS_MS[waits] * (0.75 + Math.random() / 2) : null;

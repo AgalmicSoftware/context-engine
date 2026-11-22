@@ -6,6 +6,7 @@ import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { shouldFallbackToAuthenticatedFlow } from '../worker/workerAuthFallbackPolicy.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 import { describeWorkerUnavailable, readWorkerCapabilities } from '../worker/workerCapabilities';
+import { UPLOAD_IN_PROGRESS } from '../worker/coordinatorRetry';
 import { toStr } from '../shared/primitives.js';
 import { STORAGE_BACKENDS, normalizeStorageRef } from './storageRefs.js';
 import {
@@ -208,15 +209,21 @@ const resolveStorageWorkerUrl = async ({
   return normalizeWorkerBaseUrl(resolved);
 };
 
+// The Worker is still storing this answer from an earlier send, so it has not failed. Submit sends the same request
+// id again, which the Worker replays rather than storing twice.
+export const UPLOAD_IN_PROGRESS_MESSAGE = 'Still saving. Press Submit again in a minute to check.';
+
 const parseStorageUploadResponse = async (response: Response): Promise<UnknownRecord> => {
   const body = (await response.json().catch(() => ({}))) as UnknownRecord;
   if (!response.ok) {
     // Keep the HTTP status and the Worker's machine-readable reason (for example
     // storage_resource_id_owned) so callers can react without parsing the text.
-    throw Object.assign(
-      new Error((body?.error as string) || (body?.message as string) || `Storage upload failed (${response.status}).`),
-      { status: response.status, reason: typeof body?.reason === 'string' ? body.reason : '' },
-    );
+    const reason = typeof body?.reason === 'string' ? body.reason : '';
+    const message =
+      reason === UPLOAD_IN_PROGRESS
+        ? UPLOAD_IN_PROGRESS_MESSAGE
+        : (body?.error as string) || (body?.message as string) || `Storage upload failed (${response.status}).`;
+    throw Object.assign(new Error(message), { status: response.status, reason });
   }
   const storageRef = normalizeStorageRef(body?.storageRef || body, {
     legacyArweaveTxId: body?.arweaveTxId || body?.txId || body?.id,

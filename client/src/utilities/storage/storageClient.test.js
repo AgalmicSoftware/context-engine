@@ -3,6 +3,7 @@ import {
   listSessionStorageRefsPage,
   readSessionStorageBatch,
   readSessionStorageBlob,
+  UPLOAD_IN_PROGRESS_MESSAGE,
   uploadDataToSessionStorage,
 } from './storageClient.js';
 import { normalizeSessionStorageConfig } from './sessionStorageConfig.js';
@@ -87,6 +88,21 @@ describe('Worker capability upload gates', () => {
     await expect(uploadDataToSessionStorage({}, 'json', args)).rejects.toThrow('coordinator is unavailable');
     await expect(uploadDataToSessionStorage({}, 'json', args)).resolves.toHaveProperty('id', 'cf_gate_result');
     expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+  // Once the page stops asking, the Worker may still be storing the answer: Submit is told to check again, not that
+  // it failed.
+  test('says an answer still being stored is still saving, not that it failed', async () => {
+    fetchWorkerWithAuth.mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: 'This upload is still in progress; retry shortly.', reason: 'upload_in_progress' }),
+        { status: 503 },
+      ),
+    );
+    await expect(uploadDataToSessionStorage({}, 'json', options())).rejects.toMatchObject({
+      message: UPLOAD_IN_PROGRESS_MESSAGE,
+      status: 503,
+      reason: 'upload_in_progress',
+    });
   });
   test('continues submit on a legacy Worker', async () => {
     await expect(uploadDataToSessionStorage({}, 'json', options())).resolves.toHaveProperty('id', 'cf_gate_result');
