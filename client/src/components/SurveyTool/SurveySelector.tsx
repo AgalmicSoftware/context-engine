@@ -25,6 +25,7 @@ import type { QuestionFilterHandle } from './QuestionFilter';
 import LazyFallback from '../Shared/LazyFallback';
 import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
 import { HeaderSubmittedCheck } from './SubmittedMarks';
+import { SubmitCountLabel } from './SubmitCountLabel';
 
 // Crypto and contract utilities
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -1376,9 +1377,15 @@ export class SurveySelector extends Component<any, any> {
               title="Submit responses"
               data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
               disabled={!!pendingSubmitStats.isSubmitting}
+              // A phone shows the count in the corner without its brackets; the name keeps them.
+              aria-label={pendingSubmitStats.isSubmitting ? undefined : headerSubmitLabel}
             >
               {/* Counts seconds from the Submit's start, as the AI flows' progress labels do. */}
-              {pendingSubmitStats.isSubmitting ? <ElapsedLoadingLabel label={headerSubmitLabel} /> : headerSubmitLabel}
+              {pendingSubmitStats.isSubmitting ? (
+                <ElapsedLoadingLabel label={headerSubmitLabel} />
+              ) : (
+                <SubmitCountLabel text={headerSubmitLabel} />
+              )}
               {pendingSubmitStats.isSubmitting && (
                 <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE} />
               )}

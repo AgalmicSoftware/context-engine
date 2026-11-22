@@ -17,10 +17,10 @@ import {
   resolvePileLoadingProgressFillStyle,
   resolvePileMiniLoaderStyle,
   resolvePileNavCounterStyle,
-  splitPileSubmitLabel,
   type PileInteractionSurfaceProps,
   type PileQuestionLike,
 } from './surveyPileInteractionSurface';
+import { splitPileSubmitLabel } from './SubmitCountLabel';
 import styles from './SurveyTool.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { forgetGroupReadHeader, saveGroupReadHeader } from '../../utilities/worker/workerGroupReadProof';

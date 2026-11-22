@@ -120,6 +120,20 @@ it('closes the phone arrows up to the counter and keeps the Submit count in view
   );
 });
 
+// The All questions bar's Submit shows its count by the pile's own rules, set against the button rather than its
+// word, which the bar otherwise positions and layers below the button's glow. Its word is not lowered, so on a
+// one-row bar it stays level with the buttons beside it; it leaves the count room at its end instead.
+it('sets the All questions Submit count in its corner, as the pile does', () => {
+  for (const part of ['pileSubmitButtonCountBracket', 'pileSubmitButtonCount']) {
+    expect(css).toMatch(
+      new RegExp(`\\.headerSubmitButton \\.${part},\\s*\\.pileInteractionUnit \\.pileFooter \\.${part}\\s*\\{`),
+    );
+  }
+  expect(css).not.toMatch(/\.headerSubmitButton \.pileSubmitButtonLabelCounted/);
+  expect(css).toMatch(/\.headerSubmitButton > \.pileSubmitButtonLabel\s*\{\s*position: static;\s*z-index: auto;/);
+  expect(css).toMatch(/\.headerSubmitButton > \.pileSubmitButtonLabelCounted\s*\{\s*margin-right: 10px;/);
+});
+
 // The counter gives way to Submit's word: one line, then its numbers stacked, then gone. A row that was a hair too
 // tight in another platform's rendering of the same font cut the word ("Submit" lost its end at 375px). Its form
 // now comes from the row's width against what the row needs in the font in use, never from a width in pixels.

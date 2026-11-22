@@ -7485,7 +7485,8 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
   // On a phone row the number of answers always shows, without its brackets, in the button's top corner above the
   // end of the word, where it takes none of the word's room: as large as the gap above the word holds. The label's
-  // own clipping does not reach it.
+  // own clipping does not reach it. The All questions bar's Submit shows its number the same way.
+  .headerSubmitButton .pileSubmitButtonCountBracket,
   .pileInteractionUnit .pileFooter .pileSubmitButtonCountBracket {
     display: none;
   }
@@ -7497,6 +7498,20 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     margin-bottom: -5px;
   }
 
+  // The bar's Submit positions and layers each part inside it; its word is left unpositioned and unlayered here, so
+  // the number sits in the button's corner, not the word's, and above the button's glow.
+  .headerSubmitButton > .pileSubmitButtonLabel {
+    position: static;
+    z-index: auto;
+  }
+
+  // The bar's word stays level with the buttons beside it and leaves the number room at its end instead, so two
+  // digits stay clear of it.
+  .headerSubmitButton > .pileSubmitButtonLabelCounted {
+    margin-right: 10px;
+  }
+
+  .headerSubmitButton .pileSubmitButtonCount,
   .pileInteractionUnit .pileFooter .pileSubmitButtonCount {
     position: absolute;
     top: 4px;
