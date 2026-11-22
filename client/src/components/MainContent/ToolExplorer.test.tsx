@@ -140,6 +140,10 @@ describe('ToolExplorer session propagation', () => {
       expect(screen.getByRole('option', { name: 'Shared name (rxc)' })).toBeInTheDocument();
       expect(selector.closest(`.${styles.expandedHeaderLead}`)).toBeNull();
       expect(selector.closest(`.${styles.expandedHeaderSession}`)).toBeInTheDocument();
+      // Only Context takes the wide one-row header.
+      expect(
+        container.querySelector(`.${styles.expandedHeaderRow}`)?.classList.contains(styles.expandedHeaderContext),
+      ).toBe(tool === 'Context');
       const lead = container.querySelector(`.${styles.expandedHeaderLead}`);
       expect(lead).toContainElement(screen.getByRole('button', { name: '← Back' }));
       const helpRegion = lead;

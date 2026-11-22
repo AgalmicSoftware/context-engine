@@ -289,7 +289,7 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
         {expandedComponent ? (
           <div className={styles.breadcrumbContainer}>
             <div
-              className={`${styles.expandedHeaderRow} ${useCompactExpandedHeader ? styles.expandedHeaderCompact : ''} ${showQuestionsHeaderActions ? styles.expandedHeaderQuestions : ''} ${showGroupsHeaderActions ? styles.expandedHeaderGroups : ''}`}
+              className={`${styles.expandedHeaderRow} ${useCompactExpandedHeader ? styles.expandedHeaderCompact : ''} ${showQuestionsHeaderActions ? styles.expandedHeaderQuestions : ''} ${showGroupsHeaderActions ? styles.expandedHeaderGroups : ''} ${showDataHeaderActions ? styles.expandedHeaderContext : ''}`}
             >
               <div className={styles.expandedHeaderPrimaryControls}>
                 {expandedHeaderLead}

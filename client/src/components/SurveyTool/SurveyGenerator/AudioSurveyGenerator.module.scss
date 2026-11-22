@@ -99,13 +99,15 @@ $input-border: var(--ce-input-border);
   }
 
   @media (min-width: 992px) {
+    // The box for text, links and files takes the panel's whole width, and keeps it: the question settings that
+    // appear once there is text sit under it, side by side. Beside it they left the right half empty until then,
+    // and would narrow the box under the cursor.
     form {
       display: grid;
-      grid-template-columns: 1.4fr 1fr;
-      grid-template-rows: auto auto auto;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       grid-template-areas:
-        'ingest types'
-        'ingest count'
+        'ingest ingest'
+        'types count'
         'button button';
       gap: 20px;
       align-items: stretch;
@@ -827,11 +829,12 @@ $input-border: var(--ce-input-border);
   }
 
   /* --- AI Prompt Panel --- */
+  // The prompt toggle starts at the box's left edge, under it.
   .aiPromptSection {
     margin-top: 20px;
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
+    align-items: flex-start;
   }
 
   .aiPromptToggleBtn {

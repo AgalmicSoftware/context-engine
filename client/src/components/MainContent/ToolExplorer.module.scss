@@ -467,6 +467,24 @@
   }
 }
 
+// Context on a wide screen: Back, "?", the session box and Add/View share one row. The session box takes what is
+// left and shrinks first; below this width Add/View keep their own row, as before.
+@media (min-width: 992px) {
+  .expandedHeaderContext {
+    grid-template-columns: minmax(0, 1fr) auto;
+
+    .expandedHeaderPrimaryControls {
+      grid-column: 1;
+      flex-wrap: nowrap;
+    }
+
+    .expandedHeaderActions {
+      grid-column: 2;
+      flex-wrap: nowrap;
+    }
+  }
+}
+
 // Keep the sticky slot beside the question body so the short navigation header
 // cannot constrain it as the page scrolls.
 .expandedQuestionsToolbar {
