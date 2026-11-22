@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.28] - 2026-11-21
+
+Copying unsaved answers to another device when sign-in fails, a simpler session control in Settings, and the site. The Session Worker's code is unchanged and MCP stays 0.9.2. Nothing a session already stores is changed.
+
+### Site — available when the site deploys
+
+- **Copy my answers when sign-in fails.** When a passkey sign-in fails because of the passkey or the browser, and the browser holds unsaved answers, the sign-in screen offers **Copy my answers**: a link that carries the typed answers and any interview review, to open on another device and submit there. The answers are in the link's fragment, which browsers don't send, and the page that opens it takes them out of the address before anything is fetched; anyone given the link can read them. The opening browser keeps the answers it already holds and submits nothing by itself. A copied interview review is asked about before it shows, also on a phone that is already signed in. A set too long for one link copies as a short link and a code; where the browser refuses the clipboard, they are offered on one line to copy by hand.
+- **Session control in Settings.** Settings offers the selected session or a list of sessions and applies a change at once. All sessions, General only, Save and Reset are gone from it; Home's session picker is unchanged. The active session is drawn as a plain block instead of a stretched pill.
+- **Atlas node order.** A session atlas node reads its summary, then "Where participants stand", then its lists. A node with no summary keeps the chart after the lists.
+- **Deploy helper.** It deploys the 0.9.27 Worker bundles. A Worker updated from the site gets this release's.
+
 ## [0.9.27] - 2026-11-21
 
 The Session Agent reads a session's saved links, a shorter voice brief with a question-order choice, faster group lists in the Session Worker, MCP 0.9.2 (published at merge) and the site. Nothing a session already stores is changed.

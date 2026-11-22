@@ -6,11 +6,11 @@
   "files": {
     "worker.mjs": {
       "bytes": 5446896,
-      "sha256": "e843d1914e07692dc1399336d235488af4ce2ec822cd407ccdeb871b40f970e1"
+      "sha256": "b982fefd9e82ca053762f6a4a8f3f809c1e795f809734990bedb6d802d3f12ee"
     },
     "wrangler.jsonc": {
       "bytes": 1171,
-      "sha256": "f7a1e725c318b17ef4378598995a8797a8875d34c0177172c815cad9d45f5adf"
+      "sha256": "bb8d9eb499cf6c04d7b84bd9eded1df28969d371f4086812c6a7e5c395651d63"
     },
     "package.json": {
       "bytes": 1799,
@@ -33,5 +33,5 @@
       "sha256": "c42f8978b12334dff7d62f1767182b734be990ad9e5abb960b8e819306166330"
     }
   },
-  "packageSha256": "3be222957ca921bdd12d618ab6c854b0d3d0873d07c1940941e492d1d8e2fe7f"
+  "packageSha256": "096eec1a121103eb1f5226a791d7e4ef7e2cad10a163ca3c29dae1508b028a9a"
 }
