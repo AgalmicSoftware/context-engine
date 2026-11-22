@@ -22,6 +22,17 @@ const wait = (ms: number, signal?: AbortSignal | null) =>
     signal?.addEventListener('abort', () => (clearTimeout(timer), reject(signal.reason)), { once: true });
   });
 
+// An upload's fields, read from its form or JSON body.
+const uploadField = (body: RequestInit['body'], field: string): string => {
+  if (body instanceof FormData) return String(body.get(field) || '');
+  if (typeof body !== 'string') return '';
+  try {
+    return String(JSON.parse(body || '{}')[field] || '');
+  } catch {
+    return '';
+  }
+};
+
 // Reads, group joins, and answer uploads that carry a request id the Worker
 // replays rather than stores twice. Streamed bodies cannot be sent again.
 const replaySafe = (url: string, init: RequestInit) => {
@@ -31,19 +42,17 @@ const replaySafe = (url: string, init: RequestInit) => {
   if (body != null && typeof body !== 'string' && !(body instanceof FormData)) return false;
   const path = new URL(url, 'https://worker.invalid').pathname;
   if (READ_PATHS.test(path) || REPEATABLE_WRITE_PATHS.test(path)) return true;
-  if (!path.endsWith('/storage/upload')) return false;
-  if (body instanceof FormData) return !!body.get('requestId');
-  try {
-    return !!JSON.parse(body || '{}').requestId;
-  } catch {
-    return false;
-  }
+  return path.endsWith('/storage/upload') && !!uploadField(body, 'requestId');
 };
 
 // A Worker with its session coordinator (every Worker deployed by the deploy helper or from the template) stores an
 // answer upload with a request id once, whatever becomes of its reply: sent again, it gets the copy already stored.
 // So it is also sent again when no reply came (the connection dropped, or a gateway answered for the Worker).
 // Otherwise the answer is saved while the page says it failed.
+// Limit: the Worker takes that receipt only for a signed-in person's 'responses' upload on a Worker with its
+// coordinator bound. Only those uploads are sent again after no reply; an older or custom Worker without the
+// coordinator may still keep the repeat as a second version of the answer, never losing one.
+const RECEIPT_RESOURCE = 'responses';
 const NO_REPLY_STATUSES = new Set([502, 504]);
 // The Worker holds a send it is still storing for up to two minutes, and answers a repeat sent meanwhile with
 // 'upload_in_progress', changing nothing. So a repeat that hears this asks again for about half a minute, while
@@ -59,7 +68,10 @@ export const withCoordinatorRetry =
   async (input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> => {
     const url = String(input instanceof Request ? input.url : input);
     const safe = !(input instanceof Request) && replaySafe(url, init);
-    const answerUpload = safe && new URL(url, 'https://worker.invalid').pathname.endsWith('/storage/upload');
+    const answerUpload =
+      safe &&
+      new URL(url, 'https://worker.invalid').pathname.endsWith('/storage/upload') &&
+      uploadField(init.body, 'resource') === RECEIPT_RESOURCE;
     // Sends again after a busy coordinator or no reply, and, counted apart, after an answer still being stored.
     let retries = 0;
     let waits = 0;

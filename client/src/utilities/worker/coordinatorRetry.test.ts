@@ -99,6 +99,10 @@ describe('withCoordinatorRetry', () => {
         expect(response?.status).toBe(200);
         expect(calls).toBe(2);
       }
+      const form = new FormData();
+      form.append('resource', 'responses');
+      form.append('requestId', 'answer:v1:op:q1:0');
+      expect((await settle([lost], `${worker}/storage/upload`, { method: 'POST', body: form })).calls).toBe(2);
     });
 
     it('waits about half a minute for an answer the Worker is still storing, then passes on its answer', async () => {
@@ -142,8 +146,15 @@ describe('withCoordinatorRetry', () => {
       expect(cancelled.error).toBeInstanceOf(TypeError);
       expect(cancelled.calls).toBe(1);
       const question = { method: 'POST', body: JSON.stringify({ resource: 'questions', data: {} }) };
-      for (const reply of [lost, status(502), status(503, { reason: 'upload_in_progress' })]) {
-        expect((await settle([reply], `${worker}/storage/upload`, question)).calls).toBe(1);
+      // The Worker takes a receipt only for answers, so another upload with a request id could be stored twice.
+      const comment = { method: 'POST', body: JSON.stringify({ resource: 'comments', requestId: 'c1', data: {} }) };
+      const form = new FormData();
+      form.append('resource', 'comments');
+      form.append('requestId', 'c2');
+      for (const upload of [question, comment, { method: 'POST', body: form }]) {
+        for (const reply of [lost, status(502), status(503, { reason: 'upload_in_progress' })]) {
+          expect((await settle([reply], `${worker}/storage/upload`, upload)).calls).toBe(1);
+        }
       }
       // Reads keep their own rule: only a busy coordinator is retried.
       expect((await settle([lost], `${worker}/storage/list`, {})).calls).toBe(1);
