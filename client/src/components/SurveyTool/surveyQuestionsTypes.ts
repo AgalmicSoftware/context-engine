@@ -1724,7 +1724,7 @@ export const SURVEY_QUESTIONS_SUBMISSION_ERROR_STYLE = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  color: 'var(--ce-status-danger-text)',
+  color: 'inherit',
 };
 
 export const buildSurveyQuestionsFullLoadingProgressFillStyle = ({
