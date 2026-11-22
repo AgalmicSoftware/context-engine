@@ -65,6 +65,100 @@ export const CreateLoginFileLine = ({
   </div>
 );
 
+/**
+ * "Login with file": the button, and the hidden file input it opens. The chosen file's text goes to `onSignIn`.
+ */
+const LoginWithFileButton = ({
+  onSignIn,
+  testId,
+  inputTestId,
+}: {
+  onSignIn: (text: string) => void;
+  testId: string;
+  inputTestId: string;
+}) => {
+  const [unreadable, setUnreadable] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <Button
+        type="button"
+        size="sm"
+        color="primary"
+        className={styles.passkeyCopyAnswersButton}
+        data-testid={testId}
+        onClick={() => input.current?.click()}
+      >
+        Login with file
+      </Button>
+      <input
+        ref={input}
+        type="file"
+        accept=".json,.txt,application/json,text/plain"
+        hidden
+        data-testid={inputTestId}
+        onChange={async (event) => {
+          const file = event.target.files?.[0];
+          // Cleared, so choosing the same file again is a change too.
+          event.target.value = '';
+          if (!file) return;
+          setUnreadable(false);
+          try {
+            // A login file is a few hundred bytes; something far larger was chosen by mistake.
+            if (file.size > 64 * 1024) throw new Error('too large');
+            onSignIn(await file.text());
+          } catch (_) {
+            setUnreadable(true);
+          }
+        }}
+      />
+      {unreadable ? <span role="alert"> That file could not be read.</span> : null}
+    </>
+  );
+};
+
+/**
+ * Under a sign-in that failed: "Create login file or Login with file to login without a passkey". `withOr` puts
+ * an "or" above it; `last` ends the sentence where nothing follows.
+ */
+export const LoginFilePairLine = ({
+  onCreate,
+  onSignIn,
+  withOr,
+  last,
+}: {
+  onCreate: () => void;
+  onSignIn: (text: string) => void;
+  withOr: boolean;
+  last: boolean;
+}) => (
+  <div className={styles.passkeyCopyAnswers} data-testid="ce-passkey-login-file">
+    {withOr ? <OrLine /> : null}
+    {/* Its own line height: where the two buttons wrap, their 44px tap areas do not meet. */}
+    <div className={styles.loginFilePair}>
+      <Button
+        type="button"
+        size="sm"
+        color="primary"
+        className={styles.passkeyCopyAnswersButton}
+        data-testid="ce-passkey-create-login-file-button"
+        onClick={() => onCreate()}
+      >
+        Create login file
+      </Button>{' '}
+      <span className={styles.passkeyCopyAnswersUnbroken}>
+        or{' '}
+        <LoginWithFileButton
+          onSignIn={onSignIn}
+          testId="ce-passkey-login-with-file-button"
+          inputTestId="ce-passkey-login-file-input"
+        />
+      </span>
+    </div>
+    to login without a passkey{last ? '.' : ''}
+  </div>
+);
+
 type LoginFileAccessProps = {
   /** Makes a login file and saves it to the person's downloads. */
   onCreate: () => void;
@@ -81,19 +175,8 @@ type LoginFileAccessProps = {
 // that says how to sign in with it, with a way back.
 const LoginFileAccess = ({ onCreate, onSignIn, savedName, onBack }: LoginFileAccessProps) => {
   const [opened, setOpened] = useState(false);
-  const [unreadable, setUnreadable] = useState(false);
-  const input = useRef<HTMLInputElement>(null);
   const chooseFile = (
-    <Button
-      type="button"
-      size="sm"
-      color="primary"
-      className={styles.passkeyCopyAnswersButton}
-      data-testid="ce-login-file-choose"
-      onClick={() => input.current?.click()}
-    >
-      Login with file
-    </Button>
+    <LoginWithFileButton onSignIn={onSignIn} testId="ce-login-file-choose" inputTestId="ce-login-file-input" />
   );
   const help = (
     <>
@@ -121,33 +204,6 @@ const LoginFileAccess = ({ onCreate, onSignIn, savedName, onBack }: LoginFileAcc
       </UncontrolledTooltip>
     </>
   );
-  const fileInput = (
-    <>
-      <input
-        ref={input}
-        type="file"
-        accept=".json,.txt,application/json,text/plain"
-        hidden
-        data-testid="ce-login-file-input"
-        onChange={async (event) => {
-          const file = event.target.files?.[0];
-          // Cleared, so choosing the same file again is a change too.
-          event.target.value = '';
-          if (!file) return;
-          setUnreadable(false);
-          try {
-            // A login file is a few hundred bytes; something far larger was chosen by mistake.
-            if (file.size > 64 * 1024) throw new Error('too large');
-            onSignIn(await file.text());
-          } catch (_) {
-            setUnreadable(true);
-          }
-        }}
-      />
-      <div aria-live="polite">{unreadable ? 'That file could not be read.' : null}</div>
-    </>
-  );
-
   if (savedName) {
     return (
       <div className={styles.passkeyWalletStatus} data-testid="ce-login-file">
@@ -172,7 +228,6 @@ const LoginFileAccess = ({ onCreate, onSignIn, savedName, onBack }: LoginFileAcc
             choose it with {chooseFile} {help}
           </span>
         </div>
-        {fileInput}
       </div>
     );
   }
@@ -200,7 +255,6 @@ const LoginFileAccess = ({ onCreate, onSignIn, savedName, onBack }: LoginFileAcc
         <OrLine />
         <span className={styles.passkeyCopyAnswersUnbroken}>{chooseFile} if</span> you have one.
       </div>
-      {fileInput}
     </div>
   );
 };

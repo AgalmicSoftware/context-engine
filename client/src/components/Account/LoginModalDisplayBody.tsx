@@ -17,7 +17,7 @@ import styles from './Account.module.scss';
 import { AccountMenu, AccountMenuRow } from './AccountMenu';
 import { countUnsentAnswers } from 'components/UserPage/userPageAnalyzeLink';
 const AgentAccountAccessPanel = React.lazy(() => import('./AgentAccountAccessPanel'));
-import LoginFileAccess, { CreateLoginFileLine, OrLine } from './LoginFileAccess';
+import LoginFileAccess, { LoginFilePairLine, OrLine } from './LoginFileAccess';
 import {
   PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE,
   PASSKEYS_UNAVAILABLE_MESSAGE,
@@ -56,6 +56,12 @@ const CopyPageLink = () => {
 // closed or timed out, and the errors that point at the other button, are left out: those are fixed here.
 const FIXED_HERE =
   /prompt closed or timed out|try the passkey again|Use Login\.|Sign in, or delete it first|not a Context Engine login file/;
+// Any sign-in that failed in the log-in window, whatever the cause: the status then offers a login file.
+export const isLoginIssue = (message: string): boolean =>
+  message === PASSKEYS_UNAVAILABLE_MESSAGE ||
+  /^(Create|Login) failed: /.test(message) ||
+  /^No passkey wallet is saved/.test(message);
+
 export const isPasskeyProblem = (message: string): boolean =>
   message === PASSKEYS_UNAVAILABLE_MESSAGE || (/^(Create|Login) failed: /.test(message) && !FIXED_HERE.test(message));
 
@@ -68,15 +74,17 @@ const COPY_ANSWERS_HELP =
 // is made ready as this shows, because a copy has to happen inside the tap itself. `where` names the place to open
 // it; `otherwise` shows where this browser cannot pack the answers. The button is the first words of its sentence,
 // so a copy that worked marks the button with a check rather than changing its words, and says so to screen readers.
-// `afterPhoneOffer` makes it the last of the options the phone offer starts, after an "or".
+// `afterPhoneOffer` gives it the words that follow the phone offer; `withOr` puts an "or" above it.
 const CopyMyAnswers = ({
   where,
   otherwise,
   afterPhoneOffer = false,
+  withOr = false,
 }: {
   where: string;
   otherwise: React.ReactNode;
   afterPhoneOffer?: boolean;
+  withOr?: boolean;
 }) => {
   const [text, setText] = useState<string | null | undefined>(undefined);
   const [copied, setCopied] = useState<boolean | null>(null);
@@ -91,7 +99,7 @@ const CopyMyAnswers = ({
   if (!text) return <>{otherwise}</>;
   return (
     <div className={styles.passkeyCopyAnswers} data-testid="ce-passkey-copy-answers">
-      {afterPhoneOffer ? <OrLine /> : null}
+      {withOr ? <OrLine /> : null}
       {/* Unbroken, the button keeps the sentence's first word and the (?) its last as the sentence wraps. */}
       <span className={styles.passkeyCopyAnswersUnbroken}>
         <Button
@@ -282,9 +290,19 @@ const LoginModalDisplayBody = ({
 }: LoginModalDisplayBodyProps) => {
   const passkeysUnavailable = passkeyWalletStatusMessage === PASSKEYS_UNAVAILABLE_MESSAGE;
   const passkeyLacksPrf = passkeyWalletStatusMessage === PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE;
-  // Once a login file was saved from under a failed passkey, the notice about it stands in place of that
-  // status and its other ways out; Back brings them back.
-  const noticeReplacesStatus = passkeyLacksPrf && !!loginFileSavedName;
+  // After any sign-in that failed, the status is also the list of other ways in: it offers a login file, so
+  // "Other options" is not shown beside it. A message about a login file itself stays in view on its own.
+  const loginIssue = passkeyWalletStatusTone === 'error' && isLoginIssue(passkeyWalletStatusMessage);
+  const aboutLoginFile = /login file/i.test(passkeyWalletStatusMessage);
+  // Once a login file was saved from there, the notice about it stands in place of that status and its other
+  // ways out; Back brings them back.
+  const noticeReplacesStatus = loginIssue && !aboutLoginFile && !!loginFileSavedName;
+  const offersLoginFile = loginIssue && !loginFileSavedName;
+  const copiesAnswers =
+    passkeyWalletStatusTone === 'error' && isPasskeyProblem(passkeyWalletStatusMessage) && countUnsavedAnswers() > 0;
+  const loginFileLine = (withOr: boolean, last: boolean) => (
+    <LoginFilePairLine onCreate={handleLoginFileCreate} onSignIn={handleLoginFileSignIn} withOr={withOr} last={last} />
+  );
   if (!loginComplete && !loginInProgress) {
     return (
       <CardBody>
@@ -343,30 +361,23 @@ const LoginModalDisplayBody = ({
               data-testid="ce-passkey-wallet-status"
             >
               {passkeyWalletStatusMessage}
-              {passkeyLacksPrf ? (
-                <>
-                  <UseAnotherDevice onClick={handlePasskeyWalletCreateOnAnotherDevice} />
-                  <CreateLoginFileLine
-                    onClick={handleLoginFileCreate}
-                    testId="ce-passkey-create-login-file"
-                    withOr
-                    last={countUnsavedAnswers() === 0}
-                  />
-                </>
-              ) : null}
+              {passkeyLacksPrf ? <UseAnotherDevice onClick={handlePasskeyWalletCreateOnAnotherDevice} /> : null}
+              {/* The order of the ways in: the phone, a login file, then the answers to take elsewhere. In a
+                  browser without passkeys the link to another browser is the way in, so it comes first. */}
+              {offersLoginFile && !passkeysUnavailable ? loginFileLine(passkeyLacksPrf, !copiesAnswers) : null}
               {/* When the passkey itself is the problem, unsaved answers can leave with the person; the plain link
                   stays for a browser without passkeys that holds none. */}
-              {passkeyWalletStatusTone === 'error' &&
-              isPasskeyProblem(passkeyWalletStatusMessage) &&
-              countUnsavedAnswers() > 0 ? (
+              {copiesAnswers ? (
                 <CopyMyAnswers
                   afterPhoneOffer={passkeyLacksPrf}
+                  withOr={offersLoginFile && !passkeysUnavailable}
                   where={passkeysUnavailable ? 'in Safari or Chrome' : 'on your phone'}
                   otherwise={passkeysUnavailable ? <CopyPageLink /> : null}
                 />
               ) : passkeysUnavailable ? (
                 <CopyPageLink />
               ) : null}
+              {offersLoginFile && passkeysUnavailable ? loginFileLine(true, true) : null}
               {passkeyWalletStatusHelp ? (
                 <>
                   <button
@@ -397,8 +408,8 @@ const LoginModalDisplayBody = ({
             </div>
           )}
 
-          {/* A failed passkey's box is the other options, so "Other options" is not shown beside it. */}
-          {passkeyLacksPrf && !loginFileSavedName ? null : (
+          {/* A failed sign-in's box is the other options, so "Other options" is not shown beside it. */}
+          {offersLoginFile ? null : (
             <LoginFileAccess
               onCreate={handleLoginFileCreate}
               onSignIn={handleLoginFileSignIn}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import LoginModalDisplayBody, { SlowFallback, isPasskeyProblem } from './LoginModalDisplayBody';
+import LoginModalDisplayBody, { SlowFallback, isLoginIssue, isPasskeyProblem } from './LoginModalDisplayBody';
 
 // The profile, as the dialog's lazy chunk: it puts the dialog's rows in its own list.
 jest.mock('components/UserPage/UserPage', () => ({
@@ -114,9 +114,13 @@ describe('Copy my answers after a failed sign-in', () => {
     renderBody(failed);
     const button = await screen.findByRole('button', { name: 'Copy this link' });
     const line = screen.getByTestId('ce-passkey-copy-answers');
+    // After the login file's line and an "or", its button leads its sentence.
     expect(line.querySelector('button')).toBe(button);
+    expect(screen.getByTestId('ce-passkey-login-file')).toHaveTextContent(
+      /^Create login file or Login with file ?to login without a passkey$/,
+    );
     expect(line).toHaveTextContent(
-      /^Copy this link and open it on your phone to recover and submit responses\.(?: |$)/,
+      /^orCopy this link and open it on your phone to recover and submit responses\.(?: |$)/,
     );
     expect(screen.getByRole('button', { name: 'About copying your answers' })).toHaveAccessibleDescription(
       /not sent to us/,
@@ -153,7 +157,7 @@ describe('Copy my answers after a failed sign-in', () => {
       expect(screen.getByRole('button', { name: 'Copy this link' })).toBe(button);
       expect(button.querySelector('[data-icon="check"]')).not.toBeNull();
       expect(screen.getByTestId('ce-passkey-copy-answers')).toHaveTextContent(
-        /^Copy this link and open it on your phone to recover and submit responses\.(?: |$)/,
+        /^orCopy this link and open it on your phone to recover and submit responses\.(?: |$)/,
       );
       expect(within(screen.getByRole('status')).getByText('Link copied.')).toBeInTheDocument();
     } finally {
@@ -191,6 +195,51 @@ describe('Copy my answers after a failed sign-in', () => {
     renderBody({ passkeyWalletStatusMessage: '', passkeyWalletStatusTone: '' });
     await act(async () => {});
     expect(screen.queryByTestId('ce-passkey-copy-answers')).not.toBeInTheDocument();
+  });
+
+  it('offers a login file after any sign-in that failed, and "Other options" only where none did', async () => {
+    expect(
+      [
+        'Open this link in Safari or Chrome to sign in.',
+        "Create failed: This passkey can't be used here.",
+        'Login failed: Passkey prompt closed or timed out. Try again.',
+        'Create failed: Click the page, then try the passkey again.',
+        'Login failed: That is not a Context Engine login file.',
+        'No passkey wallet is saved in this browser for this app. Use Create to make one under this RP ID.',
+      ].map(isLoginIssue),
+    ).toEqual(Array(6).fill(true));
+    expect(['', 'Signed out here, but the saved wallet could not be disconnected.'].map(isLoginIssue)).toEqual([
+      false,
+      false,
+    ]);
+
+    // A closed prompt: nothing to copy, no phone offer, and the login file as the one other way in.
+    const closed = 'Login failed: Passkey prompt closed or timed out. Try again.';
+    renderBody({ passkeyWalletStatusMessage: closed, passkeyWalletStatusTone: 'error' });
+    const status = screen.getByTestId('ce-passkey-wallet-status');
+    expect(status).toHaveTextContent(
+      /^Login failed: Passkey prompt closed or timed out\. Try again\.Create login file or Login with file ?to login without a passkey\.$/,
+    );
+    expect(screen.queryByRole('button', { name: 'Scan QR with phone' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Other options' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the link to another browser first where this one has no passkeys, then the login file', () => {
+    renderBody({
+      passkeyWalletStatusMessage: 'Open this link in Safari or Chrome to sign in.',
+      passkeyWalletStatusTone: 'error',
+    });
+    expect(
+      within(screen.getByTestId('ce-passkey-wallet-status'))
+        .getAllByRole('button')
+        .map((button) => button.textContent?.trim()),
+    ).toEqual(['Copy link', 'Create login file', 'Login with file']);
+  });
+
+  it('shows "Other options" where no sign-in failed, and for a status that is not a failed sign-in', () => {
+    renderBody({ passkeyWalletStatusMessage: '', passkeyWalletStatusTone: '' });
+    expect(screen.getByRole('button', { name: 'Other options' })).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-passkey-login-file')).not.toBeInTheDocument();
   });
 
   it('counts only errors of the passkey itself, not ones fixed in this browser', async () => {

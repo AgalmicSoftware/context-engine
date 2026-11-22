@@ -2338,6 +2338,12 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   margin-bottom: 14px;
 }
 
+// "Create login file or Login with file": tall lines, so that where the two buttons wrap onto two lines their
+// 44px tap areas do not meet.
+.loginFilePair {
+  line-height: 46px;
+}
+
 // "or", between the ways out under a failed passkey: a line of its own, larger than the text around it.
 .passkeyOr {
   margin: 10px 0 8px;

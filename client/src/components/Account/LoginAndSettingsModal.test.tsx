@@ -986,6 +986,48 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     );
   });
 
+  it('signs in with a file chosen under a failed sign-in, and Back from a new file returns to that failure', async () => {
+    const urls = URL as unknown as { createObjectURL?: unknown; revokeObjectURL?: unknown };
+    urls.createObjectURL = jest.fn(() => 'blob:login-file');
+    urls.revokeObjectURL = jest.fn();
+    const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    try {
+      mockedPasskeyWallet.unlockPasskeyWallet.mockRejectedValueOnce(
+        new Error('Passkey prompt closed or timed out. Try again.'),
+      );
+      const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
+      await subject.handlePasskeyWalletSignIn();
+      const view = render(subject.getModalDisplay());
+      const closed = 'Login failed: Passkey prompt closed or timed out. Try again.';
+      expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(closed);
+      expect(screen.queryByRole('button', { name: 'Other options' })).not.toBeInTheDocument();
+
+      // A new file: the notice stands in place of the failure; Back returns to it.
+      fireEvent.click(screen.getByRole('button', { name: 'Create login file' }));
+      view.rerender(subject.getModalDisplay());
+      expect(screen.queryByTestId('ce-passkey-wallet-status')).not.toBeInTheDocument();
+      expect(screen.getByTestId('ce-login-file-saved')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+      view.rerender(subject.getModalDisplay());
+      expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(closed);
+
+      // A file the person already has, chosen right there.
+      const chosen = new File(['the file text'], 'context-engine-login-ab12cd.json');
+      Object.defineProperty(chosen, 'text', { value: async () => 'the file text' });
+      await act(async () => {
+        fireEvent.change(screen.getByTestId('ce-passkey-login-file-input'), { target: { files: [chosen] } });
+      });
+      expect(mockedPasskeyWallet.signInWithLoginFile).toHaveBeenLastCalledWith('the file text');
+      expect(subject.props.changeAccount).toHaveBeenCalledWith(
+        expect.objectContaining({ account: '0x2222222222222222222222222222222222222222', provider: 'passkey_eoa' }),
+      );
+    } finally {
+      click.mockRestore();
+      delete urls.createObjectURL;
+      delete urls.revokeObjectURL;
+    }
+  });
+
   it('keeps a wrong file\u2019s message in view beside the notice of a saved login file', async () => {
     const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
     subject.setState({ loginFileSavedName: 'context-engine-login-ab12cd.json' });
@@ -1030,11 +1072,12 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
         'Scan QR with phone',
         'About scanning with your phone',
         'Create login file',
+        'Login with file',
         'Copy this link',
         'About copying your answers',
       ]);
-      expect(screen.getByTestId('ce-passkey-create-login-file')).toHaveTextContent(
-        /^orCreate login file to login without a passkey$/,
+      expect(screen.getByTestId('ce-passkey-login-file')).toHaveTextContent(
+        /^orCreate login file or Login with file ?to login without a passkey$/,
       );
       expect(screen.getByTestId('ce-passkey-copy-answers')).toHaveTextContent(
         /^orCopy this link to paste your responses on a different device\./,
@@ -1084,8 +1127,8 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
     await subject.handlePasskeyWalletCreate();
     render(subject.getModalDisplay());
-    expect(screen.getByTestId('ce-passkey-create-login-file')).toHaveTextContent(
-      /^orCreate login file to login without a passkey\.$/,
+    expect(screen.getByTestId('ce-passkey-login-file')).toHaveTextContent(
+      /^orCreate login file or Login with file ?to login without a passkey\.$/,
     );
     expect(screen.queryByRole('button', { name: 'Copy this link' })).not.toBeInTheDocument();
   });

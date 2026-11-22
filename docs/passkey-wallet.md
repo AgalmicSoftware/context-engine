@@ -278,11 +278,17 @@ that is closed, returns to the same message, so the offer stays.
 
 For someone whose device cannot use a passkey here at all. Under the log-in
 window's passkey buttons, **Other options** opens two buttons: **Create login
-file** and **Login with file**. After a Create whose passkey has no PRF, the
-status box is itself the other options, so "Other options" is not shown beside
-it; the box offers the login file between the phone and the copy link, with an
-"or" between the three: "Scan QR with phone to login", "Create login file to login without a
-passkey", "Copy this link to paste your responses on a different device."
+file** and **Login with file**.
+
+After any sign-in that failed there (a passkey without PRF, a prompt that was
+closed or timed out, a browser without passkeys, a file that is not a login
+file), the status box is itself the list of other ways in, so "Other options" is
+not shown beside it. The box adds "**Create login file** or **Login with file**
+to login without a passkey". After a Create whose passkey has no PRF that sits
+between the phone and the copy link, an "or" between the three: "Scan QR with
+phone to login", the login file, "Copy this link to paste your responses on a
+different device." In a browser without passkeys, the link to another browser
+stays first.
 
 - The file (`context-engine-login-<6 hex>.json`) holds a standard 12-word
   recovery phrase; the account is that phrase's first Ethereum address
