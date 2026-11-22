@@ -19,8 +19,7 @@ import SessionInterviewReviewSection from './SessionInterviewReviewSection';
 import SessionInterviewModalHeader from './SessionInterviewModalHeader';
 import { formatSessionRecordingElapsed } from './sessionElapsedTime';
 import { useWaitSeconds } from './useWaitSeconds';
-import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
-import { SubmitCountLabel } from './SubmitCountLabel';
+import SessionInterviewSubmitButton from './SessionInterviewSubmitButton';
 import SessionInterviewResearchConsent, { SessionInterviewResearchShare } from './SessionInterviewResearchConsent';
 import {
   useSessionInterviewGroupRecommendations,
@@ -33,8 +32,6 @@ import { useSessionContextPrompt } from '../../utilities/docLibrary/useSessionCo
 import { SESSION_CONTEXT_LIMIT } from './sessionInterviewRealtimeInstructions';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Input, Label, ModalBody } from 'reactstrap';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
 import SessionInterviewDraftCard from './SessionInterviewDraftCard';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -464,14 +461,6 @@ export default function SessionInterviewPanel({
   const submittableSelection = hiddenDrafts.submittable(selected);
   // The answers a Submit sends: the number in its corner and in the submission info.
   const submittableCount = drafts.filter((draft) => submittableSelection[draft.questionId]).length;
-  const submitWord =
-    pendingSubmitAfterLogin && !authenticatedForSubmit
-      ? 'Submit after login'
-      : groupsTicked
-        ? 'Submit and join'
-        : 'Submit';
-  // "Submit (3)", as on every Submit that sends answers; the button takes its name from it.
-  const submitText = submittableCount > 0 ? `${submitWord} (${submittableCount})` : submitWord;
   useEffect(() => {
     setConsentOverrides({});
   }, [activeSubmitContextToken]);
@@ -1515,43 +1504,16 @@ export default function SessionInterviewPanel({
                   ) : null}
                 </div>
               ) : null}
-              <Button
-                color="primary"
-                onClick={() => {
-                  if (submitSucceeded && showViewResults && onViewResults) {
-                    onViewResults();
-                    return;
-                  }
-                  void applyDrafts();
-                }}
-                disabled={
-                  applying ||
-                  mapping ||
-                  isInterviewBusy ||
-                  (submitSucceeded && (!showViewResults || !onViewResults)) ||
-                  submittableCount === 0
-                }
-                className={styles.sessionInterviewSubmitButton}
-                data-testid={
-                  submitSucceeded && showViewResults && onViewResults
-                    ? E2E_TESTIDS.SESSION_INTERVIEW_VIEW_RESULTS
-                    : E2E_TESTIDS.SESSION_INTERVIEW_APPLY
-                }
-                aria-label={submitSucceeded || applying ? undefined : submitText}
-              >
-                {submitSucceeded && showViewResults && onViewResults ? (
-                  'View results'
-                ) : submitSucceeded ? (
-                  <>
-                    <FontAwesomeIcon icon={faCheck} /> Responses submitted
-                  </>
-                ) : applying ? (
-                  // Counts seconds from the Submit's start, as every Submit's running label does.
-                  <ElapsedLoadingLabel label="Saving" />
-                ) : (
-                  <SubmitCountLabel text={submitText} />
-                )}
-              </Button>
+              <SessionInterviewSubmitButton
+                count={submittableCount}
+                awaitingLogin={pendingSubmitAfterLogin && !authenticatedForSubmit}
+                joiningGroups={groupsTicked}
+                applying={applying}
+                busy={mapping || isInterviewBusy}
+                submitted={submitSucceeded}
+                onViewResults={showViewResults ? onViewResults : undefined}
+                onSubmit={() => void applyDrafts()}
+              />
             </div>
           ) : null}
         </div>
