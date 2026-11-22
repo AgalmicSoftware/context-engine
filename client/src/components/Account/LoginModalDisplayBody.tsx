@@ -17,7 +17,11 @@ import styles from './Account.module.scss';
 import { AccountMenu, AccountMenuRow } from './AccountMenu';
 import { countUnsentAnswers } from 'components/UserPage/userPageAnalyzeLink';
 const AgentAccountAccessPanel = React.lazy(() => import('./AgentAccountAccessPanel'));
-import { PASSKEYS_UNAVAILABLE_MESSAGE, type PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
+import {
+  PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE,
+  PASSKEYS_UNAVAILABLE_MESSAGE,
+  type PasskeyWalletActionMode,
+} from './loginAndSettingsPasskeyActions';
 
 // For a browser without passkeys: the same page, to paste into one that has them. The link is the one the person
 // arrived with: the app has by now taken a group's invite and any drafted answers out of the address.
@@ -128,6 +132,55 @@ const CopyMyAnswers = ({ where, otherwise }: { where: string; otherwise: React.R
   );
 };
 
+const ANOTHER_DEVICE_HELP =
+  'This device shows a QR code. Scan it with your phone\u2019s camera and save the passkey on the phone. ' +
+  'After that, your phone signs you in on this device.';
+
+// After a Create whose passkey this site cannot use (Windows Hello on a Windows without PRF, or a passkey app
+// without it): the same Create, asked of a phone. It comes before the copy line, which is for when this fails too.
+const UseAnotherDevice = ({ onClick }: { onClick: () => void }) => (
+  <div
+    className={`${styles.passkeyCopyAnswers} ${styles.passkeyAnotherDevice}`}
+    data-testid="ce-passkey-another-device"
+  >
+    <span className={styles.passkeyCopyAnswersUnbroken}>
+      <Button
+        type="button"
+        size="sm"
+        color="primary"
+        className={styles.passkeyCopyAnswersButton}
+        data-testid="ce-passkey-another-device-button"
+        onClick={() => onClick()}
+      >
+        Use your phone
+      </Button>{' '}
+      instead.{' '}
+      <button
+        type="button"
+        id="ce-passkey-another-device-help"
+        className={styles.passkeyWalletStatusHelp}
+        data-ce-control-appearance="frameless"
+        aria-label="About using your phone"
+        aria-describedby="ce-passkey-another-device-about"
+      >
+        <FontAwesomeIcon icon={faQuestionCircle} />
+      </button>
+    </span>
+    <span id="ce-passkey-another-device-about" hidden>
+      {ANOTHER_DEVICE_HELP}
+    </span>
+    <UncontrolledTooltip
+      target="ce-passkey-another-device-help"
+      placement="top"
+      trigger="hover focus"
+      autohide={false}
+      className={styles.networkTooltip}
+    >
+      {ANOTHER_DEVICE_HELP}
+    </UncontrolledTooltip>
+  </div>
+);
+
 type AccountUserPageProps = {
   viewAddress?: string;
   account?: string;
@@ -147,6 +200,7 @@ type LoginModalDisplayBodyProps = {
   activeSessionSlug: string;
   handleLogout: () => void;
   handlePasskeyWalletCreate: () => void;
+  handlePasskeyWalletCreateOnAnotherDevice: () => void;
   handlePasskeyWalletSignIn: () => void;
   loginComplete: boolean;
   loginInProgress: boolean;
@@ -188,6 +242,7 @@ const LoginModalDisplayBody = ({
   activeSessionSlug,
   handleLogout,
   handlePasskeyWalletCreate,
+  handlePasskeyWalletCreateOnAnotherDevice,
   handlePasskeyWalletSignIn,
   loginComplete,
   loginInProgress,
@@ -265,6 +320,9 @@ const LoginModalDisplayBody = ({
               data-testid="ce-passkey-wallet-status"
             >
               {passkeyWalletStatusMessage}
+              {passkeyWalletStatusMessage === PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE ? (
+                <UseAnotherDevice onClick={handlePasskeyWalletCreateOnAnotherDevice} />
+              ) : null}
               {/* When the passkey itself is the problem, unsaved answers can leave with the person; the plain link
                   stays for a browser without passkeys that holds none. */}
               {passkeyWalletStatusTone === 'error' &&

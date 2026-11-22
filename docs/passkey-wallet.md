@@ -239,6 +239,39 @@ The embedded wallet requires WebAuthn PRF support. If the browser,
 authenticator, or platform does not return PRF output, wallet creation and
 unlock fail closed.
 
+### A device whose own passkeys have no PRF
+
+Create asks for a passkey kept on the device (`authenticatorAttachment:
+'platform'`). Windows Hello gives such a passkey PRF only with Chrome or Edge 147
+or later (Chromium changes 7569106 and 7600513) on a Windows 11 whose WebAuthn
+API is version 8 or later; third-party reports date that to the February 2026
+update of 24H2 and 25H2. On Windows 10, an older Windows 11 or an older browser,
+Windows Hello saves the passkey and the site cannot use it. A passkey app
+without PRF, set as a phone's passkey provider, ends the same way.
+
+After such a Create, the status under the buttons offers **Use your phone**
+"instead". It runs Create again with `authenticatorAttachment: 'cross-platform'`
+and `hints: ['hybrid']`, so the browser shows a QR code to scan with a phone.
+Everything else in the request, the PRF salt included, is unchanged, and the
+wallet is derived the same way. The passkey then lives on the phone: each later
+sign-in on that computer asks for the phone again. A try that fails, or a prompt
+that is closed, returns to the same message, so the offer stays.
+
+- The passkey the failed Create saved stays on the device. The site cannot remove
+  it (Chrome does not pass the WebAuthn Signal API on to Windows Hello by
+  default); Login offers it and fails with it. It can be deleted in the device's
+  passkey settings.
+- A phone may return no PRF output when the passkey is made, and the site then
+  asks for it once more: a second prompt on the phone.
+- A phone's passkey may return a different PRF output through a QR code than on
+  the phone itself (reported for some iPhone versions). The account made through
+  the QR code is then reached only that way, from a computer; Login on the phone
+  itself would open a different, empty account.
+- A security key is not offered. The browser's sheet may list one, but later
+  sign-ins name the saved passkey with the `internal` and `hybrid` transports
+  only, so a key may not be asked for.
+- The copy line below stays as the last resort.
+
 Allowed fallback behavior:
 
 - ask the user to use a PRF-capable passkey/browser

@@ -413,6 +413,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   syncPasskeyWalletChain = this._passkeyActions.syncPasskeyWalletChain;
   getPasskeyWalletNetwork = this._passkeyActions.getPasskeyWalletNetwork;
   handlePasskeyWalletCreate = this._passkeyActions.handlePasskeyWalletCreate;
+  handlePasskeyWalletCreateOnAnotherDevice = this._passkeyActions.handlePasskeyWalletCreateOnAnotherDevice;
   handlePasskeyWalletSignIn = this._passkeyActions.handlePasskeyWalletSignIn;
   _finalizePasskeyWalletLogin = this._passkeyActions._finalizePasskeyWalletLogin;
   _agentTokenActions = createLoginAgentActions({
@@ -2576,6 +2577,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       activeSessionSlug,
       handleLogout: this.handleLogout,
       handlePasskeyWalletCreate: this.handlePasskeyWalletCreate,
+      handlePasskeyWalletCreateOnAnotherDevice: this.handlePasskeyWalletCreateOnAnotherDevice,
       handlePasskeyWalletSignIn: this.handlePasskeyWalletSignIn,
       loginComplete: this.props.loginComplete,
       loginInProgress: this.props.loginInProgress,

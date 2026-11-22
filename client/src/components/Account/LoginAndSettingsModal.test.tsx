@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
 import {
   clearAgentClientLoginEnvelope,
@@ -928,9 +928,55 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       expect(status).toHaveTextContent(`${word} failed: This passkey can't be used here.`);
       expect(status).not.toHaveTextContent('WebAuthn');
       expect(await screen.findByRole('button', { name: 'Copy this link' })).toBeInTheDocument();
+      // Only a Create can be made again on a phone; a Login's passkey already exists.
+      expect(screen.queryAllByRole('button', { name: 'Use your phone' })).toHaveLength(word === 'Create' ? 1 : 0);
       sessionStorage.clear();
     },
   );
+
+  it('makes the passkey on a phone after a Create without PRF, and signs in', async () => {
+    mockedPasskeyWallet.createPasskeyWallet.mockRejectedValueOnce(
+      new Error('This passkey does not advertise WebAuthn PRF support.'),
+    );
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
+    await subject.handlePasskeyWalletCreate();
+    expect(mockedPasskeyWallet.createPasskeyWallet).toHaveBeenLastCalledWith();
+    const view = render(subject.getModalDisplay());
+    // The offer comes before the copy line, which is the last resort.
+    expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
+      "Create failed: This passkey can't be used here.Use your phone instead.",
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Use your phone' }));
+    await act(async () => {});
+    expect(mockedPasskeyWallet.createPasskeyWallet).toHaveBeenLastCalledWith({ anotherDevice: true });
+    expect(subject.props.changeAccount).toHaveBeenCalledWith(
+      expect.objectContaining({ account: '0x1111111111111111111111111111111111111111', provider: 'passkey_eoa' }),
+    );
+    view.rerender(subject.getModalDisplay());
+    expect(screen.queryByTestId('ce-passkey-wallet-status')).not.toBeInTheDocument();
+  });
+
+  it('keeps the phone offer and the copy line when the try on the phone fails or is closed', async () => {
+    sessionStorage.setItem(
+      'dg:surveyDraft:meadow-forum:84532:anon:all',
+      JSON.stringify({ answers: { q1: { value: 'Agree' } } }),
+    );
+    mockedPasskeyWallet.createPasskeyWallet
+      .mockRejectedValueOnce(new Error('This passkey does not advertise WebAuthn PRF support.'))
+      .mockRejectedValueOnce(new Error('Passkey prompt closed or timed out. Try again.'));
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(buildProps({ activeSessionSlug: 'meadow-forum' })),
+    );
+    await subject.handlePasskeyWalletCreate();
+    await subject.handlePasskeyWalletCreateOnAnotherDevice();
+    render(subject.getModalDisplay());
+    expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
+      "Create failed: This passkey can't be used here.",
+    );
+    expect(screen.getByRole('button', { name: 'Use your phone' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Copy this link' })).toBeInTheDocument();
+    sessionStorage.clear();
+  });
 
   it('sends someone in a browser without passkeys to Safari or Chrome, with the link to copy', async () => {
     const { PasskeysUnavailableError } = jest.requireActual<typeof import('../../wallet/passkey/unavailable')>(

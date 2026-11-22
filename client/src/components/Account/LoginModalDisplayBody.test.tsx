@@ -20,6 +20,7 @@ const renderBody = (props: Partial<Props>) => {
         account: '',
         handleLogout: jest.fn(),
         handlePasskeyWalletCreate: jest.fn(),
+        handlePasskeyWalletCreateOnAnotherDevice: jest.fn(),
         handlePasskeyWalletSignIn: jest.fn(),
         loginComplete: false,
         loginInProgress: false,

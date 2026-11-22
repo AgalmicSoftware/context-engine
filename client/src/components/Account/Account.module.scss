@@ -2313,6 +2313,11 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   margin-top: 8px;
 }
 
+// The line above the copy line: apart enough that the two buttons' 44px tap areas do not meet.
+.passkeyAnotherDevice {
+  margin-bottom: 14px;
+}
+
 // A word of the sentence: its label sits on the sentence's baseline.
 .passkeyCopyAnswersButton {
   position: relative;
