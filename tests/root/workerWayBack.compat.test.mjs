@@ -886,7 +886,8 @@ describe('saved links read as sources, back on a released bundle', () => {
   let tempDir;
   const bundles = {};
   const testResponse = globalThis.Response;
-  const refs = [['the pinned bundle', pinned], ['the live bundle', live]];
+  // The pinned bundle reads saved links since 0.9.28's pin, so the drill runs on the live bundle.
+  const refs = [['the live bundle', live]];
   beforeAll(async () => {
     globalThis.Response = (await fetch('data:,')).constructor;
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-way-back-links-'));
