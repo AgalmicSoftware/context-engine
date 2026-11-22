@@ -3300,6 +3300,12 @@ const renderPileSliderSection = (
         engine.handleConvictionImportanceChange(0, questionId, sliderMode, value, buildSliderPersistOptions(event))
       }
       onChangeComplete={engine.flushDraftPersistAfterSliderChange}
+      onClear={() => {
+        engine.clearConvictionImportance(0, questionId);
+        engine.setState((prev: { showConviction?: Record<string, boolean> }) => ({
+          showConviction: { ...prev.showConviction, [questionId]: false },
+        }));
+      }}
       onSelectMode={(nextMode: any) => {
         if (ENABLE_IMPORTANCE_SLIDER_TOGGLE) {
           engine.openConvictionSlider(questionId, nextMode);

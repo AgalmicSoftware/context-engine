@@ -78,6 +78,8 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => {
         singleQuestionMode: false,
       },
     },
+    // Nothing submitted yet.
+    resolveDiffBaselineSlice: jest.fn(() => ({})),
     resolveFieldEncryptionAudience: jest.fn(() => 'self'),
     resolveFieldEncryptionGateId: jest.fn(() => ''),
     scheduleJsonPreviewUpdate: jest.fn(),
@@ -230,6 +232,84 @@ describe('surveyQuestionsResponseEditingRuntime', () => {
     );
     expect(stateRef.current.surveysResponseState[0].answers).toEqual({});
     expect(stateRef.current.surveysResponseState[0].importance).toEqual({});
+  });
+
+  it('clears ratings never submitted and closes the slider, as before it opened', () => {
+    const stateRef = createStateRef({
+      sliderModeByQuestion: { Q1: 'importance', q2: 'conviction' },
+      sliderToggleExpandedByQuestion: { Q1: true, q2: true },
+      surveysResponseState: [
+        {
+          answers: { q1: { value: 'Agree' } },
+          additionalComments: {},
+          conviction: { q1: 6, q2: 3 },
+          importance: { q1: 8 },
+        },
+      ],
+    });
+    const context = createContext({ stateRef });
+    createSurveyQuestionsResponseEditingRuntime(context).clearConvictionImportance(0, 'Q1');
+
+    expect(stateRef.current.surveysResponseState[0]).toEqual({
+      answers: { q1: { value: 'Agree' } },
+      additionalComments: {},
+      conviction: { q2: 3 },
+      importance: {},
+    });
+    const closed = stateRef.current as SurveyQuestionsLegacyRecord;
+    expect(closed.sliderModeByQuestion).toEqual({ q2: 'conviction' });
+    expect(closed.sliderToggleExpandedByQuestion).toEqual({ q2: true });
+    expect(stateRef.current.submittedSinceLastEdit).toBe(true);
+    expect(context.inst._draftDirtyQids.has('q1')).toBe(true);
+    expect(context.invalidateDiffCaches).toHaveBeenCalledTimes(1);
+    expect(context.persistDraftSafely).toHaveBeenCalledWith(0);
+  });
+
+  it('returns submitted ratings to their saved values instead of removing them', () => {
+    const stateRef = createStateRef({
+      sliderToggleExpandedByQuestion: { q1: true },
+      surveysResponseState: [{ answers: {}, additionalComments: {}, conviction: { q1: 7 }, importance: { q1: 8 } }],
+    });
+    // The saved response keys the question in another case and has no importance. It is read
+    // with the local cache allowed, like the pending-edit count.
+    const resolveDiffBaselineSlice = jest.fn((allowLocalCache: boolean) =>
+      allowLocalCache ? { conviction: { Q1: 5 } } : {},
+    );
+    const context = createContext({ stateRef, resolveDiffBaselineSlice });
+    createSurveyQuestionsResponseEditingRuntime(context).clearConvictionImportance(0, 'q1');
+
+    expect(stateRef.current.surveysResponseState[0]).toMatchObject({ conviction: { q1: 5 }, importance: {} });
+    expect((stateRef.current as SurveyQuestionsLegacyRecord).sliderToggleExpandedByQuestion).toEqual({});
+    expect(context.inst._draftDirtyQids.has('q1')).toBe(true);
+    expect(context.persistDraftSafely).toHaveBeenCalledWith(0);
+  });
+
+  it('only closes the slider when the ratings already match what was submitted', () => {
+    const stateRef = createStateRef({
+      sliderToggleExpandedByQuestion: { q1: true },
+      surveysResponseState: [{ answers: {}, additionalComments: {}, conviction: { q1: 5 }, importance: {} }],
+    });
+    const context = createContext({ stateRef, resolveDiffBaselineSlice: jest.fn(() => ({ conviction: { q1: 5 } })) });
+    createSurveyQuestionsResponseEditingRuntime(context).clearConvictionImportance(0, 'q1');
+
+    expect(stateRef.current.surveysResponseState[0].conviction).toEqual({ q1: 5 });
+    expect((stateRef.current as SurveyQuestionsLegacyRecord).sliderToggleExpandedByQuestion).toEqual({});
+    expect(stateRef.current.submittedSinceLastEdit).toBe(false);
+    expect(context.persistDraftSafely).not.toHaveBeenCalled();
+  });
+
+  it('only closes a slider that was opened without setting a value', () => {
+    const stateRef = createStateRef({
+      sliderModeByQuestion: { q1: 'conviction' },
+      sliderToggleExpandedByQuestion: { q1: true },
+    });
+    const context = createContext({ stateRef });
+    createSurveyQuestionsResponseEditingRuntime(context).clearConvictionImportance(0, 'q1');
+
+    expect((stateRef.current as SurveyQuestionsLegacyRecord).sliderToggleExpandedByQuestion).toEqual({});
+    expect(stateRef.current.submittedSinceLastEdit).toBe(false);
+    expect(context.inst._draftDirtyQids.size).toBe(0);
+    expect(context.persistDraftSafely).not.toHaveBeenCalled();
   });
 
   it('routes answer encryption toggles through the normalized builder input', () => {

@@ -1,5 +1,8 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faTimes } from '@fortawesome/free-solid-svg-icons';
 
+import CETooltip from '../Shared/CETooltip';
 import BullhornToggleButton from './BullhornToggleButton';
 import ConvictionImportanceLabel from './ConvictionImportanceLabel';
 import ConvictionImportanceSliderControl from './ConvictionImportanceSliderControl';
@@ -18,6 +21,8 @@ type SurveyQuestionsFullQuestionSliderSectionProps = {
   isSubmitting?: boolean;
   onChange?: (nextValue: number, event?: unknown) => void;
   onChangeComplete?: (event?: unknown) => void;
+  // Closes the slider and returns both ratings to their submitted values (none if never submitted).
+  onClear?: () => void;
   onCommit?: (nextValue: number) => void;
   onSelectMode: (nextMode: SliderMode) => void;
   questionId: string;
@@ -25,6 +30,38 @@ type SurveyQuestionsFullQuestionSliderSectionProps = {
   sliderMode?: SliderMode;
   sliderOpen?: boolean;
   sliderToggleExpandedByQuestion?: Record<string, unknown>;
+};
+
+const ClearConvictionImportanceButton = ({
+  disabled,
+  importanceToggleEnabled,
+  onClick,
+}: {
+  disabled: boolean;
+  importanceToggleEnabled: boolean;
+  onClick: () => void;
+}) => {
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const label = importanceToggleEnabled ? 'Undo conviction and importance' : 'Undo conviction';
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className={`${styles.iconButton} ${styles.convictionClearButton}`}
+        aria-label={label}
+      >
+        <FontAwesomeIcon icon={faTimes} />
+      </button>
+      <CETooltip target={buttonRef} placement="top" trigger="hover focus">
+        {importanceToggleEnabled
+          ? 'Close the slider and undo your conviction and importance changes since you last submitted.'
+          : 'Close the slider and undo your conviction changes since you last submitted.'}
+      </CETooltip>
+    </>
+  );
 };
 
 const SurveyQuestionsFullQuestionSliderSection = ({
@@ -37,6 +74,7 @@ const SurveyQuestionsFullQuestionSliderSection = ({
   isSubmitting = false,
   onChange,
   onChangeComplete,
+  onClear,
   onCommit,
   onSelectMode,
   questionId,
@@ -50,10 +88,18 @@ const SurveyQuestionsFullQuestionSliderSection = ({
     questionId,
     sliderMode,
   });
+  // The X unmounts itself, so keyboard focus moves to the bullhorn that replaces it.
+  const sectionRef = useRef<HTMLDivElement | null>(null);
+  const focusBullhornRef = useRef(false);
+  useEffect(() => {
+    if (sliderOpen || !focusBullhornRef.current) return;
+    focusBullhornRef.current = false;
+    sectionRef.current?.querySelector('button')?.focus();
+  }, [sliderOpen]);
 
   if (!sliderOpen) {
     return (
-      <div className={styles.importanceSlider}>
+      <div ref={sectionRef} className={styles.importanceSlider}>
         <BullhornToggleButton
           onClick={() => onSelectMode(importanceToggleEnabled ? collapsedSliderMode : sliderMode)}
           disabled={isSubmitting}
@@ -64,7 +110,7 @@ const SurveyQuestionsFullQuestionSliderSection = ({
   }
 
   return (
-    <div className={styles.importanceSlider}>
+    <div ref={sectionRef} className={`${styles.importanceSlider} ${onClear ? styles.convictionSliderWithClear : ''}`}>
       {singleQuestionMode ? (
         <DeferredConvictionImportanceSlider
           value={activeSliderValue}
@@ -95,6 +141,16 @@ const SurveyQuestionsFullQuestionSliderSection = ({
           onChangeComplete={onChangeComplete}
         />
       )}
+      {onClear ? (
+        <ClearConvictionImportanceButton
+          disabled={isSubmitting}
+          importanceToggleEnabled={importanceToggleEnabled}
+          onClick={() => {
+            focusBullhornRef.current = true;
+            onClear();
+          }}
+        />
+      ) : null}
     </div>
   );
 };

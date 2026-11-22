@@ -7053,6 +7053,44 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   color: color-mix(in srgb, var(--ce-text-inverse) 80%, transparent);
 }
 
+// The X shares the label's row; the slider below keeps the full width.
+.convictionSliderWithClear {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 4px;
+
+  > * {
+    grid-column: 1 / -1;
+  }
+
+  > .importanceText {
+    grid-column: 1;
+  }
+
+  > .convictionClearButton {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .convictionToggleStack {
+    min-width: 0;
+  }
+}
+
+.convictionClearButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  font-size: 1rem;
+  // Above the slider's enlarged touch area.
+  position: relative;
+  z-index: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pileSubmitDone,
   .pileFooter .pileSubmitButton.submitGlow::before,

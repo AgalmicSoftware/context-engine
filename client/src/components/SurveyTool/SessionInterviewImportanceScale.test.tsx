@@ -85,9 +85,10 @@ const createPileRuntime = () => {
   return { stateRef, runtime };
 };
 
-it('interview importance/conviction land on the pile slider scale the reviewer saw', async () => {
-  const { stateRef, runtime } = createPileRuntime();
-  const onSubmitResponses = jest.fn().mockResolvedValue({ status: 'submitted' });
+const renderInterview = (
+  runtime: ReturnType<typeof createPileRuntime>['runtime'],
+  onSubmitResponses: React.ComponentProps<typeof SessionVoiceModeModal>['onSubmitResponses'],
+) =>
   render(
     <SessionVoiceModeModal
       isOpen
@@ -130,6 +131,11 @@ it('interview importance/conviction land on the pile slider scale the reviewer s
       onSubmitResponses={onSubmitResponses}
     />,
   );
+
+it('interview importance/conviction land on the pile slider scale the reviewer saw', async () => {
+  const { stateRef, runtime } = createPileRuntime();
+  const onSubmitResponses = jest.fn().mockResolvedValue({ status: 'submitted' });
+  renderInterview(runtime, onSubmitResponses);
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   // The review card shows the AI proposal on the shared 0-10 conviction/importance slider.
   fireEvent.click(screen.getByRole('button', { name: 'Conviction / importance' }));
@@ -144,4 +150,21 @@ it('interview importance/conviction land on the pile slider scale the reviewer s
   const slice = stateRef.current.surveysResponseState[0];
   expect(getQuestionConvictionSliderValue(slice, 'q1')).toBe(8);
   expect(getQuestionImportanceSliderValue(slice, 'q1')).toBe(6);
+});
+
+it('applies no importance or conviction after the review card is cleared with its X', async () => {
+  const { stateRef, runtime } = createPileRuntime();
+  const onSubmitResponses = jest.fn().mockResolvedValue({ status: 'submitted' });
+  renderInterview(runtime, onSubmitResponses);
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  fireEvent.click(screen.getByRole('button', { name: 'Conviction / importance' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Undo conviction and importance' }));
+  expect(screen.queryByRole('slider')).toBeNull();
+
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+  await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
+  const slice = stateRef.current.surveysResponseState[0];
+  expect(slice.answers.q1.value).toBe('Agree');
+  expect(slice.conviction).toEqual({});
+  expect(slice.importance).toEqual({});
 });

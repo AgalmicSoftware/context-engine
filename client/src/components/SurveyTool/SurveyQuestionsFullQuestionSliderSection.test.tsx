@@ -119,4 +119,44 @@ describe('SurveyQuestionsFullQuestionSliderSection', () => {
 
     expect(onCommit).toHaveBeenCalledWith(9);
   });
+
+  it.each([false, true])('puts an X beside the open slider that undoes it (single-question mode: %s)', (single) => {
+    const onClear = jest.fn();
+    const props = {
+      importanceToggleEnabled: true,
+      onClear,
+      onSelectMode: jest.fn(),
+      questionId: 'q1',
+      singleQuestionMode: single,
+    };
+    const view = render(<SurveyQuestionsFullQuestionSliderSection {...props} sliderOpen={false} />);
+    expect(screen.queryByRole('button', { name: 'Undo conviction and importance' })).toBeNull();
+
+    view.rerender(<SurveyQuestionsFullQuestionSliderSection {...props} sliderOpen />);
+    const clear = screen.getByRole('button', { name: 'Undo conviction and importance' });
+    expect(clear).toHaveAttribute('type', 'button');
+    expect(screen.getByRole('slider')).toBeInTheDocument();
+    clear.focus();
+    expect(clear).toHaveFocus();
+    fireEvent.click(clear);
+    expect(onClear).toHaveBeenCalledTimes(1);
+    // Keyboard focus lands on the bullhorn that replaces the slider.
+    view.rerender(<SurveyQuestionsFullQuestionSliderSection {...props} sliderOpen={false} />);
+    expect(screen.getByRole('button', { name: 'Conviction / importance' })).toHaveFocus();
+
+    view.rerender(<SurveyQuestionsFullQuestionSliderSection {...props} sliderOpen isSubmitting />);
+    expect(screen.getByRole('button', { name: 'Undo conviction and importance' })).toBeDisabled();
+  });
+
+  it('names only conviction when importance is off', () => {
+    render(
+      <SurveyQuestionsFullQuestionSliderSection
+        onClear={jest.fn()}
+        onSelectMode={jest.fn()}
+        questionId="q1"
+        sliderOpen
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Undo conviction' })).toBeInTheDocument();
+  });
 });
