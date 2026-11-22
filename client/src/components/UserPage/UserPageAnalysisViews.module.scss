@@ -106,6 +106,28 @@
   font-size: 0.85rem;
 }
 
+// Choices few need, closed until opened: for now whether the Text view has a button.
+.options {
+  margin-top: 6px;
+  color: var(--ce-document-text-muted);
+  font-size: 0.85rem;
+
+  // A list item, as summaries are, so it keeps the triangle that says it opens.
+  summary {
+    padding: 12px 0;
+    cursor: pointer;
+  }
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    color: var(--ce-document-text);
+    cursor: pointer;
+  }
+}
+
 // On a phone the Breakdown reads as one stack of cards under a filled title card.
 @media (max-width: 640px) {
   .lines,

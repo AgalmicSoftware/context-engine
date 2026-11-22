@@ -39,6 +39,26 @@ const VIEW_LABELS: ReadonlyArray<[View, string]> = [
   ['breakdown', 'Breakdown'],
   ['card', 'Card'],
 ];
+// The Text view says what the Breakdown says, so its button is there only for those who ask for it under Options.
+// The choice is kept in this browser; where storage is shut it is kept here, for this visit.
+const TEXT_VIEW_KEY = 'ce-analysis-text-view';
+let textViewThisVisit = false;
+const readTextView = (): boolean => {
+  try {
+    return window.localStorage.getItem(TEXT_VIEW_KEY) === '1';
+  } catch {
+    return textViewThisVisit;
+  }
+};
+const keepTextView = (shown: boolean): void => {
+  try {
+    if (shown) window.localStorage.setItem(TEXT_VIEW_KEY, '1');
+    else window.localStorage.removeItem(TEXT_VIEW_KEY);
+  } catch {
+    textViewThisVisit = shown;
+  }
+};
+
 const BREAKDOWN_LINES: ReadonlyArray<[keyof UserAnalysisBreakdown, string]> = [
   ['holds', 'Holds most strongly'],
   ['openTo', 'Open to'],
@@ -85,24 +105,29 @@ const UserPageAnalysisViews = ({
 }: UserPageAnalysisViewsProps): React.ReactElement => {
   const hasCard = !!(analysisCard || analysisCardPending);
   const [chosen, setChosen] = useState<View>('breakdown');
-  // A card that is taken away (the session turned it off) leaves the Breakdown, not an empty view.
-  const view = chosen === 'card' && !hasCard ? 'breakdown' : chosen;
+  const [textView, setTextView] = useState(readTextView);
+  // A card that is taken away (the session turned it off), or a Text view put away under Options, leaves the
+  // Breakdown, not an empty view.
+  const view = (chosen === 'card' && !hasCard) || (chosen === 'text' && !textView) ? 'breakdown' : chosen;
+  const views = VIEW_LABELS.filter(([id]) => (id !== 'card' || hasCard) && (id !== 'text' || textView));
   const lines = BREAKDOWN_LINES.filter(([key]) => analysisBreakdown?.[key]);
   return (
     <>
-      <div className={viewStyles.switch} role="group" aria-label="How to show the analysis">
-        {VIEW_LABELS.filter(([id]) => id !== 'card' || hasCard).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            className={viewStyles.switchButton}
-            aria-pressed={view === id}
-            onClick={() => setChosen(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {views.length > 1 ? (
+        <div className={viewStyles.switch} role="group" aria-label="How to show the analysis">
+          {views.map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className={viewStyles.switchButton}
+              aria-pressed={view === id}
+              onClick={() => setChosen(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {view === 'text' && (
         <>
@@ -198,6 +223,22 @@ const UserPageAnalysisViews = ({
         {analysisGeneration?.model || 'not recorded'}
         {analysisGeneration?.provider ? ` (${analysisGeneration.provider})` : ''}
       </p>
+      <details className={viewStyles.options}>
+        <summary>Options</summary>
+        <label>
+          <input
+            type="checkbox"
+            checked={textView}
+            onChange={(event) => {
+              setTextView(event.target.checked);
+              keepTextView(event.target.checked);
+              // Put away, it is forgotten as the view shown: ticked again, the Breakdown stays.
+              if (!event.target.checked && chosen === 'text') setChosen('breakdown');
+            }}
+          />{' '}
+          Show the Text view
+        </label>
+      </details>
     </>
   );
 };

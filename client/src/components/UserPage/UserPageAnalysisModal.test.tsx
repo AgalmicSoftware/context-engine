@@ -69,8 +69,19 @@ const createProps = (overrides: Partial<React.ComponentProps<typeof UserPageAnal
   ...overrides,
 });
 
+// The Text view's button is there once asked for under Options, which opens first.
+const showTextView = () => {
+  const options = screen.getByText('Options');
+  if (!(options.closest('details') as HTMLDetailsElement).open) fireEvent.click(options);
+  const box = screen.getByRole('checkbox', { name: 'Show the Text view' });
+  expect(box).toBeVisible();
+  fireEvent.click(box);
+};
+
 describe('UserPageAnalysisModal', () => {
-  it('is titled Analyze user and opens on the Breakdown, with the text one press away', () => {
+  afterEach(() => window.localStorage.clear());
+
+  it('is titled Analyze user and opens on the Breakdown, with the text under Options', () => {
     const analysisBreakdown = {
       holds: 'Local councils should decide.',
       openTo: 'National standards, if reviewed yearly.',
@@ -79,8 +90,8 @@ describe('UserPageAnalysisModal', () => {
     };
     render(<UserPageAnalysisModal {...createProps({ analysisBreakdown })} />);
     expect(screen.getByText('Analyze user')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Breakdown' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.queryByRole('button', { name: 'Card' })).toBeNull();
+    // With no card and the Text view put away there is nothing to switch between.
+    expect(screen.queryByRole('group', { name: 'How to show the analysis' })).toBeNull();
     // The generated name heads the view, over the summary and details as the analysis wrote them.
     expect(screen.getByRole('heading', { name: 'Custom Analysis' })).toBeTruthy();
     expect(screen.getByText('Profile synthesis')).toBeTruthy();
@@ -92,6 +103,9 @@ describe('UserPageAnalysisModal', () => {
     expect(screen.getByText('A historical figure')).toBeTruthy();
     expect(screen.getByText('Reasoning text')).toBeTruthy();
 
+    // The Text view says what the Breakdown says: its button waits under Options.
+    expect(screen.queryByRole('button', { name: 'Text' })).toBeNull();
+    showTextView();
     fireEvent.click(screen.getByRole('button', { name: 'Text' }));
     expect(screen.getByRole('button', { name: 'Text' }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.queryByText('Holds most strongly')).toBeNull();
@@ -100,6 +114,54 @@ describe('UserPageAnalysisModal', () => {
     expect(screen.getByText('Detailed analysis text')).toBeTruthy();
     expect(screen.getByText('Historical Alignment')).toBeTruthy();
     expect(screen.getByText('Reasoning text')).toBeTruthy();
+  });
+
+  it('keeps the Text view choice in this browser, and goes back to the Breakdown when it is put away', () => {
+    const { unmount } = render(<UserPageAnalysisModal {...createProps()} />);
+    showTextView();
+    fireEvent.click(screen.getByRole('button', { name: 'Text' }));
+    unmount();
+
+    // The next window offers it again, and opens on the Breakdown as always.
+    render(<UserPageAnalysisModal {...createProps()} />);
+    expect(screen.getByRole('button', { name: 'Breakdown' }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: 'Text' }));
+    expect(screen.getByRole('checkbox', { name: 'Show the Text view' })).toBeChecked();
+
+    // Put away while it is shown: the Breakdown, and no switch left to show.
+    showTextView();
+    expect(screen.queryByRole('button', { name: 'Text' })).toBeNull();
+    expect(screen.getByText('Profile synthesis').parentElement).toHaveClass('banner');
+    expect(screen.queryByRole('group', { name: 'How to show the analysis' })).toBeNull();
+    expect(window.localStorage.getItem('ce-analysis-text-view')).toBeNull();
+
+    // Asked for again, it is offered again without being shown unasked.
+    showTextView();
+    expect(screen.getByRole('button', { name: 'Breakdown' }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('offers the Text view where this browser keeps nothing', () => {
+    const getItem = jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    const setItem = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    try {
+      const { unmount } = render(<UserPageAnalysisModal {...createProps()} />);
+      showTextView();
+      fireEvent.click(screen.getByRole('button', { name: 'Text' }));
+      expect(screen.getByRole('button', { name: 'Text' }).getAttribute('aria-pressed')).toBe('true');
+      expect(getItem).toHaveBeenCalled();
+      expect(setItem).toHaveBeenCalled();
+      // Kept for the visit: a refreshed analysis or the window opened again still offers it.
+      unmount();
+      render(<UserPageAnalysisModal {...createProps()} />);
+      expect(screen.getByRole('button', { name: 'Text' })).toBeTruthy();
+    } finally {
+      getItem.mockRestore();
+      setItem.mockRestore();
+    }
   });
 
   it('draws only the Breakdown lines the analysis gave, and none for an analysis kept from before', () => {
@@ -164,6 +226,7 @@ describe('UserPageAnalysisModal', () => {
     expect(screen.getByTestId('analysis-card').textContent).toBe('Wants AI doing paperwork / ready');
     expect(screen.queryByRole('button', { name: 'View User Card' })).toBeNull();
     // In the other views the card stays drawn out of sight, so a saved card gets its picture either way.
+    showTextView();
     fireEvent.click(screen.getByRole('button', { name: 'Text' }));
     expect(screen.getAllByTestId('analysis-card')).toHaveLength(1);
     expect(screen.getByTestId('analysis-card')).not.toBeVisible();
@@ -212,10 +275,12 @@ describe('UserPageAnalysisModal', () => {
       />,
     );
     // The box belongs to the card: it is in the Card view and in neither of the others.
+    const cardBox = () => screen.queryByRole('checkbox', { name: 'Show this card on my page' });
     expect(screen.getByRole('button', { name: 'Breakdown' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(cardBox()).toBeNull();
+    showTextView();
     fireEvent.click(screen.getByRole('button', { name: 'Text' }));
-    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(cardBox()).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Card' }));
     const box = screen.getByRole('checkbox', { name: 'Show this card on my page' }) as HTMLInputElement;
     expect(box.checked).toBe(true);
@@ -241,7 +306,7 @@ describe('UserPageAnalysisModal', () => {
 
     // Another person's saved card: no box in any view, and its date under the card in the Card view.
     rerender(<UserPageAnalysisModal {...createProps({ analysisCard: card, analysisCardSavedAt: 7 })} />);
-    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(cardBox()).toBeNull();
     expect(screen.getByText('Their saved card, from day 7')).toBeTruthy();
   });
 
