@@ -1539,7 +1539,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         const aiCard = resourceCards.find(
           (candidate) => candidate.querySelector('[class*="supportedResourceName"]')?.textContent?.trim() === 'AI',
         );
-        const activeSessionPill = aiCard?.querySelector('[class*="sessionPillActive"]');
+        const activeSessionPill = aiCard?.querySelector('[class*="supportedResourcePrimarySession"]');
         const sponsorDetail = aiCard?.querySelector('[class*="supportedResourceDetail"]');
         if (!panel || !selector || !appearanceSection || !aiCard || !activeSessionPill || !sponsorDetail) {
           return { missing: true };
@@ -3146,12 +3146,12 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     assert.equal(
       preloginThemeSettingsState.sponsorDetailInsideActivePill,
       true,
-      'Active-session sponsor detail should render inside the named session pill',
+      'Active-session sponsor detail should render inside the named session block',
     );
     assert.match(
       preloginThemeSettingsState.activeSessionPillText,
-      /Demo Session\s+(No sponsor key is configured for the active session\.|Could not confirm sponsorship\.)/,
-      'Active-session pill should combine the session name with its sponsorship status',
+      /Demo Session\s*(This session does not pay for this\.|Could not confirm sponsorship\.)/,
+      'Active-session block should combine the session name with its sponsorship status',
     );
     assert.ok(
       preloginThemeSettingsState.selectorRatio >= 4.5,

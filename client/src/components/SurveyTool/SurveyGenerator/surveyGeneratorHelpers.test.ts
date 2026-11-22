@@ -111,6 +111,17 @@ describe('surveyGeneratorHelpers', () => {
     expect(scss).toMatch(/\.aiPromptToggleBtn\s*{[\s\S]*?color:\s*var\(--ce-authoring-control-text\);/);
   });
 
+  it('gives the box for text and files the panel’s whole width, with the question settings under it', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'AudioSurveyGenerator.module.scss'), 'utf8');
+    const wide = scss.slice(scss.indexOf('@media (min-width: 992px) {'), scss.indexOf('.questionTypeGrid {'));
+    // One row for the box, so typing (which brings the settings in) never changes its width.
+    expect(wide).toMatch(/form\s*{[\s\S]*?grid-template-areas:\s*'ingest ingest'\s*'types count'\s*'button button';/);
+    expect(wide).not.toMatch(/1\.4fr/);
+    expect(scss).not.toMatch(/form:not\(:has/);
+    // The prompt toggle starts at the box's left edge.
+    expect(scss).toMatch(/\.aiPromptSection\s*{[^}]*align-items:\s*flex-start;/);
+  });
+
   it('uses semantic theme tokens for the AI prompt preview', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'AudioSurveyGenerator.module.scss'), 'utf8');
     const classic95Theme = fs.readFileSync(path.join(__dirname, '../../../scss/themes/_classic-95.scss'), 'utf8');

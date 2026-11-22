@@ -16,9 +16,15 @@
   color: var(--ce-document-text);
   cursor: pointer;
 
+  // The view shown, in the accent the Compare view switch uses: the primary action colour is pink in one theme.
+  // Bold, underlined words mark it too, as in one theme the accent is as light as the others (the themes' own
+  // button shadows would cover a ring).
   &[aria-pressed='true'] {
-    background: var(--ce-action-primary);
-    color: var(--ce-action-primary-text);
+    background: var(--ce-action-accent);
+    color: var(--ce-action-accent-text);
+    font-weight: 800;
+    text-decoration: underline 2px;
+    text-underline-offset: 4px;
   }
 }
 
@@ -98,6 +104,28 @@
   border-top: 1px solid var(--ce-document-border);
   color: var(--ce-document-text-muted);
   font-size: 0.85rem;
+}
+
+// Choices few need, closed until opened: for now whether the Text view has a button.
+.options {
+  margin-top: 6px;
+  color: var(--ce-document-text-muted);
+  font-size: 0.85rem;
+
+  // A list item, as summaries are, so it keeps the triangle that says it opens.
+  summary {
+    padding: 12px 0;
+    cursor: pointer;
+  }
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    color: var(--ce-document-text);
+    cursor: pointer;
+  }
 }
 
 // On a phone the Breakdown reads as one stack of cards under a filled title card.

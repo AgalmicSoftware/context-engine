@@ -485,7 +485,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     render(tree);
 
     expect(screen.getByTestId('ce-session-identity-unavailable')).toHaveTextContent(
-      /capability profile is unavailable or invalid/i,
+      "This session's settings didn't load. Reload the page, then sign in.",
     );
     expect(screen.queryByRole('link', { name: 'Ethereum wallet' })).not.toBeInTheDocument();
     expect(screen.queryByText('test network only')).not.toBeInTheDocument();
@@ -635,7 +635,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(sessionLink).not.toHaveAttribute('href', '/session/Edge%20Session');
   });
 
-  it('shows worker session access and AI state without chain resource controls', () => {
+  it('shows the Session section without the old status line or chain resource controls', () => {
     const subject = buildWrongNetworkSubject({
       mode: 'crypto',
       aiSettingsOpen: true,
@@ -656,9 +656,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     render(subject.getSettingsDisplay());
 
-    expect(screen.getByTestId('ce-settings-worker-session-access')).toHaveTextContent(
-      /Passkey session access: signed in.*Session Worker: configured.*AI: session default/i,
-    );
+    // The line that repeated sign-in, Worker and AI state under the session control is gone.
+    expect(screen.queryByTestId('ce-settings-worker-session-access')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reset to general' })).not.toBeInTheDocument();
     expect(screen.queryByText('Network')).not.toBeInTheDocument();
     expect(screen.queryByText('RPC')).not.toBeInTheDocument();
     expect(screen.queryByText('Arweave')).not.toBeInTheDocument();
@@ -927,7 +927,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       expect(screen.getByText('Connect wallet')).toBeInTheDocument();
       expect(screen.getAllByText('Sponsored').length).toBeGreaterThan(0);
       expect(screen.getByRole('link', { name: 'Open session Demo Session' })).toBeInTheDocument();
-      const sponsoredSessionDetail = screen.getAllByText(/A sponsor key is configured/i)[0];
+      const sponsoredSessionDetail = screen.getAllByText(/The session pays for this/i)[0];
       expect(sponsoredSessionDetail.parentElement).toHaveTextContent(/Demo Session/i);
       expect(screen.queryByText('configured here')).not.toBeInTheDocument();
     });
@@ -978,7 +978,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       );
       expect(await screen.findByText('Sponsored')).toBeInTheDocument();
       expect(screen.queryByText('Not sponsored')).not.toBeInTheDocument();
-      expect(screen.getByText(/Access follows the session permissions/)).toBeInTheDocument();
+      expect(screen.getByText(/Who may use it follows the session’s own rules/)).toBeInTheDocument();
       expect(ref.current.getDisplaySessionConfig(slug).sessionModeProfile).toEqual(config.sessionModeProfile);
       expect(global.fetch).toHaveBeenCalledWith(
         `${origin}/resource-presence`,
@@ -1205,6 +1205,34 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     );
     expect(screen.getByTestId('ce-prelogin-session-scope-chip-edge')).toBeInTheDocument();
     expect(screen.getByTestId('ce-prelogin-session-scope-chip-rxc')).toBeInTheDocument();
+    const mode = screen.getByTestId('ce-prelogin-session-scope-mode');
+    expect(Array.from(mode.options).map((option) => option.textContent)).toEqual([
+      'Selected session',
+      'List of sessions',
+    ]);
+    expect(mode).toHaveValue('list');
+    expect(screen.queryByTestId('ce-prelogin-session-scope-selected-hint')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['active', 'edge', /is the selected session\./],
+    ['all', 'edge', /Home is set to ALL/],
+    ['general', 'edge', /No session is selected, so General shows\./],
+    ['active', '', /No session is selected, so General shows\./],
+  ])('says what Selected session means for a stored %s scope (session "%s")', (scope, slug, words) => {
+    const subject = new LoginAndSettingsModal(buildProps({ updateGlobalSessionSelection: jest.fn() }));
+    subject.state = { ...subject.state, preLoginSettingsOpen: true, preLoginConfigOpen: true };
+    subject.getSessionScanScopeValue = jest.fn(() => scope);
+    subject.getConfiguredSessionScanSlugs = jest.fn(() => ['rxc']);
+    subject.getActiveSessionSlug = jest.fn(() => slug);
+
+    render(subject.getPreLoginSettingsDisplay());
+
+    const mode = screen.getByTestId('ce-prelogin-session-scope-mode');
+    expect(mode).toHaveValue('active');
+    expect(mode).toHaveAccessibleDescription(words);
+    // No tick boxes that look live while "Selected session" is in force.
+    expect(screen.queryByTestId(/ce-prelogin-session-scope-chip-/)).not.toBeInTheDocument();
   });
 
   it('collapses long pre-login session lists to three rows until see more is clicked', () => {
@@ -1502,7 +1530,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(screen.queryByText(/Gate status is evaluated against the active session/i)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open session Demo Session' })).toBeInTheDocument();
     const sponsoredSessionDetail = screen.getAllByText(
-      /Sponsored key is available for the active session|A sponsor key is configured/i,
+      /Sponsored key is available for the active session|The session pays for this/i,
     )[0];
     expect(sponsoredSessionDetail.parentElement).toHaveTextContent(/Demo Session/i);
     expect(screen.queryByText('configured here')).not.toBeInTheDocument();

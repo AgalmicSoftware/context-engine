@@ -21,6 +21,7 @@ import {
 
 import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
 import PileQuestionActionMenu from './PileQuestionActionMenu';
+import { SubmitCountLabel } from './SubmitCountLabel';
 import { submittingLabel } from './surveyToolDraftState';
 import styles from './SurveyTool.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -210,12 +211,6 @@ export const buildPileFilterButtonClassName = (styleMap: Record<string, string>,
 
 export const buildPileFooterClassName = (styleMap: Record<string, string>, pileTopRailVisible: unknown) =>
   `${styleMap.pileFooter}${pileTopRailVisible ? '' : ` ${styleMap.pileFooterHidden}`}`;
-
-// "Submit (2)" splits into its word and count, so a narrow phone row can drop the count alone.
-export const splitPileSubmitLabel = (text: string): { word: string; count: string } => {
-  const match = /^(.*?) (\(\d+\))$/.exec(text);
-  return match ? { word: match[1], count: match[2] } : { word: text, count: '' };
-};
 
 export const buildPileSubmitButtonClassName = (
   styleMap: Record<string, string>,
@@ -448,8 +443,6 @@ const renderPileFooterControls = ({
   handleRevertPendingChanges,
   endOfSetShown = false,
 }: PileFooterControlsProps): React.ReactElement => {
-  const submitLabel = splitPileSubmitLabel(finalSubmitText);
-  const submitDigits = submitLabel.count.replace(/\D/g, '');
   return (
     <div className={buildPileFooterClassName(styles, pileTopRailVisible)}>
       {/* Always present, so screen readers hear the text that arrives in it. */}
@@ -467,7 +460,7 @@ const renderPileFooterControls = ({
               endOfSetShown ? ` ${styles.pileFooterControlAway}` : ''
             }`}
             disabled={isSubmitting || activePromptMasked}
-            // A narrow phone row hides the count; the name keeps it.
+            // The count shows in the corner without its brackets; the name keeps them.
             aria-label={isSubmitting ? undefined : finalSubmitText}
           >
             {isSubmitting ? (
@@ -479,21 +472,7 @@ const renderPileFooterControls = ({
             ) : (
               <span className={styles.pileSubmitButtonContent}>
                 <span className={styles.pileSubmitButtonCopy}>
-                  <span
-                    className={`${styles.pileSubmitButtonLabel}${
-                      submitLabel.count ? ` ${styles.pileSubmitButtonLabelCounted}` : ''
-                    }`}
-                  >
-                    {submitLabel.word}
-                    {/* The brackets are their own spans so a phone row can show the number alone. */}
-                    {submitLabel.count && (
-                      <span className={styles.pileSubmitButtonCount}>
-                        <span className={styles.pileSubmitButtonCountBracket}>(</span>
-                        {submitDigits}
-                        <span className={styles.pileSubmitButtonCountBracket}>)</span>
-                      </span>
-                    )}
-                  </span>
+                  <SubmitCountLabel text={finalSubmitText} />
                 </span>
                 <span className={styles.pileSubmitButtonTrail} aria-hidden="true">
                   <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />

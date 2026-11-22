@@ -18,6 +18,7 @@ import {
   faSpinner,
   faExternalLinkAlt,
   faFilter,
+  faExclamationCircle,
 } from '@fortawesome/free-solid-svg-icons';
 
 import QuestionFilter from './QuestionFilter';
@@ -25,6 +26,7 @@ import type { QuestionFilterHandle } from './QuestionFilter';
 import LazyFallback from '../Shared/LazyFallback';
 import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
 import { HeaderSubmittedCheck } from './SubmittedMarks';
+import { SubmitCountLabel } from './SubmitCountLabel';
 
 // Crypto and contract utilities
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -51,6 +53,7 @@ import {
   getSurveyDocumentLinkTitle,
   getSurveyDocumentUrls,
   resolveSelectedSurveyIndex,
+  resolveSurveySelectorHeaderSubmitFailure,
 } from './surveySelectorHelpers.js';
 
 import {
@@ -322,6 +325,9 @@ export class SurveySelector extends Component<any, any> {
   _questionCountStateContextKey: string;
   _stickyQuestionCountSnapshot: SurveySelectorQuestionCountSnapshot;
   _filterStateSig: string;
+  // From a press of the bar's Submit until the list next reports: a Submit it refuses at once never starts.
+  _headerSubmitPressed: boolean = false;
+  _headerSubmitPressTimer: ReturnType<typeof setTimeout> | null = null;
   _filteredQuestionCountEpoch: number = 0;
   _surveySelectorFetchEpoch: number = 0;
   _lastFetchSurveysSlug: string = '';
@@ -349,6 +355,7 @@ export class SurveySelector extends Component<any, any> {
       showLongLoading: false,
       selectorDropdownOpen: false,
       pendingSubmitStats: getDefaultSurveySelectorPendingSubmitStats(),
+      headerSubmitFailure: '',
     };
     this.questionFilterRef = React.createRef();
     this.surveyQuestionsRef = React.createRef();
@@ -510,6 +517,7 @@ export class SurveySelector extends Component<any, any> {
     if (this.loadingTimeout) {
       clearTimeout(this.loadingTimeout);
     }
+    if (this._headerSubmitPressTimer) clearTimeout(this._headerSubmitPressTimer);
   }
 
   componentDidUpdate(prevProps: SurveySelectorLifecycleProps, prevState: SurveySelectorRecord) {
@@ -940,7 +948,16 @@ export class SurveySelector extends Component<any, any> {
     const target = this.surveyQuestionsRef?.current as SurveySelectorPrimarySubmitTarget | null;
     if (!target || typeof target.handlePrimarySubmitClick !== 'function') return;
     if (target.state?.isSubmitting) return;
+    this._headerSubmitPressed = true;
     target.handlePrimarySubmitClick();
+    // The list reports what a press changed while the click is handled (React flushes a click's render and
+    // effects before the click ends). A press that changed nothing reports nothing, so the flag ends with the
+    // click; otherwise a later message with no Submit behind it would show as this Submit's failure.
+    if (this._headerSubmitPressTimer) clearTimeout(this._headerSubmitPressTimer);
+    this._headerSubmitPressTimer = setTimeout(() => {
+      this._headerSubmitPressed = false;
+      this._headerSubmitPressTimer = null;
+    });
   };
 
   handleHeaderRevertClick = (): void => {
@@ -952,21 +969,30 @@ export class SurveySelector extends Component<any, any> {
   handlePendingStatsChange = (stats: unknown): void => {
     if (!stats || typeof stats !== 'object') return;
     const patch = buildSurveySelectorPendingSubmitStatsPatch(stats);
-    const { total, encrypted, submittedSinceLastEdit, isSubmitting, submitCountText } = patch.pendingSubmitStats;
+    const { total, encrypted, submittedSinceLastEdit, isSubmitting, submitCountText, submitError } =
+      patch.pendingSubmitStats;
     const prev = this.state.pendingSubmitStats || {};
     if (
       prev.total === total &&
       prev.encrypted === encrypted &&
       !!prev.submittedSinceLastEdit === submittedSinceLastEdit &&
       !!prev.isSubmitting === isSubmitting &&
-      prev.submitCountText === submitCountText
+      prev.submitCountText === submitCountText &&
+      prev.submitError === submitError
     )
       return;
+    const headerSubmitFailure = resolveSurveySelectorHeaderSubmitFailure({
+      prev,
+      next: patch.pendingSubmitStats,
+      shown: this.state.headerSubmitFailure,
+      pressed: this._headerSubmitPressed,
+    });
+    this._headerSubmitPressed = false;
     // A submit that stored every answer: Submit turns into a green "Submitted", as on the phone card.
     // Any edit ends it, so clearing the edit later doesn't bring it back without a submit.
     const justSubmitted = !!prev.isSubmitting && !isSubmitting && submittedSinceLastEdit;
     const stillSubmitted = submittedSinceLastEdit && !isSubmitting && this.state.submittedAt;
-    this.setState({ ...patch, submittedAt: justSubmitted ? Date.now() : stillSubmitted || 0 });
+    this.setState({ ...patch, headerSubmitFailure, submittedAt: justSubmitted ? Date.now() : stillSubmitted || 0 });
   };
 
   handleFilterChangeForUrl = (newFilterStateFromResults: unknown): void => {
@@ -1376,9 +1402,15 @@ export class SurveySelector extends Component<any, any> {
               title="Submit responses"
               data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
               disabled={!!pendingSubmitStats.isSubmitting}
+              // The count shows in the corner without its brackets; the name keeps them.
+              aria-label={pendingSubmitStats.isSubmitting ? undefined : headerSubmitLabel}
             >
               {/* Counts seconds from the Submit's start, as the AI flows' progress labels do. */}
-              {pendingSubmitStats.isSubmitting ? <ElapsedLoadingLabel label={headerSubmitLabel} /> : headerSubmitLabel}
+              {pendingSubmitStats.isSubmitting ? (
+                <ElapsedLoadingLabel label={headerSubmitLabel} />
+              ) : (
+                <SubmitCountLabel text={headerSubmitLabel} />
+              )}
               {pendingSubmitStats.isSubmitting && (
                 <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE} />
               )}
@@ -1397,6 +1429,12 @@ export class SurveySelector extends Component<any, any> {
           </div>
         ) : showHeaderSubmitted ? (
           <HeaderSubmittedCheck key={this.state.submittedAt} />
+        ) : null}
+        {/* The list draws no Submit of its own beside this one, so why a Submit failed is said here, in the bar. */}
+        {showHeaderSubmitButton && this.state.headerSubmitFailure ? (
+          <p className={styles.headerSubmitError} role="alert">
+            <FontAwesomeIcon icon={faExclamationCircle} /> {this.state.headerSubmitFailure}
+          </p>
         ) : null}
       </div>
     );

@@ -17,8 +17,10 @@ import {
   entries as idbEntries,
   get as idbGet,
   set as idbSet,
+  IDB_STALL_MS,
 } from './cacheScripts.generationStore.js';
 import { createLogger } from '../logging.js';
+import { withCrossTabWriteLock } from './cacheScripts.crossTabLock.js';
 import {
   decryptedChainTextIn,
   holdsChainText,
@@ -27,6 +29,7 @@ import {
 } from '../survey/decryptedQuestionReader.js';
 import { getWorkerCanonicalCacheReader } from '../survey/workerCanonicalCacheReader.js';
 import { DG_MANAGED_CACHE_NAMESPACE_LIST } from './sessionCacheConstants.js';
+export { CROSS_TAB_LOCK_WAIT_MS } from './cacheScripts.crossTabLock.js';
 
 const cacheLog = createLogger('cacheScripts');
 
@@ -502,8 +505,12 @@ const ensureBackendReady = async (): Promise<void> => {
   backendReadyPromise = (async () => {
     attachStorageListenerOnce();
     attachBroadcastListenerOnce();
+    const probeStartedAt = Date.now();
     idbAvailable = await probeIdbAvailability();
     if (idbAvailable) noteIdbSuccess();
+    // A probe that waited out the stall limit (the store held by another tab) is not tried again at once: the
+    // next cache read would wait as long again.
+    else if (Date.now() - probeStartedAt >= IDB_STALL_MS) idbLastRecoveryProbeAt = Date.now();
   })();
   return backendReadyPromise;
 };
@@ -815,17 +822,9 @@ const enqueueKeyTask = <T>(storageKey: string, task: () => Promise<T>): Promise<
   return run;
 };
 
-// Each persisted write of a key also holds a browser-wide lock on it, so tabs
-// write one at a time and an atomic update reads what the last writer saved.
-// Without the Web Locks API, only this tab's queue orders the writes. Tasks
-// must not wait on another key's write, or two tabs could wait on each other.
+// Tasks must not wait on another key's write, or two tabs could wait on each other.
 const enqueueWriteTaskForStorageKey = <T>(storageKey: string, task: () => Promise<T>): Promise<T> =>
-  enqueueKeyTask(storageKey, () => {
-    const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
-    return typeof locks?.request === 'function'
-      ? (locks.request(`ce-cache:${storageKey}`, task) as Promise<T>)
-      : task();
-  });
+  enqueueKeyTask(storageKey, () => withCrossTabWriteLock(storageKey, task));
 
 const reloadMirrorFromStorage = ({ namespace, slug, key }: StorageKeyParts): Promise<void> =>
   enqueueKeyTask(key, async () => {

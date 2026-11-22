@@ -180,6 +180,7 @@ describe('surveyQuestionsRuntimeStateRuntime', () => {
       submittedSinceLastEdit: false,
       total: 2,
       submitCountText: '',
+      submitError: '',
     });
     expect(runtime.getPendingStatsSnapshot()).toEqual({ encrypted: 1, total: 2 });
 
@@ -190,6 +191,14 @@ describe('surveyQuestionsRuntimeStateRuntime', () => {
       expect.objectContaining({ isSubmitting: true, submitCountText: '12 of 40' }),
     );
     expect(context.propsRef.current.onPendingStatsChange).toHaveBeenCalledTimes(3);
+
+    // So does why it failed: the list draws no Submit of its own beside the header's.
+    Object.assign(context.stateRef.current, { isSubmitting: false, submitCountText: '', submissionError: 'Offline.' });
+    runtime.emitPendingStats({ encrypted: 2, total: 2 });
+    expect(context.propsRef.current.onPendingStatsChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isSubmitting: false, submitError: 'Offline.' }),
+    );
+    expect(context.propsRef.current.onPendingStatsChange).toHaveBeenCalledTimes(4);
   });
 
   it('resolves active survey index and edit-diff invalidation state', () => {

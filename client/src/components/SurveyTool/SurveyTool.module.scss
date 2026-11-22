@@ -350,6 +350,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     $hover-box-shadow: var(--ce-shadow-submit-hover)
   );
   & {
+    // The frame for the number of answers in its corner.
+    position: relative;
     text-transform: uppercase;
     opacity: 1;
   }
@@ -375,11 +377,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-size: 1.6rem;
   font-weight: 700;
   letter-spacing: 0.04em;
-}
-
-.singleQuestionSubmitButtonIcon {
-  font-size: 1.5em;
-  flex: 0 0 auto;
 }
 
 .submitAux {
@@ -1484,6 +1481,23 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   white-space: nowrap;
 }
 
+// Why the bar's Submit did not save: a line of its own across the bar, under its buttons, so it stays in sight
+// with the bar.
+.headerSubmitError {
+  flex: 1 0 100%;
+  margin: 0;
+  color: var(--ce-status-danger-text);
+  font-size: 1.15em;
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+// A wide screen keeps the bar to one row; with this line it wraps, so the line takes a row of its own.
+#surveysRow:has(> .headerSubmitError) {
+  flex-wrap: wrap;
+}
+
 .headerSubmitButton {
   background-color: var(--ce-action-submit);
   border: 1px solid var(--ce-action-submit);
@@ -1532,8 +1546,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     border-color: var(--ce-color-indigo);
     transform: translateY(-1px);
   }
-  &:disabled {
-    opacity: 0.4;
+  // Saving, it wears the quiet colours of every busy Submit, at full strength and under the pointer too, so
+  // "SAVING · 3s" reads.
+  &:disabled,
+  &:disabled:hover {
+    background-color: var(--ce-action-submit-disabled-bg);
+    border-color: var(--ce-action-submit-disabled-border);
+    color: var(--ce-action-submit-disabled-text);
     cursor: not-allowed;
     animation: none;
     transform: none;
@@ -1542,6 +1561,19 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     content: none;
     animation: none;
   }
+}
+
+// The bar's Submit positions and layers each part inside it; its word is left unpositioned and unlayered, so the
+// number of answers sits in the button's corner, not the word's, and above the button's glow.
+.headerSubmitButton > .pileSubmitButtonLabel {
+  position: static;
+  z-index: auto;
+}
+
+// The bar's word stays level with the buttons beside it and leaves the number room at its end instead, so two
+// digits stay clear of it.
+.headerSubmitButton > .pileSubmitButtonLabelCounted {
+  margin-right: 10px;
 }
 
 /* Styles for the question filtering modal trigger/display (kept as it's related to the Filter button in SurveySelector) */
@@ -1986,7 +2018,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  color: var(--ce-color-white);
+  // The busy Submit's own quiet text colour; white was lost on its light fill.
+  color: inherit;
 }
 
 /* Response input section */
@@ -4021,13 +4054,27 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// The status takes what the title row leaves, so it never wraps under the title; a long one ends in "…",
-// and its full words are its label.
-.sessionInterviewHeader > [role='status'] {
+// The status, and beside it how long a wait has run, take what the title row leaves, so they never wrap under
+// the title. A long status ends in "…", and its full words are its label; the time is never cut.
+.sessionInterviewStatusSlot {
   display: flex;
   flex: 1 1 0;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
   padding-inline-end: 4px;
+}
+
+.sessionInterviewStatusSlot > [role='status'] {
+  display: flex;
+  min-width: 0;
+}
+
+.sessionInterviewWaitTime {
+  flex: none;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .sessionInterviewStatusPill {
@@ -4103,6 +4150,10 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   .sessionInterviewStatusPill {
     margin-inline-start: 4px;
     padding-inline: 9px;
+    font-size: 0.8rem;
+  }
+
+  .sessionInterviewWaitTime {
     font-size: 0.8rem;
   }
 }
@@ -4784,11 +4835,18 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     $border-radius: var(--ce-radius-8)
   );
   & {
+    // The frame for the number of answers in its corner.
+    position: relative;
     width: 100%;
     text-transform: uppercase;
   }
   > span {
     color: inherit;
+  }
+  // The panel's primary buttons keep their accent fill under the pointer while disabled; a busy Submit keeps the
+  // quiet fill its words are set on instead, as every busy Submit does.
+  &:disabled:hover {
+    background: var(--ce-action-submit-disabled-bg) !important;
   }
 }
 
@@ -6513,15 +6571,16 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   text-transform: uppercase;
 }
 
-// While a Submit saves: what it is doing, its seconds, and the spinner, in plain case. A little smaller, with even
-// digits, so the button holds still as the seconds tick. A phone row too narrow for the words keeps the spinner.
+// While a Submit saves: what it is doing, its seconds, and the spinner, in capitals as every running Submit reads
+// ("SAVING · 3s"). A little smaller, with even digits, so the button holds still as the seconds tick. A phone row
+// too narrow for the words keeps the spinner.
 .pileSubmitProgress {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: 0.9em;
   font-variant-numeric: tabular-nums;
-  text-transform: none;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -6548,8 +6607,19 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   justify-content: center;
 }
 
+// The number of answers a Submit sends, on every such Submit: small, without brackets, in the button's top-right
+// corner, clear of the word: as large as the gap above the word holds. The button is its frame, so a label's own
+// clipping does not reach it.
 .pileSubmitButtonCount {
-  margin-left: 0.35em;
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  // Above the button's moving glow.
+  z-index: 3;
+  font-size: 16px;
+  font-weight: 700;
+  // The digits' own height, so the box ends where they do, clear of the word.
+  line-height: 0.75;
 }
 
 .pileSubmitButtonTrail {
@@ -7456,8 +7526,8 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     min-width: 0;
   }
 
-  // The word keeps to one line; anything that would wrap under it is out of sight. The count is set in the
-  // button's corner below, outside this clipping.
+  // The word keeps to one line; anything that would wrap under it is out of sight. The count sits in the button's
+  // corner, outside this clipping.
   .pileInteractionUnit .pileFooter .pileSubmitButtonLabel {
     flex-wrap: wrap;
     max-height: 1.25em;
@@ -7465,31 +7535,11 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     line-height: 1.25;
   }
 
-  // On a phone row the number of answers always shows, without its brackets, in the button's top corner above the
-  // end of the word, where it takes none of the word's room: as large as the gap above the word holds. The label's
-  // own clipping does not reach it.
-  .pileInteractionUnit .pileFooter .pileSubmitButtonCountBracket {
-    display: none;
-  }
-
-  // With a number above it the word sits a little lower, so the two never touch. The margins cancel, so the button
-  // keeps its height.
+  // With a number above it the word sits a little lower in the row's shorter button, so the two never touch. The
+  // margins cancel, so the button keeps its height.
   .pileInteractionUnit .pileFooter .pileSubmitButtonLabelCounted {
     margin-top: 5px;
     margin-bottom: -5px;
-  }
-
-  .pileInteractionUnit .pileFooter .pileSubmitButtonCount {
-    position: absolute;
-    top: 4px;
-    right: 5px;
-    margin: 0;
-    // Above the button's moving glow.
-    z-index: 3;
-    font-size: 16px;
-    font-weight: 700;
-    // The digits' own height, so the box ends where they do, clear of the word.
-    line-height: 0.75;
   }
 
   // While saving, the spinner always shows; the words show where they fit whole and otherwise wrap out of sight.
@@ -7964,14 +8014,25 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
+// The set's Submit, in the colours and capitals of every other Submit, framing its number of answers in its corner.
 .pileEndPrimary {
+  position: relative;
   border: 0;
-  background: var(--ce-action-primary);
-  color: var(--ce-action-primary-text);
+  background: var(--ce-action-submit);
+  color: var(--ce-action-submit-text);
+  text-transform: uppercase;
 
+  &:hover:not(:disabled) {
+    background: var(--ce-action-submit-hover);
+  }
+
+  // Saving, the quiet colours of every busy Submit, at full strength, so "SAVING · 3s" reads. The line round it is
+  // drawn inside, so the button keeps its size.
   &:disabled {
     cursor: default;
-    opacity: 0.7;
+    background: var(--ce-action-submit-disabled-bg);
+    color: var(--ce-action-submit-disabled-text);
+    box-shadow: inset 0 0 0 1px var(--ce-action-submit-disabled-border);
   }
 }
 

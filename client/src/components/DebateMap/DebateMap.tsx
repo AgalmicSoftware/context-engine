@@ -1577,6 +1577,38 @@ const Modal = ({
     ? 'Where participants stand'
     : content?.compass?.xAxis?.label || content?.name || 'Compass';
 
+  // A reader takes in the AI's summary, then sees it on the chart, before the lists. With no summary the chart keeps
+  // its place after them.
+  const chartFollowsSummary = generatedSummaryEntries.some(
+    (entry) => !entry?.label && String(entry?.comment || '').trim(),
+  );
+  const chartSection = compassData ? (
+    <div className={styles.collapseSection}>
+      <div
+        className={styles.collapseHeader}
+        onClick={() => setCompassOpen(!compassOpen)}
+        role="button"
+        tabIndex={0}
+        aria-expanded={compassOpen}
+        onKeyDown={(event) => handleCollapseHeaderKeyDown(event, () => setCompassOpen(!compassOpen))}
+      >
+        <FontAwesomeIcon icon={compassOpen ? faCaretUp : faCaretDown} style={{ marginRight: 6 }} />
+        <span>{compassTitle}</span>
+        <span className={styles.collapseToggle}>{compassOpen ? 'Hide' : 'Show'}</span>
+      </div>
+      {compassOpen && (
+        <div className={`${styles.collapseContent} ${styles.compassSection}`}>
+          <div className={styles.compassContainer}>
+            <React.Suspense fallback={null}>
+              <StandalonePoliticalCompass compass={compassData as any} />
+            </React.Suspense>
+          </div>
+          {!compassData.points?.length && <p className={styles.compassEmpty}>No one is placed on this compass yet.</p>}
+        </div>
+      )}
+    </div>
+  ) : null;
+
   // Logic for Depth Label and Styling
   const depthIndex = content.depth !== undefined ? content.depth : content.parentPath ? content.parentPath.length : 0;
   const depthLabel = levelLabels[Math.min(depthIndex, levelLabels.length - 1)] || 'Node';
@@ -2020,38 +2052,15 @@ const Modal = ({
         </div>
 
         {generatedSummaryEntries.length > 0 && (
-          <DebateMapGeneratedSummary key={content.id || 'generated-summary'} entries={generatedSummaryEntries} />
+          <DebateMapGeneratedSummary
+            key={content.id || 'generated-summary'}
+            entries={generatedSummaryEntries}
+            afterSummary={chartFollowsSummary ? chartSection : null}
+          />
         )}
         {readOnly && content.split && <DebateMapSplit split={content.split} />}
 
-        {compassData && (
-          <div className={styles.collapseSection}>
-            <div
-              className={styles.collapseHeader}
-              onClick={() => setCompassOpen(!compassOpen)}
-              role="button"
-              tabIndex={0}
-              aria-expanded={compassOpen}
-              onKeyDown={(event) => handleCollapseHeaderKeyDown(event, () => setCompassOpen(!compassOpen))}
-            >
-              <FontAwesomeIcon icon={compassOpen ? faCaretUp : faCaretDown} style={{ marginRight: 6 }} />
-              <span>{compassTitle}</span>
-              <span className={styles.collapseToggle}>{compassOpen ? 'Hide' : 'Show'}</span>
-            </div>
-            {compassOpen && (
-              <div className={`${styles.collapseContent} ${styles.compassSection}`}>
-                <div className={styles.compassContainer}>
-                  <React.Suspense fallback={null}>
-                    <StandalonePoliticalCompass compass={compassData as any} />
-                  </React.Suspense>
-                </div>
-                {!compassData.points?.length && (
-                  <p className={styles.compassEmpty}>No one is placed on this compass yet.</p>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+        {!chartFollowsSummary && chartSection}
 
         {hasArguments && (
           <div className={styles.collapseSection}>

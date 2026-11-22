@@ -440,7 +440,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByText('1 of 1 selected')).not.toBeInTheDocument();
     await editReadableDraftText('Additional comments for What matters?', 'My own comment');
     await expectReadableDraftText('Additional comments for What matters?', 'My own comment');
-    fireEvent.click(screen.getByRole('button', { name: 'Submit responses' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Submit (1)' }));
     await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'My edited answer'));
     expect(baseProps.onApplyAdditional).toHaveBeenCalledWith('q1', 'My own comment');
   });
@@ -588,7 +588,10 @@ describe('SessionVoiceModeModal', () => {
     const choices = screen.getByText('AI submission info').closest('details')!;
     const submission = screen.getByRole('group', { name: 'Response submission' });
     expect(submission).toContainElement(choices);
-    expect(submission).toContainElement(screen.getByRole('button', { name: 'Submit responses' }));
+    // As on every Submit that sends answers: its count, here of both drafts, in the corner without its brackets.
+    const submitButton = screen.getByRole('button', { name: 'Submit (2)' });
+    expect(submission).toContainElement(submitButton);
+    expect(submitButton.querySelector('.pileSubmitButtonCount')).toHaveTextContent(/^2$/);
     expect(choices).not.toHaveAttribute('open');
     expect(screen.getByLabelText('Include platform/model provenance')).toBeChecked();
     // Sharing for research starts on, beside the closed submission info.
@@ -623,7 +626,8 @@ describe('SessionVoiceModeModal', () => {
     expect(metadata).toHaveTextContent('1 selected draft and 1 unselected draft');
     expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
     expect(onInterviewProgressChange).toHaveBeenLastCalledWith(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Submit responses' }));
+    // The removed draft leaves one to send.
+    fireEvent.click(screen.getByRole('button', { name: 'Submit (1)' }));
     await waitFor(() => expect(baseProps.onSubmitResponses).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(onInterviewProgressChange).toHaveBeenLastCalledWith(false));
     expect(baseProps.onApplyAnswer).toHaveBeenCalledTimes(1);
@@ -2104,7 +2108,7 @@ describe('SessionVoiceModeModal', () => {
         expect.objectContaining({ availability: 'loading', joinRequest: 0, hidden: false }),
       );
     else expect(mockGroupArea).not.toHaveBeenCalled();
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toHaveTextContent('Submit responses');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toHaveAccessibleName('Submit (1)');
   });
 
   it.each([true, false])(
@@ -2184,11 +2188,12 @@ describe('SessionVoiceModeModal', () => {
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
     const area = () => mockGroupArea.mock.calls.at(-1)?.[0];
     const submit = () => screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY);
-    expect(submit()).toHaveTextContent('Submit responses');
+    expect(submit()).toHaveAccessibleName('Submit (1)');
     act(() => area().onTickedChange(true));
-    expect(submit()).toHaveTextContent('Submit and join');
+    expect(submit()).toHaveAccessibleName('Submit and join (1)');
+    expect(submit().querySelector('.pileSubmitButtonCount')).toHaveTextContent(/^1$/);
     act(() => area().onTickedChange(false));
-    expect(submit()).toHaveTextContent('Submit responses');
+    expect(submit()).toHaveAccessibleName('Submit (1)');
     act(() => area().onTickedChange(true));
     expect(area().joinRequest).toBe(0);
 
@@ -2197,6 +2202,54 @@ describe('SessionVoiceModeModal', () => {
     // Groups join only after the answers are saved.
     await waitFor(() => expect(area().joinRequest).toBeGreaterThan(0));
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Responses submitted');
+  });
+
+  it('says Submitting in the status, and Saving on the button with its seconds, seen but not read out', async () => {
+    jest.useFakeTimers();
+    try {
+      let finish!: (value: unknown) => void;
+      const onSubmitResponses = jest.fn().mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      );
+      render(
+        <SessionVoiceModeModal
+          {...baseProps}
+          mode="interview"
+          isResponsesCacheReady
+          onSubmitResponses={onSubmitResponses}
+          prefillPacket={{
+            version: 1,
+            sessionSlug: 'demo',
+            responderContext: { summary: 'My own context' },
+            source: { platform: 'other', modelId: 'direct-user-context', verification: 'self_reported' },
+            responses: [{ questionId: 'q1', answer: 'A reviewed answer', confidence: 0.8 }],
+          }}
+        />,
+      );
+      await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+      // As every Submit reads while it runs.
+      const button = screen.getByRole('button', { name: 'Saving' });
+      const statusRegion = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS);
+      expect(button).toHaveTextContent('Saving · 0s');
+      expect(within(button).getByText('· 0s')).toHaveAttribute('aria-hidden', 'true');
+      // The time is on the button only, so a phone's header keeps the word whole.
+      expect(screen.getByRole('button', { name: 'Interview status: Submitting' })).toHaveTextContent(/^Submitting$/);
+      expect(statusRegion.nextElementSibling).toBeNull();
+      await act(async () => {
+        jest.advanceTimersByTime(2_000);
+      });
+      expect(button).toHaveTextContent('Saving · 2s');
+      expect(statusRegion.nextElementSibling).toBeNull();
+      await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
+      await act(async () => finish({ status: 'submitted' }));
+      expect(await screen.findByRole('button', { name: 'Responses submitted' })).not.toHaveTextContent(/\ds/);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('asks the Groups area to join nothing when a submit fails', async () => {
@@ -3027,7 +3080,7 @@ describe('SessionVoiceModeModal', () => {
       expect(onViewResults).toHaveBeenCalledTimes(1);
 
       await editReadableDraftText('Draft answer for What matters?', 'Edited after submit');
-      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toHaveTextContent('Submit responses');
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toHaveAccessibleName('Submit (1)');
       expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_VIEW_RESULTS)).not.toBeInTheDocument();
     },
   );
@@ -3822,8 +3875,14 @@ describe('Interview cancellation and recovery', () => {
     const pill = screen.getByRole('button', { name: 'Interview status: Preparing responses…' });
     expect(pill).toHaveAttribute('data-tone', 'busy');
     expect(pill.querySelector('svg.fa-spinner.fa-spin')).toHaveAttribute('aria-hidden', 'true');
+    // How long drafting has run shows beside the status, outside what is read out.
+    const statusRegion = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS);
+    expect(statusRegion).not.toHaveTextContent('0:00');
+    expect(statusRegion.nextElementSibling).toHaveTextContent(/^0:00$/);
+    expect(statusRegion.nextElementSibling).toHaveAttribute('aria-hidden', 'true');
     await act(async () => finish([{ questionId: 'q1', answer: 'New evidence' }]));
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS).querySelector('svg.fa-spinner')).toBeNull();
+    expect(statusRegion.nextElementSibling).toBeNull();
     expect(screen.getByRole('heading', { name: 'Review proposed responses' }).closest('summary')).toHaveFocus();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Review drafts');
     expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();

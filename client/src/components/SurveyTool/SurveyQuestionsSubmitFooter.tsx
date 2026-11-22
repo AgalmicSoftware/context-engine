@@ -1,15 +1,11 @@
 import React from 'react';
 import { Button } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faArrowRight,
-  faExclamationCircle,
-  faExternalLinkAlt,
-  faSpinner,
-  faTimes,
-} from '@fortawesome/free-solid-svg-icons';
+import { faExclamationCircle, faExternalLinkAlt, faSpinner, faTimes } from '@fortawesome/free-solid-svg-icons';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
+import { SubmitCountLabel } from './SubmitCountLabel';
 import styles from './SurveyTool.module.scss';
 import {
   buildSurveyQuestionsSubmitAuxIconClassName,
@@ -26,12 +22,19 @@ type SurveyQuestionsSubmitFooterProps = {
   onRevertPendingChanges: () => void;
   pendingEditCount?: number;
   responseUrl?: string;
-  submitButtonText?: React.ReactNode;
+  // "Submit (2)": the count shows in the button's corner, and the button takes its name from the full text.
+  submitButtonText?: string;
   submissionError?: string;
 };
 
+// The Submit button holds a short message whole; a longer one shows its start, then an ellipsis.
+export const SUBMIT_BUTTON_MESSAGE_MAX_CHARS = 50;
+const ELLIPSIS = '...';
+
 const renderSubmissionErrorText = (submissionError: string): string =>
-  submissionError.length > 50 ? `${submissionError.substring(0, 47)}...` : submissionError;
+  submissionError.length > SUBMIT_BUTTON_MESSAGE_MAX_CHARS
+    ? `${submissionError.substring(0, SUBMIT_BUTTON_MESSAGE_MAX_CHARS - ELLIPSIS.length)}${ELLIPSIS}`
+    : submissionError;
 
 const SurveyQuestionsSubmitFooter = ({
   displayState = {},
@@ -48,7 +51,7 @@ const SurveyQuestionsSubmitFooter = ({
     showSubmitAux = false,
     submitDisabled = false,
     submittedIndicatorActive = false,
-    uploadStatusText = 'Uploading...',
+    uploadStatusText = 'Saving',
   } = displayState;
   const submitFooterClassName = (isSingleQuestionView ? styles.singleQuestionSubmitFooter : '') || undefined;
   const singleQuestionSubmittedIndicatorActive = !isSingleQuestionView && submittedIndicatorActive;
@@ -66,6 +69,7 @@ const SurveyQuestionsSubmitFooter = ({
   const submitLinkClassName = isSingleQuestionView ? styles.singleQuestionSubmitLink : undefined;
   const showClearChanges = pendingEditCount > 0 && !isSubmitting && !singleQuestionSubmittedIndicatorActive;
   const showSubmittedResponseLink = singleQuestionSubmittedIndicatorActive && !!responseUrl;
+  const showsSubmitLabel = !isSubmitting && !singleQuestionSubmittedIndicatorActive && !submissionError;
 
   return (
     <div className={submitFooterClassName} id={styles.surveyFooter}>
@@ -75,11 +79,13 @@ const SurveyQuestionsSubmitFooter = ({
         onClick={onPrimarySubmitClick}
         className={submitButtonClassName}
         disabled={submitDisabled}
+        aria-label={showsSubmitLabel && submitButtonText ? submitButtonText : undefined}
       >
         {isSubmitting ? (
           <div id={styles.uploadingEncryptingText}>
             <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_QUESTIONS_SUBMIT_ICON_STYLE} />
-            {uploadStatusText}
+            {/* Counts seconds from the Submit's start, as every Submit's running label does. */}
+            <ElapsedLoadingLabel label={uploadStatusText} />
           </div>
         ) : singleQuestionSubmittedIndicatorActive ? (
           <div className={styles.submittedIndicatorText} data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}>
@@ -92,11 +98,12 @@ const SurveyQuestionsSubmitFooter = ({
           </div>
         ) : isSingleQuestionView ? (
           <div className={styles.singleQuestionSubmitButtonContent}>
-            <span className={styles.singleQuestionSubmitButtonLabel}>{submitButtonText}</span>
-            <FontAwesomeIcon icon={faArrowRight} className={styles.singleQuestionSubmitButtonIcon} />
+            <span className={styles.singleQuestionSubmitButtonLabel}>
+              <SubmitCountLabel text={submitButtonText} />
+            </span>
           </div>
         ) : (
-          submitButtonText
+          <SubmitCountLabel text={submitButtonText} />
         )}
       </Button>
 

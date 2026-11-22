@@ -181,7 +181,7 @@ export const runInterviewDraftSubmit = async ({
     return;
   }
 
-  setStatus('Preparing submission…');
+  setStatus('Submitting');
   // Applied drafts stay in the form only once saved; any other outcome restores what it held.
   const restoreResponses = onCaptureResponses?.(applied.map((draft) => draft.questionId));
   let saved = false;

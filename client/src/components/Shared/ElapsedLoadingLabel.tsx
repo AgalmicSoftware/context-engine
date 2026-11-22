@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 
+// "s" is the symbol for seconds, so it stays lower case on a button that sets its words in capitals ("SAVING · 3s").
+const SECONDS_STYLE = { textTransform: 'none' } as const;
+
 // Keep elapsed seconds visual: live regions should announce the task, not every tick.
 // Counts from `since` when the task started before this label appeared.
 export default function ElapsedLoadingLabel({ label, since = null }: { label: string; since?: number | null }) {
@@ -13,7 +16,10 @@ export default function ElapsedLoadingLabel({ label, since = null }: { label: st
   return (
     <span>
       {label}
-      <span aria-hidden="true"> · {seconds}s</span>
+      <span aria-hidden="true" style={SECONDS_STYLE}>
+        {' '}
+        · {seconds}s
+      </span>
     </span>
   );
 }

@@ -175,7 +175,6 @@ type SubmitLabelContext = {
 } & UnknownRecord;
 
 type SubmitLabelOptions = {
-  suffix?: unknown;
   pendingStats?: Partial<PendingStatsSnapshot> | PendingStatsSnapshot | null;
 } & UnknownRecord;
 
@@ -1311,12 +1310,9 @@ export function computeSubmitLabel(ctx: SubmitLabelContext = {}, opts: SubmitLab
 
   const { isSubmitting, submitCountText } = (stats || {}) as SubmitLabelStats;
   if (isSubmitting) return submittingLabel(submitCountText);
+  // Every Submit that sends answers reads "Submit (2)", its count shown in the button's corner.
   const pendingCount = Number(stats?.total || 0);
-  const base = 'Submit';
-  const suffix = opts.suffix ? ` ${String(opts.suffix)}` : '';
-  const baseWithSuffix = `${base}${suffix}`;
-
-  return pendingCount > 0 ? `${baseWithSuffix} (${pendingCount})` : baseWithSuffix;
+  return pendingCount > 0 ? `Submit (${pendingCount})` : 'Submit';
 }
 
 export function shouldShowSingleQuestionResponseLookupSpinner({

@@ -2,6 +2,8 @@ import { PasskeysUnavailableError } from '../../wallet/passkey/unavailable';
 
 /** Shown where this browser has no passkeys (many apps' built-in browsers); the login offers to copy the link. */
 export const PASSKEYS_UNAVAILABLE_MESSAGE = 'Open this link in Safari or Chrome to sign in.';
+/** Shown after "Login failed: " or "Create failed: " where the passkey has no PRF; the console keeps the thrown text. */
+export const PASSKEY_PRF_UNSUPPORTED_TEXT = "This passkey can't be used here.";
 
 export type LoginPasskeyNetwork = Record<string, unknown> & {
   chainId?: unknown;
@@ -153,9 +155,13 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
         ? 'No passkey wallet is saved in this browser for this app. Use Create to make one under this RP ID.'
         : error instanceof PasskeysUnavailableError
           ? PASSKEYS_UNAVAILABLE_MESSAGE
-          : mode === 'create'
-            ? `Create failed: ${deps.getErrorMessage(error).trim() || 'Could not create passkey wallet.'}`
-            : `Login failed: ${deps.getErrorMessage(error).trim() || 'Could not unlock passkey wallet.'}`;
+          : `${mode === 'create' ? 'Create' : 'Login'} failed: ${
+              // Both PRF errors (prf.ts and createCredential.ts) name WebAuthn PRF, which means nothing to a participant.
+              /WebAuthn PRF/.test(deps.getErrorMessage(error))
+                ? PASSKEY_PRF_UNSUPPORTED_TEXT
+                : deps.getErrorMessage(error).trim() ||
+                  (mode === 'create' ? 'Could not create passkey wallet.' : 'Could not unlock passkey wallet.')
+            }`;
       deps.setStatus({
         passkeyWalletStatusMessage: message,
         passkeyWalletStatusTone: 'error',

@@ -6,6 +6,49 @@
  */
 
 const DEFAULT_DB_VERSION = 1;
+// Every tab of the site shares this store, and a write to it waits for any other tab's write to end. A phone can
+// suspend a tab in the middle of one, and the store then stays held for as long as that tab sleeps; WebKit can also
+// leave an open unanswered. So an open, or a transaction on a connection that makes no progress, fails after this
+// long, and the caller's fallback takes over, rather than every cache read waiting with it.
+export const IDB_STALL_MS = 5_000;
+
+const stalledError = (what: string): Error =>
+  new Error(`IndexedDB ${what} made no progress for ${IDB_STALL_MS / 1000} seconds.`);
+
+// When each connection last moved: a transaction completed or a cursor stepped. A transaction aborted for making no
+// progress doesn't count, so one failing can't hold back the failure of the others waiting with it.
+const lastProgressAt = new WeakMap<IDBDatabase, number>();
+const noteProgress = (db: IDBDatabase): void => {
+  lastProgressAt.set(db, Date.now());
+};
+
+// Fails a transaction once its connection has made no progress for IDB_STALL_MS. Counted from the connection's last
+// progress, not from the transaction's start, so a long queue of this tab's own work runs as long as it moves. The
+// transaction is aborted, so a write given up can't land after its fallback, and the connection, which the caller
+// forgets, is closed. Returns the function that stops the check.
+const failWhenStalled = (db: IDBDatabase, tx: IDBTransaction, onStalled: (error: Error) => void): (() => void) => {
+  const startedAt = Date.now();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const check = (): void => {
+    const idle = Date.now() - Math.max(startedAt, lastProgressAt.get(db) ?? 0);
+    if (idle < IDB_STALL_MS) {
+      timer = setTimeout(check, IDB_STALL_MS - idle);
+      return;
+    }
+    try {
+      tx.abort();
+    } catch (_) {
+      // Already finishing: the failure stands, as its outcome may never arrive.
+    }
+    try {
+      db.close();
+    } catch (_) {}
+    onStalled(stalledError('transaction'));
+  };
+  timer = setTimeout(check, IDB_STALL_MS);
+  return () => clearTimeout(timer);
+};
+
 type CacheIdbStore = {
   dbName: string;
   storeName: string;
@@ -44,6 +87,12 @@ const getOrOpenDatabase = (store: Partial<CacheIdbStore>): Promise<IDBDatabase> 
     }
 
     const request = indexedDB.open(normalizedStore.dbName, DEFAULT_DB_VERSION);
+    let gaveUp = false;
+    const stall = setTimeout(() => {
+      gaveUp = true;
+      forgetDatabase(identity, dbPromise);
+      reject(stalledError('open'));
+    }, IDB_STALL_MS);
 
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -53,20 +102,28 @@ const getOrOpenDatabase = (store: Partial<CacheIdbStore>): Promise<IDBDatabase> 
     };
 
     request.onsuccess = () => {
+      clearTimeout(stall);
       const db = request.result;
+      // Answered after it was given up: no operation holds this connection.
+      if (gaveUp) {
+        db.close();
+        return;
+      }
       // WebKit can lose a connection, such as after iOS suspends the page: the next operation opens a new one.
       db.onclose = () => forgetDatabase(identity, dbPromise);
       db.onversionchange = () => {
         try {
           db.close();
         } catch (_) {}
-        dbPromises.delete(identity);
+        forgetDatabase(identity, dbPromise);
       };
       resolve(db);
     };
 
     request.onerror = () => {
-      dbPromises.delete(identity);
+      clearTimeout(stall);
+      if (gaveUp) return;
+      forgetDatabase(identity, dbPromise);
       reject(request.error || new Error(`Failed to open IndexedDB store ${identity}`));
     };
   });
@@ -90,15 +147,28 @@ const runTransaction = async <T>(
 
   return new Promise((resolve, reject) => {
     let request: IDBRequest<T> | null = null;
+    let stopStallCheck: (() => void) | undefined;
     try {
       const tx = db.transaction(normalizedStore.storeName, mode);
+      stopStallCheck = failWhenStalled(db, tx, (error) => fail(reject, error));
       const objectStore = tx.objectStore(normalizedStore.storeName);
       request = executeRequest(objectStore);
 
-      tx.oncomplete = () => resolve(request ? request.result : undefined);
-      tx.onerror = () => fail(reject, tx.error || request?.error || new Error(`IndexedDB ${mode} failed`));
-      tx.onabort = () => fail(reject, tx.error || request?.error || new Error(`IndexedDB ${mode} aborted`));
+      tx.oncomplete = () => {
+        stopStallCheck?.();
+        noteProgress(db);
+        resolve(request ? request.result : undefined);
+      };
+      tx.onerror = () => {
+        stopStallCheck?.();
+        fail(reject, tx.error || request?.error || new Error(`IndexedDB ${mode} failed`));
+      };
+      tx.onabort = () => {
+        stopStallCheck?.();
+        fail(reject, tx.error || request?.error || new Error(`IndexedDB ${mode} aborted`));
+      };
     } catch (error) {
+      stopStallCheck?.();
       fail(reject, error);
     }
   });
@@ -128,13 +198,17 @@ export const entries = async (store?: Partial<CacheIdbStore>): Promise<CacheIdbE
   };
 
   return new Promise((resolve, reject) => {
+    let stopStallCheck: (() => void) | undefined;
     try {
       const tx = db.transaction(normalizedStore.storeName, 'readonly');
+      stopStallCheck = failWhenStalled(db, tx, (error) => fail(reject, error));
       const objectStore = tx.objectStore(normalizedStore.storeName);
       const collected: CacheIdbEntry[] = [];
       const cursorRequest = objectStore.openCursor();
 
       cursorRequest.onsuccess = () => {
+        // Each entry read is progress: reading a large store takes as long as it needs.
+        noteProgress(db);
         const cursor = cursorRequest.result;
         if (!cursor) return;
         collected.push([cursor.key, cursor.value]);
@@ -142,13 +216,25 @@ export const entries = async (store?: Partial<CacheIdbStore>): Promise<CacheIdbE
       };
 
       cursorRequest.onerror = () => {
+        stopStallCheck?.();
         fail(reject, cursorRequest.error || new Error('Failed to read IndexedDB entries'));
       };
 
-      tx.oncomplete = () => resolve(collected);
-      tx.onerror = () => fail(reject, tx.error || cursorRequest.error || new Error('Failed to read IndexedDB entries'));
-      tx.onabort = () => fail(reject, tx.error || cursorRequest.error || new Error('Failed to read IndexedDB entries'));
+      tx.oncomplete = () => {
+        stopStallCheck?.();
+        noteProgress(db);
+        resolve(collected);
+      };
+      tx.onerror = () => {
+        stopStallCheck?.();
+        fail(reject, tx.error || cursorRequest.error || new Error('Failed to read IndexedDB entries'));
+      };
+      tx.onabort = () => {
+        stopStallCheck?.();
+        fail(reject, tx.error || cursorRequest.error || new Error('Failed to read IndexedDB entries'));
+      };
     } catch (error) {
+      stopStallCheck?.();
       fail(reject, error);
     }
   });

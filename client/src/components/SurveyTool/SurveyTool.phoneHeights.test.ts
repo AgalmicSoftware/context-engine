@@ -110,14 +110,70 @@ it('closes the phone arrows up to the counter and keeps the Submit count in view
   expect(css).toMatch(
     /\.pileInteractionUnit \.pileControls \.pileNav \.pileNavArrow:focus-visible\s*\{\s*outline-offset: -1px;/,
   );
-  expect(css).toMatch(/\.pileInteractionUnit \.pileFooter \.pileSubmitButtonCountBracket\s*\{\s*display: none;/);
   // The word moves down under the number, by margins that cancel, so the button does not grow.
   expect(css).toMatch(
     /\.pileInteractionUnit \.pileFooter \.pileSubmitButtonLabelCounted\s*\{\s*margin-top: 5px;\s*margin-bottom: -5px;/,
   );
-  expect(css).toMatch(
-    /\.pileInteractionUnit \.pileFooter \.pileSubmitButtonCount\s*\{\s*position: absolute;\s*top: 4px;\s*right: 5px;[^}]*font-size: 16px;\s*font-weight: 700;/,
+});
+
+// Rules outside every media query: in the expanded output only their selectors start a line.
+const topLevelRules = (selector: string) =>
+  [...css.matchAll(/(?:^|\n)([^\s@}][^{}]*)\{([^{}]*)\}/g)]
+    .filter(([, selectors]) => selectors.split(',').some((candidate) => candidate.trim() === selector))
+    .map(([, , body]) => body);
+
+// Every Submit that sends answers shows its count the same way at every width: small, without brackets, in the
+// button's top corner. Each button is the count's frame. The bar's word, which the bar otherwise positions and layers
+// below the button's glow, is left unpositioned, and on a one-row bar stays level with the buttons beside it,
+// leaving the count room at its end instead.
+it('frames the count in the corner of every Submit that sends answers, at every width', () => {
+  expect(topLevelRules('.pileSubmitButtonCount').join('')).toMatch(
+    /position: absolute;\s*top: 4px;\s*right: 5px;\s*z-index: 3;\s*font-size: 16px;\s*font-weight: 700;\s*line-height: 0\.75;/,
   );
+  for (const button of [
+    '.headerSubmitButton',
+    '.pileFooter .pileSubmitButton',
+    '#submitSurveyButton',
+    '.sessionInterviewPanel .sessionInterviewSubmitButton',
+    '.pileEndPrimary',
+  ]) {
+    expect([button, topLevelRules(button).some((body) => /position: relative;/.test(body))]).toEqual([button, true]);
+  }
+  expect(css).not.toMatch(/pileSubmitButtonCountBracket/);
+  expect(topLevelRules('.headerSubmitButton > .pileSubmitButtonLabel').join('')).toMatch(
+    /position: static;\s*z-index: auto;/,
+  );
+  expect(topLevelRules('.headerSubmitButton > .pileSubmitButtonLabelCounted').join('')).toMatch(/margin-right: 10px;/);
+});
+
+// While a Submit saves, every one wears the pile's busy look: the theme's quiet Submit colours at full strength, so
+// "SAVING · 3s" reads. The bar's had faded to 40% and the end card's to 70%; the one-question page's label stayed
+// white on the light fill; and the interview's, under the pointer, took the panel's accent fill under its quiet text.
+it('keeps a busy Submit in the quiet Submit colours everywhere, at full strength', () => {
+  const quietFill = /background(?:-color)?: var\(--ce-action-submit-disabled-bg\)/;
+  for (const busy of [
+    '.headerSubmitButton:disabled',
+    '.headerSubmitButton:disabled:hover',
+    '.pileEndPrimary:disabled',
+  ]) {
+    const body = topLevelRules(busy).join('');
+    expect([busy, quietFill.test(body), /color: var\(--ce-action-submit-disabled-text\)/.test(body)]).toEqual([
+      busy,
+      true,
+      true,
+    ]);
+    expect([busy, /opacity/.test(body)]).toEqual([busy, false]);
+  }
+  expect(topLevelRules('#uploadingEncryptingText').join('')).toMatch(/color: inherit;/);
+  const interviewHover = '.sessionInterviewPanel .sessionInterviewSubmitButton:disabled:hover';
+  expect(topLevelRules(interviewHover).join('')).toMatch(
+    /background: var\(--ce-action-submit-disabled-bg\) !important;/,
+  );
+  // As specific as the panel's accent rule for disabled primary buttons, so it must come after it.
+  expect(css.indexOf(`${interviewHover} {`)).toBeGreaterThan(
+    css.indexOf('.sessionInterviewPanel :global(.btn-primary):disabled:hover {'),
+  );
+  expect(css.indexOf('.sessionInterviewPanel :global(.btn-primary):disabled:hover {')).toBeGreaterThan(-1);
 });
 
 // The counter gives way to Submit's word: one line, then its numbers stacked, then gone. A row that was a hair too

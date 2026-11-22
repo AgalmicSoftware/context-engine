@@ -22,6 +22,17 @@ const wait = (ms: number, signal?: AbortSignal | null) =>
     signal?.addEventListener('abort', () => (clearTimeout(timer), reject(signal.reason)), { once: true });
   });
 
+// An upload's fields, read from its form or JSON body.
+const uploadField = (body: RequestInit['body'], field: string): string => {
+  if (body instanceof FormData) return String(body.get(field) || '');
+  if (typeof body !== 'string') return '';
+  try {
+    return String(JSON.parse(body || '{}')[field] || '');
+  } catch {
+    return '';
+  }
+};
+
 // Reads, group joins, and answer uploads that carry a request id the Worker
 // replays rather than stores twice. Streamed bodies cannot be sent again.
 const replaySafe = (url: string, init: RequestInit) => {
@@ -31,30 +42,70 @@ const replaySafe = (url: string, init: RequestInit) => {
   if (body != null && typeof body !== 'string' && !(body instanceof FormData)) return false;
   const path = new URL(url, 'https://worker.invalid').pathname;
   if (READ_PATHS.test(path) || REPEATABLE_WRITE_PATHS.test(path)) return true;
-  if (!path.endsWith('/storage/upload')) return false;
-  if (body instanceof FormData) return !!body.get('requestId');
-  try {
-    return !!JSON.parse(body || '{}').requestId;
-  } catch {
-    return false;
-  }
+  return path.endsWith('/storage/upload') && !!uploadField(body, 'requestId');
 };
+
+// A Worker with its session coordinator (every Worker deployed by the deploy helper or from the template) stores an
+// answer upload with a request id once, whatever becomes of its reply: sent again, it gets the copy already stored.
+// So it is also sent again when no reply came (the connection dropped, or a gateway answered for the Worker).
+// Otherwise the answer is saved while the page says it failed.
+// Limit: the Worker takes that receipt only for a signed-in person's 'responses' upload on a Worker with its
+// coordinator bound. Only those uploads are sent again after no reply; an older or custom Worker without the
+// coordinator may still keep the repeat as a second version of the answer, never losing one.
+const RECEIPT_RESOURCE = 'responses';
+const NO_REPLY_STATUSES = new Set([502, 504]);
+// The Worker holds a send it is still storing for up to two minutes, and answers a repeat sent meanwhile with
+// 'upload_in_progress', changing nothing. So a repeat that hears this asks again for about half a minute, while
+// Submit counts the seconds, before the page passes on the Worker's answer. That answer is not a failure: the
+// upload parser says so plainly, and Submit pressed again sends the same request id, so it replays.
+export const UPLOAD_IN_PROGRESS = 'upload_in_progress';
+const UPLOAD_IN_PROGRESS_DELAYS_MS = [1000, 2000, 4000, 6000, 8000, 8000];
+// Each wait runs from 75% to 125% of its planned length, so a crowd does not return in step.
+const WAIT_JITTER_MIN = 0.75;
+const WAIT_JITTER_SPAN = 0.5;
+const uploadInProgressDelayMs = (waits: number): number | null =>
+  waits < UPLOAD_IN_PROGRESS_DELAYS_MS.length
+    ? UPLOAD_IN_PROGRESS_DELAYS_MS[waits] * (WAIT_JITTER_MIN + Math.random() * WAIT_JITTER_SPAN)
+    : null;
 
 export const withCoordinatorRetry =
   (fetchImpl: typeof fetch = fetch) =>
   async (input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> => {
     const url = String(input instanceof Request ? input.url : input);
     const safe = !(input instanceof Request) && replaySafe(url, init);
-    for (let attempt = 0; ; attempt += 1) {
-      const response = await fetchImpl(input, init);
-      // Spread retries so a crowd does not return in step.
-      const delayMs = coordinatorRetryDelayMs(attempt);
-      if (!safe || response.status !== 503 || delayMs == null) return response;
-      const body = await response
-        .clone()
-        .json()
-        .catch(() => null);
-      if (!isRetryableBusy(response.status, body)) return response;
+    const answerUpload =
+      safe &&
+      new URL(url, 'https://worker.invalid').pathname.endsWith('/storage/upload') &&
+      uploadField(init.body, 'resource') === RECEIPT_RESOURCE;
+    // Sends again after a busy coordinator or no reply, and, counted apart, after an answer still being stored.
+    let retries = 0;
+    let waits = 0;
+    for (;;) {
+      let response: Response;
+      try {
+        response = await fetchImpl(input, init);
+      } catch (error) {
+        // A failed fetch is a TypeError; one the page cancelled is not sent again.
+        const resend = answerUpload && error instanceof TypeError && !init.signal?.aborted;
+        const delayMs = resend ? coordinatorRetryDelayMs(retries++) : null;
+        if (delayMs == null) throw error;
+        await wait(delayMs, init.signal);
+        continue;
+      }
+      if (!safe) return response;
+      let delayMs: number | null = null;
+      if (answerUpload && NO_REPLY_STATUSES.has(response.status)) {
+        delayMs = coordinatorRetryDelayMs(retries++);
+      } else if (response.status === 503) {
+        const body = await response
+          .clone()
+          .json()
+          .catch(() => null);
+        if (answerUpload && body?.reason === UPLOAD_IN_PROGRESS) delayMs = uploadInProgressDelayMs(waits++);
+        else if (isRetryableBusy(response.status, body)) delayMs = coordinatorRetryDelayMs(retries++);
+      }
+      if (delayMs == null) return response;
+      // Spread so a crowd does not return in step.
       await wait(delayMs, init.signal);
     }
   };

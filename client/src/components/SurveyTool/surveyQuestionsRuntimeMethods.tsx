@@ -29,6 +29,11 @@ import { readQuestionsCache } from './surveyToolCacheState.js';
 import { resolveQuestionReadCacheContext } from './surveyToolScope.js';
 import { resolveEditableQuestionList } from './surveyToolResponsePayloadController.js';
 import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads';
+import { UPLOAD_IN_PROGRESS } from '../../utilities/worker/coordinatorRetry';
+
+// A Submit some of whose answers stored, while the Worker is still storing another: nothing failed, so it is not
+// put as "didn't save". Pressing Submit again replays that answer's request id. Kept short for the Submit button.
+export const PARTIAL_UPLOAD_IN_PROGRESS_MESSAGE = 'Still saving some answers. Submit in a minute.';
 
 export type SurveyQuestionsRuntimeMethods = SurveyQuestionsLegacyRecord;
 
@@ -2427,7 +2432,14 @@ export const createSurveyQuestionsRuntimeMethods = (
       const isStored = (index: number) => storedIds.has(String(hashedQuestionIds[index] || '').toLowerCase());
       tx = { ...partialReceipt, retryPending: true };
       const failureMessage = 'message' in error ? error.message : '';
-      uploadFailure = `Some answers didn't save (${String(failureMessage || 'upload failed').replace(/\.$/, '')}).`;
+      // The upload's own error, with the Worker's reason, is the partial error's cause.
+      const cause = 'cause' in error && error.cause && typeof error.cause === 'object' ? error.cause : null;
+      const stillSaving = [error, cause].some(
+        (part) => !!part && 'reason' in part && part.reason === UPLOAD_IN_PROGRESS,
+      );
+      uploadFailure = stillSaving
+        ? PARTIAL_UPLOAD_IN_PROGRESS_MESSAGE
+        : `Some answers didn't save (${String(failureMessage || 'upload failed').replace(/\.$/, '')}).`;
       questionResponses.forEach((response: SurveyQuestionsLegacyValue, index: number) => {
         if (!isStored(index)) heldBack.set(normalizeQuestionIdKey(response?.questionID), 'unsaved');
       });

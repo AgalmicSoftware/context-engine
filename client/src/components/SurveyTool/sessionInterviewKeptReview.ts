@@ -39,8 +39,11 @@ export type KeptInterviewReview = {
   includeResponderName: boolean;
   draftText: SharingChoice;
 };
-/** A kept review, whose it is, and when it was first kept. */
-export type RestoredReview = { owner: string; since: number; review: KeptInterviewReview };
+/**
+ * A kept review, whose it is, and when it was first kept. `copied` marks one signed-out review loaded from another
+ * browser's copied answers, which the person who copied it may open signed in here (see answersHandoff).
+ */
+export type RestoredReview = { owner: string; since: number; review: KeptInterviewReview; copied?: boolean };
 
 /** Whose review this is: the signed-in account, or this browser alone when signed out. */
 export const keptReviewOwner = (account: unknown, signedIn: boolean): string => {
@@ -141,6 +144,7 @@ export const readKeptReview = (sessionSlug: string, owner: string, now = Date.no
     return {
       owner,
       since: Number(kept.savedAt),
+      ...(owner === 'browser' && kept.copied === true ? { copied: true } : {}),
       review: {
         packet: isRecord(packet) ? (packet as InterviewPrefillPacket) : null,
         transcript,

@@ -1,6 +1,7 @@
 /** @file PileEndOfSetCard.tsx: what Next opens after the last question, so the end of the set is plain. */
 import React from 'react';
 import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
+import { SubmitCountLabel } from './SubmitCountLabel';
 import styles from './SurveyTool.module.scss';
 import { submittingLabel } from './surveyToolDraftState';
 
@@ -46,11 +47,18 @@ const PileEndOfSetCard = ({
     </p>
     <div className={styles.pileEndActions}>
       {unsent > 0 && (
-        <button type="button" className={styles.pileEndPrimary} onClick={onSubmit} disabled={isSubmitting}>
+        <button
+          type="button"
+          className={styles.pileEndPrimary}
+          onClick={onSubmit}
+          disabled={isSubmitting}
+          // The count shows in the corner without its brackets; the name keeps them.
+          aria-label={isSubmitting ? undefined : `Submit (${unsent})`}
+        >
           {isSubmitting ? (
             <ElapsedLoadingLabel label={submittingLabel(submitCountText)} />
           ) : (
-            `Submit ${unsent} ${unsent === 1 ? 'answer' : 'answers'}`
+            <SubmitCountLabel text={`Submit (${unsent})`} />
           )}
         </button>
       )}

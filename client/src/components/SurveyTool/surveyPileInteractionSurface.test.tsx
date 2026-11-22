@@ -17,10 +17,10 @@ import {
   resolvePileLoadingProgressFillStyle,
   resolvePileMiniLoaderStyle,
   resolvePileNavCounterStyle,
-  splitPileSubmitLabel,
   type PileInteractionSurfaceProps,
   type PileQuestionLike,
 } from './surveyPileInteractionSurface';
+import { splitPileSubmitLabel } from './SubmitCountLabel';
 import styles from './SurveyTool.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { forgetGroupReadHeader, saveGroupReadHeader } from '../../utilities/worker/workerGroupReadProof';
@@ -571,15 +571,13 @@ it('sizes the phone card from the measured top of the card, kept current as the 
   }
 });
 
-it('sets the Submit count apart, so a narrow row can drop it while the name keeps it', () => {
+it('sets the Submit count apart, for the corner without its brackets, while the name keeps them', () => {
   expect(splitPileSubmitLabel('Submit (12)')).toEqual({ word: 'Submit', count: '(12)' });
   expect(splitPileSubmitLabel('Submit')).toEqual({ word: 'Submit', count: '' });
   expect(splitPileSubmitLabel('Submitted')).toEqual({ word: 'Submitted', count: '' });
   render(renderPileInteractionSurface({ ...buildBaseProps(), finalSubmitText: 'Submit (3)' }));
   const submit = screen.getByRole('button', { name: 'Submit (3)' });
-  expect(submit.querySelector('.pileSubmitButtonCount')).toHaveTextContent('(3)');
-  // The brackets are their own spans, which a phone row hides.
-  expect(submit.querySelectorAll('.pileSubmitButtonCountBracket')).toHaveLength(2);
+  expect(submit.querySelector('.pileSubmitButtonCount')).toHaveTextContent(/^3$/);
   // The word is marked while it carries a number, so a phone row can set it clear of the number above it.
   expect(submit.querySelector('.pileSubmitButtonLabel')).toHaveClass('pileSubmitButtonLabelCounted');
   cleanup();

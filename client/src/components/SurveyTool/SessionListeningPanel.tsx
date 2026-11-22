@@ -29,6 +29,7 @@ import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS, transcriptSpeech } from '../../
 import { applySpeakerMerges } from '../../utilities/audio/speakerMerges';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SessionListeningWaveform } from './SessionListeningWaveform';
+import { formatSessionRecordingElapsed } from './sessionElapsedTime';
 export { SessionListeningWaveform } from './SessionListeningWaveform';
 import { generateQuestionsFromListeningTranscript, LISTENING_QUESTION_COUNT } from './sessionListeningQuestions';
 import type { QuestionDrafts } from '../../utilities/audio/recordingChunkStore';
@@ -93,12 +94,8 @@ const mergeGeneratedQuestionDrafts = (
   return additions.length ? [...previous, ...additions] : previous;
 };
 
-export const formatSessionRecordingElapsed = (secondsRaw: unknown) => {
-  const seconds = Math.max(0, Math.floor(Number(secondsRaw || 0)));
-  const minutes = Math.floor(seconds / 60);
-  const rest = seconds % 60;
-  return `${minutes}:${String(rest).padStart(2, '0')}`;
-};
+// In its own file, so a panel that only times a wait need not import this one.
+export { formatSessionRecordingElapsed };
 
 const KEEP_AUDIO_HELP =
   'Closes without waiting for transcription. Audio still waiting for it stays on this device and resumes uploading when you reopen this recording.';

@@ -13,10 +13,11 @@ import {
 } from 'utilities/analysisCard/analysisCardCanvas';
 import { noteAnalysisCardDrawn } from 'utilities/analysisCard/analysisCardDrawn';
 import type { AnalysisCardDownload } from 'utilities/analysisCard/analysisCardExport';
-import type { AnalysisCard } from 'utilities/analysisCard/analysisCardModel';
+import { ANALYSIS_CARD_TASTES, type AnalysisCard } from 'utilities/analysisCard/analysisCardModel';
 import { analysisCardVideoType } from 'utilities/analysisCard/analysisCardVideoType';
 
 import styles from './UserPageAnalysisCard.module.scss';
+import UserPageAnalysisCardSkeleton from './UserPageAnalysisCardSkeleton';
 
 // The illustration of the matched figure: asked for when the analysis arrives, and absent ("none") when the
 // session cannot make one. The card is complete without it.
@@ -125,11 +126,15 @@ const UserPageAnalysisCard = ({ card, picture = null }: UserPageAnalysisCardProp
 
   return (
     <div className={styles.card}>
-      {/* Shown once it is whole: a card that appears and then redraws itself with its picture reads as a fault. */}
+      {/* Shown once it is whole: a card that appears and then redraws itself with its picture reads as a fault.
+          Until then one status line, kept from drawing to any fault, so a screen reader hears the fault too. */}
       {ready ? null : (
-        <p className={styles.drawing} role="status">
+        <p className={error ? styles.drawing : styles.skeletonStatus} role="status">
           {error || 'Drawing the card…'}
         </p>
+      )}
+      {ready || error ? null : (
+        <UserPageAnalysisCardSkeleton tastes={ANALYSIS_CARD_TASTES.filter((kind) => card.tastes[kind])} />
       )}
       <canvas
         ref={preview}

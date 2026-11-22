@@ -151,10 +151,13 @@ describe('UserPageAnalysisCard', () => {
       throw new Error('no canvas');
     });
     const { rerender } = render(<UserPageAnalysisCard card={card} picture={null} />);
+    // The line that says the card is being drawn then says the fault: a line put in its place may go unheard.
+    const status = screen.getByRole('status');
+    expect(status.textContent).toBe('Drawing the card…');
 
-    await waitFor(() =>
-      expect(screen.getByRole('status').textContent).toBe('The card could not be drawn in this browser.'),
-    );
+    await waitFor(() => expect(status.textContent).toBe('The card could not be drawn in this browser.'));
+    expect(screen.getByRole('status')).toBe(status);
+    expect(screen.queryByText('Historical match')).toBeNull();
     expect(screen.queryByText('Download')).toBeNull();
 
     rerender(<UserPageAnalysisCard card={{ ...card }} picture={null} />);
@@ -171,11 +174,14 @@ describe('UserPageAnalysisCard', () => {
     );
   });
 
-  it('shows a plain waiting box, not a half-made card, until the picture has arrived or is known to be absent', async () => {
+  it('shows the card in outline, not half-made, until the picture has arrived or is known to be absent', async () => {
     const { rerender } = render(<UserPageAnalysisCard card={card} picture={{ status: 'loading' }} />);
     await waitFor(() => expect(mockDraw).toHaveBeenCalled());
 
     expect(screen.getByRole('status').textContent).toBe('Drawing the card…');
+    // The outline has the card's headings, read out as the words above instead.
+    expect(screen.getByText('Historical match').closest('[aria-hidden="true"]')).toBeTruthy();
+    expect(screen.queryByText(/ guess$/)).toBeNull();
     expect(screen.queryByRole('img')).toBeNull();
     expect(screen.queryByText('Download')).toBeNull();
     expect(screen.queryByLabelText('Show page 2 of the card')).toBeNull();
@@ -186,6 +192,18 @@ describe('UserPageAnalysisCard', () => {
     expect(screen.getByRole('img')).toBeTruthy();
     expect(drawImage).toHaveBeenCalledWith(pages.page1, 0, 0, 540, 960);
     expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('outlines only the guesses the card has', async () => {
+    const tastes = {
+      ...card.tastes,
+      book: { title: 'Governing the Commons', by: 'Ostrom' },
+      song: { title: 'Ode', by: '' },
+    };
+    render(<UserPageAnalysisCard card={{ ...card, tastes }} picture={{ status: 'loading' }} />);
+    await waitFor(() => expect(mockDraw).toHaveBeenCalled());
+
+    expect(screen.getAllByText(/ guess$/).map((node) => node.textContent)).toEqual(['book guess', 'song guess']);
   });
 
   it("offers no Download on someone else's card, only the page turns", async () => {

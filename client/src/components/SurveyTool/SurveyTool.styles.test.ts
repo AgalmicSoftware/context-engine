@@ -239,3 +239,11 @@ it('starts a phone choice list at its top, so an overflowing list keeps its firs
   expect(rule).toMatch(/overflow-y: auto;/);
   expect(rule).toMatch(/justify-content: flex-start;/);
 });
+
+// A wide screen keeps the bar to one row, where the line saying why its Submit failed would push the buttons
+// out of the bar. So the bar wraps while that line shows, and the line takes the new row.
+it('wraps the bar while it says why Submit failed, so that line takes a row of its own', () => {
+  const scss = readSurveyToolScss();
+  expect(ruleText(scss, '#surveysRow:has(> .headerSubmitError)')).toMatch(/\{\s*flex-wrap: wrap;\s*\}$/);
+  expect(ruleText(scss, '.headerSubmitError')).toMatch(/flex: 1 0 100%;/);
+});

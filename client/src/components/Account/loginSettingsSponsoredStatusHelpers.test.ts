@@ -31,7 +31,7 @@ describe('loginSettingsSponsoredStatusHelpers', () => {
     expect(formatSponsoredStatusMeta({ status: 'granted' }, false)).toEqual({
       label: 'Not sponsored',
       tone: 'muted',
-      detail: 'No sponsor key is configured for the active session.',
+      detail: 'This session does not pay for this.',
     });
     expect(formatSponsoredStatusMeta({ status: 'granted' }, true)).toEqual({
       label: 'Gate unlocked',
@@ -61,7 +61,7 @@ describe('loginSettingsSponsoredStatusHelpers', () => {
     expect(formatSponsoredStatusMeta(null, true, 'sbt')).toEqual({
       label: 'Sponsored',
       tone: 'ok',
-      detail: 'A sponsor key is configured and does not require an SBT gate.',
+      detail: 'The session pays for this.',
     });
     expect(formatSponsoredStatusMeta({ status: 'denied' }, true)).toEqual({
       label: 'Gate locked',
@@ -73,7 +73,7 @@ describe('loginSettingsSponsoredStatusHelpers', () => {
   it('reports Worker sponsorship without pretending an on-chain gate was checked', () => {
     expect(formatSponsoredStatusMeta({ status: 'worker-managed' }, true)).toMatchObject({
       label: 'Sponsored',
-      detail: 'A sponsor key is configured. Access follows the session permissions.',
+      detail: 'The session pays for this. Who may use it follows the session’s own rules.',
     });
     expect(formatSponsoredStatusMeta(null, false, 'session', 'checking').label).toBe('Checking');
     expect(formatSponsoredStatusMeta(null, false, 'session', 'unavailable').label).toBe('Check unavailable');
@@ -137,7 +137,7 @@ describe('loginSettingsSponsoredStatusHelpers', () => {
     expect(card.status).toEqual({
       label: 'Not sponsored',
       tone: 'muted',
-      detail: 'No sponsor key is configured for the active session.',
+      detail: 'This session does not pay for this.',
     });
     expect(card.activeSponsorSession).toBeNull();
     expect(card.otherSponsorSessions).toEqual([otherSponsorSession]);

@@ -14,7 +14,151 @@
   border: 1px solid var(--ce-document-border);
 }
 
-// Where the card will be, while its words and picture are on their way.
+// The card in outline while it is made or drawn: its first page's headings in their places, with bars for the
+// words to come. Sizes are shares of the card's width, as the card's own are, so the outline keeps the card's
+// shape at any width and the card takes its place at the same size.
+.skeleton {
+  width: min(100%, 440px);
+  margin: 0 auto;
+  container-type: inline-size;
+}
+
+// What is happening, read out in place of the outline, which screen readers skip.
+.skeletonStatus {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skeletonPage {
+  display: flex;
+  flex-direction: column;
+  aspect-ratio: 9 / 16;
+  padding: 7.8cqw 6.7cqw 4.3cqw;
+  border: 1px solid var(--ce-document-border);
+  border-radius: var(--ce-radius-12);
+  // Its own document ground, as the page behind it is dark in one theme.
+  background: var(--ce-document-canvas);
+}
+
+.skeletonGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 1.6cqw;
+  min-width: 0;
+}
+
+// As on the card, the room left over is shared by the gaps either side of the historical match.
+.skeletonMatch,
+.skeletonEnd {
+  margin-top: auto;
+  padding-top: 3.7cqw;
+}
+
+.skeletonEnd {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1cqw;
+}
+
+.skeletonLabel {
+  font-size: max(11px, 3.4cqw);
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ce-document-text-muted);
+}
+
+.skeletonBar {
+  position: relative;
+  display: block;
+  height: 3.2cqw;
+  overflow: hidden;
+  border-radius: var(--ce-radius-4);
+  background: color-mix(in srgb, var(--ce-document-text) 10%, transparent);
+
+  // A light passing along the bars says the card is on its way.
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in srgb, var(--ce-document-canvas) 70%, transparent) 50%,
+      transparent 100%
+    );
+    transform: translateX(-100%);
+    animation: analysisCardSkeletonSweep 1.5s linear infinite;
+  }
+}
+
+.skeletonTitle {
+  height: 9cqw;
+}
+
+.skeletonName {
+  width: 62%;
+  height: 6.5cqw;
+}
+
+.skeletonShort {
+  width: 64%;
+}
+
+.skeletonPick {
+  display: flex;
+  align-items: center;
+  gap: 2.4cqw;
+  min-height: 11.7cqw;
+  padding: 1.6cqw 2.4cqw;
+  border-radius: 2cqw;
+  background: color-mix(in srgb, var(--ce-document-text) 5%, transparent);
+
+  > .skeletonGroup {
+    flex: 1;
+    gap: 1cqw;
+  }
+}
+
+.skeletonIcon {
+  flex: none;
+  width: 5.9cqw;
+  height: 5.9cqw;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ce-document-text) 12%, transparent);
+}
+
+.skeletonFoot {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1.3cqw;
+
+  .skeletonBar {
+    width: 30%;
+  }
+}
+
+@keyframes analysisCardSkeletonSweep {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonBar::after {
+    animation: none;
+  }
+}
+
+// Where the card will be, when it cannot be drawn.
 .drawing {
   display: flex;
   align-items: center;

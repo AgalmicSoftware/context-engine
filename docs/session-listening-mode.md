@@ -251,16 +251,22 @@ conflict with an existing local answer remain visible with **Replace with draft*
 until the responder explicitly selects them. A card whose draft would replace a different
 earlier answer quotes that answer under the question, free text and quadratic votes included;
 one longer than 120 characters is cut at a word with **Show all**, and a locked or encrypted one
-is only mentioned. **Submit responses** saves reviewed values and enters the
+is only mentioned. **Submit**, with the number of selected drafts small in its top
+corner as on every Submit that sends answers, saves reviewed values and enters the
 normal submission flow, opening sign-in when necessary. Drafts survive sign-in,
 and the modal resumes the normal response upload after the authenticated
-response state has rehydrated. Canceling sign-in leaves the review open without
+response state has rehydrated. While drafts are prepared, the interview shows
+how long the wait has run (m:ss) beside its status; while responses upload, the
+status reads **Submitting** and the button **Saving** with the seconds it has run
+(**Saving · 3s**).
+Screen readers hear the status and the button without the ticking time. Canceling sign-in
+leaves the review open without
 submitting; after a successful submit the submit button changes to
 **Responses submitted**, and a **View results** action appears after five seconds
 when a results handler is available. The modal remains open so suggested
 questions can still be reviewed or uploaded separately. Editing a draft after
 submission clears the success/results affordance until the reviewer submits
-again. The **Submit responses**
+again. The **Submit**
 and **Upload Questions** actions share the pile view’s submit styling. **Upload
 Questions** remains inside Suggested new questions and uses the normal question
 upload flow. Stopping alone never submits answers.

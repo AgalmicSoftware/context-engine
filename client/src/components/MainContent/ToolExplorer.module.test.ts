@@ -69,4 +69,14 @@ describe('ToolExplorer sparse card layout', () => {
     );
     expect(compact).not.toMatch(/\.expandedHeaderSession\s*{/);
   });
+
+  it('puts Add and View on the session row for Context on a wide screen only', () => {
+    const wide =
+      scss.match(/@media \(min-width: 992px\) {\n {2}\.expandedHeaderContext {([\s\S]*?)\n {2}}\n}/)?.[1] || '';
+    expect(wide).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\) auto;/);
+    expect(wide).toMatch(/\.expandedHeaderPrimaryControls\s*{\s*grid-column:\s*1;\s*flex-wrap:\s*nowrap;/);
+    expect(wide).toMatch(/\.expandedHeaderActions\s*{\s*grid-column:\s*2;\s*flex-wrap:\s*nowrap;/);
+    // Nothing else names the Context header, so narrower screens keep Add and View on their own row.
+    expect(scss.match(/\.expandedHeaderContext/g)).toHaveLength(1);
+  });
 });

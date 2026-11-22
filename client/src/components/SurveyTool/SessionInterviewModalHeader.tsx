@@ -16,6 +16,8 @@ type SessionInterviewModalHeaderProps = {
   statusLabel: string;
   statusTone: string;
   statusRef: React.RefObject<HTMLButtonElement>;
+  /** How long a long wait (drafting) has run, as m:ss; shown after the status. */
+  waitTime?: string;
 };
 
 /** Behind the interview's "?": the voice interviewer follows the language someone speaks. */
@@ -39,6 +41,7 @@ export default function SessionInterviewModalHeader({
   statusLabel,
   statusTone,
   statusRef,
+  waitTime = '',
 }: SessionInterviewModalHeaderProps) {
   const onBack = React.useContext(VoiceModeBackContext);
   return (
@@ -59,24 +62,33 @@ export default function SessionInterviewModalHeader({
           {guidance} {INTERVIEW_LANGUAGE_HINT}
         </UncontrolledTooltip>
         <SessionInterviewLanguageMarks />
-        <span
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          aria-label={`Interview status: ${statusLabel}`}
-          data-testid={E2E_TESTIDS.SESSION_INTERVIEW_STATUS}
-        >
-          <button
-            type="button"
-            id="ce-interview-status-help"
-            ref={statusRef}
-            className={styles.sessionInterviewStatusPill}
-            data-tone={statusTone}
-            onClick={idle ? readinessRetry : undefined}
+        <span className={styles.sessionInterviewStatusSlot}>
+          <span
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
             aria-label={`Interview status: ${statusLabel}`}
+            data-testid={E2E_TESTIDS.SESSION_INTERVIEW_STATUS}
           >
-            <span>{statusTone === 'busy' ? <InterviewBusyLabel label={statusLabel} /> : statusLabel}</span>
-          </button>
+            <button
+              type="button"
+              id="ce-interview-status-help"
+              ref={statusRef}
+              className={styles.sessionInterviewStatusPill}
+              data-tone={statusTone}
+              onClick={idle ? readinessRetry : undefined}
+              aria-label={`Interview status: ${statusLabel}`}
+            >
+              <span>{statusTone === 'busy' ? <InterviewBusyLabel label={statusLabel} /> : statusLabel}</span>
+            </button>
+          </span>
+          {/* Beside the status, not in it: never cut short with a long status, and seen, not heard, so screen
+              readers don't hear the status again each second. */}
+          {waitTime ? (
+            <span className={styles.sessionInterviewWaitTime} aria-hidden="true">
+              {waitTime}
+            </span>
+          ) : null}
         </span>
         <UncontrolledTooltip
           target="ce-interview-status-help"

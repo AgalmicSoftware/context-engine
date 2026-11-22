@@ -193,16 +193,18 @@ export const createSurveyQuestionsRuntimeStateRuntime = (
     const submittedSinceLastEdit = !!stateRef.current.submittedSinceLastEdit;
     const isSubmitting = !!stateRef.current.isSubmitting;
     const submitCountText = String(stateRef.current.submitCountText || '');
+    const submitError = String(stateRef.current.submissionError || '');
     const last = inst._lastPendingStats;
     if (
       last?.total === total &&
       last?.encrypted === encrypted &&
       !!last?.submittedSinceLastEdit === submittedSinceLastEdit &&
       !!last?.isSubmitting === isSubmitting &&
-      last?.submitCountText === submitCountText
+      last?.submitCountText === submitCountText &&
+      last?.submitError === submitError
     )
       return;
-    const next = { total, encrypted, submittedSinceLastEdit, isSubmitting, submitCountText };
+    const next = { total, encrypted, submittedSinceLastEdit, isSubmitting, submitCountText, submitError };
     inst._lastPendingStats = next;
     propsRef.current.onPendingStatsChange({ ...next });
   };

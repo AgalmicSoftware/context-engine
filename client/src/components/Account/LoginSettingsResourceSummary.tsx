@@ -76,8 +76,11 @@ export const LoginSettingsSupportedResourceCard = ({
       </div>
       <div className={styles.supportedResourceSessions}>
         <div className={styles.supportedResourceSessionsLabel}>Active session</div>
-        <div className={styles.supportedResourcePrimarySession}>
-          <LoginSettingsSessionPills sessions={[{ ...activeSession, detail: card.status.detail, isActive: true }]} />
+        {/* The session's name, then what its status means, as plain lines: a pill stretched round two lines of
+            text drew as a wide oval. */}
+        <div className={styles.supportedResourcePrimarySession} data-testid={`ce-settings-resource-${card.key}-active`}>
+          <span className={styles.supportedResourceActiveName}>{activeSession.label}</span>
+          {card.status.detail ? <span className={styles.supportedResourceDetail}>{card.status.detail}</span> : null}
         </div>
         {extraCount > 0 ? (
           <div className={styles.supportedResourceOtherSessions}>
