@@ -2049,10 +2049,7 @@ it('explains instead of publishing a masked comment when the answer lock is remo
 
 it('counts a Submit that saves several answers', () => {
   expect(
-    buildSurveyQuestionsSubmitFooterDisplayState({ isSubmitting: true, currentStep: 2, submitCountText: '12 of 40' })
-      .uploadStatusText,
+    buildSurveyQuestionsSubmitFooterDisplayState({ isSubmitting: true, submitCountText: '12 of 40' }).uploadStatusText,
   ).toBe('Saving 12 of 40');
-  expect(buildSurveyQuestionsSubmitFooterDisplayState({ isSubmitting: true, currentStep: 2 }).uploadStatusText).toBe(
-    'Saving',
-  );
+  expect(buildSurveyQuestionsSubmitFooterDisplayState({ isSubmitting: true }).uploadStatusText).toBe('Saving');
 });
