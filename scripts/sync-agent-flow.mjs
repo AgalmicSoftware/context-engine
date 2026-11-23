@@ -1,7 +1,8 @@
 // Writes the steps an AI follows to take part for a person (shared/agentParticipationGuide.mjs) into the
 // files an agent reads for instructions: llms.txt, the agent guide (/skill.md) and the Session Worker's
-// skill for its Agent HTTP API. The site's copied prompts and the MCP's instructions import the same steps. The pages themselves (client/index.html) only point to the guide: instructions in
-// every page's HTML end up in search results and read to an agent's harness as injected text.
+// skill for its Agent HTTP API. The site's copied prompts import the same steps. The pages themselves
+// (client/index.html) only point to the guide: instructions in every page's HTML end up in search results
+// and read to an agent's harness as injected text.
 // Run after editing the steps: node scripts/sync-agent-flow.mjs
 // scripts/public-discovery.test.js fails while the files differ from it.
 

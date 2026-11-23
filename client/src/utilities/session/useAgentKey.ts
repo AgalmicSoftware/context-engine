@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { AGENTS_SIGNED_OUT_EVENT, agentKeyErrorMessage, type AgentDelegateKey } from './agentHandoff';
 
-/** How long after each failed quiet try the next one waits; after the last, the prompt goes without a key. */
+/** How long after each failed quiet try the next one waits; after the last, the card says no key was added. */
 export const QUIET_RETRY_DELAYS_MS = [1500, 3000];
+/** A quiet try that has not answered by then has failed for good: the copy button stops turning. */
+export const QUIET_TRY_TIMEOUT_MS = 15000;
 
 const stillGood = (key: AgentDelegateKey | null): key is AgentDelegateKey =>
   Boolean(key) && Date.parse(key!.expiresAt) > Date.now();
@@ -35,9 +37,16 @@ export const useAgentKey = (
   const [waiting, setWaiting] = useState(false);
   const quietTries = useRef(0);
   const retryTimer = useRef<ReturnType<typeof setTimeout>>();
-  useEffect(() => () => clearTimeout(retryTimer.current), []);
   // Bumped by each request and each reset, so a key asked for before one is not kept after it.
   const round = useRef(0);
+  // Gone from the page, nothing is tried again and no answer still on its way is acted on.
+  useEffect(
+    () => () => {
+      round.current += 1;
+      clearTimeout(retryTimer.current);
+    },
+    [],
+  );
   const request = useRef(requestKey);
   request.current = requestKey;
 
@@ -46,15 +55,31 @@ export const useAgentKey = (
     const mine = round.current;
     setMaking(true);
     setError('');
+    let timedOut = false;
     try {
-      const made = await request.current({ prompt });
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const made = await Promise.race([
+        request.current({ prompt }),
+        // Asked for outright, the person may be at their passkey: only a quiet try is timed.
+        ...(prompt
+          ? []
+          : [
+              new Promise<never>((_, reject) => {
+                timer = setTimeout(() => {
+                  timedOut = true;
+                  reject(new Error('no answer in time'));
+                }, QUIET_TRY_TIMEOUT_MS);
+              }),
+            ]),
+      ]).finally(() => clearTimeout(timer));
       // One that has already ended is no key: asking again at once would only get the same.
       if (!stillGood(made)) throw new Error('the key had already ended');
       if (mine === round.current) setKey(made);
     } catch (err) {
       if (mine !== round.current) return;
       if (prompt) setError(agentKeyErrorMessage(err));
-      else if (quietTries.current < QUIET_RETRY_DELAYS_MS.length) {
+      // A try that got no answer is not tried again: the button would turn for as long again.
+      else if (!timedOut && quietTries.current < QUIET_RETRY_DELAYS_MS.length) {
         setWaiting(true);
         retryTimer.current = setTimeout(() => setWaiting(false), QUIET_RETRY_DELAYS_MS[quietTries.current]);
         quietTries.current += 1;
@@ -106,8 +131,10 @@ export const useAgentKey = (
     /** A key is on its way, or about to be asked for: a copy now would give the prompt without it. */
     making: wanted && (making || (!paused && !good && !quietFailed && !error)),
     error,
-    /** Every quiet try needed a sign-in: the prompt goes without a key, unless the caller asks outright. */
-    quietFailed: wanted && !paused && quietFailed && !good && !making && !error,
+    /** No key could be added, quietly or when asked for: the card says so and offers to add it. */
+    keyMissing: wanted && !paused && !good && !making && (quietFailed || Boolean(error)),
+    /** The session gave a key that cannot submit: the prompt holds none, and drafts. */
+    draftOnly: wanted && good && !key.submitAnswers,
     /** Asks for the key, signing in to the session if need be: for a person who came for it. */
     ask: () => void make(true),
     /** Lets a key be made again after Sign Agents Out. */

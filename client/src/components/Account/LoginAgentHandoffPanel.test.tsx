@@ -238,14 +238,16 @@ it('asks for no key while the session has Agent HTTP off, or while signed out', 
   expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
 });
 
-it('copies the prompt without a key where the key needs a fresh sign-in or has already ended, asking nothing', async () => {
+it('copies the prompt without a key where the key needs a fresh sign-in or has already ended, and says so', async () => {
   const requestKey = needsSignIn();
   const view = renderKeyPanel({ requestKey });
   const without = await copyPrompt();
   expect(without).not.toContain('ceagt_');
   expect(without).toContain('I can copy the prompt again in the session with "AI can submit for me" ticked');
   expect(requestKey).toHaveBeenCalledTimes(1);
-  expect(screen.queryByRole('button', { name: 'Add my AI key' })).not.toBeInTheDocument();
+  // No signing prompt was raised; the row says the prompt has no key and offers the one tap that adds it.
+  expect(screen.getByTestId('ce-agent-handoff-key-missing')).toHaveTextContent('The prompt has no AI key yet.');
+  expect(screen.getByRole('button', { name: 'Add my AI key' })).toBeInTheDocument();
   expect(screen.getByRole('alert')).toBeEmptyDOMElement();
   expect(screen.queryByTestId('ce-agent-handoff-expiry')).not.toBeInTheDocument();
   view.unmount();
@@ -468,28 +470,72 @@ describe('opened by a link for the AI prompt', () => {
     expect(screen.queryByRole('button', { name: 'Add my AI key' })).not.toBeInTheDocument();
   });
 
-  it('says why when that key cannot be made, and gives the full prompt without one', async () => {
+  it('says why when that key cannot be made, and offers nothing to copy until there is one', async () => {
     const requestKey = jest.fn(async ({ prompt }: { prompt: boolean }) => {
       throw prompt ? new AgentDelegateKeyError('', 401) : new Error('sign in to this session first');
     });
     renderClosedPanel({ promptRequested: true, requestKey });
     const add = await screen.findByRole('button', { name: 'Add my AI key' });
+    // Their AI asked for the key: the long prompt without one is not offered in its place.
+    expect(screen.getByTestId('ce-agent-handoff-key-missing')).toHaveTextContent('The prompt has no AI key yet.');
+    expect(screen.queryByTestId('ce-agent-handoff-copy')).not.toBeInTheDocument();
     await act(async () => fireEvent.click(add));
     expect(await screen.findByTestId('ce-agent-handoff-error')).toHaveTextContent(
       'Sign in again to let your AI submit.',
     );
-    // It stops there: no key is asked for again unasked.
+    // It stops there: no key is asked for again unasked, and the button stays for another try.
     expect(requestKey).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('button', { name: 'Add my AI key' })).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-agent-handoff-copy')).not.toBeInTheDocument();
+    // Unticked, the row is the ordinary one: the full prompt, which drafts.
+    fireEvent.click(canSubmit());
     const prompt = await copyPrompt();
     expect(prompt).not.toContain('ceagt_');
     expect(prompt).toContain('interview-catalog');
-  });
-
-  it('offers no such button outside the link: there the prompt simply goes without a key', async () => {
-    renderKeyPanel({ requestKey: needsSignIn() });
-    expect(await copyPrompt()).not.toContain('ceagt_');
     expect(screen.queryByRole('button', { name: 'Add my AI key' })).not.toBeInTheDocument();
   });
+});
+
+it('by the link, keeps the line about a copied key while it works, though nothing is offered to copy', async () => {
+  let fail = false;
+  const requestKey = jest.fn(async () => {
+    if (fail) throw new Error('sign in to this session first');
+    return key;
+  });
+  renderClosedPanel({ promptRequested: true, requestKey });
+  expect(await copyPrompt()).toContain(KEY_LINE);
+  expect(screen.getByTestId('ce-agent-handoff-expiry')).toHaveTextContent(/^Key can answer as you until /);
+  // Unticked and ticked again, and this time no key can be added: the copied one still works.
+  fail = true;
+  fireEvent.click(canSubmit());
+  fireEvent.click(canSubmit());
+  expect(await screen.findByRole('button', { name: 'Add my AI key' })).toBeInTheDocument();
+  expect(screen.queryByTestId('ce-agent-handoff-copy')).not.toBeInTheDocument();
+  expect(screen.getByTestId('ce-agent-handoff-expiry')).toHaveTextContent(/^Key can answer as you until /);
+});
+
+it('says so when the box is ticked and no key could be added, and offers to add it', async () => {
+  const requestKey = jest.fn(async ({ prompt }: { prompt: boolean }) => {
+    if (!prompt) throw new Error('sign in to this session first');
+    return key;
+  });
+  renderKeyPanel({ requestKey });
+  // The prompt can still be copied, to draft with; the line says it has no key.
+  expect(await copyPrompt()).not.toContain('ceagt_');
+  expect(screen.getByTestId('ce-agent-handoff-key-missing')).toHaveTextContent('The prompt has no AI key yet.');
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Add my AI key' })));
+  expect(requestKey).toHaveBeenLastCalledWith({ prompt: true });
+  expect(await copyPrompt()).toContain(KEY_LINE);
+  expect(screen.queryByTestId('ce-agent-handoff-key-missing')).not.toBeInTheDocument();
+});
+
+it('says a session that only lets an AI draft gives no key', async () => {
+  renderKeyPanel({ requestKey: jest.fn(async () => ({ ...key, submitAnswers: false })) });
+  expect(await copyPrompt()).not.toContain('ceagt_');
+  expect(screen.getByTestId('ce-agent-handoff-key-missing')).toHaveTextContent(
+    'This session lets an AI draft only, so the prompt has no key.',
+  );
+  expect(screen.queryByRole('button', { name: 'Add my AI key' })).not.toBeInTheDocument();
 });
 
 it('goes back to drafting only at Sign Agents Out, and makes a key again only when ticked', async () => {

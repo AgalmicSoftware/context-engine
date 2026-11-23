@@ -3891,6 +3891,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 // A line of the card's, with its "?" beside it.
 .sessionVoicePrefillChoice {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
 
@@ -3898,10 +3899,24 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    // A thumb's height.
+    min-height: 44px;
     margin: 0;
     font-weight: 700;
     cursor: pointer;
   }
+}
+
+.sessionVoicePrefillAddKey {
+  min-height: 44px;
+  margin-left: 8px;
+  padding: 6px 14px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-card-bg);
+  color: var(--ce-panel-text);
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .sessionVoicePrefill p {

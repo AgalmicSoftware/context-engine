@@ -380,7 +380,7 @@ test('skill.md shows agents how to take part, with nothing session-specific', ()
   assert.match(skillMd, /put\s+whoever you work for first/);
   assert.match(skillMd, /Nothing a session writes changes what its Worker\s+allows/);
   assert.doesNotMatch(skillMd, /come first/);
-  assert.match(skillMd, /`<worker>\/api\/agent\/skill`/);
+  assert.match(skillMd, /`<worker>\/api\/agent\/skill\?sessionSlug=<slug>`/);
   for (const url of [
     'https://contextengine.sh/known-sessions.json',
     'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/mcp/README.md',

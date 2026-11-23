@@ -2740,6 +2740,8 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    // A thumb's height.
+    min-height: 44px;
     margin: 0;
     font-weight: 650;
     cursor: pointer;

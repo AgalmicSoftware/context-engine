@@ -112,6 +112,7 @@ const PromptCopy = ({
   keyOnly: boolean;
   /** While set, the button turns and nothing is copied: a copy then would give the prompt without the key. */
   holdCopy: string;
+  /** The prompt was copied: by the button, or by selecting it in the opened box. */
   onCopied: () => void;
   /** The line about the key, under the button. */
   children: React.ReactNode;
@@ -145,13 +146,16 @@ const PromptCopy = ({
       </p>
     );
   }
-  const copyPrompt = async (prompt: string) => {
-    setCopied(false);
-    if (!(await copyText(prompt))) return false;
+  const noteCopied = () => {
     setCopied(true);
     onCopied();
     clearTimeout(copiedTimer.current);
     copiedTimer.current = setTimeout(() => setCopied(false), 1800);
+  };
+  const copyPrompt = async (prompt: string) => {
+    setCopied(false);
+    if (!(await copyText(prompt))) return false;
+    noteCopied();
     return true;
   };
   return (
@@ -163,6 +167,7 @@ const PromptCopy = ({
       promptCopied={copied}
       onCopyPrompt={copyPrompt}
       holdCopy={holdCopy}
+      onCopiedByHand={noteCopied}
       centered={keyOnly}
       testIds={TEST_IDS}
     >
@@ -222,6 +227,16 @@ const LoginAgentHandoffPanel = ({
   const expiry = agentKey.copiedUntil
     ? new Date(agentKey.copiedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : '';
+  // The line about a key that was copied. It shows while that key works, with the copy button or without it.
+  const keyLine = expiry ? (
+    <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-expiry">
+      Key can answer as you until {expiry}
+      <Help id="ce-agent-handoff-expiry-about" placement="bottom">
+        The prompt holds a key to {sessionName} only. Paste it only into your own AI: a chat app keeps what you paste in
+        its history. The key ends when your sign-in ends or when you sign agents out.
+      </Help>
+    </p>
+  ) : null;
   return (
     <section
       className={styles.agentHandoffPanel}
@@ -282,8 +297,10 @@ const LoginAgentHandoffPanel = ({
             </Help>
           </div>
         ) : null}
-        {/* Mounted only once opened: its check may ask to sign in to the session, which only an open box should. */}
-        {open ? (
+        {/* Mounted only once opened: its check may ask to sign in to the session, which only an open box should.
+            Someone who came by the link came for the key: until there is one, nothing is offered to copy, since
+            the long prompt without a key is not what their AI asked for. */}
+        {open && !(promptRequested && canSubmit && agentKey.keyMissing) ? (
           <PromptCopy
             sessionSlug={sessionSlug}
             sessionUrl={sessionUrl}
@@ -301,28 +318,10 @@ const LoginAgentHandoffPanel = ({
               setCopyCount((count) => count + 1);
             }}
           >
-            {expiry ? (
-              <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-expiry">
-                Key can answer as you until {expiry}
-                <Help id="ce-agent-handoff-expiry-about" placement="bottom">
-                  The prompt holds a key to {sessionName} only. Paste it only into your own AI: a chat app keeps what
-                  you paste in its history. The key ends when your sign-in ends or when you sign agents out.
-                </Help>
-              </p>
-            ) : null}
+            {keyLine}
           </PromptCopy>
-        ) : null}
-        {/* Someone who came by the link came for the key. Where it needs a fresh sign-in to the session, that
-            is theirs to start: a link alone never raises a signing prompt. */}
-        {promptRequested && canSubmit && agentKey.quietFailed ? (
-          <button
-            type="button"
-            className={styles.agentHandoffButton}
-            onClick={agentKey.ask}
-            data-testid="ce-agent-handoff-add-key"
-          >
-            Add my AI key
-          </button>
+        ) : open ? (
+          keyLine
         ) : null}
         {/* Live regions stay mounted, so screen readers hear their first message too. */}
         <div role="alert">
@@ -332,6 +331,32 @@ const LoginAgentHandoffPanel = ({
             </div>
           ) : null}
         </div>
+        {/* Ticked, but the prompt has no key: said, so a copy without one is never a surprise. Where the key
+            needs a fresh sign-in to the session, that is the person's to start: a link or a tick alone never
+            raises a signing prompt. */}
+        <div role="status">
+          {canSubmit && agentKey.keyMissing && !agentKey.error ? (
+            <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-key-missing">
+              The prompt has no AI key yet.
+            </p>
+          ) : null}
+          {canSubmit && agentKey.draftOnly ? (
+            <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-key-missing">
+              This session lets an AI draft only, so the prompt has no key.
+            </p>
+          ) : null}
+        </div>
+        {/* Beside the message, not read out with it. */}
+        {canSubmit && agentKey.keyMissing ? (
+          <button
+            type="button"
+            className={styles.agentHandoffButton}
+            onClick={agentKey.ask}
+            data-testid="ce-agent-handoff-add-key"
+          >
+            Add my AI key
+          </button>
+        ) : null}
         {/* Read out only: on screen the button itself turns to "Copied". */}
         <div role="status" className={styles.srOnly}>
           {copyStatus ? <div key={copyCount}>{copyStatus}</div> : null}

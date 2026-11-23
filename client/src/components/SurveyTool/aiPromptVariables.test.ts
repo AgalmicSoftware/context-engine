@@ -48,7 +48,7 @@ it('shows a stand-in in place of every value, and no key, ticket or address', ()
   expect(shown).toContain(
     'The key is <AIKey>; it works only for the session with slug <SessionSlug>, at <WorkerAddress>, until <KeyEnds>.',
   );
-  expect(shown).toContain('Follow <WorkerAddress>/api/agent/skill.');
+  expect(shown).toContain('Read <WorkerAddress>/api/agent/skill?sessionSlug=demo first and follow it.');
   expect(shown).toContain('It is only for the session <SessionName> at <SessionLink>.');
   expect(shown).toContain('To draft, fetch this URL with a plain HTTP GET:\n<QuestionsAddress>\n');
   expect(shown).toContain('Unanswered question IDs, newest first: <UnansweredQuestions>');

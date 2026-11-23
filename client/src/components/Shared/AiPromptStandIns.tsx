@@ -1,5 +1,9 @@
 import { findPromptPlaceholders, splitPromptByVariables, type PromptVariable } from './aiPromptPieces';
 
+/** Marks each stand-in drawn, for the box that asks whether a selection holds one. */
+export const STAND_IN_ATTRIBUTE = 'data-prompt-stand-in';
+const MARK = { [STAND_IN_ATTRIBUTE]: '' };
+
 type Props = {
   prompt: string;
   /** The values to stand in for. Left out: the template's own `<Name>` and `{{name}}` placeholders. */
@@ -17,7 +21,9 @@ export function PromptStandInList({ prompt, variables = findPromptPlaceholders(p
       {standIns.map((standIn, index) => (
         <span key={standIn}>
           {index ? ', ' : ''}
-          <span className={className}>{standIn}</span>
+          <span className={className} {...MARK}>
+            {standIn}
+          </span>
         </span>
       ))}
     </>
@@ -30,7 +36,7 @@ export function PromptText({ prompt, variables = findPromptPlaceholders(prompt),
     <>
       {splitPromptByVariables(prompt, variables).map((piece, index) =>
         piece.variable ? (
-          <span key={index} className={className}>
+          <span key={index} className={className} {...MARK}>
             {piece.text}
           </span>
         ) : (

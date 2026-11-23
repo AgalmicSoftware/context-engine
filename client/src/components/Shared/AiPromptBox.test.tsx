@@ -81,3 +81,40 @@ it('takes a placeholder described in words only where asked to', () => {
     '<Branch>',
   ]);
 });
+
+const select = (node: Node) => {
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.selectAllChildren(node);
+};
+
+it('copies the prompt itself when a selection that holds a stand-in is copied by hand', () => {
+  const variables = [{ name: 'Key', value: 'sk-secret' }];
+  const { rerender } = render(<AiPromptBox testId="box" prompt="Use sk-secret now." variables={variables} />);
+  const box = screen.getByTestId('box');
+  const setData = jest.fn();
+  // What was selected holds the stand-in, which no AI can use: the page's own copy takes its place.
+  select(box);
+  expect(fireEvent.copy(box, { clipboardData: { setData } })).toBe(false);
+  expect(setData).toHaveBeenCalledWith('text/plain', 'Use sk-secret now.');
+  // A few plain words are the browser's to copy: no key lands on a clipboard for them.
+  setData.mockClear();
+  select(screen.getByText('AI Prompt'));
+  expect(fireEvent.copy(box, { clipboardData: { setData } })).toBe(true);
+  expect(setData).not.toHaveBeenCalled();
+  // Told to wait, the clipboard is emptied rather than left holding an earlier prompt.
+  rerender(<AiPromptBox testId="box" prompt="Use sk-secret now." variables={variables} handCopy={() => null} />);
+  select(box);
+  expect(fireEvent.copy(box, { clipboardData: { setData } })).toBe(false);
+  expect(setData).toHaveBeenCalledWith('text/plain', '');
+});
+
+it('leaves a template’s own text to the browser: its placeholders are what it says', () => {
+  const template = 'Rank {{list}} for <Users>.';
+  render(<AiPromptBox testId="box" prompt={template} variables={findPromptPlaceholders(template)} />);
+  const box = screen.getByTestId('box');
+  const setData = jest.fn();
+  select(box);
+  expect(fireEvent.copy(box, { clipboardData: { setData } })).toBe(true);
+  expect(setData).not.toHaveBeenCalled();
+});

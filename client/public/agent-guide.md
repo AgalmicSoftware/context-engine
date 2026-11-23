@@ -461,7 +461,7 @@ Encode exact JSON as unpadded UTF-8 base64url: catalog.reviewUrl + #prefill=PACK
 
 ## On their behalf: the Agent HTTP API
 
-Follow `<worker>/api/agent/skill`. Send the key, from the prompt they gave you
+Follow `<worker>/api/agent/skill?sessionSlug=<slug>`. Send the key, from the prompt they gave you
 or from `CE_AGENT_TOKEN`, only as the header `Authorization: Bearer <key>` to
 `<worker>`, and never repeat or print it, or put it in files or URLs. Show the person
 your draft answers and submit only the ones they approve, unless they tell
