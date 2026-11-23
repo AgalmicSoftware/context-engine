@@ -239,6 +239,87 @@ The embedded wallet requires WebAuthn PRF support. If the browser,
 authenticator, or platform does not return PRF output, wallet creation and
 unlock fail closed.
 
+### A device whose own passkeys have no PRF
+
+Create asks for a passkey kept on the device (`authenticatorAttachment:
+'platform'`). Windows Hello gives such a passkey PRF only with Chrome or Edge 147
+or later (Chromium changes 7569106 and 7600513) on a Windows 11 whose WebAuthn
+API is version 8 or later; third-party reports date that to the February 2026
+update of 24H2 and 25H2. On Windows 10, an older Windows 11 or an older browser,
+Windows Hello saves the passkey and the site cannot use it. A passkey app
+without PRF, set as a phone's passkey provider, ends the same way.
+
+After such a Create, the status under the buttons offers "**Scan QR with phone**
+to login", then a login file (below), then, where the browser holds unsaved
+answers, "**Copy this link** to paste your responses on a different device."
+The first button runs Create again with `authenticatorAttachment: 'cross-platform'`
+and `hints: ['hybrid']`, so the browser shows a QR code to scan with a phone.
+Everything else in the request, the PRF salt included, is unchanged, and the
+wallet is derived the same way. The passkey then lives on the phone: each later
+sign-in on that computer asks for the phone again. A try that fails, or a prompt
+that is closed, returns to the same message, so the offer stays.
+
+- The passkey the failed Create saved stays on the device. The site cannot remove
+  it (Chrome does not pass the WebAuthn Signal API on to Windows Hello by
+  default); Login offers it and fails with it. It can be deleted in the device's
+  passkey settings.
+- A phone may return no PRF output when the passkey is made, and the site then
+  asks for it once more: a second prompt on the phone.
+- A phone's passkey may return a different PRF output through a QR code than on
+  the phone itself (reported for some iPhone versions). The account made through
+  the QR code is then reached only that way, from a computer; Login on the phone
+  itself would open a different, empty account.
+- A security key is not offered. The browser's sheet may list one, but later
+  sign-ins name the saved passkey with the `internal` and `hybrid` transports
+  only, so a key may not be asked for.
+- The copy line below stays as the last resort.
+
+### Login file: sign-in without a passkey
+
+For someone whose device cannot use a passkey here at all. Under the log-in
+window's passkey buttons, **Other options** opens two buttons: **Create login
+file** and **Login with file**.
+
+After any sign-in that failed there (a passkey without PRF, a prompt that was
+closed or timed out, a browser without passkeys, a file that is not a login
+file), the status box is itself the list of other ways in, so "Other options" is
+not shown beside it. The box adds "**Create login file** or **Login with file**
+to login without a passkey". After a Create whose passkey has no PRF that sits
+between the phone and the copy link, an "or" between the three: "Scan QR with
+phone to login", the login file, "Copy this link to paste your responses on a
+different device." In a browser without passkeys, the link to another browser
+stays first.
+
+- The file (`context-engine-login-<6 hex>.json`) holds a standard 12-word
+  recovery phrase; the account is that phrase's first Ethereum address
+  (`m/44'/60'/0'/0/0`). It is made in the browser and sent nowhere. Whoever holds
+  the file holds the account, and a lost file cannot be replaced. It has no
+  password.
+- Creating never signs in by itself. It saves the file, and one notice then
+  stands in place of every other choice (the failed passkey's box and "Other
+  options"): Back in its top-left corner, what was saved, and **Login with
+  file**. The person signs in by choosing the file, which shows that they have
+  it. Back returns to the choices. The 12 words alone, in a text file, sign in
+  too.
+- The account is a `passkey_eoa` account like any other from there on: the same
+  provider, session, signatures and transactions, none of which asks again while
+  the file is loaded. No Worker or contract knows the difference. It is a
+  different account from any passkey's.
+- The file stays loaded for 6 hours from the moment it is chosen, across reloads;
+  use of the page does not extend that. In that time the key rests in the
+  wallet's IndexedDB record (`keyMode: 'login-file'`), encrypted with AES-GCM
+  under a non-extractable WebCrypto key kept in the same record. Page scripts
+  cannot read it as text. It is no guard against a script running in the site's
+  origin while it lasts, nor against a copy of the browser's profile.
+- After 6 hours, and on Disconnect, the key is wiped from the record: by a timer
+  on an open page, and otherwise at the next page load or signature. What is left
+  names the account and holds no key, so another tab on that account is told
+  "Your login file is needed again." rather than asked for a passkey. A browser
+  that never opens the site again keeps the sealed key until it does.
+- A passkey Login or Create replaces a login file's record, and the reverse. An
+  `encrypted-private-key` wallet's record is never written over. A file that is
+  not a login file leaves the signed-in account as it was.
+
 Allowed fallback behavior:
 
 - ask the user to use a PRF-capable passkey/browser
@@ -256,9 +337,10 @@ Forbidden fallback behavior:
 
 A failed sign-in changes nothing about sign-in itself. When the passkey itself is
 the problem and the browser holds unsaved answers (typed on the page, or drafted
-in an interview), the status under the buttons adds **Copy my answers link** and one
-line: "Copy this and open it on your phone to sign in and submit." (In a browser
-without passkeys the line names Safari or Chrome instead.)
+in an interview), the status under the buttons adds one sentence that starts with a
+**Copy this link** button: "Copy this link and open it on your phone to recover and
+submit responses." (In a browser without passkeys it names Safari or Chrome
+instead.) A copy that worked puts a check on the button.
 
 A passkey problem is: no passkeys in this browser, no PRF support, or any other
 create or unlock the device or browser refused. Errors fixed in the same browser

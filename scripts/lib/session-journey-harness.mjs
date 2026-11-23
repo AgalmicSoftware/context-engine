@@ -148,6 +148,27 @@ export const passkeyFixture = (name) => {
   return { wallet, seed: passkeyWallets.toPasskeyEoaSeedRecord({ credentialId, address: wallet.address }) };
 };
 
+// A person with no passkey: a login file as the site writes one, and the account its 12 words open. `seed` is
+// empty, so the browser is given no stand-in passkey at all.
+export const loginFileFixture = () => {
+  const wallet = ethers.Wallet.createRandom();
+  const text = JSON.stringify({ type: 'context-engine-login-file', version: 1, address: wallet.address, recoveryPhrase: wallet.mnemonic.phrase });
+  return { wallet, seed: null, file: { name: 'context-engine-login.json', mimeType: 'application/json', buffer: Buffer.from(text) } };
+};
+
+// Chooses the person's login file in the log-in dialog, opening it first if need be, and waits to be signed in.
+export const signInWithLoginFile = async (page, { wallet, file }) => {
+  if (!(await page.getByTestId('ce-passkey-wallet-create').isVisible())) await openLoginDialog(page);
+  const open = page.getByTestId('ce-login-file-open');
+  if (await open.isVisible()) await open.click();
+  await page.getByTestId('ce-login-file-choose').waitFor();
+  await page.getByTestId('ce-login-file-input').setInputFiles(file);
+  const display = page.getByTestId('ce-wallet-display');
+  await display.waitFor().catch(() => assert.fail('The login file did not sign the person in'));
+  assert.equal((await display.getAttribute('data-ce-wallet-address')).toLowerCase(), wallet.address.toLowerCase());
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+};
+
 export const createJourneySession = ({ baseUrl, slug }) => {
   const appOrigin = new URL(baseUrl).origin;
   const admin = passkeyFixture('admin');

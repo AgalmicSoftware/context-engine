@@ -328,6 +328,18 @@ function SessionInterviewDraftCardContent({
   const onCommentsChange = (additionalComments: string) => {
     onEdit(markEdit('additionalComments', additionalComments));
   };
+  // The slider's X: this draft then sets neither rating.
+  const clearRatings = () => {
+    setSliderOpen(false);
+    setSliderMode('conviction');
+    // Clearing a rating the AI proposed is an edit; clearing one it left blank is not.
+    const fields = new Set<EditableField>((edited.userEditedFields || []) as EditableField[]);
+    for (const field of ['conviction', 'importance'] as const) {
+      if (valuesEqual(undefined, startingValue(field), field)) fields.delete(field);
+      else fields.add(field);
+    }
+    onEdit({ conviction: undefined, importance: undefined, userEditedFields: [...fields] });
+  };
   return (
     <article
       className={`${styles.draftCard} ${question?.type === 'quadratic' ? styles.quadraticDraftCard : ''} ${selected ? '' : styles.draftCardRemoved}`}
@@ -430,6 +442,7 @@ function SessionInterviewDraftCardContent({
                 setSliderOpen(true);
               }}
               onChange={(value) => onEdit(markEdit(sliderMode, value))}
+              onClear={clearRatings}
             />
             <QuadraticScrollControlsSlot />
             <div className={styles.footerIconCluster}>

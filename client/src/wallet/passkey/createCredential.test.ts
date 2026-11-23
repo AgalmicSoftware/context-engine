@@ -89,6 +89,47 @@ describe('createPasskeyCredential', () => {
     expect(createOptions(credentials)).not.toHaveProperty('excludeCredentials');
   });
 
+  it('asks for a passkey on this device unless told to use another one', async () => {
+    const credentials = makeCredentials(async () => prfCredential);
+
+    await createPasskeyCredential({ config, salt: new Uint8Array(32), credentials });
+    await createPasskeyCredential({ config, salt: new Uint8Array(32), credentials, anotherDevice: true });
+
+    const [here, elsewhere] = [createOptions(credentials, 0), createOptions(credentials, 1)];
+    expect(here.authenticatorSelection?.authenticatorAttachment).toBe('platform');
+    expect(here).not.toHaveProperty('hints');
+    expect(elsewhere.authenticatorSelection?.authenticatorAttachment).toBe('cross-platform');
+    expect(elsewhere).toHaveProperty('hints', ['hybrid']);
+    // All else is asked for alike, the PRF salt included.
+    const rest = ({
+      authenticatorSelection,
+      challenge: _c,
+      user: _u,
+      ...options
+    }: PublicKeyCredentialCreationOptions) => ({
+      ...options,
+      authenticatorSelection: { ...authenticatorSelection, authenticatorAttachment: undefined },
+      hints: undefined,
+    });
+    expect(rest(elsewhere)).toEqual(rest(here));
+  });
+
+  it('refuses a passkey that does not report PRF', async () => {
+    const create = (results: unknown) =>
+      createPasskeyCredential({
+        config,
+        salt: new Uint8Array(32),
+        credentials: makeCredentials(
+          async () =>
+            ({ rawId: new Uint8Array([1]).buffer, getClientExtensionResults: () => results }) as PublicKeyCredential,
+        ),
+      });
+
+    for (const results of [{ prf: { enabled: false } }, { prf: {} }, {}]) {
+      await expect(create(results)).rejects.toThrow('This passkey does not advertise WebAuthn PRF support.');
+    }
+  });
+
   it('excludes saved passkeys and explains when the device already holds one', async () => {
     const credentials = makeCredentials(async () => {
       throw Object.assign(new Error('credential excluded'), { name: 'InvalidStateError' });

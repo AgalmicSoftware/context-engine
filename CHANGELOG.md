@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.29] - 2026-11-22
+
+Sign-in with a login file where no passkey works, a phone for a computer whose passkey can't be used here, an X that closes the conviction slider, and simpler atlas cards. Site only: the Session Worker's code is unchanged and MCP stays 0.9.2. Nothing a session already stores is changed.
+
+### Site — available when the site deploys
+
+- **Sign in with a login file where no passkey works.** Under the log-in window's passkey buttons, "Other options" opens "Create login file" and "Login with file". After any sign-in that failed, the message itself offers both, in place of "Other options". Creating saves the file and shows one notice, in place of the other choices, that says how to login with it, with Back in its corner. The file holds a 12-word recovery phrase made in the browser and sent nowhere; choosing it signs in to the same account on any device, and everything a passkey account can do works the same, with no prompt per action. The file stays loaded for 6 hours, across reloads; then, and on Disconnect, its key is wiped from the browser and the file is asked for again. Anyone who has the file can sign in as its owner, and a lost file cannot be replaced.
+- **A computer whose own passkey can't be used here can sign in with a phone.** Windows Hello passkeys work on this site only on an up-to-date Windows 11 with a recent Chrome or Edge; elsewhere Create saved a passkey and then failed with "This passkey can't be used here." Under that message the log-in window now gives three ways out, an "or" between them: "Scan QR with phone to login" (the computer shows a QR code to scan, the passkey is saved on the phone, and the phone signs that computer in, then and at later sign-ins there), "Create login file or Login with file to login without a passkey", and, where answers are unsaved, "Copy this link to paste your responses on a different device". Closing the phone's prompt returns to the same message. Existing passkeys and accounts are unchanged.
+- **An X closes the conviction and importance slider.** Once the bullhorn opens a question's conviction and importance slider, a small X beside it closes the slider and undoes both ratings: a question never submitted is left with neither, so the bullhorn loses its glow, the saved draft drops them and Submit sends neither, while a submitted question gets back the ratings it was submitted with. It works in the pile, All questions, the one-question page and the interview's review cards. Before, nothing closed the slider or undid what it set.
+- **A topic's only question shows its AI summary above its card.** In a session atlas, a question that is the only one in its topic has no window of its own. Its topic's window now lays out the question's AI summary as it does a topic's: the summary first, then each category with how many participants fall in it. Cards in topics with more questions stay bare.
+- **Atlas question cards show the question alone again.** In a session atlas topic, a question's card no longer carries the AI's summary of its answers and their categories, added in 0.9.26. A question's own atlas window still opens with that summary.
+- **"Where people split" is gone from atlas nodes.** A session atlas node no longer repeats its positions in two columns, one for each end of its chart's first axis, added in 0.9.19. Each position still shows once in the node's list, with how many hold it, and the atlas list still sorts by split.
+- **Deploy helper.** It deploys the 0.9.28 Worker bundles. A Worker updated from the site gets this release's.
+
 ## [0.9.28] - 2026-11-22
 
 Answers that were stored no longer look unsent, every Submit shows its count and how long it runs, unsaved answers can be copied to another device when sign-in fails, pages stop waiting on another tab's cache, and more on the site. The Session Worker's code is unchanged and MCP stays 0.9.2. Nothing a session already stores is changed.

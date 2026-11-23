@@ -318,49 +318,25 @@ it('names a question\u2019s circle by the start of its prompt, cut at a word', (
   expect(lone.questions).toHaveLength(1);
 });
 
-it('gathers a node\u2019s positions at the two ends of its first axis, only when both ends hold one', () => {
-  const split = (positions: DebateAtlasBuild['branches'][0]['positions'], withCompass = true) =>
-    buildDebateAtlasTree({
-      ...build,
-      branches: [{ ...build.branches[0], compass: withCompass ? compass : null, positions, answered: 10, topics: [] }],
-    })[0].split;
-  const both = split([
-    { label: 'Wait', summary: 'Care first.', participantCount: 4, x: 0.1, y: 0.5 },
-    { label: 'Go', summary: 'Move now.', participantCount: 5, x: 0.9, y: 0.5 },
-    { label: 'Depends', participantCount: 1, x: 0.5, y: 0.5 },
-    { label: 'Unplaced', participantCount: 1 },
-  ]);
-  // Under the axis's own end labels, never "For" and "Against"; the middle and the unplaced join neither.
-  expect(both).toEqual({
-    axis: 'Pace',
-    left: {
-      label: 'Slow',
-      positions: [
-        expect.objectContaining({ label: 'Wait', comment: 'Care first.', participantCount: 4, participantTotal: 10 }),
-      ],
-    },
-    right: {
-      label: 'Fast',
-      positions: [
-        expect.objectContaining({ label: 'Go', comment: 'Move now.', participantCount: 5, participantTotal: 10 }),
-      ],
-    },
+it('gives a node no split, even with positions at both ends of its first axis', () => {
+  const [branch] = buildDebateAtlasTree({
+    ...build,
+    branches: [
+      {
+        ...build.branches[0],
+        compass,
+        answered: 10,
+        topics: [],
+        positions: [
+          { label: 'Wait', summary: 'Care first.', participantCount: 4, x: 0.1, y: 0.5 },
+          { label: 'Go', summary: 'Move now.', participantCount: 5, x: 0.9, y: 0.5 },
+        ],
+      },
+    ],
   });
-  // One end only, or no compass: no section.
-  expect(split([{ label: 'Go', participantCount: 5, x: 0.9, y: 0.5 }])).toBeUndefined();
-  expect(
-    split(
-      [
-        { label: 'Wait', participantCount: 4, x: 0.1, y: 0.5 },
-        { label: 'Go', participantCount: 5, x: 0.9, y: 0.5 },
-      ],
-      false,
-    ),
-  ).toBeUndefined();
-  // The fixture's own nodes: the branch has one position, the topic two at the same end.
-  const [branch] = buildDebateAtlasTree(build);
-  expect(branch.split).toBeUndefined();
-  expect(branch.children?.[0].split).toBeUndefined();
+  // Each position still shows once, in the node's list of positions.
+  expect(branch).not.toHaveProperty('split');
+  expect(branch.comments?.filter((entry) => entry.label).map((entry) => entry.label)).toEqual(['Wait', 'Go']);
 });
 
 it('leads a question circle with the saved analysis, and leaves a build without one as it was', () => {
@@ -418,7 +394,7 @@ it('leads a question circle with the saved analysis, and leaves a build without 
   // An analysis without a summary is none.
   expect(second.comments).toBeUndefined();
   expect(openness.questions?.[1].analysis).toBeUndefined();
-  // A lone question has no circle of its own: its card in the topic carries the analysis.
+  // A lone question has no circle of its own: its topic shows the analysis above its card.
   expect(lone.children).toBeUndefined();
   expect(lone.questions?.[0].analysis).toMatchObject({
     summary: 'Most want contracts published; a few fear the cost.',

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
 import {
   clearAgentClientLoginEnvelope,
@@ -54,6 +54,8 @@ jest.mock('../../wallet/passkeyWallet.js', () => ({
   restorePasskeyWalletSession: jest.fn(async () => null),
   createPasskeyWallet: jest.fn(async () => '0x1111111111111111111111111111111111111111'),
   unlockPasskeyWallet: jest.fn(async () => '0x1111111111111111111111111111111111111111'),
+  signInWithLoginFile: jest.fn(async () => '0x2222222222222222222222222222222222222222'),
+  createLoginFile: jest.fn(() => ({ name: 'context-engine-login-ab12cd.json', text: '{}' })),
   logoutPasskeyWallet: jest.fn(),
 }));
 
@@ -927,10 +929,235 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       const status = screen.getByTestId('ce-passkey-wallet-status');
       expect(status).toHaveTextContent(`${word} failed: This passkey can't be used here.`);
       expect(status).not.toHaveTextContent('WebAuthn');
-      expect(await screen.findByRole('button', { name: 'Copy my answers link' })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Copy this link' })).toBeInTheDocument();
+      // Only a Create can be made again on a phone; a Login's passkey already exists.
+      expect(screen.queryAllByRole('button', { name: 'Scan QR with phone' })).toHaveLength(word === 'Create' ? 1 : 0);
       sessionStorage.clear();
     },
   );
+
+  it('makes the passkey on a phone after a Create without PRF, and signs in', async () => {
+    mockedPasskeyWallet.createPasskeyWallet.mockRejectedValueOnce(
+      new Error('This passkey does not advertise WebAuthn PRF support.'),
+    );
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
+    await subject.handlePasskeyWalletCreate();
+    expect(mockedPasskeyWallet.createPasskeyWallet).toHaveBeenLastCalledWith();
+    const view = render(subject.getModalDisplay());
+    // The offer comes before the copy line, which is the last resort.
+    expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
+      "Create failed: This passkey can't be used here.Scan QR with phone to login",
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Scan QR with phone' }));
+    await act(async () => {});
+    expect(mockedPasskeyWallet.createPasskeyWallet).toHaveBeenLastCalledWith({ anotherDevice: true });
+    expect(subject.props.changeAccount).toHaveBeenCalledWith(
+      expect.objectContaining({ account: '0x1111111111111111111111111111111111111111', provider: 'passkey_eoa' }),
+    );
+    view.rerender(subject.getModalDisplay());
+    expect(screen.queryByTestId('ce-passkey-wallet-status')).not.toBeInTheDocument();
+  });
+
+  it('signs in from a login file as a passkey account does, and says so when the file is not one', async () => {
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
+    const view = render(subject.getModalDisplay());
+    // One button under the passkey buttons until it is asked for.
+    expect(screen.getByRole('button', { name: 'Other options' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Login with file' })).not.toBeInTheDocument();
+
+    await subject.handleLoginFileSignIn('the file text');
+    expect(mockedPasskeyWallet.signInWithLoginFile).toHaveBeenLastCalledWith('the file text');
+    expect(subject.props.changeAccount).toHaveBeenCalledWith(
+      expect.objectContaining({ account: '0x2222222222222222222222222222222222222222', provider: 'passkey_eoa' }),
+    );
+    expect(subject.props.updateLoginInfo).toHaveBeenLastCalledWith({
+      loginInProgress: false,
+      loginComplete: true,
+      provider: 'passkey_eoa',
+    });
+
+    mockedPasskeyWallet.signInWithLoginFile.mockRejectedValueOnce(
+      new Error('That is not a Context Engine login file.'),
+    );
+    await subject.handleLoginFileSignIn('something else');
+    view.rerender(subject.getModalDisplay());
+    expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
+      'Login failed: That is not a Context Engine login file.',
+    );
+  });
+
+  it('signs in with a file chosen under a failed sign-in, and Back from a new file returns to that failure', async () => {
+    const urls = URL as unknown as { createObjectURL?: unknown; revokeObjectURL?: unknown };
+    urls.createObjectURL = jest.fn(() => 'blob:login-file');
+    urls.revokeObjectURL = jest.fn();
+    const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    try {
+      mockedPasskeyWallet.unlockPasskeyWallet.mockRejectedValueOnce(
+        new Error('Passkey prompt closed or timed out. Try again.'),
+      );
+      const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
+      await subject.handlePasskeyWalletSignIn();
+      const view = render(subject.getModalDisplay());
+      const closed = 'Login failed: Passkey prompt closed or timed out. Try again.';
+      expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(closed);
+      expect(screen.queryByRole('button', { name: 'Other options' })).not.toBeInTheDocument();
+
+      // A new file: the notice stands in place of the failure; Back returns to it.
+      fireEvent.click(screen.getByRole('button', { name: 'Create login file' }));
+      view.rerender(subject.getModalDisplay());
+      expect(screen.queryByTestId('ce-passkey-wallet-status')).not.toBeInTheDocument();
+      expect(screen.getByTestId('ce-login-file-saved')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+      view.rerender(subject.getModalDisplay());
+      expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(closed);
+
+      // A file the person already has, chosen right there.
+      const chosen = new File(['the file text'], 'context-engine-login-ab12cd.json');
+      Object.defineProperty(chosen, 'text', { value: async () => 'the file text' });
+      await act(async () => {
+        fireEvent.change(screen.getByTestId('ce-passkey-login-file-input'), { target: { files: [chosen] } });
+      });
+      expect(mockedPasskeyWallet.signInWithLoginFile).toHaveBeenLastCalledWith('the file text');
+      expect(subject.props.changeAccount).toHaveBeenCalledWith(
+        expect.objectContaining({ account: '0x2222222222222222222222222222222222222222', provider: 'passkey_eoa' }),
+      );
+    } finally {
+      click.mockRestore();
+      delete urls.createObjectURL;
+      delete urls.revokeObjectURL;
+    }
+  });
+
+  it('keeps a wrong file\u2019s message in view beside the notice of a saved login file', async () => {
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
+    subject.setState({ loginFileSavedName: 'context-engine-login-ab12cd.json' });
+    mockedPasskeyWallet.signInWithLoginFile.mockRejectedValueOnce(
+      new Error('That is not a Context Engine login file.'),
+    );
+    await subject.handleLoginFileSignIn('something else');
+    render(subject.getModalDisplay());
+    expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
+      'Login failed: That is not a Context Engine login file.',
+    );
+    expect(screen.getByTestId('ce-login-file-saved')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Login with file' })).toBeInTheDocument();
+  });
+
+  it('offers a login file under a failed passkey, after the phone and before the copy link', async () => {
+    sessionStorage.setItem(
+      'dg:surveyDraft:meadow-forum:84532:anon:all',
+      JSON.stringify({ answers: { q1: { value: 'Agree' } } }),
+    );
+    const urls = URL as unknown as { createObjectURL?: unknown; revokeObjectURL?: unknown };
+    urls.createObjectURL = jest.fn(() => 'blob:login-file');
+    urls.revokeObjectURL = jest.fn();
+    const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    try {
+      mockedPasskeyWallet.createPasskeyWallet.mockRejectedValueOnce(
+        new Error('This passkey does not advertise WebAuthn PRF support.'),
+      );
+      const subject = mountClassSubject(
+        new LoginAndSettingsModalSubject(buildProps({ activeSessionSlug: 'meadow-forum' })),
+      );
+      await subject.handlePasskeyWalletCreate();
+      const view = render(subject.getModalDisplay());
+      await screen.findByRole('button', { name: 'Copy this link' });
+      // Three ways out, in this order, an "or" between them.
+      const status = screen.getByTestId('ce-passkey-wallet-status');
+      expect(
+        within(status)
+          .getAllByRole('button')
+          .map((button) => button.textContent?.trim() || button.getAttribute('aria-label')),
+      ).toEqual([
+        'Scan QR with phone',
+        'About scanning with your phone',
+        'Create login file',
+        'Login with file',
+        'Copy this link',
+        'About copying your answers',
+      ]);
+      expect(screen.getByTestId('ce-passkey-login-file')).toHaveTextContent(
+        /^orCreate login file or Login with file ?to login without a passkey$/,
+      );
+      expect(screen.getByTestId('ce-passkey-copy-answers')).toHaveTextContent(
+        /^orCopy this link to paste your responses on a different device\./,
+      );
+      // This box is the other options: no "Other options" button beside it.
+      expect(screen.queryByRole('button', { name: 'Other options' })).not.toBeInTheDocument();
+
+      // Creating saves a file and signs no one in. The notice about it stands in place of the failed passkey's
+      // box and of "Other options": one box, and nothing else to choose from.
+      fireEvent.click(within(status).getByRole('button', { name: 'Create login file' }));
+      expect(mockedPasskeyWallet.createLoginFile).toHaveBeenCalledTimes(1);
+      expect(click).toHaveBeenCalledTimes(1);
+      expect(mockedPasskeyWallet.signInWithLoginFile).not.toHaveBeenCalled();
+      view.rerender(subject.getModalDisplay());
+      expect(screen.getByTestId('ce-login-file-saved')).toHaveTextContent(
+        'Saved context-engine-login-ab12cd.json to your downloads.',
+      );
+      expect(screen.getByRole('button', { name: 'Login with file' })).toBeInTheDocument();
+      expect(screen.queryByTestId('ce-passkey-wallet-status')).not.toBeInTheDocument();
+      for (const gone of ['Scan QR with phone', 'Create login file', 'Copy this link', 'Other options']) {
+        expect(screen.queryByRole('button', { name: gone })).not.toBeInTheDocument();
+      }
+
+      // Back returns to the failed passkey's three ways out.
+      fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+      view.rerender(subject.getModalDisplay());
+      expect(screen.queryByTestId('ce-login-file-saved')).not.toBeInTheDocument();
+      expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
+        "Create failed: This passkey can't be used here.",
+      );
+      expect(screen.getByRole('button', { name: 'Scan QR with phone' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Create login file' })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Copy this link' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Other options' })).not.toBeInTheDocument();
+    } finally {
+      click.mockRestore();
+      delete urls.createObjectURL;
+      delete urls.revokeObjectURL;
+      sessionStorage.clear();
+    }
+  });
+
+  it('ends the login file line with a full stop where no answers wait to be copied', async () => {
+    mockedPasskeyWallet.createPasskeyWallet.mockRejectedValueOnce(
+      new Error('This passkey does not advertise WebAuthn PRF support.'),
+    );
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
+    await subject.handlePasskeyWalletCreate();
+    render(subject.getModalDisplay());
+    expect(screen.getByTestId('ce-passkey-login-file')).toHaveTextContent(
+      /^orCreate login file or Login with file ?to login without a passkey\.$/,
+    );
+    expect(screen.queryByRole('button', { name: 'Copy this link' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the phone offer and the copy line when the try on the phone fails or is closed', async () => {
+    sessionStorage.setItem(
+      'dg:surveyDraft:meadow-forum:84532:anon:all',
+      JSON.stringify({ answers: { q1: { value: 'Agree' } } }),
+    );
+    mockedPasskeyWallet.createPasskeyWallet
+      .mockRejectedValueOnce(new Error('This passkey does not advertise WebAuthn PRF support.'))
+      .mockRejectedValueOnce(new Error('Passkey prompt closed or timed out. Try again.'));
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(buildProps({ activeSessionSlug: 'meadow-forum' })),
+    );
+    await subject.handlePasskeyWalletCreate();
+    await subject.handlePasskeyWalletCreateOnAnotherDevice();
+    render(subject.getModalDisplay());
+    expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
+      "Create failed: This passkey can't be used here.",
+    );
+    expect(screen.getByRole('button', { name: 'Scan QR with phone' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Copy this link' })).toBeInTheDocument();
+    expect(screen.getByTestId('ce-passkey-another-device')).toHaveTextContent(/^Scan QR with phone to login/);
+    expect(screen.getByTestId('ce-passkey-copy-answers')).toHaveTextContent(
+      /^orCopy this link to paste your responses on a different device\./,
+    );
+    sessionStorage.clear();
+  });
 
   it('sends someone in a browser without passkeys to Safari or Chrome, with the link to copy', async () => {
     const { PasskeysUnavailableError } = jest.requireActual<typeof import('../../wallet/passkey/unavailable')>(

@@ -31,6 +31,7 @@ export const createSurveyQuestionsResponseEditingRuntime = (
     normalizeResponseEncryptionAudience,
     persistDraftSafely,
     propsRef,
+    resolveDiffBaselineSlice,
     resolveFieldEncryptionAudience,
     resolveFieldEncryptionGateId,
     scheduleJsonPreviewUpdate,
@@ -332,6 +333,75 @@ export const createSurveyQuestionsResponseEditingRuntime = (
     );
   };
 
+  // The slider's X undoes it: the slider closes and both ratings return to their submitted
+  // values, so a question never submitted holds none. A saved rating is restored, not removed:
+  // the draft cannot record a removed rating, and locked or encrypted answers resend the saved one.
+  const clearConvictionImportance = (
+    surveyIndex: SurveyQuestionsLegacyValue,
+    rawQuestionId: SurveyQuestionsLegacyValue,
+  ) => {
+    surveyIndex = propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : surveyIndex;
+    const questionId: SurveyQuestionsLegacyValue = normalizeQuestionIdKey(rawQuestionId);
+    if (!questionId) return;
+    // Maps may key the question in another case or spacing.
+    const keysFor = (map: SurveyQuestionsLegacyValue): string[] =>
+      Object.keys(map || {}).filter((key) => normalizeQuestionIdKey(key) === questionId);
+    const without = (map: SurveyQuestionsLegacyValue) => {
+      const next = { ...(map || {}) };
+      keysFor(map).forEach((key) => delete next[key]);
+      return next;
+    };
+    const ratingIn = (map: SurveyQuestionsLegacyValue): number | null => {
+      const value = [questionId, ...keysFor(map)]
+        .map((key) => map?.[key])
+        .find((candidate) => candidate !== undefined && candidate !== null && !Number.isNaN(Number(candidate)));
+      return value === undefined ? null : Number(value);
+    };
+    const RATINGS = ['conviction', 'importance'] as const;
+    const baseline: SurveyQuestionsLegacyValue = resolveDiffBaselineSlice(true);
+    const saved = Object.fromEntries(RATINGS.map((field) => [field, ratingIn(baseline?.[field])]));
+    const slice: SurveyQuestionsLegacyValue = stateRef.current.surveysResponseState?.[surveyIndex];
+    const changes = RATINGS.some((field) => ratingIn(slice?.[field]) !== saved[field]);
+    if (changes) {
+      if (inst._draftDirtyQids) inst._draftDirtyQids.add(questionId);
+      invalidateDiffCaches();
+    }
+
+    setState(
+      (prev: SurveyQuestionsLegacyValue) => {
+        const baseState: SurveyQuestionsLegacyValue = prev || stateRef.current;
+        const closed = {
+          sliderModeByQuestion: without(baseState.sliderModeByQuestion),
+          sliderToggleExpandedByQuestion: without(baseState.sliderToggleExpandedByQuestion),
+        };
+        if (!changes) return closed;
+        const newSurveysResponseState: SurveyQuestionsLegacyValue = [...(baseState.surveysResponseState || [])];
+        const current: SurveyQuestionsLegacyValue = newSurveysResponseState[surveyIndex] || {};
+        const restored = (field: (typeof RATINGS)[number]) => ({
+          ...without(current[field]),
+          ...(saved[field] === null ? null : { [questionId]: saved[field] }),
+        });
+        newSurveysResponseState[surveyIndex] = {
+          ...current,
+          conviction: restored('conviction'),
+          importance: restored('importance'),
+        };
+        return {
+          ...closed,
+          ...buildSurveyUserEditResponseStatePatch(
+            newSurveysResponseState,
+            updateSubmittedSinceLastEdit(baseState.submittedSinceLastEdit, 'user_edit'),
+          ),
+        };
+      },
+      () => {
+        if (!changes) return;
+        scheduleJsonPreviewUpdate();
+        persistDraftSafely(0);
+      },
+    );
+  };
+
   const toggleAnswerEncryption = (
     surveyIndex: SurveyQuestionsLegacyValue,
     questionId: SurveyQuestionsLegacyValue,
@@ -424,6 +494,7 @@ export const createSurveyQuestionsResponseEditingRuntime = (
   };
 
   return {
+    clearConvictionImportance,
     handleAdditional,
     handleAnswer,
     handleConviction,

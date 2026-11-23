@@ -57,6 +57,7 @@ describe('loginAndSettings auth controllers', () => {
       passkeyWallet: {
         createPasskeyWallet: async () => '0xbbb',
         setPasskeyWalletChain: jest.fn(),
+        signInWithLoginFile: jest.fn(),
         unlockPasskeyWallet: async () => '0xbbb',
       },
       setActionMode,
@@ -100,6 +101,7 @@ describe('loginAndSettings auth controllers', () => {
       passkeyWallet: {
         createPasskeyWallet,
         setPasskeyWalletChain: jest.fn(),
+        signInWithLoginFile: jest.fn(),
         unlockPasskeyWallet,
       },
       setActionMode,
@@ -138,6 +140,7 @@ describe('loginAndSettings auth controllers', () => {
         createPasskeyWallet: action,
         unlockPasskeyWallet: action,
         setPasskeyWalletChain: jest.fn(),
+        signInWithLoginFile: jest.fn(),
         isPasskeyWalletOperationCancelledError: (error) => error === cancelled,
       },
       setActionMode: jest.fn(),

@@ -4,6 +4,8 @@ import { PasskeysUnavailableError } from '../../wallet/passkey/unavailable';
 export const PASSKEYS_UNAVAILABLE_MESSAGE = 'Open this link in Safari or Chrome to sign in.';
 /** Shown after "Login failed: " or "Create failed: " where the passkey has no PRF; the console keeps the thrown text. */
 export const PASSKEY_PRF_UNSUPPORTED_TEXT = "This passkey can't be used here.";
+/** The status after a Create whose passkey has no PRF: the login then offers to keep the passkey on a phone. */
+export const PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE = `Create failed: ${PASSKEY_PRF_UNSUPPORTED_TEXT}`;
 
 export type LoginPasskeyNetwork = Record<string, unknown> & {
   chainId?: unknown;
@@ -14,7 +16,8 @@ export type LoginPasskeyNetwork = Record<string, unknown> & {
 export type PasskeyWalletActionMode = '' | 'create' | 'sign-in';
 
 export type LoginPasskeyWalletPort = {
-  createPasskeyWallet: () => Promise<unknown>;
+  createPasskeyWallet: (options?: { anotherDevice?: boolean }) => Promise<unknown>;
+  signInWithLoginFile: (text: string) => Promise<unknown>;
   getPasskeyWalletChain?: () => unknown;
   isMissingPasskeyWalletRecordError?: (error: unknown) => boolean;
   isPasskeyWalletOperationCancelledError?: (error: unknown) => boolean;
@@ -44,7 +47,9 @@ export type LoginPasskeyActions = {
   _finalizePasskeyWalletLogin: (address: unknown, targetNetwork?: unknown) => void;
   getPasskeyWalletNetwork: (targetNetwork?: unknown) => unknown;
   handlePasskeyWalletCreate: () => Promise<void>;
+  handlePasskeyWalletCreateOnAnotherDevice: () => Promise<void>;
   handlePasskeyWalletSignIn: () => Promise<void>;
+  handleLoginFileSignIn: (text: string) => Promise<void>;
   syncPasskeyWalletChain: (targetNetwork?: unknown) => unknown;
 };
 
@@ -124,9 +129,12 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
   const runPasskeyWalletAction = async ({
     action,
     mode,
+    failureMessage,
   }: {
     action: () => Promise<unknown>;
     mode: Exclude<PasskeyWalletActionMode, ''>;
+    /** Shown for any failure, in place of the failure's own words. */
+    failureMessage?: string;
   }): Promise<void> => {
     const passkeyActionId = deps.startAction();
     deps.setActionMode(mode);
@@ -151,17 +159,19 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
       deps.accountLogError(mode === 'create' ? 'Passkey wallet create error:' : 'Passkey wallet sign-in error:', error);
       if (!deps.isCurrentAction(passkeyActionId)) return;
       const isMissingWallet = mode === 'sign-in' && deps.passkeyWallet.isMissingPasskeyWalletRecordError?.(error);
-      const message = isMissingWallet
-        ? 'No passkey wallet is saved in this browser for this app. Use Create to make one under this RP ID.'
-        : error instanceof PasskeysUnavailableError
-          ? PASSKEYS_UNAVAILABLE_MESSAGE
-          : `${mode === 'create' ? 'Create' : 'Login'} failed: ${
-              // Both PRF errors (prf.ts and createCredential.ts) name WebAuthn PRF, which means nothing to a participant.
-              /WebAuthn PRF/.test(deps.getErrorMessage(error))
-                ? PASSKEY_PRF_UNSUPPORTED_TEXT
-                : deps.getErrorMessage(error).trim() ||
-                  (mode === 'create' ? 'Could not create passkey wallet.' : 'Could not unlock passkey wallet.')
-            }`;
+      const message =
+        failureMessage ||
+        (isMissingWallet
+          ? 'No passkey wallet is saved in this browser for this app. Use Create to make one under this RP ID.'
+          : error instanceof PasskeysUnavailableError
+            ? PASSKEYS_UNAVAILABLE_MESSAGE
+            : `${mode === 'create' ? 'Create' : 'Login'} failed: ${
+                // Both PRF errors (prf.ts and createCredential.ts) name WebAuthn PRF, which means nothing to a participant.
+                /WebAuthn PRF/.test(deps.getErrorMessage(error))
+                  ? PASSKEY_PRF_UNSUPPORTED_TEXT
+                  : deps.getErrorMessage(error).trim() ||
+                    (mode === 'create' ? 'Could not create passkey wallet.' : 'Could not unlock passkey wallet.')
+              }`);
       deps.setStatus({
         passkeyWalletStatusMessage: message,
         passkeyWalletStatusTone: 'error',
@@ -176,12 +186,28 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
     getPasskeyWalletNetwork,
     handlePasskeyWalletCreate: () =>
       runPasskeyWalletAction({
-        action: deps.passkeyWallet.createPasskeyWallet,
+        action: () => deps.passkeyWallet.createPasskeyWallet(),
         mode: 'create',
+      }),
+    // For a device whose own passkeys lack PRF (Windows Hello on Windows 10, or on an older Windows 11 or
+    // browser): the passkey is kept on a phone, reached by QR code. A try that fails, or a prompt that is closed,
+    // returns to the message that offered it, so the offer and the copy line stay; the console keeps the cause.
+    handlePasskeyWalletCreateOnAnotherDevice: () =>
+      runPasskeyWalletAction({
+        action: () => deps.passkeyWallet.createPasskeyWallet({ anotherDevice: true }),
+        mode: 'create',
+        failureMessage: PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE,
       }),
     handlePasskeyWalletSignIn: () =>
       runPasskeyWalletAction({
         action: () => deps.passkeyWallet.unlockPasskeyWallet({ selectCredential: true }),
+        mode: 'sign-in',
+      }),
+    // A login file's account is the same kind as a passkey's from here on: the same provider, signatures and
+    // transactions. Only the way its key is reached differs.
+    handleLoginFileSignIn: (text: string) =>
+      runPasskeyWalletAction({
+        action: () => deps.passkeyWallet.signInWithLoginFile(text),
         mode: 'sign-in',
       }),
     syncPasskeyWalletChain,

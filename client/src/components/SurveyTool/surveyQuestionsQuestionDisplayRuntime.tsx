@@ -35,6 +35,7 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
     buildQuestionRoutePath,
     buildSliderModeStatePatch,
     buildSliderPersistOptions,
+    clearConvictionImportance,
     engine,
     getAudioInputWorkerProps,
     getQuestionConvictionSliderValue,
@@ -180,6 +181,7 @@ export const createSurveyQuestionsQuestionDisplayRuntime = (
         handleConvictionImportanceChange(surveyIndex, questionId, sliderMode, value, buildSliderPersistOptions(event))
       }
       onChangeComplete={flushDraftPersistAfterSliderChange}
+      onClear={() => clearConvictionImportance(surveyIndex, questionId)}
       onCommit={(committedValue: SurveyQuestionsLegacyValue) =>
         handleConvictionImportanceChange(surveyIndex, questionId, sliderMode, committedValue, {
           persistDraft: false,

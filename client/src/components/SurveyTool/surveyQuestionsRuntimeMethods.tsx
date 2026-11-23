@@ -406,6 +406,7 @@ export const createSurveyQuestionsRuntimeMethods = (
   });
 
   const {
+    clearConvictionImportance,
     handleAdditional,
     handleAnswer,
     handleConviction,
@@ -428,6 +429,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     normalizeFieldAudienceMode,
     normalizeResponseEncryptionAudience,
     persistDraftSafely: (delayMs?: SurveyQuestionsLegacyValue) => persistDraftSafely(delayMs),
+    resolveDiffBaselineSlice: (allowLocalCache?: boolean) => resolveDiffBaselineSlice(allowLocalCache),
     resolveFieldEncryptionAudience,
     resolveFieldEncryptionGateId,
     scheduleJsonPreviewUpdate: () => scheduleJsonPreviewUpdate(),
@@ -593,6 +595,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     handleAdditional,
     handleAnswer,
     handleBookmarkToggle,
+    clearConvictionImportance,
     handleConviction,
     handleDecryptQuestionAnswer: (
       questionId: SurveyQuestionsLegacyValue,
@@ -2691,6 +2694,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     handleDecryptQuestionAnswerInternal,
     handleAnswer,
     handleAdditional,
+    clearConvictionImportance,
     handleConviction,
     handleImportance,
     toggleAnswerEncryption,

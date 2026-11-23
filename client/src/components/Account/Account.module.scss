@@ -2308,12 +2308,121 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   margin: 8px auto 0;
 }
 
+// One sentence that starts with its button: one line where the box is wide enough, wrapping like text on a phone.
 .passkeyCopyAnswers {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
   margin-top: 8px;
+}
+
+// One quiet line under the log-in buttons; a tap area at least 44px tall.
+.loginFileToggle {
+  display: block;
+  min-height: 44px;
+  margin: -10px auto;
+  padding: 0 8px;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  color: inherit !important;
+  font-size: 0.9rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+// The line above another line with a button: apart enough that the two buttons' 44px tap areas do not meet.
+.passkeyAnotherDevice {
+  margin-bottom: 14px;
+}
+
+// "Create login file or Login with file": tall lines, so that where the two buttons wrap onto two lines their
+// 44px tap areas do not meet.
+.loginFilePair {
+  line-height: 46px;
+}
+
+// "or", between the ways out under a failed passkey: a line of its own, larger than the text around it.
+.passkeyOr {
+  margin: 10px 0 8px;
+  font-size: 1.25em;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+// The notice after a login file was saved: Back on a row of its own, in the box's top-left corner.
+.loginFileBackRow {
+  display: flex;
+  justify-content: flex-start;
+  margin: -10px -12px 4px;
+}
+
+.loginFileBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  color: inherit !important;
+  font-weight: 600;
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+// What was just saved to the person's downloads: news, on the theme's success colour, not part of the choices.
+// It carries its own background, so it reads on the box in every theme.
+.loginFileSaved {
+  padding: 6px 10px;
+  border-radius: var(--ce-radius-6);
+  background: var(--ce-status-success);
+  color: var(--ce-status-success-contrast);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+// A word of the sentence: its label sits on the sentence's baseline.
+.passkeyCopyAnswersButton {
+  position: relative;
+  vertical-align: baseline;
+
+  // A tap area at least 44px tall, centred on the button, that leaves the line's height alone.
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 0;
+    left: 0;
+    height: max(100%, 44px);
+    transform: translateY(-50%);
+  }
+}
+
+.passkeyCopyAnswersUnbroken {
+  white-space: nowrap;
+}
+
+.passkeyCopiedMark {
+  margin-inline-end: 0.35em;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .passkeyWalletStatus {
@@ -2327,6 +2436,12 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   font-size: 0.9rem;
   line-height: 1.4;
   text-align: center;
+}
+
+// Room on a computer for the copy line to stay on one line, also once its button carries the check and in its
+// longer Safari-or-Chrome wording. In em, so it grows with the text.
+.passkeyWalletStatus:has(.passkeyCopyAnswers) {
+  max-width: min(48em, 100%);
 }
 
 .passkeyWalletStatusError {

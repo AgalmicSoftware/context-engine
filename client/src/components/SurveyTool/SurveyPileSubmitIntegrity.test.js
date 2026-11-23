@@ -1455,3 +1455,91 @@ describe('unsent answers in View all', () => {
     expect([stored[BINARY_QID]?.value, stored[FREEFORM_QID]?.value]).toEqual(['Yes', 'Edited']);
   });
 });
+
+describe('the X beside the conviction slider', () => {
+  const draftEntry = (questionId) =>
+    Object.keys(sessionStorage)
+      .filter((key) => key.startsWith(`dg:surveyDraft:${SLUG}:`))
+      .map((key) => JSON.parse(sessionStorage.getItem(key))?.answers?.[questionId])
+      .find(Boolean) || {};
+  const bullhorn = () => screen.getByRole('button', { name: 'Conviction / importance' });
+  const slide = (value) => {
+    const slider = screen.getByRole('slider');
+    fireEvent.mouseDown(slider);
+    fireEvent.change(slider, { target: { value: String(value) } });
+    fireEvent.mouseUp(slider);
+  };
+  // Opens the slider from the bullhorn, sets both ratings, and undoes them with the X.
+  const setThenClear = async (engine, questionId) => {
+    fireEvent.click(bullhorn());
+    slide(7);
+    fireEvent.click(screen.getByRole('button', { name: /^Importance/ }));
+    slide(4);
+    await settle();
+    expect(draftEntry(questionId)).toMatchObject({ conviction: 7, importance: 4 });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo conviction and importance' }));
+    await settle();
+    expect(screen.queryByRole('button', { name: 'Undo conviction and importance' })).toBeNull();
+    expect(bullhorn()).not.toHaveClass('iconButtonActive');
+    const slice = engine.state.surveysResponseState[0];
+    expect(slice.conviction).not.toHaveProperty(questionId);
+    expect(slice.importance).not.toHaveProperty(questionId);
+    expect(draftEntry(questionId)).not.toHaveProperty('conviction');
+    expect(draftEntry(questionId)).not.toHaveProperty('importance');
+  };
+  const expectUploadWithoutRatings = async (h, questionId) => {
+    await h.click();
+    await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
+    const row = h.submitResponses.mock.calls[0][2].find((response) => response.questionID === questionId);
+    expect(row).toMatchObject({ conviction: null, importance: null });
+  };
+
+  it('undoes both ratings in the pile, and the upload carries neither', async () => {
+    const h = await fixture();
+    await act(async () => h.sync());
+    await h.mount();
+    const questionId = screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE).dataset.ceQuestionId;
+    await act(async () => h.engine().handleAnswerPile(questionId, questionId === BINARY_QID ? 'Yes' : 'An answer'));
+    await setThenClear(h.engine(), questionId);
+    expect(h.engine().state.showConviction[questionId]).toBe(false);
+    await expectUploadWithoutRatings(h, questionId);
+  });
+
+  it.each([
+    ['View all', {}],
+    ['one question', { singleQuestionMode: true, isStandalone: false, questionID: FREEFORM_QID }],
+  ])('undoes both ratings in %s, and the upload carries neither', async (_, props) => {
+    const h = await fixture();
+    await act(async () => h.sync());
+    await h.mountEditor(props);
+    await act(async () => h.editor().handleAnswer(0, FREEFORM_QID, 'An answer'));
+    await setThenClear(h.editor(), FREEFORM_QID);
+    expect(h.editor().state.sliderToggleExpandedByQuestion).not.toHaveProperty(FREEFORM_QID);
+    await expectUploadWithoutRatings(h, FREEFORM_QID);
+  });
+
+  it('returns a submitted conviction to its saved value, through a reload', async () => {
+    const h = await fixture();
+    h.add('responses', { ...savedFreeform({ value: 'Saved answer', encrypted: false }), conviction: 5 });
+    await act(async () => h.sync());
+    await h.mountEditor();
+    const conviction = () => h.editor().state.surveysResponseState[0].conviction[FREEFORM_QID];
+    expect(conviction()).toBe(5);
+    fireEvent.click(bullhorn());
+    slide(8);
+    await settle();
+    expect(draftEntry(FREEFORM_QID)).toMatchObject({ conviction: 8 });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo conviction and importance' }));
+    await settle();
+    expect(conviction()).toBe(5);
+    expect(bullhorn()).toHaveClass('iconButtonActive');
+    expect(h.editor().getPendingEditStats().total).toBe(0);
+    expect(draftEntry(FREEFORM_QID)).not.toHaveProperty('conviction');
+
+    h.unmount();
+    await h.mountEditor();
+    expect(conviction()).toBe(5);
+  });
+});

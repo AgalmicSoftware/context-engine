@@ -39,12 +39,14 @@ type Props = {
   entries: DebateComment[];
   // Drawn straight under the summary, ahead of the list. Left out when there is no summary to sit under.
   afterSummary?: React.ReactNode;
+  // A lone question needs its own name so it remains distinct from the topic summary beside it.
+  label?: string;
 };
 
 // The AI's summary of a node: a short lead (the whole summary on request), then every position with how many
 // participants hold it. The positions show straight away: they are what a reader opens the node for. A question's
 // node lists its categories of answer the same way.
-export default function DebateMapGeneratedSummary({ entries, afterSummary }: Props) {
+export default function DebateMapGeneratedSummary({ entries, afterSummary, label = 'AI-generated summary' }: Props) {
   const [open, setOpen] = useState(false);
   const detailsId = `generated-summary-${useId().replace(/:/g, '')}`;
   const summary = String(entries.find((entry) => !entry.label)?.comment || '').trim();
@@ -57,8 +59,8 @@ export default function DebateMapGeneratedSummary({ entries, afterSummary }: Pro
   return (
     <>
       {summary && (
-        <section className={styles.generatedSummarySection} aria-label="AI-generated summary">
-          <div className={styles.generatedSummaryEyebrow}>AI-generated summary</div>
+        <section className={styles.generatedSummarySection} aria-label={label}>
+          <div className={styles.generatedSummaryEyebrow}>{label}</div>
           <p id={detailsId} className={styles.generatedSummaryLead}>
             {open ? summary : lead}
           </p>

@@ -70,6 +70,57 @@ describe('SessionInterviewDraftCard sliders', () => {
   });
 });
 
+describe('SessionInterviewDraftCard slider X', () => {
+  const Review = ({ draft, onEdit }: { draft: InterviewDraftResponse; onEdit: jest.Mock }) => {
+    const [edited, setEdited] = useState<InterviewDraftResponse>(draft);
+    return (
+      <SessionInterviewDraftCard
+        draft={draft}
+        edited={edited}
+        selected
+        existing={false}
+        disabled={false}
+        onSelect={jest.fn()}
+        onEdit={(patch) => {
+          onEdit(patch);
+          setEdited((current) => ({ ...current, ...patch }));
+        }}
+      />
+    );
+  };
+
+  it('closes the slider and drops the ratings the AI proposed, as an edit', () => {
+    const onEdit = jest.fn();
+    render(<Review draft={{ questionId: 'q1', answer: 'Agree', conviction: 4, importance: 6 }} onEdit={onEdit} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Conviction / importance' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Undo conviction and importance' }));
+
+    expect(onEdit).toHaveBeenLastCalledWith({
+      conviction: undefined,
+      importance: undefined,
+      userEditedFields: ['conviction', 'importance'],
+    });
+    expect(JSON.parse(JSON.stringify(onEdit.mock.lastCall?.[0]))).toEqual({
+      userEditedFields: ['conviction', 'importance'],
+    });
+    expect(screen.queryByRole('slider')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Conviction / importance' })).not.toHaveClass('iconButtonActive');
+  });
+
+  it('returns ratings the person set on a blank draft to an untouched card', () => {
+    const onEdit = jest.fn();
+    render(<Review draft={{ questionId: 'q1', answer: 'Agree' }} onEdit={onEdit} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Conviction / importance' }));
+    fireEvent.change(screen.getByRole('slider'), { target: { value: '7' } });
+    expect(screen.getByRole('button', { name: /^Conviction/ })).toHaveTextContent('7');
+    fireEvent.click(screen.getByRole('button', { name: 'Undo conviction and importance' }));
+
+    expect(onEdit).toHaveBeenLastCalledWith({ conviction: undefined, importance: undefined, userEditedFields: [] });
+    expect(screen.getByLabelText('AI-proposed response')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Conviction / importance' })).not.toHaveClass('iconButtonActive');
+  });
+});
+
 describe('SessionInterviewDraftCard readable draft editors', () => {
   it.each([true, false])('preserves numeric quadratic drafts through review controls (injected: %s)', (injected) => {
     const draft = { questionId: 'q-budget', answer: [3, -4], confidence: 0.6 };

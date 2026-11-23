@@ -10,6 +10,8 @@ import { assertSoftSessionAllowed, createSoftSessionPolicy, extendSoftSessionPol
 import type { PasskeyCredentialClient, PasskeyWalletConfig } from './types.js';
 import { createInMemorySoftSessionClient, type SoftSessionClient } from './session/sessionWorkerClient.js';
 import { bufferToBase64URL } from './passkey/encoding.js';
+import { PASSKEY_PRF_INFO } from './passkey/prf.js';
+import { deriveEoaPrivateKeyFromPrf, getPasskeyDerivedPrfSalt } from './keystore/derivePrivateKey.js';
 
 const PRIVATE_KEY = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5' as const;
 const ADDRESS = new ethers.Wallet(PRIVATE_KEY).address as `0x${string}`;
@@ -36,6 +38,8 @@ const derivedConfig: PasskeyWalletConfig = {
   ...config,
   walletKeyMode: 'passkey-derived',
 };
+// The wallet PRF_OUTPUT derives under derivedConfig.
+const DERIVED_ADDRESS = '0x8FDc63316B1251e5463a0039da73adfceb5d5f3D';
 
 const makeCredential = ({
   prf = true,
@@ -571,6 +575,33 @@ describe('PasskeyEoaWalletClient', () => {
 
     expect(credentials.create).toHaveBeenCalledTimes(1);
     expect(credentials.get).toHaveBeenCalledTimes(1);
+  });
+
+  it('makes the passkey on another device when asked, and derives the wallet the same way', async () => {
+    const credentials = makeCredentials();
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage: createMemoryWalletStorage(),
+      credentials,
+      sessionClient: makeSessionClient(),
+    });
+
+    await expect(client.createWallet({ anotherDevice: true })).resolves.toBe(DERIVED_ADDRESS);
+    const [[options]] = (credentials.create as jest.Mock<unknown, [CredentialCreationOptions]>).mock.calls;
+    expect(options.publicKey?.authenticatorSelection?.authenticatorAttachment).toBe('cross-platform');
+    await client.lock();
+  });
+
+  // Every passkey already made must keep opening the same wallet: the salt asked of the passkey, the labels and
+  // the derivation are pinned here, for the live site's RP ID. A change to any of these values loses accounts.
+  it('pins the PRF salt, the PRF label and the wallet derived from a known PRF output', async () => {
+    const live = { ...derivedConfig, rpId: 'contextengine.sh' };
+    expect(Buffer.from(await getPasskeyDerivedPrfSalt(live)).toString('hex')).toBe(
+      '733d28ddb7c79aae1fd1281837b7752e7f617fe3a4ce9207e98b3db061ccaf76',
+    );
+    expect(new TextDecoder().decode(PASSKEY_PRF_INFO)).toBe('context-engine:passkey-eoa:v1');
+    const privateKey = await deriveEoaPrivateKeyFromPrf({ prfOutput: PRF_OUTPUT, config: live });
+    expect(new ethers.Wallet(privateKey).address).toBe('0x3eDA28bA5CA4165F21Ba27C71997A26C68a00883');
   });
 
   it('creates an encrypted EOA record without persisting plaintext private keys', async () => {

@@ -82,7 +82,6 @@ import type {
 export { buildExpandedHistoricalCaseBriefMap, buildHistoricalCaseBrief, buildHistoricalCompassPoints };
 
 import DebateMapGeneratedSummary from './DebateMapGeneratedSummary';
-import DebateMapSplit from './DebateMapSplit';
 
 import { createTextMeasurer, fitPackedAtlasCirclesToBox, fitPackedAtlasLabel } from './packedAtlasFit';
 import { QuadraticQuestionPreview } from './QuadraticQuestionPreview';
@@ -2058,7 +2057,6 @@ const Modal = ({
             afterSummary={chartFollowsSummary ? chartSection : null}
           />
         )}
-        {readOnly && content.split && <DebateMapSplit split={content.split} />}
 
         {!chartFollowsSummary && chartSection}
 
@@ -2151,6 +2149,13 @@ const Modal = ({
             )}
             {questionsOpen && (
               <div className={`${styles.collapseContent} ${styles.questionsSection}`}>
+                {/* A topic's only question has no circle of its own, so its analysis shows here, above its card. */}
+                {!content.isQuestion && questions.length === 1 && (
+                  <QuestionAnalysisNote
+                    key={String(questions[0].id || 'lone-question')}
+                    analysis={questions[0].analysis}
+                  />
+                )}
                 {questions.map((q, i) => {
                   const questionType = normalizeQuestionType(q.questionType || q.type);
                   const questionText = q.question || q.prompt || 'Untitled question';
@@ -2173,7 +2178,6 @@ const Modal = ({
                             target: '_blank',
                             rel: 'noopener noreferrer',
                             'aria-label': `Answer: ${questionText} (opens in a new tab)`,
-                            'aria-describedby': q.analysis ? `ce-atlas-analysis-${i}` : undefined,
                           }
                         : {})}
                     >
@@ -2198,7 +2202,6 @@ const Modal = ({
                         </div>
                       </div>
                       <div className={styles.pileCardBody}>{renderQuestionPreview(q)}</div>
-                      <QuestionAnalysisNote analysis={q.analysis} id={`ce-atlas-analysis-${i}`} />
                       {questionHref && (
                         <span className={styles.pileCardAction} aria-hidden="true">
                           Answer <FontAwesomeIcon icon={faExternalLinkAlt} />
