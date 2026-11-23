@@ -2,7 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import LoginFileAccess, { saveLoginFile } from './LoginFileAccess';
 
-const file = { name: 'context-engine-login-ab12cd.json', text: '{"type":"context-engine-login-file"}' };
+const file = { name: 'ContextEngine-Login-November23-2026-1003PM.json', text: '{"type":"context-engine-login-file"}' };
 
 const renderAccess = ({ savedName = '', protectedName = '', passwordRefusedBy = '' } = {}) => {
   const onCreate = jest.fn();

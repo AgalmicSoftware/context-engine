@@ -55,9 +55,9 @@ jest.mock('../../wallet/passkeyWallet.js', () => ({
   createPasskeyWallet: jest.fn(async () => '0x1111111111111111111111111111111111111111'),
   unlockPasskeyWallet: jest.fn(async () => '0x1111111111111111111111111111111111111111'),
   signInWithLoginFile: jest.fn(async () => '0x2222222222222222222222222222222222222222'),
-  createLoginFile: jest.fn(() => ({ name: 'context-engine-login-ab12cd.json', text: '{}' })),
+  createLoginFile: jest.fn(() => ({ name: 'ContextEngine-Login-November23-2026-1003PM.json', text: '{}' })),
   createProtectedLoginFile: jest.fn(async (_password: string) => ({
-    name: 'context-engine-login-cd34ef.json',
+    name: 'ContextEngine-Login-November23-2026-1004PM.json',
     text: '{"protected":true}',
   })),
   isLoginFileProtected: jest.fn((text: string) => /"protected":true/.test(text)),
@@ -1017,7 +1017,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(closed);
 
       // A file the person already has, chosen right there.
-      const chosen = new File(['the file text'], 'context-engine-login-ab12cd.json');
+      const chosen = new File(['the file text'], 'ContextEngine-Login-November23-2026-1003PM.json');
       Object.defineProperty(chosen, 'text', { value: async () => 'the file text' });
       await act(async () => {
         fireEvent.change(screen.getByTestId('ce-passkey-login-file-input'), { target: { files: [chosen] } });
@@ -1043,12 +1043,12 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       await subject.handleLoginFileCreate();
       expect(mockedPasskeyWallet.createLoginFile).toHaveBeenCalledTimes(1);
       expect(mockedPasskeyWallet.createProtectedLoginFile).not.toHaveBeenCalled();
-      expect(subject.state.loginFileSavedName).toBe('context-engine-login-ab12cd.json');
+      expect(subject.state.loginFileSavedName).toBe('ContextEngine-Login-November23-2026-1003PM.json');
 
       await subject.handleLoginFileCreate('salon 2026');
       expect(mockedPasskeyWallet.createProtectedLoginFile).toHaveBeenCalledWith('salon 2026');
       expect(mockedPasskeyWallet.createLoginFile).toHaveBeenCalledTimes(1);
-      expect(subject.state.loginFileSavedName).toBe('context-engine-login-cd34ef.json');
+      expect(subject.state.loginFileSavedName).toBe('ContextEngine-Login-November23-2026-1004PM.json');
       expect(click).toHaveBeenCalledTimes(2);
       // Neither signs anyone in, and the password is kept nowhere in the window's state.
       expect(mockedPasskeyWallet.signInWithLoginFile).not.toHaveBeenCalled();
@@ -1104,13 +1104,13 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       const subject = mountClassSubject(
         new LoginAndSettingsModalSubject(buildProps({ activeSessionSlug: 'meadow-forum' })),
       );
-      const protectedFile = { name: 'context-engine-login-cd34ef.json', text: '{"protected":true}' };
+      const protectedFile = { name: 'ContextEngine-Login-November23-2026-1004PM.json', text: '{"protected":true}' };
       subject.handleLoginFileChosen(protectedFile);
       // Nothing is tried until the password is given.
       expect(mockedPasskeyWallet.signInWithLoginFile).not.toHaveBeenCalled();
       const view = render(subject.getModalDisplay());
       expect(screen.getByTestId('ce-login-file-protected')).toHaveTextContent(
-        'context-engine-login-cd34ef.json has a password.',
+        'ContextEngine-Login-November23-2026-1004PM.json has a password.',
       );
       expect(screen.queryByRole('button', { name: 'Other options' })).not.toBeInTheDocument();
 
@@ -1156,7 +1156,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(mockedPasskeyWallet.signInWithLoginFile).toHaveBeenLastCalledWith('the file text', undefined);
     expect(subject.state.loginFileProtected).toBeNull();
 
-    subject.setState({ loginFileSavedName: 'context-engine-login-ab12cd.json' });
+    subject.setState({ loginFileSavedName: 'ContextEngine-Login-November23-2026-1003PM.json' });
     subject.handleLoginFileChosen({ name: 'locked.json', text: '{"protected":true}' });
     const view = render(subject.getModalDisplay());
     // The password box comes before the notice of a saved file; Back leaves it for that notice.
@@ -1169,7 +1169,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
   it('keeps a wrong file\u2019s message in view beside the notice of a saved login file', async () => {
     const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
-    subject.setState({ loginFileSavedName: 'context-engine-login-ab12cd.json' });
+    subject.setState({ loginFileSavedName: 'ContextEngine-Login-November23-2026-1003PM.json' });
     mockedPasskeyWallet.signInWithLoginFile.mockRejectedValueOnce(
       new Error('That is not a Context Engine login file.'),
     );
@@ -1233,7 +1233,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       expect(mockedPasskeyWallet.signInWithLoginFile).not.toHaveBeenCalled();
       view.rerender(subject.getModalDisplay());
       expect(screen.getByTestId('ce-login-file-saved')).toHaveTextContent(
-        'Check your downloads for context-engine-login-ab12cd.json.',
+        'Check your downloads for ContextEngine-Login-November23-2026-1003PM.json.',
       );
       expect(screen.getByRole('button', { name: 'Login with file' })).toBeInTheDocument();
       expect(screen.queryByTestId('ce-passkey-wallet-status')).not.toBeInTheDocument();

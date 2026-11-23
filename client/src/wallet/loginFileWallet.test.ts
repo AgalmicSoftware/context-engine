@@ -1,3 +1,4 @@
+import { formatPasskeyCredentialUserName } from './passkey/createCredential.js';
 import { ethers } from 'ethers';
 import { PasskeyEoaWalletClient } from './passkeyWallet.js';
 import { createMemoryWalletStorage } from './keystore/storage.js';
@@ -11,6 +12,7 @@ import {
   createLoginFile,
   createProtectedLoginFile,
   isLoginFileProtected,
+  loginFileName,
   openLoginFile,
   readLoginFileKey,
 } from './keystore/loginFile.js';
@@ -81,11 +83,12 @@ const makeClient = ({
 
 describe('a login file', () => {
   it('holds a 12-word phrase and reads back to the account it names', () => {
-    const file = createLoginFile(new Date('2026-11-22T12:00:00Z'));
+    // The device's own time, as a passkey's name has it.
+    const file = createLoginFile(new Date(2026, 10, 23, 22, 3));
     const parsed = JSON.parse(file.text);
     expect(parsed).toMatchObject({ type: 'context-engine-login-file', version: 1, address: file.address });
     expect(parsed.recoveryPhrase.split(' ')).toHaveLength(12);
-    expect(file.name).toBe(`context-engine-login-${file.address.slice(2, 8).toLowerCase()}.json`);
+    expect(file.name).toBe('ContextEngine-Login-November23-2026-1003PM.json');
     expect(readLoginFileKey(file.text).address).toBe(file.address);
     expect(createLoginFile().address).not.toBe(file.address);
   });
@@ -106,6 +109,31 @@ describe('a login file', () => {
   );
 });
 
+describe('a login file\u2019s name', () => {
+  it('follows the passkey\u2019s, with the device\u2019s date and time, and is safe as a file name everywhere', () => {
+    const at = new Date(2026, 6, 2, 22, 3);
+    expect(formatPasskeyCredentialUserName(at)).toBe('ContextEngine-July2-2026-1003PM');
+    expect(loginFileName(at)).toBe('ContextEngine-Login-July2-2026-1003PM.json');
+    // No colon, slash, space or other character a phone or computer refuses, at any time of day or year.
+    for (const date of [new Date(2026, 0, 1, 0, 0), new Date(2026, 11, 31, 12, 59), new Date(2027, 1, 28, 23, 59)]) {
+      expect(loginFileName(date)).toMatch(/^ContextEngine-Login-[A-Za-z]+\d{1,2}-\d{4}-\d{3,4}(AM|PM)\.json$/);
+    }
+    // It carries no part of the account.
+    const file = createLoginFile(at);
+    expect(file.name).not.toContain(file.address.slice(2, 8).toLowerCase());
+  });
+
+  it('is not what signs in: the file reads the same under any name', async () => {
+    const file = createLoginFile();
+    // Nothing of the name is in the text, and the text alone gives the account.
+    expect(file.text).not.toContain(file.name);
+    expect(readLoginFileKey(file.text).address).toBe(file.address);
+    // A file saved under the earlier name pattern holds the same kind of text.
+    const earlier = JSON.stringify({ type: 'context-engine-login-file', version: 1, recoveryPhrase: PHRASE });
+    await expect(openLoginFile(earlier)).resolves.toMatchObject({ address: PHRASE_ADDRESS });
+  });
+});
+
 describe('a login file with a password', () => {
   const PASSWORD = 'correct horse battery';
   const edit = (text: string, change: (file: any) => void): string => {
@@ -116,7 +144,7 @@ describe('a login file with a password', () => {
   // One file for the cases that only read it; making one stretches the password, which takes a moment.
   let file: Awaited<ReturnType<typeof createProtectedLoginFile>>;
   beforeAll(async () => {
-    file = await createProtectedLoginFile(PASSWORD, new Date('2026-11-23T12:00:00Z'));
+    file = await createProtectedLoginFile(PASSWORD, new Date(2026, 10, 23, 9, 5));
   });
 
   it('holds no words in the clear, and records how it is protected', () => {
@@ -136,7 +164,7 @@ describe('a login file with a password', () => {
     expect(bytes(parsed.encryptedRecoveryPhrase.iv)).toBe(12);
     expect(parsed.warning).toMatch(/password cannot be recovered/);
     expect(isLoginFileProtected(file.text)).toBe(true);
-    expect(file.name).toBe(`context-engine-login-${file.address.slice(2, 8).toLowerCase()}.json`);
+    expect(file.name).toBe('ContextEngine-Login-November23-2026-905AM.json');
   });
 
   it('opens with its password to the account it names, every time', async () => {

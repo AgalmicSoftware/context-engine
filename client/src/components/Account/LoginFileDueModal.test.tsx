@@ -21,7 +21,8 @@ const renderModal = () => {
   return { onSignedIn, onClose };
 };
 
-const choose = async (text: string, name = 'context-engine-login.json') => {
+// The default name is the earlier pattern: a file downloaded before the names changed still signs in.
+const choose = async (text: string, name = 'context-engine-login-ab12cd.json') => {
   const chosen = new File([text], name, { type: 'application/json' });
   // jsdom's File has no text().
   Object.defineProperty(chosen, 'text', { value: async () => text });
@@ -83,10 +84,10 @@ describe('LoginFileDueModal', () => {
 
   it('asks for the password of a file that has one, inside the same window, and takes a second try', async () => {
     const { onSignedIn } = renderModal();
-    await choose('{"protected":true}', 'context-engine-login-locked.json');
+    await choose('{"protected":true}', 'ContextEngine-Login-November23-2026-1004PM.json');
     expect(mockSignIn).not.toHaveBeenCalled();
     expect(screen.getByTestId('ce-login-file-due-protected')).toHaveTextContent(
-      'context-engine-login-locked.json has a password.',
+      'ContextEngine-Login-November23-2026-1004PM.json has a password.',
     );
     const password = screen.getByLabelText('Password');
     mockSignIn.mockRejectedValueOnce(new Error('Wrong password, or the file is damaged.'));

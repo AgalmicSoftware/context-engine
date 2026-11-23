@@ -1,6 +1,7 @@
 import { Wallet } from 'ethers';
 import type { HexString, LoginFileWalletRecord, PasskeyWalletConfig } from '../types.js';
 import { base64URLToBuffer, bufferSourceToWebCryptoBufferSource, bufferToBase64URL } from '../passkey/encoding.js';
+import { formatPasskeyCredentialUserName } from '../passkey/createCredential.js';
 import {
   LOGIN_FILE_DUE_TEXT,
   LOGIN_FILE_OTHER_ACCOUNT_TEXT,
@@ -68,7 +69,13 @@ export class LoginFilePasswordWrongError extends Error {
 export type LoginFile = { name: string; text: string; address: HexString };
 
 const FILE_WARNING = 'Anyone who has this file can sign in as you. Keep it private. It cannot be replaced if lost.';
-const fileName = (address: string): string => `context-engine-login-${address.slice(2, 8).toLowerCase()}.json`;
+// Named as a passkey is, by the device's own date and time, so that it is found again among downloads: for
+// example ContextEngine-Login-November23-2026-1003PM.json. Letters, digits and hyphens only, which every phone
+// and computer takes in a file's name. The name is for the person: a login file signs in under any name.
+export const loginFileName = (now: Date = new Date()): string =>
+  `${formatPasskeyCredentialUserName(now)
+    .replace(/^ContextEngine-/, 'ContextEngine-Login-')
+    .replace(/[^A-Za-z0-9-]/g, '')}.json`;
 
 export const createLoginFile = (now: Date = new Date()): LoginFile => {
   const wallet = Wallet.createRandom();
@@ -85,7 +92,7 @@ export const createLoginFile = (now: Date = new Date()): LoginFile => {
     null,
     2,
   );
-  return { name: fileName(address), text, address };
+  return { name: loginFileName(now), text, address };
 };
 
 // A login file with a password (version 2) holds its 12 words encrypted: the password is stretched with
@@ -162,7 +169,7 @@ export const createProtectedLoginFile = async (password: string, now: Date = new
     null,
     2,
   );
-  return { name: fileName(address), text, address };
+  return { name: loginFileName(now), text, address };
 };
 
 type ParsedLoginFile = {

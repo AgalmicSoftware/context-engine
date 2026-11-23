@@ -290,7 +290,11 @@ phone to login", the login file, "Copy this link to paste your responses on a
 different device." In a browser without passkeys, the link to another browser
 stays first.
 
-- The file (`context-engine-login-<6 hex>.json`) holds a standard 12-word
+- The file is named as a passkey is, with the device's date and time, for
+  example `ContextEngine-Login-November23-2026-1003PM.json` (letters, digits and
+  hyphens only; no part of the account). The name is for finding it again: a
+  login file signs in under any name, the earlier
+  `context-engine-login-<6 hex>.json` among them. It holds a standard 12-word
   recovery phrase; the account is that phrase's first Ethereum address
   (`m/44'/60'/0'/0/0`). It is made in the browser and sent nowhere. Whoever holds
   the file holds the account, and a lost file cannot be replaced. It has no

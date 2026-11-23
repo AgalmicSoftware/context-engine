@@ -154,7 +154,8 @@ export const passkeyFixture = (name) => {
 export const loginFileFixture = () => {
   const wallet = ethers.Wallet.createRandom();
   const text = JSON.stringify({ type: 'context-engine-login-file', version: 1, address: wallet.address, recoveryPhrase: wallet.mnemonic.phrase });
-  return { wallet, seed: null, file: { name: 'context-engine-login.json', mimeType: 'application/json', buffer: Buffer.from(text) } };
+  // Under the earlier name pattern: a file downloaded before the names changed still signs in.
+  return { wallet, seed: null, file: { name: 'context-engine-login-ab12cd.json', mimeType: 'application/json', buffer: Buffer.from(text) } };
 };
 
 // The same person's login file with a password: the same 12 words, encrypted as the site encrypts them, by this
@@ -170,7 +171,7 @@ export const withFilePassword = async ({ wallet, seed }, password = 'journey sal
     type: 'context-engine-login-file', version: 2, address: wallet.address,
     encryptedRecoveryPhrase: { kdf: 'PBKDF2-SHA256', iterations, salt: b64(salt), cipher: 'AES-GCM-256', iv: b64(iv), ciphertext: b64(ciphertext) },
   });
-  return { wallet, seed, password, file: { name: 'context-engine-login-locked.json', mimeType: 'application/json', buffer: Buffer.from(text) } };
+  return { wallet, seed, password, file: { name: 'ContextEngine-Login-November23-2026-1003PM.json', mimeType: 'application/json', buffer: Buffer.from(text) } };
 };
 
 // Chooses the person's login file in the log-in dialog, opening it first if need be, and waits to be signed in.
