@@ -248,6 +248,20 @@ it('keeps quadratic option order and budgets in profile analysis and excludes ma
   });
 });
 
+it('leaves a cleared allocation, every vote at 0, out of profile analysis', () => {
+  const question = { id: 'q1', prompt: 'Priorities', type: 'quadratic', options: ['Parks', 'Transit'] };
+  const cleared = { answer: { value: [0, 0] } };
+  expect(
+    buildUserPageAnalysisQuestions({ questionResponseInfo: [question], detailedQuestionResponses: { q1: cleared } }),
+  ).toEqual([]);
+  expect(
+    buildUserPageAnalysisSurveys({
+      surveyResponseInfo: [{ id: 's1' }],
+      detailedSurveyResponses: { s1: [{ questionData: question, responseData: cleared }] },
+    })[0],
+  ).toMatchObject({ answeredCount: 0, sample: [] });
+});
+
 // Shaped like the answers surveyToolResponsePayloadController stores: the
 // writer stamps every answer with the audience it resolved, public ones too.
 const writerAnswer = (value: unknown, encryptionAudience: string) => ({

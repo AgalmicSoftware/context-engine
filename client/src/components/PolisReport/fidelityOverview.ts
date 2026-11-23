@@ -4,6 +4,7 @@ import {
   scoreFidelityOverview,
   type FidelityOverview,
 } from '../../../../shared/agentFidelity.mjs';
+import { isBlankQuadraticAllocation } from '../../utilities/survey/quadraticAnswer';
 
 export type FidelityOverviewInput = {
   // Cached questions, keyed by ID.
@@ -29,11 +30,21 @@ export const computeFidelityOverview = ({
     id,
     ...(question && typeof question === 'object' ? question : {}),
   }));
-  const { pairs } = collectSessionFidelityData({
+  const { answers, pairs } = collectSessionFidelityData({
     questions: questionList,
     payloads: resultsResponseRows({ filteredQuestionResponses: questionResponses }),
   });
-  const prefill = pairs.filter((pair) => pair.origin === 'external_prefill');
+  // Results reads a cleared allocation, every vote at 0, as no answer, so its draft has nothing to be
+  // scored against. Only an allocation reads as a list of numbers. Pairs are dropped after each
+  // person's latest answer is chosen, so an answer from before they cleared it doesn't count instead.
+  const cleared = new Set(
+    (answers as { participantId: string; questionId: string; value: unknown }[])
+      .filter(({ value }) => isBlankQuadraticAllocation(value))
+      .map(({ participantId, questionId }) => `${participantId} ${questionId}`),
+  );
+  const prefill = pairs.filter(
+    (pair) => pair.origin === 'external_prefill' && !cleared.has(`${pair.participantId} ${pair.questionId}`),
+  );
   return prefill.length
     ? // Results shows the condition and platform rows, so only those are withheld together.
       scoreFidelityOverview({

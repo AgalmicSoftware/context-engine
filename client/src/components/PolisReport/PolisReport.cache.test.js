@@ -2834,6 +2834,33 @@ describe('Polis mixed answer report filtering', () => {
       Object.keys(applyFilterStateToAggregator(responses, { id: 84532 }, { questionTypes: ['quadratic'] }, '')),
     ).toEqual(['quadratic']);
   });
+
+  it('leaves cleared allocations out of the response count that ranks questions', () => {
+    const top = (allocations) =>
+      Object.keys(
+        applyFilterStateToAggregator(
+          { ...responses, quadratic: makeRows('quadratic', allocations) },
+          { id: 84532 },
+          { selectedTags: ['mobility'], topQuestions: { count: 1, by: 'responses' } },
+          '',
+        ),
+      );
+    // Three allocations outrank the rating's two answers, unless two were cleared to every vote at 0.
+    expect(
+      top([
+        [2, -3],
+        [1, 1],
+        [0, 2],
+      ]),
+    ).toEqual(['quadratic']);
+    expect(
+      top([
+        [2, -3],
+        [0, 0],
+        [0, 0],
+      ]),
+    ).toEqual(['rating']);
+  });
 });
 
 it('filters demo answer sections and binary analysis by the same question tags', () => {

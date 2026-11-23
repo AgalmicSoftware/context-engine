@@ -1,6 +1,7 @@
 import { validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
 import { normalizeRatingAnswer } from '../../../../shared/questions/ratingScale.mjs';
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope';
+import { isBlankQuadraticAllocation } from '../../utilities/survey/quadraticAnswer';
 import { normalizeRatingScale } from '../../utilities/survey/ratingValue';
 import { takesOnePick } from '../SurveyTool/surveyToolResponseState';
 
@@ -118,7 +119,7 @@ export function readReportAnswer(payload: ReportRecord, question: ReportRecord):
       return selected.length <= limit ? selected : null;
     }
     case 'quadratic':
-      return validateQuadraticAllocation(value, question) ? null : value;
+      return validateQuadraticAllocation(value, question) || isBlankQuadraticAllocation(value) ? null : value;
     default:
       return null;
   }

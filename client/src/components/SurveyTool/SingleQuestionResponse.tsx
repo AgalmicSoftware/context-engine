@@ -3,6 +3,7 @@ import { choiceKindLabel } from './MultichoiceQuestionInput';
 import { takesOnePick } from './surveyToolResponseState';
 import { getVoiceCredits } from '../../../../shared/questions/quadraticAllocation.mjs';
 import QuadraticAllocationResponse from './QuadraticAllocationResponse';
+import { isBlankQuadraticAllocation } from '../../utilities/survey/quadraticAnswer';
 /** @file SingleQuestionResponse.tsx */
 
 import React, { Component } from 'react';
@@ -1464,7 +1465,12 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
 
   // For single-person display: renders the answer portion by question type (UPDATED for multichoice)
   renderAnswerByType = (type: unknown, value: unknown): React.ReactNode => {
-    if (value === null || value === undefined || value === '') {
+    if (
+      value === null ||
+      value === undefined ||
+      value === '' ||
+      (type === 'quadratic' && isBlankQuadraticAllocation(value))
+    ) {
       return <div className={styles.freeformAnswer}>No answer provided.</div>;
     }
 

@@ -33,22 +33,28 @@ it('preserves a custom quadratic budget through filtered CSV and report snapshot
   expect(renderSessionResultsHtmlReport(snapshot, { format: 'single-html' })).toContain('25 voice credits');
 });
 
-it('gives AI analysis named signed votes and a budget, including neutral answers', () => {
+it('gives AI analysis named signed votes and a budget, leaving out a cleared allocation', () => {
   const { aiPayload } = buildSessionResultsAnalysisAiPayload({
     questions: [question],
     responses: [
-      [3, -4],
-      [0, 0],
-      [5, -1],
-    ].map((answer, index) => ({
+      { answer: [3, -4] },
+      { answer: [0, 0] },
+      { answer: [5, -1] },
+      { answer: [0, 0], additional: 'Unsure' },
+    ].map((response, index) => ({
       questionId: 'q1',
       questionType: 'quadratic',
-      answer,
+      ...response,
       participantAddress: `participant-${index}`,
     })),
   });
   expect(aiPayload.questions[0]).toMatchObject({ voiceCredits: 25 });
-  expect(aiPayload.responses.map((row) => row.answer)).toEqual(['Parks: +3; Transit: -4', 'Parks: 0; Transit: 0']);
+  // [0, 0] is what clearing leaves, so only a comment keeps it; [5, -1] costs 26 of 25 credits.
+  expect(aiPayload.responses.map(({ answer, additional }) => [answer, additional])).toEqual([
+    ['Parks: +3; Transit: -4', undefined],
+    ['', 'Unsure'],
+  ]);
+  expect(aiPayload.counts).toMatchObject({ participants: 2, responses: 2 });
   expect(buildSessionResultsAnalysisPrompt(aiPayload)).toContain(QUADRATIC_READING_RULE);
 });
 

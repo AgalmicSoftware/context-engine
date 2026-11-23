@@ -5,6 +5,7 @@ import {
 } from '../../../../shared/questions/quadraticAllocation.mjs';
 import { readStoredRating } from '../../../../shared/questions/storedRating.mjs';
 import type { SessionResultsReportAnswer, SessionResultsReportQuestion } from '../../utilities/sessionResultsExport';
+import { isBlankQuadraticAllocation } from '../../utilities/survey/quadraticAnswer';
 import type { RatingScale } from '../../utilities/survey/ratingValue';
 import { getSurveyResultsLatestResponsesByResponder } from './surveyResultsSummaryModels';
 
@@ -162,6 +163,8 @@ const readViewedText = (field: unknown, question: SurveyResultsRecord = {}): str
   const value = isRecord(field) ? (field.value ?? field.text ?? field.answer) : field;
   if (value === null || value === undefined || value === '*') return '';
   if (Array.isArray(value)) {
+    // A cleared allocation, every vote at 0, is no answer, like a cleared choice ([]).
+    if (question.type === 'quadratic' && isBlankQuadraticAllocation(value)) return '';
     return question.type === 'quadratic' && !validateQuadraticAllocation(value, question)
       ? formatQuadraticAllocation(value, normalizeStringList(question.options))
       : value.join('; ');
@@ -194,7 +197,8 @@ export const buildSurveyResultsHtmlReportAnswersForExport = ({
     const viewed = toRecord(
       applyDecryptedOverride ? applyDecryptedOverride(stored, responder, questionId, surveyId) : stored,
     );
-    const answer = readViewedText(viewed.answer, question);
+    // As in the Report, the type stored with the answer covers a question no longer cached.
+    const answer = readViewedText(viewed.answer, { type: viewed.type, ...question });
     const comment = readViewedText(viewed.additional);
     const conviction = readStoredRating(viewed.conviction !== undefined ? viewed.conviction : viewed.importance);
     if (!answer && !comment && conviction === null) return;

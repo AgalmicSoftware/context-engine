@@ -732,6 +732,20 @@ describe('SingleQuestionResponse rating rendering', () => {
     expect(renderToStaticMarkup(tree)).toContain('No answer provided.');
   });
 
+  it('shows a cleared allocation, every vote at 0, as no answer', () => {
+    const render = (value: number[]) =>
+      renderToStaticMarkup(
+        createSubject({
+          mode: 'fullscreen',
+          question: { id: 'q1', type: 'quadratic', prompt: 'Allocate', options: ['Parks', 'Transit'] },
+          response: { answer: { value, encrypted: false }, additional: { value: '', encrypted: false } },
+        }).renderSinglePersonView(),
+      );
+    expect(render([0, 0])).toContain('No answer provided.');
+    expect(render([3, 0])).not.toContain('No answer provided.');
+    expect(render([3, 0])).toContain('Parks');
+  });
+
   it('renders read-only ratings against per-question scale metadata', () => {
     const subject = createSubject({
       mode: 'fullscreen',

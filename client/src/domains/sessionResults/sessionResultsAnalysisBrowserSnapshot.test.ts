@@ -130,7 +130,7 @@ describe('sessionResultsAnalysisBrowserSnapshot', () => {
     );
   });
 
-  it('keeps neutral allocations and excludes unrelated cached metadata', () => {
+  it('reads a cleared allocation as blank, keeps its comment, and excludes unrelated cached metadata', async () => {
     const result = buildResultsAnalysisBrowserSnapshotFromCacheNode({
       sessionSlug: 'edge',
       networkNode: {
@@ -138,15 +138,29 @@ describe('sessionResultsAnalysisBrowserSnapshot', () => {
           q: { id: 'q', type: 'quadratic', options: ['A', 'B'], privateNotes: 'Never export', secret: 'Never export' },
         },
         questionResponses: {
-          q: { participant: { sessionSlug: 'edge', answer: { value: [0, 0] }, additional: { value: ['one', 'two'] } } },
+          // Clearing an allocation leaves every vote at 0.
+          q: {
+            participant: { sessionSlug: 'edge', answer: { value: [0, 0] }, additional: { value: ['one', 'two'] } },
+            cleared: { sessionSlug: 'edge', answer: { value: [0, 0] } },
+            voter: { sessionSlug: 'edge', answer: { value: [2, -1] } },
+          },
         },
       },
     });
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error(result.reason);
-    expect(result.snapshot.responses[0]).toEqual(
-      expect.objectContaining({ answer: [0, 0], additionalComments: 'one; two' }),
-    );
+    expect(result.snapshot.responses).toEqual([
+      expect.objectContaining({ participantId: 'participant', answer: '', additionalComments: 'one; two' }),
+      expect.objectContaining({ participantId: 'voter', answer: [2, -1] }),
+    ]);
+    expect(result.counts).toEqual(expect.objectContaining({ participantCount: 2, responseCount: 2, skippedCount: 1 }));
+    const source = await loadAdminSnapshotResultsAnalysisSource({
+      slug: 'edge',
+      config: { slug: 'edge' },
+      body: { source: { kind: 'admin-snapshot', snapshot: result.snapshot } },
+    });
+    if (!source.ok || !('counts' in source)) throw new Error('Worker did not accept the snapshot.');
+    expect(source.counts).toEqual(expect.objectContaining({ responseCount: 2, excludedCount: 0 }));
     expect(result.snapshot.questions[0]).toEqual({
       id: 'q',
       prompt: '',
