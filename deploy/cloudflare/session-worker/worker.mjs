@@ -108626,7 +108626,7 @@ var FEATURES = Object.freeze([
   "worker_groups"
 ]);
 var WORKERS_AI_FEATURE = "workers_ai_v1";
-var workerRelease = () => "0.9.33" ? "0.9.33" : null;
+var workerRelease = () => "0.9.34" ? "0.9.34" : null;
 var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 = {} }) => {
   const deployed = FEATURES.filter((feature) => feature !== WORKER_GROUP_READ_CODE_FEATURE || workerGroupCodeReadsOn(env));
   const body = {

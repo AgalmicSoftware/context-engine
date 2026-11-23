@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.9.34] - 2026-11-23
+
+The AI prompt a person copies is one short task again and always carries the session's question ids, so an ordinary chat app can build a review link; an atlas or risk matrix Build press is answered at once and followed, and a cleared quadratic answer no longer counts in the Worker's analysis. Needs a Worker update for the Worker changes. MCP stays 0.9.2. Nothing a session already stores is changed.
 
 ### Session Worker — needs a Worker update
 
@@ -23,6 +25,7 @@ All notable changes to this project will be documented in this file.
 - **By an `aiPrompt=1` link, nothing is offered to copy until there is a key.** The centred button used to copy the long prompt without a key, which is not what the person's AI asked for. Unticking the box brings the ordinary prompt back.
 - **The key prompt and the agent guide name the session in the skill's address** (`/api/agent/skill?sessionSlug=…`), for a Worker that serves more than one session, and the prompt no longer ends that address with a full stop.
 - **Larger touch targets.** The "AI can submit for me" row and the prompt box's copy button are now 44 pixels high, and the box's text starts below the button.
+- **Deploy helper.** It deploys the 0.9.33 Worker bundles. A Worker updated from the site gets this release's.
 
 ## [0.9.33] - 2026-11-23
 
