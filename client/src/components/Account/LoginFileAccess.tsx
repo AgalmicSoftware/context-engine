@@ -1,12 +1,13 @@
 import React, { useRef, useState } from 'react';
 import { Button, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faCheck, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faDownload, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import styles from './Account.module.scss';
 
 const LOGIN_FILE_HELP =
   'A login file signs you in without a passkey. Anyone who has the file can sign in as you, so keep it private, ' +
-  'and keep it: it cannot be replaced. This browser asks for the file again after 6 hours, and after you disconnect.';
+  'and keep it: it cannot be replaced. This browser asks for the file again after 6 hours, and after you disconnect. ' +
+  'If no file was saved, open this page in Safari or Chrome and create it there.';
 
 /** Saves a new login file to the person's downloads. */
 export const saveLoginFile = ({ name, text }: { name: string; text: string }): void => {
@@ -17,8 +18,8 @@ export const saveLoginFile = ({ name, text }: { name: string; text: string }): v
   document.body.appendChild(link);
   link.click();
   link.remove();
-  // After the click has started the download.
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  // Long after the click: a phone asks before it downloads, and the address has to last until the answer.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 };
 
 /** Between ways to sign in: larger than the text, so each reads as its own way. */
@@ -219,8 +220,9 @@ const LoginFileAccess = ({ onCreate, onSignIn, savedName, onBack }: LoginFileAcc
           </button>
         </div>
         <div role="status" className={styles.loginFileSaved} data-testid="ce-login-file-saved">
-          <FontAwesomeIcon icon={faCheck} className={styles.passkeyCopiedMark} />
-          Saved {savedName} to your downloads.
+          {/* Where to look, not that it worked: the page cannot tell whether the browser saved the file. */}
+          <FontAwesomeIcon icon={faDownload} className={styles.passkeyCopiedMark} />
+          Check your downloads for {savedName}.
         </div>
         <div className={styles.passkeyCopyAnswers}>
           Keep it safe. To login, here or on another device,{' '}

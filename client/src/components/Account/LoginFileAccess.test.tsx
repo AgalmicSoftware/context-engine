@@ -67,7 +67,12 @@ describe('LoginFileAccess', () => {
     const notice = screen.getByTestId('ce-login-file');
     // Back comes first, in the notice's corner.
     expect(within(notice).getAllByRole('button')[0]).toHaveTextContent('Back');
-    expect(screen.getByRole('status')).toHaveTextContent(`Saved ${file.name} to your downloads.`);
+    // Where to look, without claiming the browser saved it; what to do if it did not is behind the (?).
+    expect(screen.getByRole('status')).toHaveTextContent(`Check your downloads for ${file.name}.`);
+    expect(screen.getByRole('status')).not.toHaveTextContent(/Saved/);
+    expect(screen.getByRole('button', { name: 'About login files' })).toHaveAccessibleDescription(
+      /If no file was saved, open this page in Safari or Chrome and create it there\./,
+    );
     expect(notice).toHaveTextContent(
       'Keep it safe. To login, here or on another device, choose it with Login with file',
     );
@@ -81,6 +86,19 @@ describe('LoginFileAccess', () => {
     expect(saved).toHaveLength(1);
     expect(saved[0].size).toBe(file.text.length);
     expect(saved[0].type).toBe('application/json');
+  });
+
+  it('keeps the download\u2019s address for a minute, for a phone that asks before it downloads', () => {
+    jest.useFakeTimers();
+    try {
+      saveLoginFile(file);
+      jest.advanceTimersByTime(59_000);
+      expect(urls.revokeObjectURL).not.toHaveBeenCalled();
+      jest.advanceTimersByTime(1_000);
+      expect(urls.revokeObjectURL).toHaveBeenCalledWith('blob:login-file');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('signs in with the text of the file that is chosen', async () => {

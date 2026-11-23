@@ -326,6 +326,9 @@ stays first.
   are kept." A reload shows signed out and keeps that tab's unsent answers, which
   return once the same file signs in. Disconnect would discard them, and asks
   first.
+- The page cannot tell whether a browser saved the file. The notice says where
+  to look ("Check your downloads for …"), and its (?) says what to do if no file
+  was saved: built-in browsers of other apps often drop downloads.
 - A passkey Login or Create replaces a login file's record, and the reverse. An
   `encrypted-private-key` wallet's record is never written over. A file that is
   not a login file leaves the signed-in account as it was.

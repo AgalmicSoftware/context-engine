@@ -1093,7 +1093,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       expect(mockedPasskeyWallet.signInWithLoginFile).not.toHaveBeenCalled();
       view.rerender(subject.getModalDisplay());
       expect(screen.getByTestId('ce-login-file-saved')).toHaveTextContent(
-        'Saved context-engine-login-ab12cd.json to your downloads.',
+        'Check your downloads for context-engine-login-ab12cd.json.',
       );
       expect(screen.getByRole('button', { name: 'Login with file' })).toBeInTheDocument();
       expect(screen.queryByTestId('ce-passkey-wallet-status')).not.toBeInTheDocument();
