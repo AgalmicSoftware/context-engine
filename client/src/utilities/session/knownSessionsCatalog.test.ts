@@ -19,9 +19,14 @@ it("lists each known session's catalog address as its page builds it, and the pr
     if (interviewCatalog === undefined) continue;
     const lines = prompt.split('\n');
     const site = `https://contextengine.sh/questions/${slug}`;
-    // The two addresses come in the generator's order, as llms.txt shows them for this session.
+    // The two JSON addresses come in the generator's order, as llms.txt shows them for this session after its
+    // question pages' index, which the prompt does not need: it carries the ids itself.
     const listedOrder = llms
-      .match(new RegExp(`/session/${slug} \\([^\\n]*\\): (\\S+)\\n\\s+second address: (\\S+)\\n`))!
+      .match(
+        new RegExp(
+          `/session/${slug} \\([^\\n]*\\): ${site}\\.md\\n\\s+as JSON: (\\S+)\\n\\s+second address: (\\S+)\\n`,
+        ),
+      )!
       .slice(1, 3);
     expect([...listedOrder].sort()).toEqual([site, interviewCatalog].sort());
     const page = `https://contextengine.sh/session/${slug}`;
