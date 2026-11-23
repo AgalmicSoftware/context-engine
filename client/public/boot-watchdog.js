@@ -12,9 +12,6 @@
   // index.html's loading line: its bar is filled here from the sizes the build wrote on the page's file links.
   var LOADING_ID = 'ce-boot-loading';
   var SLOW_NOTE_MS = 15000;
-  // One automatic fresh try before the message, at most once in this long for a tab.
-  var RETRY_KEY = 'ce:bootAutoRetryAt';
-  var RETRY_WINDOW_MS = 300000;
   var timer = 0;
   var progressTimer = 0;
 
@@ -116,36 +113,14 @@
     document.body.appendChild(notice);
   };
 
-  // A stuck connection often clears on a fresh one, so the first time the wait runs out the page reloads by
-  // itself. The time is kept for the tab, so a page that cannot load reloads once, then says so. Where the
-  // browser keeps nothing for the tab, there is no automatic try.
-  var retried = function retried() {
-    try {
-      var last = Number(window.sessionStorage.getItem(RETRY_KEY)) || 0;
-      if (Date.now() - last < RETRY_WINDOW_MS) return false;
-      window.sessionStorage.setItem(RETRY_KEY, String(Date.now()));
-    } catch (_error) {
-      return false;
-    }
-    var note = document.getElementById(LOADING_ID + '-note');
-    if (note) note.textContent = 'Trying again…';
-    reload();
-    return true;
-  };
-
-  var giveUp = function giveUp() {
-    if (appShown() || document.getElementById(NOTICE_ID)) return;
-    if (!retried()) show();
-  };
-
   var onWaitOver = function onWaitOver() {
     // The app's first script removes the agents' note as it starts, so a missing note means it ran.
     if (!waitedLonger && !document.getElementById(AGENT_NOTE_ID)) {
       waitedLonger = true;
-      timer = window.setTimeout(giveUp, WAIT_WHILE_LOADING_MS - WAIT_AFTER_LOAD_MS);
+      timer = window.setTimeout(show, WAIT_WHILE_LOADING_MS - WAIT_AFTER_LOAD_MS);
       return;
     }
-    giveUp();
+    show();
   };
 
   var startTimer = function startTimer() {
@@ -167,7 +142,7 @@
 
   // Whatever else happens (a part of the page that never arrives also holds back the load event), nothing drawn
   // after the long wait is reported.
-  window.setTimeout(giveUp, WAIT_WHILE_LOADING_MS);
+  window.setTimeout(show, WAIT_WHILE_LOADING_MS);
 
   // The loading line: its bar moves as files arrive, and a slow load is told that it is slow, not broken.
   progressTimer = window.setInterval(showProgress, 300);

@@ -7763,7 +7763,8 @@ a[data-toggle='collapse'][aria-expanded='true'] .caret,
 }
 
 // index.html's loading line while the app's files arrive: hidden for the first second, so a normal load never
-// flashes it. Hidden by its own style, not by the animation: WebKit paints a frame before an animation starts.
+// flashes it. Hidden by its own inline style, not by the animation: WebKit paints a frame before an animation
+// starts, and the line is in the page before this stylesheet arrives.
 .ce-app-loading {
   display: flex;
   flex-direction: column;
@@ -7773,7 +7774,6 @@ a[data-toggle='collapse'][aria-expanded='true'] .caret,
   text-align: center;
   font-size: 16px;
   color: var(--ce-panel-text, CanvasText);
-  visibility: hidden;
   animation: ce-app-loading-in 0s linear 1s forwards;
 
   progress {

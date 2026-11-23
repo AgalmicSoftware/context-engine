@@ -9,7 +9,7 @@ const chunk = (fileName, { facadeModuleId = null, imports = [], css = [], code =
   fileName,
   // As the build gives them: a part loaded on demand has no facade, only the source files it holds.
   facadeModuleId: null,
-  modules: facadeModuleId ? { '/repo/client/src/other.ts': {}, [facadeModuleId]: {} } : {},
+  modules: facadeModuleId ? { '/repo/client/node_modules/dep/src/index.tsx': {}, [facadeModuleId]: {} } : {},
   imports,
   code,
   viteMetadata: { importedCss: new Set(css) },

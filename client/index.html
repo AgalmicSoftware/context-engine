@@ -183,9 +183,9 @@
       second address: https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/agent/interview-catalog?slug=demo-sh&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Fdemo-sh
       <!-- /known-session-catalogs -->
     </p>
-    <!-- Shown while the app's files arrive, from a second in. boot-watchdog.js fills the bar and removes this once
-         the app has drawn. -->
-    <div id="ce-boot-loading" class="ce-app-loading" role="status">
+    <!-- Shown while the app's files arrive, from a second in: hidden here, and revealed by the stylesheet's
+         animation. boot-watchdog.js fills the bar and removes this once the app has drawn. -->
+    <div id="ce-boot-loading" class="ce-app-loading" role="status" style="visibility: hidden">
       <span>Loading…</span>
       <progress max="1" value="0" aria-label="Loading Context Engine"></progress>
       <span id="ce-boot-loading-note"></span>

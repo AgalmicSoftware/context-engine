@@ -137,8 +137,13 @@ const hasReloadParam = (win: BootWindow, reloadParam: string): boolean => {
 };
 
 // Reading window.sessionStorage itself throws when site data is blocked.
+// The in-memory stand-in for blocked storage (storageFallback.ts) is empty after every reload, so it cannot
+// guard against reload loops: it counts as no storage, and the URL marker stays the guard.
 const readSessionStorage = (win: BootWindow | undefined): BootStorage | undefined => {
   try {
+    if ((win as { ceStorageBlocked?: string[] } | undefined)?.ceStorageBlocked?.includes('sessionStorage')) {
+      return undefined;
+    }
     return win?.sessionStorage;
   } catch {
     return undefined;

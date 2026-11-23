@@ -8,15 +8,11 @@ const source = fs.readFileSync(path.join(clientRoot, 'public', 'boot-watchdog.js
 const WAIT_MS = 12000;
 const LONG_WAIT_MS = 45000;
 
-const RETRY_KEY = 'ce:bootAutoRetryAt';
-const boot = ({ retriedAlready = true } = {}) => {
+const boot = () => {
   document.body.innerHTML =
     '<p id="ce-agent-note">For AI agents.</p>' +
     '<div id="ce-boot-loading"><span>Loading…</span><progress max="1" value="0"></progress><span id="ce-boot-loading-note"></span></div>' +
     '<div id="root"></div><script type="module" id="entry"></script><img id="picture" />';
-  // Most tests are about the message, which comes once the one automatic retry has been used.
-  if (retriedAlready) window.sessionStorage.setItem(RETRY_KEY, String(Date.now()));
-  else window.sessionStorage.removeItem(RETRY_KEY);
   // The script runs as the browser would run it: once, against this document.
   new Function(source)();
   window.dispatchEvent(new Event('load'));
@@ -35,26 +31,6 @@ describe('the blank-page message', () => {
   afterEach(() => {
     jest.useRealTimers();
     document.body.innerHTML = '';
-  });
-
-  // First in the file: every boot() below leaves its listeners on the window, and a second copy of the script
-  // answering the same load event would see the first copy's retry as already used.
-  it('reloads by itself the first time the wait runs out, and shows the message the next time', () => {
-    const fetched = jest.fn((_url: string, _init: RequestInit) => new Promise<Response>(() => undefined));
-    (window as unknown as { fetch: unknown }).fetch = fetched;
-    boot({ retriedAlready: false });
-    jest.advanceTimersByTime(WAIT_MS);
-    // A fresh copy of the page is asked for, as Reload does; no message yet.
-    expect(fetched).toHaveBeenCalledTimes(1);
-    expect(notice()).toBeNull();
-    expect(document.getElementById('ce-boot-loading-note')!.textContent).toBe('Trying again…');
-    expect(Number(window.sessionStorage.getItem(RETRY_KEY))).toBeGreaterThan(0);
-
-    // The reloaded page, in the same tab, fails the same way: the message, and no second reload.
-    boot({ retriedAlready: true });
-    jest.advanceTimersByTime(WAIT_MS);
-    expect(fetched).toHaveBeenCalledTimes(1);
-    expect(notice()).not.toBeNull();
   });
 
   it('shows a message and a Reload button when nothing was drawn some seconds after the page loaded', () => {
@@ -83,7 +59,6 @@ describe('the blank-page message', () => {
 
   it('reports a page whose load never finishes, after the long wait', () => {
     document.body.innerHTML = '<p id="ce-agent-note">For AI agents.</p><div id="root"></div>';
-    window.sessionStorage.setItem(RETRY_KEY, String(Date.now()));
     // Still loading, and no load event ever comes: a part of the page never arrived.
     const state = jest.spyOn(document, 'readyState', 'get').mockReturnValue('loading');
     try {
@@ -149,22 +124,11 @@ describe('the blank-page message', () => {
     expect(app).not.toContain('data-ce-boot-ignore');
   });
 
-  it('does not reload by itself where the browser keeps nothing for the tab, or for a blocked first script', () => {
+  it('never reloads the page by itself: a slow load that is still arriving is not thrown away', () => {
     const fetched = jest.fn((_url: string, _init: RequestInit) => new Promise<Response>(() => undefined));
     (window as unknown as { fetch: unknown }).fetch = fetched;
-    const blocked = jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-      throw new DOMException('Access is denied for this document.', 'SecurityError');
-    });
-    try {
-      boot({ retriedAlready: false });
-      jest.advanceTimersByTime(WAIT_MS);
-      expect(notice()).not.toBeNull();
-    } finally {
-      blocked.mockRestore();
-    }
-    document.body.innerHTML = '';
-    boot({ retriedAlready: false });
-    document.getElementById('entry')!.dispatchEvent(new Event('error'));
+    boot();
+    jest.advanceTimersByTime(LONG_WAIT_MS * 2);
     expect(notice()).not.toBeNull();
     expect(fetched).not.toHaveBeenCalled();
   });
@@ -237,7 +201,9 @@ describe('the blank-page message', () => {
     expect(source).not.toMatch(/import |require\(/);
     expect(html).toContain('<noscript>');
     // The loading line is in the shell itself, before the root, and hidden where no script will ever remove it.
-    expect(html.indexOf('id="ce-boot-loading"')).toBeGreaterThan(0);
+    expect(html).toContain(
+      '<div id="ce-boot-loading" class="ce-app-loading" role="status" style="visibility: hidden">',
+    );
     expect(html.indexOf('id="ce-boot-loading"')).toBeLessThan(html.indexOf('<div id="root">'));
     expect(html).toContain('<noscript><style>#ce-boot-loading { display: none; }</style></noscript>');
     expect(html).toContain('id="ce-agent-note"');

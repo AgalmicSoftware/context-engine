@@ -297,6 +297,29 @@ describe('bootRecovery', () => {
     ).toBe(true);
   });
 
+  it('keeps the URL marker as the loop guard when storage is only the in-memory stand-in', () => {
+    // With site data blocked the page runs on a stand-in that is empty after every reload: a reload time kept
+    // there guards nothing, so the marker in the address must stay.
+    const storage = createMemoryStorage();
+    const replaceState = jest.fn();
+    const fakeWindow = {
+      ceStorageBlocked: ['localStorage', 'sessionStorage'],
+      history: { replaceState },
+      location: { href: 'https://app.example.test/session/alpha?ceChunkReload=1000000' },
+      sessionStorage: storage,
+    };
+
+    expect(clearStaleChunkReloadMarker(fakeWindow)).toBe(false);
+    expect(replaceState).not.toHaveBeenCalled();
+    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(
+      recoverFromStaleChunkLoadError(new TypeError('Failed to fetch dynamically imported module'), {
+        window: fakeWindow,
+        reload: jest.fn(),
+      }),
+    ).toBe(false);
+  });
+
   it('leaves an offline chunk failure to the error boundary instead of reloading', () => {
     const reload = jest.fn();
     const storage = createMemoryStorage();

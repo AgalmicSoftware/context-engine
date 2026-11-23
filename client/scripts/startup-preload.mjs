@@ -1,7 +1,8 @@
 // The page's first script asks for the app, and the app asks for its main part: three round trips, one after
 // another, before anything shows. The built page names those files itself, so they download together from the
 // start. Each link carries its file's size, which public/boot-watchdog.js adds up to show how far the load is.
-const STARTS = [/\/src\/index\.tsx$/, /\/src\/components\/MainSite\/AppShell\.tsx$/];
+// The client's own two files, not a dependency's file of the same name.
+const STARTS = [/\/client\/src\/index\.tsx$/, /\/client\/src\/components\/MainSite\/AppShell\.tsx$/];
 
 export const addStartupPreloads = (html, { bundle, entryFileName }) => {
   const base = (html.match(/<script type="module"[^>]* src="([^"]*\/)assets\//) || [])[1] || '/';
