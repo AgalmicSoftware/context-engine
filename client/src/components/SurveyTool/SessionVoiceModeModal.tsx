@@ -82,7 +82,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   const [interviewVersion, setInterviewVersion] = useState(0);
   // The interview on screen, as the panel's key counts it: each opening and each fresh start is a new one.
   const interviewKey = `${props.openCount || 0}:${interviewVersion}`;
-  // Once it has begun, "Let your AI draft your answers" stays off the Interview screen, after Submit too; the
+  // Once it has begun, "Have AI draft your answers" stays off the Interview screen, after Submit too; the
   // choices one level back still offer it, and the next interview starts on it again.
   const [begunFor, setBegunFor] = useState('');
   useEffect(() => {

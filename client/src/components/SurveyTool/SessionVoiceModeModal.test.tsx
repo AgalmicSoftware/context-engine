@@ -2307,13 +2307,13 @@ describe('SessionVoiceModeModal', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent(groupAbout);
     fireEvent.blur(help);
     expect(help).toHaveAccessibleDescription(`Interview ${interviewAbout} Group Conversation ${groupAbout}`);
-    const prefill = screen.getByRole('region', { name: 'Let your AI draft your answers' });
+    const prefill = screen.getByRole('region', { name: 'Have AI draft your answers' });
     // Its description is only read out with its "?", not shown as text.
     const prefillAbout =
       'Your AI drafts answers from what it knows about you, and you review them here before anything is submitted.';
     expect(within(prefill).getByText(prefillAbout)).not.toBeVisible();
     expect(
-      within(prefill).getByRole('button', { name: 'About letting your AI draft your answers' }),
+      within(prefill).getByRole('button', { name: 'About having AI draft your answers' }),
     ).toHaveAccessibleDescription(prefillAbout);
     expect(prefill).toHaveAttribute('data-testid', E2E_TESTIDS.SESSION_VOICE_PREFILL);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_CHOOSER)).not.toContainElement(prefill);

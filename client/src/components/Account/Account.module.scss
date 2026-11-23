@@ -2730,6 +2730,22 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
+// "AI can submit for me", above the button, with its "?" beside it.
+.agentHandoffCanSubmit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-weight: 650;
+    cursor: pointer;
+  }
+}
+
 // The open row: the Copy prompt button, then one line about the key.
 .agentHandoffBody {
   display: grid;

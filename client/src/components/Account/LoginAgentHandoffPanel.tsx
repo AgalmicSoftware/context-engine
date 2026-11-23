@@ -187,12 +187,13 @@ const LoginAgentHandoffPanel = ({
   const signedIn = Boolean((context as { account?: unknown } | null | undefined)?.account);
   // Starts closed so the sign-in dialog stays short; a link for the prompt opens it.
   const [open, setOpen] = useState(promptRequested);
-  // Signed in, where the session gives keys, the prompt holds the person's: made once the row is open, since
-  // only an open row should ask the session anything.
-  const agentKey = useAgentKey(requestKey, agentHttpEnabled && signedIn && open);
+  // Unticked to start with: the prompt then only drafts, and no key is made or copied. A person sent here by
+  // their AI's link came for the key, so for them it starts ticked.
+  const [canSubmit, setCanSubmit] = useState(promptRequested);
+  const keysOffered = agentHttpEnabled && signedIn;
+  // The key is made once the row is open, since only an open row should ask the session anything.
+  const agentKey = useAgentKey(requestKey, keysOffered && open && canSubmit);
   const { promptKey } = agentKey;
-  // The key of the prompt last copied: the line about it shows only once that prompt has been copied.
-  const [copiedKey, setCopiedKey] = useState('');
   const [copyStatus, setCopyStatus] = useState('');
   // A new node for each copy, so a screen reader announces a repeated message.
   const [copyCount, setCopyCount] = useState(0);
@@ -206,13 +207,20 @@ const LoginAgentHandoffPanel = ({
     if (signedOutSeen.current === agentsSignedOut) return;
     signedOutSeen.current = agentsSignedOut;
     resetKey.current();
+    setCanSubmit(false);
     setOpen(false);
     setSignOutShown(true);
     setCopyStatus('');
   }, [agentsSignedOut]);
 
-  const expiry = promptKey
-    ? new Date(promptKey.key.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  // After Sign Agents Out the row is back where it starts: drafting only.
+  const { signOuts } = agentKey;
+  useEffect(() => {
+    if (signOuts) setCanSubmit(false);
+  }, [signOuts]);
+  // A key that was copied works until its time, wherever it was pasted, so the line stays while it does.
+  const expiry = agentKey.copiedUntil
+    ? new Date(agentKey.copiedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : '';
   return (
     <section
@@ -244,12 +252,36 @@ const LoginAgentHandoffPanel = ({
         </h3>
         <Help id="ce-agent-handoff-about">
           Copy the prompt and paste it into ChatGPT, Claude or another AI. It drafts answers from what it knows about
-          you and gives back a link that opens them here for you to review and submit. Signed in, where this session
-          allows it, the prompt also holds a key that lets an AI submit answers as you: yours is told to show you its
-          answers and wait for your yes, but nothing stops whoever holds the prompt, so paste it only into your own AI.
+          you and gives back a link that opens them here for you to review and submit. With &quot;AI can submit for
+          me&quot; ticked, the prompt also holds a key that lets an AI submit answers as you: yours is told to show you
+          its answers and wait for your yes, but nothing stops whoever holds the prompt, so paste it only into your own
+          AI.
         </Help>
       </div>
       <div id="ce-agent-handoff-body" className={styles.agentHandoffBody} hidden={!open}>
+        {keysOffered ? (
+          <div className={styles.agentHandoffCanSubmit}>
+            <label>
+              <input
+                type="checkbox"
+                checked={canSubmit}
+                onChange={(event) => {
+                  // Ticking is the tap that lets a key be made, after Sign Agents Out too. Unticked again, the
+                  // key leaves the prompt and this page; one already copied still works.
+                  if (event.target.checked) agentKey.resume();
+                  else agentKey.forget();
+                  setCanSubmit(event.target.checked);
+                }}
+                aria-describedby="ce-agent-handoff-can-submit-about-about"
+                data-testid="ce-agent-handoff-can-submit"
+              />
+              AI can submit for me
+            </label>
+            <Help id="ce-agent-handoff-can-submit-about" placement="bottom">
+              If checked, the prompt can hold a key and the AI can act on your behalf.
+            </Help>
+          </div>
+        ) : null}
         {/* Mounted only once opened: its check may ask to sign in to the session, which only an open box should. */}
         {open ? (
           <PromptCopy
@@ -261,17 +293,17 @@ const LoginAgentHandoffPanel = ({
             workerUrl={workerUrl}
             agentHttpEnabled={agentHttpEnabled}
             agentKey={promptKey}
-            keyOnly={promptRequested}
+            keyOnly={promptRequested && canSubmit}
             holdCopy={agentKey.making ? 'Adding your AI key…' : ''}
             onCopied={() => {
-              setCopiedKey(promptKey?.key.token || '');
+              agentKey.markCopied();
               setCopyStatus('Copied the prompt.');
               setCopyCount((count) => count + 1);
             }}
           >
-            {promptKey && copiedKey === promptKey.key.token ? (
+            {expiry ? (
               <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-expiry">
-                Whoever gets this prompt can answer as you here until {expiry}
+                Key can answer as you until {expiry}
                 <Help id="ce-agent-handoff-expiry-about" placement="bottom">
                   The prompt holds a key to {sessionName} only. Paste it only into your own AI: a chat app keeps what
                   you paste in its history. The key ends when your sign-in ends or when you sign agents out.
@@ -282,7 +314,7 @@ const LoginAgentHandoffPanel = ({
         ) : null}
         {/* Someone who came by the link came for the key. Where it needs a fresh sign-in to the session, that
             is theirs to start: a link alone never raises a signing prompt. */}
-        {promptRequested && agentKey.quietFailed ? (
+        {promptRequested && canSubmit && agentKey.quietFailed ? (
           <button
             type="button"
             className={styles.agentHandoffButton}

@@ -967,6 +967,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       this.getTestFundsRequestContextKey(this.props, this.state) !==
       this.getTestFundsRequestContextKey(prevProps, prevState);
     const accountChanged = this.props.account !== prevProps.account;
+    // The link's request for the AI prompt was for whoever signed in from it, not for the next account.
+    if (accountChanged && prevProps.account && this.state.agentPromptRequested) {
+      this.setStateIfMounted({ agentPromptRequested: false });
+    }
     if ((accountChanged || activeSessionChanged) && this.state.agentTokenStatus === 'loading') {
       this.setStateIfMounted({ agentTokenInput: '', agentTokenStatus: '', agentTokenError: '' });
     }

@@ -657,7 +657,9 @@ export const buildExternalInterviewKickoff = ({
       ? [
           'I have an account in this session: make no other. This prompt holds no AI key, so draft.',
           ...(agentKeysOffered
-            ? ['If I want you to submit as me, I can copy the prompt again in the session with my AI key in it.']
+            ? [
+                'If I want you to submit as me, I can copy the prompt again in the session with "AI can submit for me" ticked.',
+              ]
             : []),
         ]
       : ['This prompt holds no AI key.'];

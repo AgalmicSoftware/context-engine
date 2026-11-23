@@ -14,6 +14,7 @@ import styles from './SurveyTool.module.scss';
 
 const PREFILL_ABOUT =
   'Your AI drafts answers from what it knows about you, and you review them here before anything is submitted.';
+const CAN_SUBMIT_ABOUT = 'If checked, the prompt can hold a key and the AI can act on your behalf.';
 const KEY_ABOUT =
   'The prompt holds a key to this session. With it an AI can submit answers as you; yours is told to show you its answers and wait for your yes, but nothing stops whoever holds the prompt. Paste it only into your own AI: a chat app keeps what you paste in its history. The key ends with your sign-in, or when you sign agents out.';
 
@@ -51,7 +52,8 @@ const Help = ({ id, label, children }: { id: string; label: string; children: Re
 
 /**
  * The voice chooser's own-AI option: a prompt to paste into ChatGPT or Claude. Signed in, where the session
- * gives AI keys, the prompt holds the person's key, so their AI can ask whether to draft or to submit as them.
+ * gives AI keys, ticking "AI can submit for me" puts the person's key in the prompt, so their AI can submit
+ * as them; unticked, as it starts, no key is made.
  */
 export default function SessionVoicePrefillCard({
   sessionSlug = '',
@@ -62,8 +64,8 @@ export default function SessionVoicePrefillCard({
   existingResponseSlice,
 }: Props) {
   const [promptCopied, setPromptCopied] = useState(false);
-  // The key of the prompt last copied: the line about it shows only once that prompt has been copied.
-  const [copiedKey, setCopiedKey] = useState('');
+  // Unticked to start with: the prompt then only drafts, and no key is made or copied.
+  const [canSubmit, setCanSubmit] = useState(false);
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const account = String((context as { account?: unknown } | null | undefined)?.account || '');
   const keysOffered = isSessionModeProfileAgentHttpEnabled(sessionConfig);
@@ -82,7 +84,7 @@ export default function SessionVoicePrefillCard({
       if (!workerToken) throw new Error('sign in to this session first');
       return requestAgentDelegateKey({ agentWorkerUrl: worker, sessionSlug, workerToken });
     },
-    keysOffered && Boolean(account) && Boolean(worker),
+    keysOffered && Boolean(account) && Boolean(worker) && canSubmit,
   );
   const sessionName = String(sessionConfig?.sessionName || '').trim();
   const { kickoff: prefill, workerUrl: foundWorker } = useSessionPrefillKickoff({
@@ -106,7 +108,14 @@ export default function SessionVoicePrefillCard({
     if (firstAccount.current === account) return;
     firstAccount.current = account;
     resetKey.current();
+    // Another person starts where everyone does: drafting only.
+    setCanSubmit(false);
   }, [account]);
+  // After Sign Agents Out the card is back where it starts: drafting only.
+  const { signOuts } = agentKey;
+  useEffect(() => {
+    if (signOuts) setCanSubmit(false);
+  }, [signOuts]);
   useEffect(
     () => () => {
       if (copyResetRef.current) clearTimeout(copyResetRef.current);
@@ -118,15 +127,15 @@ export default function SessionVoicePrefillCard({
   const copyPrompt = async (prompt: string) => {
     setPromptCopied(false);
     if (!(await copyText(prompt))) return false;
-    setCopiedKey(agentKey.promptKey?.key.token || '');
+    agentKey.markCopied();
     setPromptCopied(true);
     if (copyResetRef.current) clearTimeout(copyResetRef.current);
     copyResetRef.current = setTimeout(() => setPromptCopied(false), 1800);
     return true;
   };
-  const { promptKey } = agentKey;
-  const expiry = promptKey
-    ? new Date(promptKey.key.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  // A key that was copied works until its time, wherever it was pasted, so the line stays while it does.
+  const expiry = agentKey.copiedUntil
+    ? new Date(agentKey.copiedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : '';
   return (
     <section
@@ -135,11 +144,34 @@ export default function SessionVoicePrefillCard({
       data-testid={E2E_TESTIDS.SESSION_VOICE_PREFILL}
     >
       <div className={styles.sessionVoicePrefillHeading}>
-        <h3 id="ce-session-voice-prefill-title">Let your AI draft your answers</h3>
-        <Help id="ce-session-voice-prefill-help" label="About letting your AI draft your answers">
+        <h3 id="ce-session-voice-prefill-title">Have AI draft your answers</h3>
+        <Help id="ce-session-voice-prefill-help" label="About having AI draft your answers">
           {PREFILL_ABOUT}
         </Help>
       </div>
+      {keysOffered && account ? (
+        <div className={styles.sessionVoicePrefillChoice}>
+          <label>
+            <input
+              type="checkbox"
+              checked={canSubmit}
+              onChange={(event) => {
+                // Ticking is the tap that lets a key be made, after Sign Agents Out too. Unticked again, the key
+                // leaves the prompt and this page; one already copied still works.
+                if (event.target.checked) agentKey.resume();
+                else agentKey.forget();
+                setCanSubmit(event.target.checked);
+              }}
+              aria-describedby="ce-session-voice-prefill-submit-help-about"
+              data-testid={E2E_TESTIDS.SESSION_VOICE_PREFILL_CAN_SUBMIT}
+            />
+            AI can submit for me
+          </label>
+          <Help id="ce-session-voice-prefill-submit-help" label="About letting AI submit for you">
+            {CAN_SUBMIT_ABOUT}
+          </Help>
+        </div>
+      ) : null}
       <SessionInterviewMemoryKickoffCard
         // Another account is checked afresh, for its own ticket.
         key={prefill.accountKey}
@@ -148,11 +180,11 @@ export default function SessionVoicePrefillCard({
         promptCopied={promptCopied}
         onCopyPrompt={copyPrompt}
         // The prompt is about to take the key: a copy now would give the one without it.
-        holdCopy={keysOffered && account && (!worker || agentKey.making) ? 'Adding your AI key…' : ''}
+        holdCopy={keysOffered && account && canSubmit && (!worker || agentKey.making) ? 'Adding your AI key…' : ''}
       >
-        {promptKey && copiedKey === promptKey.key.token ? (
+        {expiry ? (
           <div className={styles.sessionVoicePrefillChoice} data-testid={E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE}>
-            <span>Whoever gets this prompt can answer as you here until {expiry}</span>
+            <span>Key can answer as you until {expiry}</span>
             <Help id="ce-session-voice-prefill-key-help" label="About your AI key">
               {KEY_ABOUT}
             </Help>

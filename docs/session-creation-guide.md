@@ -1382,7 +1382,7 @@ answers ([agent-fidelity.md](agent-fidelity.md)):
 2. Before anyone answers, write down the primary measure
    ([Fix the plan before looking](agent-fidelity.md#fix-the-plan-before-looking)).
 3. Share the session link with `?mode=voice`. It opens the microphone's
-   chooser with **Let your AI draft your answers**: people copy its prompt
+   chooser with **Have AI draft your answers**: people copy its prompt
    into ChatGPT or Claude, open the link it returns, and review the drafts
    before submitting.
 4. After submitting, each person sees how well their AI predicted them,

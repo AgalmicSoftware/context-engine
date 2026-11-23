@@ -78,6 +78,13 @@ const copyPrompt = async () => {
   return String(writeText.mock.calls.at(-1)?.[0] || '');
 };
 const KEY_LINE = `The key is ${key.token};`;
+const canSubmit = () => screen.getByRole('checkbox', { name: 'AI can submit for me' });
+// Opens the row and ticks "AI can submit for me", which is what puts a key in the prompt.
+const renderKeyPanel = (props: Partial<React.ComponentProps<typeof LoginAgentHandoffPanel>> = {}) => {
+  const view = renderPanel(props);
+  fireEvent.click(canSubmit());
+  return view;
+};
 // A quiet try that would need a fresh sign-in; a try the person asked for gets the key.
 const needsSignIn = () =>
   jest.fn(async ({ prompt }: { prompt: boolean }) => {
@@ -102,25 +109,26 @@ it('starts closed, with its explanation still at hand, and opens as a disclosure
   expect(document.getElementById('ce-agent-handoff-body')).toBeVisible();
 });
 
-it('signed in, gives one prompt to copy with the AI key already in it, and one line saying so', async () => {
+it('starts with "AI can submit for me" unticked: no key is made or copied until the person ticks it', async () => {
   const requestKey = jest.fn(async (_options: { prompt: boolean }) => key);
   renderPanel({ requestKey });
-  // Nothing about the key shows until the prompt holding it has been copied.
-  await waitFor(() => expect(screen.getByTestId('ce-agent-handoff-copy')).toHaveAttribute('aria-disabled', 'false'));
+  expect(canSubmit()).not.toBeChecked();
+  const draft = await copyPrompt();
+  expect(draft).not.toContain('ceagt_');
+  expect(draft).toContain('I have an account in this session: make no other. This prompt holds no AI key, so draft.');
+  expect(requestKey).not.toHaveBeenCalled();
   expect(screen.queryByTestId('ce-agent-handoff-expiry')).not.toBeInTheDocument();
+  expect(screen.getAllByTestId('ce-agent-handoff-copy')).toHaveLength(1);
+
+  // Ticked, the key is made without asking the person anything more, once, and goes into the prompt.
+  fireEvent.click(canSubmit());
+  expect(canSubmit()).toBeChecked();
   const prompt = await copyPrompt();
-  // Made without asking the person anything, once.
   expect(requestKey).toHaveBeenCalledTimes(1);
   expect(requestKey).toHaveBeenCalledWith({ prompt: false });
   expect(screen.getByTestId('ce-agent-handoff-copy')).toHaveTextContent('Copied');
   expect(await screen.findByText('Copied the prompt.')).toBeInTheDocument();
-  expect(screen.getByTestId('ce-agent-handoff-expiry')).toHaveTextContent(
-    /^Whoever gets this prompt can answer as you here until /,
-  );
-  // No setting to choose: the AI asks whether to draft or submit, and shows its answers before it submits.
-  expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
-  expect(screen.queryByRole('radio')).not.toBeInTheDocument();
-  expect(screen.getAllByTestId('ce-agent-handoff-copy')).toHaveLength(1);
+  expect(screen.getByTestId('ce-agent-handoff-expiry')).toHaveTextContent(/^Key can answer as you until /);
   expect(prompt).toContain(KEY_LINE);
   expect(prompt).toContain('I have an account in this session: make no other. This prompt holds my AI key');
   expect(prompt).toContain('submit them as me only after I say yes here');
@@ -131,6 +139,39 @@ it('signed in, gives one prompt to copy with the AI key already in it, and one l
   expect(prompt).not.toMatch(/no MCP|This task does not need it|without asking me again/);
   // Drafts come back to the session's page, not to wherever the dialog was opened.
   expect(prompt).toContain(`sessionUrl=${encodeURIComponent(sessionUrl)}`);
+
+  // Unticked again, the key leaves the prompt. The line stays, since the key that was copied still works.
+  fireEvent.click(canSubmit());
+  expect(await copyPrompt()).not.toContain('ceagt_');
+  expect(screen.getByTestId('ce-agent-handoff-expiry')).toHaveTextContent(/^Key can answer as you until /);
+  expect(requestKey).toHaveBeenCalledTimes(1);
+  // The page kept no key: ticked again, it asks for a new one.
+  fireEvent.click(canSubmit());
+  expect(await copyPrompt()).toContain(KEY_LINE);
+  expect(requestKey).toHaveBeenCalledTimes(2);
+  expect(canSubmit()).toHaveAccessibleDescription(
+    'If checked, the prompt can hold a key and the AI can act on your behalf.',
+  );
+});
+
+it('takes no key that arrives after the box is unticked again', async () => {
+  let resolve: (value: typeof key) => void = () => {};
+  const requestKey = jest.fn(() => new Promise<typeof key>((done) => (resolve = done)));
+  renderKeyPanel({ requestKey });
+  await waitFor(() => expect(requestKey).toHaveBeenCalledTimes(1));
+  fireEvent.click(canSubmit());
+  await act(async () => resolve(key));
+  expect(await copyPrompt()).not.toContain('ceagt_');
+  expect(screen.queryByTestId('ce-agent-handoff-expiry')).not.toBeInTheDocument();
+});
+
+it('tries quietly again shortly, as right after a sign-in, before giving up on the key', async () => {
+  QUIET_RETRY_DELAYS_MS.push(20, 20);
+  const requestKey = jest.fn().mockRejectedValueOnce(new Error('the page is still signing in')).mockResolvedValue(key);
+  renderKeyPanel({ requestKey });
+  expect(await copyPrompt()).toContain(KEY_LINE);
+  expect(requestKey).toHaveBeenCalledTimes(2);
+  expect(requestKey).toHaveBeenLastCalledWith({ prompt: false });
 });
 
 it('shows the prompt with stand-ins where its key and private link are, never the values', async () => {
@@ -141,7 +182,7 @@ it('shows the prompt with stand-ins where its key and private link are, never th
       ? catalog()
       : new Response(JSON.stringify({ reason: 'private_session_invite_required' }), { status: 403 }),
   );
-  renderPanel();
+  renderKeyPanel();
   const prompt = await copyPrompt();
   expect(prompt).toContain('&ticket=ic1.mine');
   expect(prompt).toContain('The link is private to me');
@@ -176,12 +217,11 @@ it('says so when the session has no Worker to read its questions from', async ()
 });
 
 it("keeps the key out of the prompt where the session doesn't let an AI submit", async () => {
-  renderPanel({ requestKey: jest.fn(async () => ({ ...key, submitAnswers: false })) });
+  renderKeyPanel({ requestKey: jest.fn(async () => ({ ...key, submitAnswers: false })) });
   const prompt = await copyPrompt();
   expect(prompt).not.toContain('ceagt_');
   expect(prompt).toContain('This prompt holds no AI key, so draft.');
   expect(screen.queryByTestId('ce-agent-handoff-expiry')).not.toBeInTheDocument();
-  expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
 });
 
 it('asks for no key while the session has Agent HTTP off, or while signed out', async () => {
@@ -198,26 +238,26 @@ it('asks for no key while the session has Agent HTTP off, or while signed out', 
   expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
 });
 
-it('copies the prompt without a key where the key needs a fresh sign-in or has already ended, with nothing to tick', async () => {
+it('copies the prompt without a key where the key needs a fresh sign-in or has already ended, asking nothing', async () => {
   const requestKey = needsSignIn();
-  const view = renderPanel({ requestKey });
+  const view = renderKeyPanel({ requestKey });
   const without = await copyPrompt();
   expect(without).not.toContain('ceagt_');
-  expect(without).toContain('If I want you to submit as me, I can copy the prompt again in the session with my AI key');
+  expect(without).toContain('I can copy the prompt again in the session with "AI can submit for me" ticked');
   expect(requestKey).toHaveBeenCalledTimes(1);
-  expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Add my AI key' })).not.toBeInTheDocument();
   expect(screen.getByRole('alert')).toBeEmptyDOMElement();
   expect(screen.queryByTestId('ce-agent-handoff-expiry')).not.toBeInTheDocument();
   view.unmount();
   const ended = jest.fn(async () => ({ ...key, expiresAt: new Date(Date.now() - 1000).toISOString() }));
-  renderPanel({ requestKey: ended, context: { account: `0x${'6'.repeat(40)}` } });
+  renderKeyPanel({ requestKey: ended, context: { account: `0x${'6'.repeat(40)}` } });
   expect(await copyPrompt()).not.toContain('ceagt_');
   expect(ended).toHaveBeenCalledTimes(1);
 });
 
 it('holds the copy while the key is made, so the prompt copied is the one with it', async () => {
   let resolve: (value: typeof key) => void = () => {};
-  renderPanel({ requestKey: jest.fn(() => new Promise<typeof key>((done) => (resolve = done))) });
+  renderKeyPanel({ requestKey: jest.fn(() => new Promise<typeof key>((done) => (resolve = done))) });
   expect(await screen.findByText('Adding your AI key…')).toBeInTheDocument();
   const copy = await screen.findByTestId('ce-agent-handoff-copy');
   // Unclickable, with a spinner, until the key is in the prompt.
@@ -250,7 +290,7 @@ it('gives a refused copy its own field with the whole prompt, key included, not 
   writeText.mockImplementation(async () => {
     throw new Error('denied');
   });
-  renderPanel();
+  renderKeyPanel();
   const button = await screen.findByTestId('ce-agent-handoff-copy');
   await waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'false'));
   fireEvent.click(screen.getByRole('button', { name: 'Read the AI prompt' }));
@@ -270,7 +310,7 @@ it('copies with the older copy command where the clipboard is missing', async ()
     value: () => copied.push((document.activeElement as HTMLTextAreaElement).value) > 0,
   });
   try {
-    renderPanel();
+    renderKeyPanel();
     const button = await screen.findByTestId('ce-agent-handoff-copy');
     await waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'false'));
     await act(async () => fireEvent.click(button));
@@ -323,6 +363,7 @@ it('holds Sign Agents Out under the prompt; after it, drops the dead key and clo
   const toggle = screen.getByRole('button', { name: 'Your AI agent' });
   fireEvent.click(toggle);
   expect(signOut).toBeVisible();
+  fireEvent.click(canSubmit());
   expect(await copyPrompt()).toContain(KEY_LINE);
   const expiry = screen.getByTestId('ce-agent-handoff-expiry');
   expect(expiry.compareDocumentPosition(signOut) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -336,8 +377,11 @@ it('holds Sign Agents Out under the prompt; after it, drops the dead key and clo
   expect(signOut).toBeVisible();
   expect(props.requestKey).toHaveBeenCalledTimes(1);
 
-  // Reopened, the prompt gets a new key.
+  // Reopened, it is back on drafting only; ticked, the prompt gets a new key.
   fireEvent.click(toggle);
+  expect(canSubmit()).not.toBeChecked();
+  expect(await copyPrompt()).not.toContain('ceagt_');
+  fireEvent.click(canSubmit());
   expect(await copyPrompt()).toContain(KEY_LINE);
   expect(props.requestKey).toHaveBeenCalledTimes(2);
   fireEvent.click(toggle);
@@ -358,6 +402,7 @@ it('shows no key asked for before Sign Agents Out', async () => {
   };
   const { rerender } = render(<LoginAgentHandoffPanel {...props} agentsSignedOut={0} />);
   fireEvent.click(screen.getByRole('button', { name: 'Your AI agent' }));
+  fireEvent.click(canSubmit());
   await waitFor(() => expect(props.requestKey).toHaveBeenCalledTimes(1));
   rerender(<LoginAgentHandoffPanel {...props} agentsSignedOut={1} />);
   await act(async () => resolve(key));
@@ -373,6 +418,8 @@ describe('opened by a link for the AI prompt', () => {
     expect(screen.getByRole('button', { name: 'Your AI agent' })).toHaveAttribute('aria-expanded', 'true');
     expect(await copyPrompt()).not.toContain('ceagt_');
     expect(requestKey).not.toHaveBeenCalled();
+    // Signed out there is no key to choose, so nothing to tick.
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
   });
 
   it('signed in, copies a short prompt that hands over the key, with the button in the middle', async () => {
@@ -393,6 +440,18 @@ describe('opened by a link for the AI prompt', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Read the AI prompt' }));
     expect(screen.getByTestId('ce-agent-handoff-prompt')).toHaveTextContent('The key is <AIKey>;');
     expect(screen.getByTestId('ce-agent-handoff-prompt')).not.toHaveTextContent('ceagt_secret');
+  });
+
+  it('starts ticked for a person sent for their key; unticked, it copies the full prompt without one', async () => {
+    const requestKey = jest.fn(async () => key);
+    renderClosedPanel({ promptRequested: true, requestKey });
+    expect(canSubmit()).toBeChecked();
+    expect(await copyPrompt()).toContain(KEY_LINE);
+    fireEvent.click(canSubmit());
+    const draft = await copyPrompt();
+    expect(draft).not.toContain('ceagt_');
+    expect(draft).toContain('interview-catalog');
+    expect(requestKey).toHaveBeenCalledTimes(1);
   });
 
   it('raises no signing prompt by itself where the key needs a fresh sign-in: the person adds the key', async () => {
@@ -427,25 +486,28 @@ describe('opened by a link for the AI prompt', () => {
   });
 
   it('offers no such button outside the link: there the prompt simply goes without a key', async () => {
-    renderPanel({ requestKey: needsSignIn() });
+    renderKeyPanel({ requestKey: needsSignIn() });
     expect(await copyPrompt()).not.toContain('ceagt_');
     expect(screen.queryByRole('button', { name: 'Add my AI key' })).not.toBeInTheDocument();
   });
 });
 
-it('makes no new key straight after Sign Agents Out; opening the row again does', async () => {
+it('goes back to drafting only at Sign Agents Out, and makes a key again only when ticked', async () => {
   const requestKey = jest.fn(async () => key);
-  renderPanel({ requestKey });
+  renderKeyPanel({ requestKey });
   expect(await copyPrompt()).toContain(KEY_LINE);
   expect(requestKey).toHaveBeenCalledTimes(1);
   act(() => void window.dispatchEvent(new Event('ce-agents-signed-out')));
-  // The dead key is gone from the prompt, and nothing asks for another.
+  // The dead key is gone from the prompt, the copied one no longer works, and the box is unticked again.
   expect(await copyPrompt()).not.toContain('ceagt_');
-  expect(requestKey).toHaveBeenCalledTimes(1);
   expect(screen.queryByTestId('ce-agent-handoff-expiry')).not.toBeInTheDocument();
+  expect(canSubmit()).not.toBeChecked();
   const toggle = screen.getByRole('button', { name: 'Your AI agent' });
   fireEvent.click(toggle);
   fireEvent.click(toggle);
+  expect(await copyPrompt()).not.toContain('ceagt_');
+  expect(requestKey).toHaveBeenCalledTimes(1);
+  fireEvent.click(canSubmit());
   expect(await copyPrompt()).toContain(KEY_LINE);
   expect(requestKey).toHaveBeenCalledTimes(2);
 });

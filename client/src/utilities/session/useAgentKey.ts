@@ -9,11 +9,11 @@ const stillGood = (key: AgentDelegateKey | null): key is AgentDelegateKey =>
 
 /**
  * The AI key that goes into a signed-in person's AI prompt, so their AI can submit as them. While `wanted`
- * (they are signed in and the session gives keys), one is made without asking them anything; where that would
- * need a fresh sign-in to the session, none is made unless `ask` runs, for a person who came for the key. It is made before
- * the copy, never in it, since a copy must begin in its own tap. The key lives only here, never in browser
- * storage; one past its time is replaced, and Sign Agents Out drops it and makes no other until the person
- * comes back to the card.
+ * (they are signed in, the session gives keys, and they have ticked "AI can submit for me"), one is made
+ * without asking them anything more; where that would need a fresh sign-in to the session, none is made unless
+ * `ask` runs, for a person who came for the key. It is made before the copy, never in it, since a copy must
+ * begin in its own tap. The key lives only here, never in browser storage; one past its time is replaced, and
+ * Sign Agents Out drops it and makes no other until the person comes back to the card.
  */
 export const useAgentKey = (
   requestKey: (options: { prompt: boolean }) => Promise<AgentDelegateKey>,
@@ -26,6 +26,10 @@ export const useAgentKey = (
   const [quietFailed, setQuietFailed] = useState(false);
   // After Sign Agents Out no key is made until the person comes back to it: the card is opened again, or `resume`.
   const [paused, setPaused] = useState(false);
+  // When the key last copied ends: it works until then wherever it was pasted, whatever the card does next.
+  const [copiedUntil, setCopiedUntil] = useState('');
+  // Counts Sign Agents Out, so a card can go back to drafting only.
+  const [signOuts, setSignOuts] = useState(0);
   // A quiet try that fails is tried again shortly, a few times: right after a sign-in the page is still signing
   // in to the session, and a quiet try never waits on that.
   const [waiting, setWaiting] = useState(false);
@@ -66,8 +70,8 @@ export const useAgentKey = (
     // `make` reads only refs and setters.
   }, [wanted, paused, good, making, waiting, quietFailed, error]);
 
-  /** Drops the key and starts afresh, as for another account or after Sign Agents Out. */
-  const reset = () => {
+  /** Drops the key this page holds, and the answer to any request for one still on its way. */
+  const forget = () => {
     round.current += 1;
     clearTimeout(retryTimer.current);
     quietTries.current = 0;
@@ -78,12 +82,18 @@ export const useAgentKey = (
     setQuietFailed(false);
     setPaused(false);
   };
+  /** Starts afresh, as for another account or after Sign Agents Out: no key, and none copied that still works. */
+  const reset = () => {
+    forget();
+    setCopiedUntil('');
+  };
   const resetRef = useRef(reset);
   resetRef.current = reset;
   useEffect(() => {
     const dropKey = () => {
       resetRef.current();
       setPaused(true);
+      setSignOuts((count) => count + 1);
     };
     window.addEventListener(AGENTS_SIGNED_OUT_EVENT, dropKey);
     return () => window.removeEventListener(AGENTS_SIGNED_OUT_EVENT, dropKey);
@@ -102,6 +112,12 @@ export const useAgentKey = (
     ask: () => void make(true),
     /** Lets a key be made again after Sign Agents Out. */
     resume: () => setPaused(false),
+    /** Call when the prompt was copied: a key in it now works wherever it is pasted. */
+    markCopied: () => setCopiedUntil(promptKey ? promptKey.key.expiresAt : copiedUntil),
+    /** When a key that was copied ends, while it still works; '' otherwise. */
+    copiedUntil: Date.parse(copiedUntil) > Date.now() ? copiedUntil : '',
+    signOuts,
+    forget,
     reset,
   };
 };

@@ -400,7 +400,7 @@ test('skill.md starts from what the agent can do', () => {
   const found = order.map((text) => cases.indexOf(text));
   assert.ok(found.every((at) => at >= 0), 'a case is missing');
   assert.deepEqual([...found].sort((a, b) => a - b), found);
-  assert.match(skillMd, /\n## Draft answers for the person to review\n[\s\S]*\*\*Let your AI draft your answers\*\*/);
+  assert.match(skillMd, /\n## Draft answers for the person to review\n[\s\S]*\*\*Have AI draft your answers\*\*/);
   // The invite a link carries is kept only by the server that read it.
   assert.match(skillMd, /`join_group` uses it for that group without being asked, while the server that\s+joined is still running/);
 });

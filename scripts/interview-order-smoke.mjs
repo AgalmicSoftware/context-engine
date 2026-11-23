@@ -56,7 +56,7 @@ try {
     assert(brief.includes('1. (freeform) Newest breakout\n2. (freeform) First breakout'));
     assert(!brief.includes('Opening question'));
     await page.getByRole('button', { name: 'Prompt', exact: true }).click();
-    await page.getByRole('heading', { name: 'Let your AI draft your answers' }).waitFor();
+    await page.getByRole('heading', { name: 'Have AI draft your answers' }).waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     assert.deepEqual(failures, []);
     await page.screenshot({ path: path.join(output, `interview-${theme}-${width}.png`) });

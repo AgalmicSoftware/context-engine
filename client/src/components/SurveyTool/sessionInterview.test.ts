@@ -340,7 +340,7 @@ describe('session interview protocol', () => {
     );
     expect(signedIn).not.toContain('If I want you to submit as me');
     expect(buildExternalInterviewKickoff({ ...options, hasAccount: true, agentKeysOffered: true })).toContain(
-      'If I want you to submit as me, I can copy the prompt again in the session with my AI key in it.',
+      'If I want you to submit as me, I can copy the prompt again in the session with "AI can submit for me" ticked.',
     );
     // Nothing in it sends a capable agent away from its tools.
     for (const prompt of [signedOut, signedIn]) expect(prompt).not.toMatch(/no MCP|Do not POST|ceagt_/);

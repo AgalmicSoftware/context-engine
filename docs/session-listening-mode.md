@@ -16,7 +16,7 @@ The session links are:
 The direct links open the selected modal panel; `?mode=voice` opens the
 launcher, as does clicking the microphone without a mode query. The launcher's
 two choices sit side by side, each with a question mark that shows what it
-does. Below them, a bordered **Let your AI draft your answers** card holds the
+does. Below them, a bordered **Have AI draft your answers** card holds the
 ChatGPT or Claude prefill prompt (see below). Picking a choice replaces
 `?mode=voice` with its own mode.
 `?mode=listening` still opens the pile-adjacent group recorder. Any other
@@ -308,7 +308,7 @@ failed check offers Retry. Copy starts directly from the tap, including on
 Safari. If clipboard access fails or is unavailable, the page shows an error
 and reveals the prompt for manual copying.
 
-The voice launcher's **Let your AI draft your answers** card, below the
+The voice launcher's **Have AI draft your answers** card, below the
 Interview and Group Conversation choices, offers the prompt as one split
 button; the interview itself does not show it. **Copy AI prompt** copies the
 request; while the session is checked, or a signed-in person's AI key is being
@@ -336,10 +336,12 @@ in `shared/agentParticipationGuide.mjs`: what the AI can do (submit with the
 person's AI key, submit from an account it makes, or draft only), what a
 draft-only AI returns, the one question an AI that can submit asks, and what
 it does when it knows nothing about the person. `scripts/sync-agent-flow.mjs`
-writes the same steps into `llms.txt` and the agent guide. Signed in, where the session has Agents (HTTP API) on, the
-prompt also holds the person's AI key, made without a tap, and after the copy
-the card says so in one line with the time it ends; the account menu's **Your
-AI agent** row gives the same prompt from one **Copy AI prompt** button.
+writes the same steps into `llms.txt` and the agent guide. Signed in, where
+the session has Agents (HTTP API) on, the card shows **AI can submit for me**
+above the button, unticked to start with: the prompt then holds no key and
+none is made. Ticked, the page makes the person's AI key and puts it in the
+prompt, and after the copy the card says so in one line with the time it
+ends; the account menu's **Your AI agent** row has the same tick and button.
 Signed out, the prompt holds no key. A session link with `aiPrompt=1` in its
 query opens the account dialog, where a signed-in person copies a short
 prompt that hands their key to the AI that sent them.

@@ -49,22 +49,25 @@ Codex, Gemini CLI, Hermes Agent, Cursor and the OpenAI Agents SDK, and the
 account it makes, an agent joins through the MCP with the session link as
 received, under a name that says whose agent it is.
 
-The person's AI key comes in the AI prompt they copy while signed in, from
-the account menu's **Your AI agent** or from Voice mode's **Let your AI draft
-your answers** card, where the session has **Agents (HTTP API)** on. The page
-makes the key without a tap as the card opens; it ends with the person's
-sign-in (within 4 hours), works only in that session, and **Sign Agents Out**
-ends it. The prompt names the session, tells the agent never to repeat the
+The person's AI key comes in the AI prompt once they tick **AI can submit for
+me**, the box above **Copy AI prompt** in the account menu's **Your AI agent**
+and in Voice mode's **Have AI draft your answers** card. The box is there for
+a signed-in person where the session has **Agents (HTTP API)** on, and starts
+unticked: the prompt then holds no key and none is made. Ticked, the page
+makes the key without a further tap; it ends with the person's sign-in
+(within 4 hours), works only in that session, and **Sign Agents Out** ends it. The prompt names the session, tells the agent never to
+repeat the
 key, has it show its answers in the chat and submit once the person says yes
 there, and still says how to draft, for an AI that can't send web requests
-with its own headers. After the copy the card says in one line that whoever
-gets the prompt can answer as the person there, and until when. No prompt the site gives approves a
+with its own headers. After the copy the card says in one line that the key
+can answer as the person, and until when. No prompt the site gives approves a
 submission in advance; the guide keeps "submit only the answers they approve"
 unless the person says otherwise in the chat. Not signed in, the prompt holds
 no key, and an agent that can submit offers to make an account. A session
 link with `aiPrompt=1` in its query is for a person who already has one: it
-opens the account dialog, and once they sign in **Copy AI prompt** gives a
-short prompt with the key and its rules only, for the agent that sent them. From the link alone, an
+opens the account dialog with **AI can submit for me** ticked, and once
+they sign in **Copy AI prompt** gives a short prompt with the key and its
+rules only, for the agent that sent them. From the link alone, an
 agent can also draft answers for a public session: the guide says how, and the
 MCP's `get_interview_catalog` and `make_review_link` do it without web access.
 When a session lets
