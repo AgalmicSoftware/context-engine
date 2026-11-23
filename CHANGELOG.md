@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.31] - 2026-11-23
+
+A login file can have a password, a Submit that finds it due asks for it there, and it downloads under a passkey-like name; the conviction slider's X sits beside the slider, and an atlas level's title sits under "Up Level". Site only: the Session Worker's code is unchanged and MCP stays 0.9.2. Nothing a session already stores is changed.
+
+### Site — available when the site deploys
+
+- **A login file can have a password.** "Add a password", under "Create login file", takes a password, and the file made then holds its 12 words encrypted, so the file alone no longer signs in. Choosing such a file to log in asks for its password; a wrong one says so and can be tried again. The password is never stored or sent, and it cannot be recovered: a forgotten password leaves the file of no use. Once the file is opened everything is as before, and the password is not asked for again during the file's 6 hours. Files without a password keep working.
+- **A Submit that finds the login file due again asks for it right there.** On a page left open past a login file's time, Submit now opens a window with "Login with file" in it: "Your unsent answers are kept." Choosing the same file signs the account back in without a reload, and the Submit goes ahead; a file for another account is refused and the account is not switched. Closing the window keeps the answers, and the line under the Submit bar still says what to do.
+- **A login file is named like a passkey, with its date and time.** A new login file downloads as, for example, "ContextEngine-Login-November23-2026-1003PM.json", by the device's own date and time, where it used to be "context-engine-login-" and six characters of the account. Files already downloaded keep working: a login file signs in under any name.
+- **The conviction slider's X sits beside the slider.** The X that closes the conviction and importance slider now sits on the slider's own line, just past the track's end and centred on it, in place of across the row level with the Conviction and Importance labels, where a budget question's option arrows had pushed it to the card's far edge. Its tap area grows from 36 to 44 pixels, clear of the slider's end, so a drag to the top never presses it.
+- **An atlas level's title sits under "Up Level", larger.** Below a session atlas's top level, the button with the level's title now has a line of its own under "Up Level", in larger type with more room around it, so it reads as the level's heading. Before, on a phone it sat right under "Up Level", touching it, and on a wide screen beside it, where a long title could run into it and over the circles. A long title wraps within the atlas, and the circles start below it however many lines it takes.
+- **Deploy helper.** It deploys the 0.9.30 Worker bundles. A Worker updated from the site gets this release's.
+
 ## [0.9.30] - 2026-11-23
 
 A login file that is due again says to reload, its download lasts long enough for a phone to save it, and a failed Submit on the one-question pile shows its reason on screen. Site only: the Session Worker's code is unchanged and MCP stays 0.9.2. Nothing a session already stores is changed.
