@@ -77,6 +77,19 @@ const assertContrast = (
   }
 };
 
+// Beside a chosen answer the other options dim under a 30% layer of --ce-color-black, which is
+// --ce-overlay-base (SurveyTool.module.scss); their labels must stay readable. A desktop-window theme
+// keeps its faces grey and dims only the swatch, so no label sits on the dimmed colour there.
+const expectDimmedBinaryLabelsReadable = (values: Record<string, string>, themeId: string) => {
+  if (registry.themes.find(({ id }) => id === themeId)?.layoutProfile === 'desktop-window') return;
+  const shade = parseColor(values['overlay-base']);
+  ['agree', 'unsure', 'disagree'].forEach((stance) => {
+    const fill = composite([shade[0], shade[1], shade[2], 0.3], parseColor(values[`binary-choice-${stance}-bg`]));
+    const label = stance === 'unsure' ? values['overlay-base'] : values[`binary-choice-${stance}-text`];
+    expect(contrastRatio(parseColor(label), fill)).toBeGreaterThanOrEqual(4.5);
+  });
+};
+
 describe('bundled app-theme contrast', () => {
   const scssDir = path.resolve(__dirname, '..', '..');
   const css = sass.compile(path.resolve(scssDir, 'assets/css/contextEngine.scss'), {
@@ -1034,6 +1047,7 @@ describe('bundled app-theme contrast', () => {
     for (const stance of ['agree', 'disagree']) {
       assertContrast(values, `binary-choice-${stance}-text`, `binary-choice-${stance}-bg`, 4.5);
     }
+    expectDimmedBinaryLabelsReadable(values, themeId);
   });
 
   test('Civic keeps forms, disabled actions, and session chrome readable', () => {
@@ -1087,6 +1101,7 @@ describe('bundled app-theme contrast', () => {
     });
     assertContrast(values, 'status-success-contrast', 'status-success', 4.5, 'surface');
     assertContrast(values, 'status-error-contrast', 'status-error', 4.5, 'surface');
+    expectDimmedBinaryLabelsReadable(values, themeId);
     expect(values['binary-choice-agree-bg']).toBe('#56b4e9');
     expect(values['binary-choice-disagree-bg']).toBe('#e69f00');
     expect(values['chart-series-1']).toBe(values['data-series-1']);

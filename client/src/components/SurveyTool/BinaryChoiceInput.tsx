@@ -18,8 +18,14 @@ export const buildBinaryChoiceOptionClassName = (
   styleMap: Record<string, string>,
   option: string,
   isSelected: unknown,
+  isDimmed: unknown = false,
 ) =>
-  [styleMap.radioOptionText, styleMap[option.toLowerCase()], isSelected ? styleMap.selected : '']
+  [
+    styleMap.radioOptionText,
+    styleMap[option.toLowerCase()],
+    isSelected ? styleMap.selected : '',
+    isDimmed ? styleMap.dimmed : '',
+  ]
     .filter(Boolean)
     .join(' ');
 
@@ -34,9 +40,11 @@ const BinaryChoiceInput = ({
   <FormGroup id={styles.binaryChoice}>
     {BINARY_OPTIONS.map((option) => {
       const isSelected = value === option;
+      // Once one is chosen, the others dim so the choice stands out; with none chosen, all stay bright.
+      const isDimmed = !isSelected && BINARY_OPTIONS.some((choice) => choice === value);
 
       return (
-        <Label key={option} check className={buildBinaryChoiceOptionClassName(styles, option, isSelected)}>
+        <Label key={option} check className={buildBinaryChoiceOptionClassName(styles, option, isSelected, isDimmed)}>
           <Input
             type="radio"
             name={`${inputNamePrefix}-${questionId}`}
