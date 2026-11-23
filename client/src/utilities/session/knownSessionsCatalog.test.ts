@@ -29,12 +29,13 @@ it("lists each known session's catalog address as its page builds it, and the pr
       listedOrder,
     );
     const at = lines.indexOf(listedOrder[0]);
-    expect(lines.slice(at, at + 4)).toEqual([
+    expect(lines.slice(at, at + 3)).toEqual([
       listedOrder[0],
-      'Second address:',
+      'Second address, if the first does not give you that:',
       listedOrder[1],
-      'If the first address does not open, fetch the second exactly as written; if neither opens, say so, ask me to paste the questions and give your drafts of those as plain text with no review link, and never make questions up.',
     ]);
+    // What follows the two addresses says what to do when neither gives the catalog whole.
+    expect(lines[at + 3]).toMatch(/^If you can't get it whole \(a summary, part of the list, no questionSetHash\), /);
     // The join panel pins the Worker on the page link; the Worker drops that, so it is the same catalog.
     const pinned = buildExternalInterviewKickoff({
       workerUrl: worker,
@@ -43,7 +44,11 @@ it("lists each known session's catalog address as its page builds it, and the pr
     });
     const pinnedLines = pinned.split('\n');
     const pinnedAt = pinnedLines.indexOf(listedOrder[0]);
-    expect(pinnedLines.slice(pinnedAt, pinnedAt + 3)).toEqual([listedOrder[0], 'Second address:', listedOrder[1]]);
+    expect(pinnedLines.slice(pinnedAt, pinnedAt + 3)).toEqual([
+      listedOrder[0],
+      'Second address, if the first does not give you that:',
+      listedOrder[1],
+    ]);
     // The host passes that address through to the same catalog.
     const rule = redirects.find((line) => line.startsWith(`/questions/${slug} `))?.split(' ');
     expect(rule?.[2]).toBe('200');
