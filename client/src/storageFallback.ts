@@ -7,7 +7,7 @@
 // a method without replacing it.
 export const createMemoryStorage = (): Storage => {
   const items = new Map<string, string>();
-  const api = {
+  const api: Storage = {
     get length() {
       return items.size;
     },
@@ -17,14 +17,14 @@ export const createMemoryStorage = (): Storage => {
     removeItem: (key: string) => void items.delete(String(key)),
     clear: () => items.clear(),
   };
-  return new Proxy(api, {
+  return new Proxy<Storage>(api, {
     get: (target, key) => (key in target ? Reflect.get(target, key) : items.get(String(key))),
     ownKeys: () => [...items.keys()],
     getOwnPropertyDescriptor: (_target, key) =>
       items.has(String(key))
         ? { value: items.get(String(key)), configurable: true, enumerable: true, writable: true }
         : undefined,
-  }) as unknown as Storage;
+  });
 };
 
 type StorageName = 'localStorage' | 'sessionStorage';
