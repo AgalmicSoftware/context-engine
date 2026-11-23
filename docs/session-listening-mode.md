@@ -435,7 +435,7 @@ identifiers are forbidden and the exact JSON is also given in a code block.
 An AI that can't encode the link exactly links the review page with
 `#prefill=paste`, which opens the review on the paste box, without an error;
 a link that fails to open shows the same box. The packet also names the
-prompt's wording, `promptRevision` (now `ce-prefill-prompt-4`), which the
+prompt's wording, `promptRevision` (now `ce-prefill-prompt-5`), which the
 page keeps with the AI provenance; the catalog version below is the Worker's
 and does not change with the wording. The current catalog prompt version is
 `ce-interview-brief-v6`. The copied request accepts a catalog with type
@@ -465,17 +465,20 @@ The answer contract is question-specific:
   are valid.
 
 The additive `researchCoverageContract` describes self-reported count fields,
-not agent instructions. Existing v1–v5 packets remain importable with their
-original fingerprint rules and current question validation. V5 and v6 hashes
-include selection mode; v1–v4 hashes do not. Source compatibility does not prove
+not agent instructions. Existing v1–v5 packets remain importable, with current
+question validation. V5 and v6 hashes include selection mode; v1–v4 hashes do
+not. Source compatibility does not prove
 a live frontend or Worker has been updated: verify both served contracts during
 an authorized rollout, especially before generating v6 packets.
 
 
 When Context Engine opens that link, it validates the packet, requires the
-session slug and question-set hash to match, removes the fragment from browser
-history, and validates the AI-authored response drafts against the current
-questions and listed options. Current direct responses are not re-authored by a
+session slug to match, removes the fragment from browser history, and fits each
+AI-authored response draft to the current questions and listed options. The
+question-set hash is compared with nothing: it records which question list the
+AI read, and a session's questions may change after that. A draft for a question
+that was removed, or whose answer is no longer one of its options, is left out
+and counted in one notice; the rest are reviewed as usual. Current direct responses are not re-authored by a
 different mapping model, so their source attribution and confidence remain
 faithful to the external AI. Every proposed answer remains a local review draft.
 The link is read by the same decoder as setup links
@@ -498,9 +501,8 @@ fields the participant already edited in review. That block is labeled as
 untrusted, unconfirmed AI prediction data: the interviewer uses it for related,
 deeper and gap-filling questions, never asks the questions the AI drafted, and
 must not treat predicted answers as spoken beliefs or override later spoken
-clarifications. If the prefill hash is stale or belongs to a
-different question set, the live interviewer is not started with the imported
-context.
+clarifications. If the packet names another session, the live interviewer is
+not started with the imported context.
 The account used at final normal submission owns the response. If an older
 packet contains context facts but not responses, the session AI mapping lane
 still converts those facts into drafts.
@@ -694,12 +696,10 @@ Signing in from the interview closes the account dialog after successful login; 
 
 Interview choice mapping and review preserve one option for binary/single-select questions and arrays for multiple-selection questions. A legacy scalar choice imported for a current multi-select question becomes a one-element selection; it does not reconstruct selections absent from the original packet. Unknown options and multiple distinct options for a single-select question are rejected.
 
-Prefill validation uses the shared public-question normalization contract. If the
-local bank differs from the Worker’s bounded catalog (up to 100 questions), the
-client fetches that session’s current catalog and verifies its identity, hash,
-and each question against locally available metadata. It never accepts an
-arbitrary prefix. Imported predictions are scoped to the verified catalog;
-network failures remain retryable and closing the modal cancels catalog work.
+Prefill validation reads nothing from the session: the packet must name this
+session in a prompt version the page reads, and its drafts are fitted to the
+questions the page has. Where the page first shows a cached question list, drafts
+for questions that arrive with the refreshed list are read again.
 
 ### Live interview context limits
 

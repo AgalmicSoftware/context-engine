@@ -1,7 +1,7 @@
 // The copied AI prompt has to end in a review link the site takes. Two readers stand in for an AI here, each
 // doing only what the prompt says: one is given a summary of the catalog, so it has only what the prompt
 // carries (the fingerprint, the version and the ids by position); the other reads the catalog whole. Each
-// link is then read and checked by the site's own code against the session's catalog.
+// link is then read by the site's own code and its drafts fitted to the session's questions.
 import { webcrypto } from 'crypto';
 import { __test__interviewQuestionCatalog as workerCatalog } from '../../../../workers/sessionCorsWorker/interviewQuestionCatalog';
 import {
@@ -12,7 +12,7 @@ import {
   readImportedInterviewDraftResponses,
   readInterviewPrefillFromHash,
 } from './sessionInterview';
-import { resolveInterviewPrefillQuestions } from './sessionInterviewCatalogValidation';
+import { checkInterviewPrefillPacket } from './sessionInterviewCatalogValidation';
 
 const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
 beforeAll(() => {
@@ -90,23 +90,16 @@ const packetFor = (
   responses: responses.map((response) => ({ ...response, confidence: 0.35, evidence: 'inferred from one remark' })),
 });
 
-// The site's side: read the link as the session page does, then check its packet against the catalog.
-const openOnSite = async (link: string, catalog: Record<string, unknown>) => {
+// The site's side: read the link as the session page does, check whose drafts they are, then fit each draft
+// to the session's questions as they are now.
+const openOnSite = (link: string, current: unknown[] = pool) => {
   const url = new URL(link);
   expect(`${url.origin}${url.pathname}`).toBe(`https://client.example.test/session/${SLUG}`);
   expect(url.searchParams.get('mode')).toBe('interview');
   const read = readInterviewPrefillFromHash(url.hash);
   expect(read).toMatchObject({ error: '', notice: '' });
-  const questions = await resolveInterviewPrefillQuestions({
-    packet: read.packet!,
-    // The page's own list differs from the catalog's, so the check goes to the catalog.
-    questions: normalizeInterviewQuestions([...pool].reverse()),
-    sessionSlug: SLUG,
-    sessionUrl: SESSION_URL,
-    loadWorkerUrl: async () => WORKER,
-    fetchImpl: async () => new Response(JSON.stringify(catalog)),
-  });
-  return readImportedInterviewDraftResponses(read.packet, questions) || [];
+  checkInterviewPrefillPacket({ packet: read.packet!, sessionSlug: SLUG });
+  return readImportedInterviewDraftResponses(read.packet, normalizeInterviewQuestions(current)) || [];
 };
 
 it('a reader given only a summary makes, from the prompt alone, a review link the site takes', async () => {
@@ -133,7 +126,7 @@ it('a reader given only a summary makes, from the prompt alone, a review link th
       responses,
     ),
   );
-  const drafts = await openOnSite(link, catalog);
+  const drafts = openOnSite(link);
   expect(drafts.map(({ questionId, answer }) => [questionId, answer])).toEqual([
     ['0xq1', 'Agree'],
     ['0xq2', 'Start with the bus lanes.'],
@@ -163,18 +156,38 @@ it('a reader that gets the catalog whole makes a review link the site takes, opt
       responses,
     ),
   );
-  const drafts = await openOnSite(link, catalog);
+  const drafts = openOnSite(link);
   expect(drafts.map(({ questionId }) => questionId)).toEqual(['0xq1', '0xq2', '0xq3', '0xq4']);
   expect(drafts[2].answer).toEqual(['Transit']);
 });
 
-it('a link made for another question set is refused, in words that ask for a fresh one', async () => {
+it('a link made before the questions changed still opens, without the drafts that no longer fit', async () => {
   const { catalog, prompt } = await setup();
   const link = reviewLink(
     prompt,
-    packetFor({ sessionSlug: SLUG, questionSetHash: '0'.repeat(64), promptVersion: VERSION }, [
+    packetFor({ sessionSlug: SLUG, questionSetHash: catalog.questionSetHash, promptVersion: VERSION }, [
+      { questionId: '0xq1', answer: 'Agree' },
+      { questionId: '0xq3', answer: ['Transit'] },
+      { questionId: '0xq4', answer: 'Disagree' },
+    ]),
+  );
+  // Since the AI read them: one question was removed, one lost the option it chose, and one was added.
+  const changed = [
+    pool[0],
+    pool[1],
+    { ...pool[2], options: ['Housing', 'Parks'] },
+    { id: '0xq5', prompt: 'A new question?', type: 'freeform' },
+  ];
+  expect(openOnSite(link, changed).map(({ questionId, answer }) => [questionId, answer])).toEqual([['0xq1', 'Agree']]);
+});
+
+it('a link for another session is refused', async () => {
+  const { catalog, prompt } = await setup();
+  const link = reviewLink(
+    prompt,
+    packetFor({ sessionSlug: 'elsewhere', questionSetHash: catalog.questionSetHash, promptVersion: VERSION }, [
       { questionId: '0xq1', answer: 'Agree' },
     ]),
   );
-  await expect(openOnSite(link, catalog)).rejects.toThrow('older or different question set');
+  expect(() => openOnSite(link)).toThrow('These draft answers are for another session.');
 });

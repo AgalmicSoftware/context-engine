@@ -2907,10 +2907,6 @@ describe('SessionVoiceModeModal', () => {
           .getAllByRole('checkbox', { name: 'Transit' })
           .every((checkbox) => (checkbox as HTMLInputElement).checked),
       ).toBe(true);
-      expect(mockedHashInterviewQuestions).toHaveBeenCalledWith(
-        expect.arrayContaining([expect.objectContaining({ id: 'multi', singleSelect: false })]),
-        promptVersion,
-      );
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
       await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('multi', ['Parks', 'Transit']));
       expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('single', 'Transit');
@@ -3623,15 +3619,14 @@ describe('SessionVoiceModeModal', () => {
     );
   });
 
-  it('rejects stale imported context before calling the mapper', async () => {
-    mockedHashInterviewQuestions.mockResolvedValue('b'.repeat(64));
+  it('refuses another session’s drafts before calling the mapper', async () => {
     render(
       <SessionVoiceModeModal
         {...baseProps}
         mode="interview"
         prefillPacket={{
           version: 1,
-          sessionSlug: 'demo',
+          sessionSlug: 'another-session',
           questionSetHash: 'a'.repeat(64),
           promptVersion: 'ce-interview-brief-v1',
           source: { platform: 'chatgpt', modelId: 'gpt-example', verification: 'self_reported' },
@@ -3640,108 +3635,93 @@ describe('SessionVoiceModeModal', () => {
       />,
     );
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/older or different question set/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'These draft answers are for another session. Ask the AI for a link to this one.',
+    );
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName('Interview status: Error');
     expect(mapInterviewEvidenceToResponses).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
     expect(mockedStartSessionRealtimeInterview).not.toHaveBeenCalled();
   });
 
-  it('checks a prefill link again once a stale cached question set refreshes', async () => {
-    const fresh = [
-      { id: 'q1', prompt: 'What matters?', type: 'freeform' },
-      { id: 'q2', prompt: 'Added since the last visit?', type: 'freeform' },
-    ];
-    mockedHashInterviewQuestions.mockImplementation(async (questions) =>
-      questions.length === 2 ? 'a'.repeat(64) : 'b'.repeat(64),
-    );
-    jest.mocked(globalThis.fetch).mockImplementation(
-      async () =>
-        new Response(
-          JSON.stringify({
-            type: 'context-engine.interview-question-catalog',
-            version: 1,
-            sessionSlug: 'demo',
-            prefillPromptVersion: 'ce-interview-brief-v5',
-            questionSetHash: 'a'.repeat(64),
-            questions: fresh.map((question) => ({ ...question, options: [] })),
-          }),
-        ),
-    );
-    const props = {
-      ...baseProps,
-      mode: 'interview' as const,
-      prefillPacket: {
-        version: 1 as const,
-        sessionSlug: 'demo',
-        questionSetHash: 'a'.repeat(64),
-        promptVersion: 'ce-interview-brief-v5',
-        source: { platform: 'claude' as const, modelId: 'example', verification: 'self_reported' as const },
-        responderContext: {},
-        responses: [{ questionId: 'q2', answer: 'Fresh answer', confidence: 0.8 }],
-      },
-    };
-    // The pile first shows a cached question set that predates the link.
-    const view = render(<SessionVoiceModeModal {...props} questionPool={[fresh[0]]} />);
-    expect(await screen.findByRole('alert')).toHaveTextContent(/older or different question set/i);
-
-    view.rerender(<SessionVoiceModeModal {...props} questionPool={fresh} />);
-
-    await expectReadableDraftText('Draft answer for Added since the last visit?', 'Fresh answer');
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  // The fingerprint in a packet is compared with nothing: a session's questions may change after an AI
+  // read them, and each draft is fitted to its question as it is now.
+  const olderSetPacket = (responses: Array<{ questionId: string; answer: unknown; confidence: number }>) => ({
+    version: 1 as const,
+    sessionSlug: 'demo',
+    questionSetHash: 'a'.repeat(64),
+    promptVersion: 'ce-interview-brief-v5',
+    source: { platform: 'claude' as const, modelId: 'example', verification: 'self_reported' as const },
+    responderContext: {},
+    responses,
   });
 
-  it('accepts a fresh bounded Worker catalog when the local session contains 101 questions', async () => {
-    const questionPool = Array.from({ length: 101 }, (_, index) => ({
-      id: `q${index}`,
-      prompt: `Question ${index}?`,
-      type: 'freeform',
-    }));
-    const catalogQuestions = questionPool.slice(1).map((question) => ({ ...question, options: [] }));
-    mockedHashInterviewQuestions.mockImplementation(async (questions) =>
-      questions.length === 101 ? 'b'.repeat(64) : 'a'.repeat(64),
-    );
+  it('applies the drafts that still fit from a link made for an older question set, and counts the rest', async () => {
     const previousFetch = globalThis.fetch;
-    globalThis.fetch = jest.fn(
-      async () =>
-        new Response(
-          JSON.stringify({
-            type: 'context-engine.interview-question-catalog',
-            version: 1,
-            sessionSlug: 'demo',
-            prefillPromptVersion: 'ce-interview-brief-v5',
-            questionSetHash: 'a'.repeat(64),
-            questions: catalogQuestions,
-          }),
-        ),
-    );
+    globalThis.fetch = jest.fn();
     try {
       render(
         <SessionVoiceModeModal
           {...baseProps}
           mode="interview"
-          questionPool={questionPool}
-          prefillPacket={{
-            version: 1,
-            sessionSlug: 'demo',
-            questionSetHash: 'a'.repeat(64),
-            promptVersion: 'ce-interview-brief-v5',
-            source: { platform: 'claude', modelId: 'example', verification: 'self_reported' },
-            responderContext: {},
-            responses: [
-              { questionId: 'q100', answer: 'A catalog answer', confidence: 0.8 },
-              { questionId: 'q0', answer: 'Outside catalog', confidence: 0.8 },
-            ],
-          }}
+          questionPool={[
+            { id: 'q1', prompt: 'What matters?', type: 'freeform' },
+            // It offered "Roads" when the AI read it.
+            {
+              id: 'q2',
+              prompt: 'Which first?',
+              type: 'multichoice',
+              options: ['Parks', 'Transit'],
+              singleSelect: true,
+            },
+          ]}
+          prefillPacket={olderSetPacket([
+            { questionId: 'q1', answer: 'Still fits', confidence: 0.8 },
+            { questionId: 'q2', answer: 'Roads', confidence: 0.8 },
+            { questionId: 'removed', answer: 'For a question that is gone', confidence: 0.8 },
+          ])}
         />,
       );
-      expect(
-        await screen.findByRole('button', { name: 'Draft answer for Question 100?. Activate to edit.' }),
-      ).toHaveTextContent('A catalog answer');
-      expect(screen.queryByText('Outside catalog')).not.toBeInTheDocument();
+      await expectReadableDraftText('Draft answer for What matters?', 'Still fits');
+      expect(screen.getByText(/Left out 3 drafts from your AI/)).toHaveTextContent(
+        'Left out 3 drafts from your AI that don’t fit this session’s questions or their options.',
+      );
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByText('For a question that is gone')).not.toBeInTheDocument();
+      // Nothing is read from the session to decide this.
+      expect(globalThis.fetch).not.toHaveBeenCalled();
     } finally {
       globalThis.fetch = previousFetch;
     }
+  });
+
+  it('reads the drafts again once a stale cached question set brings a question one of them is for', async () => {
+    const fresh = [
+      { id: 'q1', prompt: 'What matters?', type: 'freeform' },
+      { id: 'q2', prompt: 'Added since the last visit?', type: 'freeform' },
+    ];
+    const props = {
+      ...baseProps,
+      mode: 'interview' as const,
+      prefillPacket: olderSetPacket([
+        { questionId: 'q1', answer: 'First answer', confidence: 0.8 },
+            { questionId: 'q2', answer: 'Roads', confidence: 0.8 },
+            { questionId: 'also-removed', answer: 'For another that is gone', confidence: 0.8 },
+            { questionId: 'q1', answer: 'Still fits', confidence: 0.8 },
+        { questionId: 'q2', answer: 'Fresh answer', confidence: 0.8 },
+      ]),
+    };
+    // The pile first shows a cached question set that predates the link.
+    const view = render(<SessionVoiceModeModal {...props} questionPool={[fresh[0]]} />);
+    await expectReadableDraftText('Draft answer for What matters?', 'First answer');
+    expect(screen.getByText(/Left out 1 draft from your AI/)).toBeInTheDocument();
+
+    view.rerender(<SessionVoiceModeModal {...props} questionPool={fresh} />);
+
+    await expectReadableDraftText('Draft answer for Added since the last visit?', 'Fresh answer');
+    await expectReadableDraftText('Draft answer for What matters?', 'First answer');
+    expect(screen.queryByText(/Left out 1 draft from your AI/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
 
@@ -3915,7 +3895,6 @@ describe('Interview cancellation and recovery', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
     await expectReadableDraftText('Draft answer for New question?', 'Newly answered');
     await expectReadableDraftText('Draft answer for What matters?', 'Imported answer');
-    expect(mockedHashInterviewQuestions).toHaveBeenCalledTimes(1);
   });
 
   it('continues the transcript and preserves edits while keeping removed cards hidden after new predictions', async () => {
@@ -4137,6 +4116,6 @@ describe('Interview cancellation and recovery', () => {
     fireEvent.click(copy);
     const prompt = jest.mocked(navigator.clipboard.writeText).mock.lastCall?.[0] || '';
     expect(prompt).toContain('Unanswered question IDs, in the session’s order: ["q1","q2"]');
-    expect(prompt).toContain('"promptRevision":"ce-prefill-prompt-4+arranged",');
+    expect(prompt).toContain('"promptRevision":"ce-prefill-prompt-5+arranged",');
   });
 });

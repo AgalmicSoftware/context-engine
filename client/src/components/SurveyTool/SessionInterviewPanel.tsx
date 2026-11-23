@@ -37,7 +37,6 @@ import SessionInterviewDraftCard from './SessionInterviewDraftCard';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { ImportedResponderContextEditor, SessionInterviewVoiceControls } from './SessionInterviewVoiceControls';
 import SessionInterviewPrefillPaste from './SessionInterviewPrefillPaste';
-import { buildInterviewReturnSessionUrl } from './sessionInterviewReturnUrl';
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
 import { getAnonymousRateId } from '../../utilities/worker/workerAuthAnonymousHeaders.js';
 import {
@@ -50,10 +49,7 @@ import {
   type InterviewQuestion,
   INTERVIEW_PREFILL_PASTE_NOTE,
 } from './sessionInterview';
-import {
-  resolveInterviewPrefillQuestions,
-  scopeInterviewPrefillToQuestions,
-} from './sessionInterviewCatalogValidation';
+import { checkInterviewPrefillPacket, scopeInterviewPrefillToQuestions } from './sessionInterviewCatalogValidation';
 import { useSessionInterviewRecorder } from './useSessionInterviewRecorder';
 import { silentCatalogTicketSource } from './interviewCatalogTicket';
 import {
@@ -155,10 +151,8 @@ export default function SessionInterviewPanel({
   const disposedRef = useRef(false);
   const importedRef = useRef(kept.drafts.length > 0);
   const validatedPrefillRef = useRef<InterviewPrefillPacket | null>(kept.drafts.length ? prefillPacket : null);
-  const catalogAbortRef = useRef<AbortController | null>(null);
-  const validatedPrefillQuestionsRef = useRef<InterviewQuestion[] | null>(null);
-  // The question set a prefill link was last checked against.
-  const checkedPrefillQuestionsRef = useRef<InterviewQuestion[] | null>(null);
+  // Questions the AI drafted that this page did not have when the drafts were read.
+  const missedPrefillIdsRef = useRef<string[]>([]);
   const viewResultsRevealRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [resolvedWorkerUrl, setResolvedWorkerUrl] = useState(workerUrl);
   // The claimed part of a group conversation this review has taken in.
@@ -282,7 +276,6 @@ export default function SessionInterviewPanel({
     disposedRef.current = false;
     return () => {
       disposedRef.current = true;
-      catalogAbortRef.current?.abort();
       if (viewResultsRevealRef.current) clearTimeout(viewResultsRevealRef.current);
     };
   }, []);
@@ -589,29 +582,23 @@ export default function SessionInterviewPanel({
       setStatus('Preparing responses…');
       try {
         if (prefillPacket?.questionSetHash && validatedPrefillRef.current !== prefillPacket) {
-          checkedPrefillQuestionsRef.current = questions;
-          catalogAbortRef.current = new AbortController();
-          const matchedQuestions = await resolveInterviewPrefillQuestions({
-            packet: prefillPacket,
-            questions,
-            sessionSlug,
-            loadWorkerUrl: resolveWorkerUrl,
-            sessionUrl: buildInterviewReturnSessionUrl(),
-            signal: catalogAbortRef.current.signal,
-            // Their AI may have read questions only their sign-in shows; checking never asks them to sign in.
-            ticket: silentCatalogTicketSource({ account, context, sessionSlug, sessionConfig, resolveWorkerUrl }),
-          });
-          if (disposedRef.current) return;
-          // Validate imported evidence once; later additions must not block continued interviews.
+          // Another session's drafts are refused. An older question list's are not: each draft is fitted
+          // below to its question as it is now.
+          checkInterviewPrefillPacket({ packet: prefillPacket, sessionSlug });
           validatedPrefillRef.current = prefillPacket;
-          validatedPrefillQuestionsRef.current = matchedQuestions;
         }
         const importedDrafts = nextTranscript.trim()
           ? null
-          : readImportedInterviewDraftResponses(prefillPacket, validatedPrefillQuestionsRef.current || questions);
+          : readImportedInterviewDraftResponses(prefillPacket, questions);
         // An AI's drafts are never dropped silently: those the link couldn't carry, and those that fit
         // no question here or none of its options, are counted in the notice.
         const unmatched = importedDrafts ? (prefillPacket?.responses?.length || 0) - importedDrafts.length : 0;
+        // A draft for a question this page doesn't have yet is read again if the question arrives.
+        missedPrefillIdsRef.current = importedDrafts
+          ? (prefillPacket?.responses || [])
+              .map(({ questionId }) => questionId)
+              .filter((id) => !questions.some((question) => question.id === id))
+          : [];
         const importNotices = importedDrafts
           ? [
               prefillNotice,
@@ -621,13 +608,7 @@ export default function SessionInterviewPanel({
             ]
           : [];
         const contextPacket: InterviewPrefillPacket | null =
-          (prefillPacket
-            ? scopeInterviewPrefillToQuestions(
-                prefillPacket,
-                validatedPrefillQuestionsRef.current || questions,
-                responderContext,
-              )
-            : null) ||
+          (prefillPacket ? scopeInterviewPrefillToQuestions(prefillPacket, questions, responderContext) : null) ||
           (responderContext.trim()
             ? {
                 version: 1,
@@ -653,8 +634,7 @@ export default function SessionInterviewPanel({
           if (disposedRef.current) return;
           // The mapper hears no AI prediction for an answered or AI-drafted question, so it can't hand one back.
           if (usedClaimRef.current) reconsidered = readAnswersToReconsider(questions, existingResponsesRef.current);
-          const asked =
-            !nextTranscript.trim() && prefillPacket ? validatedPrefillQuestionsRef.current || questions : questions;
+          const asked = !nextTranscript.trim() && prefillPacket ? questions : questions;
           // With every question held it still suggests questions and groups; its drafts are dropped below.
           const open = asked.filter((question) => !heldIds.has(question.id));
           mapped = await mapInterviewEvidenceToResponses({
@@ -727,8 +707,7 @@ export default function SessionInterviewPanel({
         const predicted = new Map(
           (importedDrafts || !hasAiPrefill
             ? []
-            : readImportedInterviewDraftResponses(prefillPacket, validatedPrefillQuestionsRef.current || questions) ||
-              []
+            : readImportedInterviewDraftResponses(prefillPacket, questions) || []
           ).map((draft) => [draft.questionId, draft.answer]),
         );
         const ownEvidence = (draft: InterviewDraftResponse) =>
@@ -831,7 +810,6 @@ export default function SessionInterviewPanel({
       account,
       assignHiddenDrafts,
       authenticatedForSubmit,
-      context,
       drafts,
       hasAiPrefill,
       heldIds,
@@ -859,11 +837,7 @@ export default function SessionInterviewPanel({
     setGroupRecommendationRequest(
       buildGroupRecommendationRequest({
         prefillPacket: prefillPacket
-          ? scopeInterviewPrefillToQuestions(
-              prefillPacket,
-              validatedPrefillQuestionsRef.current || questions,
-              responderContext,
-            )
+          ? scopeInterviewPrefillToQuestions(prefillPacket, questions, responderContext)
           : null,
         draftingPicks: draftingPicksRef.current,
         drafts,
@@ -886,15 +860,18 @@ export default function SessionInterviewPanel({
 
   useEffect(() => {
     if (!prefillPacket || !questions.length || mapping) return;
-    // A link rejected against an older cached question set is checked again once the set refreshes.
+    // Drafts read against an older cached question set are read again once the set brings a question one of
+    // them is for, while the review is still only those drafts and nothing else is under way.
     const recheck =
-      !!prefillPacket.questionSetHash &&
-      validatedPrefillRef.current !== prefillPacket &&
-      checkedPrefillQuestionsRef.current !== questions;
+      !submitSucceeded &&
+      !isInterviewBusy &&
+      !applying &&
+      !transcriptRef.current.trim() &&
+      missedPrefillIdsRef.current.some((id) => questions.some((question) => question.id === id));
     if (importedRef.current && !recheck) return;
     importedRef.current = true;
     void runMapping({ nextTranscript: '' });
-  }, [mapping, prefillPacket, questions, runMapping]);
+  }, [applying, isInterviewBusy, mapping, prefillPacket, questions, runMapping, submitSucceeded]);
 
   // Someone's part of a group conversation joins whatever they've said here, and what they already had is
   // reconsidered against it, so a signed-in person's saved answers load first. A failed load holds drafting
@@ -928,9 +905,15 @@ export default function SessionInterviewPanel({
   const startInterview = () => {
     if (isInterviewBusy || mappingRef.current || applying) return;
     if (prefillPacket?.questionSetHash && validatedPrefillRef.current !== prefillPacket) {
-      setError('This prefill link was created for an older or different question set. Ask the AI for a fresh link.');
-      setStatus('Error');
-      return;
+      // Not read yet, or refused: another session's drafts never reach the interviewer.
+      try {
+        checkInterviewPrefillPacket({ packet: prefillPacket, sessionSlug });
+        validatedPrefillRef.current = prefillPacket;
+      } catch (refusal) {
+        setError(refusal instanceof Error ? refusal.message : 'These draft answers can’t be used here.');
+        setStatus('Error');
+        return;
+      }
     }
     if (error === INTERVIEW_PREFILL_PASTE_NOTE) setError('');
     setMappingNotice('');
@@ -942,21 +925,14 @@ export default function SessionInterviewPanel({
     const voiceContext = omitConcealedInterviewFacts(responderContext, prefillPacket, isDraftConcealed, questions);
     const validatedPrefillPacket =
       prefillPacket && (!prefillPacket.questionSetHash || validatedPrefillRef.current === prefillPacket)
-        ? scopeInterviewPrefillToQuestions(
-            prefillPacket,
-            validatedPrefillQuestionsRef.current || questions,
-            voiceContext,
-          )
+        ? scopeInterviewPrefillToQuestions(prefillPacket, questions, voiceContext)
         : null;
     const answered = (questionId: string) =>
       hasDraftValue(responseFieldValue(existingResponsesRef.current, 'answers', questionId));
     // The interviewer never hears a hidden draft's guess, nor a draft for an answered question.
     const shown = (draft: InterviewDraftResponse) => !isDraftConcealed(draft.questionId) && !answered(draft.questionId);
     const importedDrafts = validatedPrefillPacket
-      ? readImportedInterviewDraftResponses(
-          validatedPrefillPacket,
-          validatedPrefillQuestionsRef.current || questions,
-        )?.filter(shown) || null
+      ? readImportedInterviewDraftResponses(validatedPrefillPacket, questions)?.filter(shown) || null
       : null;
     // It spends the conversation on unanswered questions while any remain, and leaves an AI's drafts to review.
     const openQuestions = questions.filter((question) => !answered(question.id) && !heldIds.has(question.id));

@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Site — available when the site deploys
+
+- **A review link made before the questions changed still opens.** The review page compared the fingerprint in the AI's packet with the session's question list and refused the whole link, "This prefill link was created for an older or different question set", when a question had been added, removed or edited since the AI read them. It now compares the fingerprint with nothing and fits each draft to its question as it is now: a draft for a question that was removed, or whose answer is no longer one of its options, is left out and counted in the existing notice ("Left out 2 drafts from your AI that don’t fit this session’s questions or their options."), and the rest are reviewed as usual. The page no longer reads the session's question list to decide this. A link for another session is still refused, in its own words; each answer is still checked against its question; nothing is submitted without the person's Submit. The fingerprint stays in the packet as a record of what the AI read.
+- **The copied prompt no longer tells an AI to give up the link when the question list changed.** From a summary with another count or fingerprint it asks its tool for each question's id and leaves out any it can't get; from a whole list it uses that list's own values. The prompt's wording label is now `ce-prefill-prompt-5`.
+
 ## [0.9.35] - 2026-11-23
 
 A slow or stuck load shows a loading bar instead of a white page and the site works with site data blocked; the AI gives the review link once; MCP 0.9.35 carries the site's steps and one rule for an agent's name; a refused name says which word.
