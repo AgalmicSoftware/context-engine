@@ -302,6 +302,24 @@ test('llms.txt, the guide and the Worker skill carry the same steps, written onc
   }
 });
 
+// A site with no security contact reads as less trustworthy to reputation checkers. The contact is the public
+// repository's private report page: no email address is published.
+test('security.txt names the repository as the contact, is dated, and is served as text', () => {
+  const securityTxt = fs.readFileSync(path.join(repoRoot, 'client', 'public', '.well-known', 'security.txt'), 'utf8');
+  assert.match(securityTxt, /^Contact: https:\/\/github\.com\/AgalmicSoftware\/context-engine\/security\/advisories\/new$/m);
+  assert.match(securityTxt, /^Canonical: https:\/\/contextengine\.sh\/\.well-known\/security\.txt$/m);
+  assert.doesNotMatch(securityTxt, /mailto:|@/);
+  const expires = new Date((securityTxt.match(/^Expires: (.+)$/m) || [])[1]);
+  // Fails a month before the date, so the file is renewed before a checker finds it stale.
+  assert.ok(expires.getTime() - Date.now() > 30 * 24 * 60 * 60 * 1000, 'renew Expires in security.txt');
+  assert.ok(expires.getTime() - Date.now() < 366 * 24 * 60 * 60 * 1000, 'Expires is within a year');
+  const headers = fs.readFileSync(path.join(repoRoot, 'client', 'public', '_headers'), 'utf8');
+  assert.match(headers, /^\/\.well-known\/security\.txt\n  Content-Type: text\/plain; charset=utf-8$/m);
+  // The catch-all for /.well-known/ is not forced, so the host serves the real file first.
+  const redirects = fs.readFileSync(path.join(repoRoot, 'client', 'public', '_redirects'), 'utf8');
+  assert.match(redirects, /^\/\.well-known\/\* \/404\.html 404$/m);
+});
+
 // The file-not-found page answers agents probing /.well-known/ addresses.
 test('the file-not-found page points agents to the guide', () => {
   const notFound = fs.readFileSync(path.join(repoRoot, 'client', 'public', '404.html'), 'utf8');

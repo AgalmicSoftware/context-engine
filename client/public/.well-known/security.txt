@@ -1,0 +1,6 @@
+# Report a security problem privately through the public repository.
+Contact: https://github.com/AgalmicSoftware/context-engine/security/advisories/new
+Policy: https://github.com/AgalmicSoftware/context-engine/security/policy
+Expires: 2027-11-01T00:00:00Z
+Preferred-Languages: en
+Canonical: https://contextengine.sh/.well-known/security.txt
