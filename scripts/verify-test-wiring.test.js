@@ -112,10 +112,16 @@ test('the browser journeys run as their own hosted job, one leg per engine, and 
 
   assert.deepEqual(gates.gates['e2e-journey'].commands.map(({ args }) => args), [
     ['run', 'test:e2e:journey'],
+    ['run', 'test:e2e:journey:login-file'],
     ['run', 'test:e2e:results-salon'],
   ]);
   assert.ok(gates.profiles.hosted.includes('e2e-journey'));
   assert.equal(manifest.scripts['test:e2e:journey'], 'node scripts/participant-journey-smoke.mjs');
+  // The visit again with no passkey at all: the sealed key's real browser storage, in both engines.
+  assert.equal(
+    manifest.scripts['test:e2e:journey:login-file'],
+    'JOURNEY_LOGIN=file JOURNEY_ONLY=visit node scripts/participant-journey-smoke.mjs',
+  );
   assert.equal(manifest.scripts['test:e2e:results-salon'], 'node scripts/results-salon-journey-smoke.mjs');
   // WebKit is the engine of every iPhone browser; each engine is its own leg, so one cannot hide the other.
   assert.match(journeyJob, /fail-fast: false\s+matrix:\s+engine: \[chromium, webkit\]/);

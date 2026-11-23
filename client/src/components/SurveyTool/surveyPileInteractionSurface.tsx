@@ -638,6 +638,20 @@ const renderPileEmptyState = ({
 // above it (header, session title, sign-in hint) varies by session and changes as the page loads, so the top is
 // measured: on mount, and whenever the page's size changes. A change applies on the next frame, as setting it resizes
 // the page the observer watches (Safari reports a loop otherwise).
+// Why a Submit failed, under the bar. On a phone the card and its bar fill the screen, so this line starts just
+// below it: it is brought into view when it appears or changes, and a failed Submit is never silent.
+const PileSubmitError = ({ message }: { message: string }) => {
+  const line = React.useRef<HTMLParagraphElement>(null);
+  React.useEffect(() => {
+    line.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [message]);
+  return (
+    <p ref={line} className={styles.pileSubmitError} role="alert">
+      {message}
+    </p>
+  );
+};
+
 const PileInteractionUnit = ({
   className,
   children,
@@ -841,10 +855,6 @@ export const renderPileInteractionSurface = ({
     <p className={styles.draftPersistenceStatus} role="status" aria-atomic="true">
       {draftPersistenceError || ''}
     </p>
-    {submissionError && (
-      <p className={styles.pileSubmitError} role="alert">
-        {submissionError}
-      </p>
-    )}
+    {submissionError && <PileSubmitError message={submissionError} />}
   </PileInteractionUnit>
 );

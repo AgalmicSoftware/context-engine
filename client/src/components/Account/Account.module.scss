@@ -2450,7 +2450,46 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   color: var(--ce-status-danger-text);
 }
 
-.passkeyWalletStatusHelp,
+// The (?) in the log-in window's boxes: a glyph of the text's size on the text's line, right after the word it
+// follows. It has no fill in any state: a touch screen keeps :hover after a tap, which left a grey square behind
+// it. Its tap area is 44px, reaching to the glyph's free side so that it does not cover the button before it.
+.passkeyWalletStatusHelp {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: 0.15em;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 50%;
+  box-shadow: none !important;
+  background: transparent !important;
+  color: inherit !important;
+  font-size: 1em;
+  line-height: 1;
+  vertical-align: -0.125em;
+
+  &:hover,
+  &:active,
+  &:focus {
+    background: transparent !important;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: -6px;
+    width: 44px;
+    height: 44px;
+    transform: translateY(-50%);
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
 .agentHandoffHelp {
   display: inline-flex;
   align-items: center;

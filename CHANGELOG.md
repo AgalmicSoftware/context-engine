@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.30] - 2026-11-23
+
+A login file that is due again says to reload, its download lasts long enough for a phone to save it, and a failed Submit on the one-question pile shows its reason on screen. Site only: the Session Worker's code is unchanged and MCP stays 0.9.2. Nothing a session already stores is changed.
+
+### Site — available when the site deploys
+
+- **A login file that is due again says how to get back in.** Six hours after a login file was chosen, a page left open still shows the account, and a Submit there used to say "Open Log in and choose your login file", which that window does not offer. It now says "Reload the page, then log in with your file. Unsent answers are kept." A reload shows signed out and keeps the tab's unsent answers; they return once the same file signs in.
+- **A failed Submit on the one-question pile shows its reason without a scroll.** The reason sits under the bar, which on a phone is just below the screen; the page now brings it into view when it appears.
+- **A login file's download lasts on phones, and its notice no longer claims it was saved.** The download's address was withdrawn a second after the tap, before a phone that asks first could save it; it now lasts a minute. The notice reads "Check your downloads for …", and its (?) says what to do if no file was saved.
+- **The (?) in the log-in window's boxes no longer leaves a grey square.** After a tap on a phone, the (?) kept a grey fill twice the height of the text, and stood apart from the sentence it belongs to. It is now the size of the text, right after the last word of its sentence, with no fill in any state; a keyboard's focus still shows as an outline, and its tap area is unchanged.
+- **Deploy helper.** It deploys the 0.9.29 Worker bundles. A Worker updated from the site gets this release's.
+
 ## [0.9.29] - 2026-11-22
 
 Sign-in with a login file where no passkey works, a phone for a computer whose passkey can't be used here, an X that closes the conviction slider, and simpler atlas cards. Site only: the Session Worker's code is unchanged and MCP stays 0.9.2. Nothing a session already stores is changed.

@@ -338,6 +338,14 @@
           ]
         },
         {
+          "label": "Run phone participant journey smoke with a login file",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:e2e:journey:login-file"
+          ]
+        },
+        {
           "label": "Run salon-size Results journey smoke",
           "command": "npm",
           "args": [

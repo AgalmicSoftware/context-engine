@@ -190,6 +190,7 @@ function verifyRootScripts(rootDir, failures) {
       ['workers', 'npm run test:worker:session-cors'],
       ['e2e-smoke', 'npm run test:e2e:smoke'],
       ['e2e-journey', 'npm run test:e2e:journey'],
+      ['e2e-journey', 'npm run test:e2e:journey:login-file'],
       ['e2e-journey', 'npm run test:e2e:results-salon'],
       ['cecc-and-node', 'npm run test:node:tracked'],
       ['cecc-and-node', 'npm run test:cache-guard'],
