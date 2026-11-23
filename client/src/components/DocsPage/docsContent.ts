@@ -74,7 +74,7 @@ export const QUICKSTART_STEPS: readonly QuickstartStep[] = Object.freeze(
       links: [
         { href: '/session/new', label: 'Create a session' },
         // The session the About page's Demo button opens; a test keeps the two the same.
-        { href: '/session/rxc-ra-test-5', label: 'Try the demo session' },
+        { href: '/session/rxc-ra-2', label: 'Try the demo session' },
       ],
     },
     {

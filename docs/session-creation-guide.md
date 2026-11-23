@@ -1453,10 +1453,10 @@ Worker's own host.
 
 The file lists EDDY 2026 (`eddy26`), the Reverse Alignment salon (`rxc-ra-2`),
 the test sessions `rxc-ra-test-5` and `rxc-ra-agent-test-1`, and the demo
-session (`demo-sh`). The About page's **Demo** button opens `rxc-ra-test-5`,
-and the films, stills, promo slides and writeup carry its link. Delete its
-entry only once those links switch to another listed session and the button
-opens it. A listed session that also has demo data in `demo_sessions.json`, as
+session (`demo-sh`). The About page's **Demo** button opens `rxc-ra-2`, so
+its entry stays while the button does. The films, stills, promo slides and
+writeup carry `rxc-ra-test-5`'s link: delete its entry only once those links
+switch to another listed session. A listed session that also has demo data in `demo_sessions.json`, as
 `demo-sh` does, keeps that data; the list sets only its Worker, its session ID
 and its normal link.
 
