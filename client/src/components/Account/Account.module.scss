@@ -2344,6 +2344,73 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   line-height: 46px;
 }
 
+// "Add a password" under "Create login file", and the box a password is typed in. The text and the box's line
+// take the colour of the box they sit in, so they read in every theme.
+.loginFilePassword {
+  margin-top: 4px;
+}
+
+.loginFilePasswordCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  min-height: 44px;
+  margin: 0;
+  cursor: pointer;
+
+  input {
+    width: 1.15em;
+    height: 1.15em;
+    margin: 0;
+    accent-color: currentColor;
+  }
+}
+
+.loginFilePasswordField {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 12px;
+  margin-top: 4px;
+}
+
+.loginFilePasswordLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  margin: 0;
+}
+
+.loginFilePasswordInput {
+  width: min(12em, 60vw);
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid currentColor !important;
+  border-radius: var(--ce-radius-6);
+  // The box's own colours, over a theme's colours for inputs: what is typed reads as the text around it does.
+  background: transparent !important;
+  color: inherit !important;
+  -webkit-text-fill-color: currentColor;
+  caret-color: currentColor;
+  font: inherit;
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+.loginFilePasswordNote {
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.loginFileName {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
 // "or", between the ways out under a failed passkey: a line of its own, larger than the text around it.
 .passkeyOr {
   margin: 10px 0 8px;

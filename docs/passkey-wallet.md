@@ -326,6 +326,39 @@ stays first.
   are kept." A reload shows signed out and keeps that tab's unsent answers, which
   return once the same file signs in. Disconnect would discard them, and asks
   first.
+- **A password, if asked for.** "Add a password", under "Create login file",
+  takes a password, and the file made then (version 2) holds its 12 words
+  encrypted: PBKDF2-SHA256 with 600,000 iterations and a random 16-byte salt
+  stretches the password into an AES-GCM-256 key, used with a random 12-byte IV.
+  The password is taken as UTF-8 after Unicode NFKC normalisation; the cipher's
+  input is the phrase as UTF-8, with no additional data; `salt`, `iv` and
+  `ciphertext` (which ends with the 16-byte tag) are base64url without padding.
+  The file records the method and its numbers (`encryptedRecoveryPhrase`: `kdf`,
+  `iterations`, `salt`, `cipher`, `iv`, `ciphertext`), so they can be raised later
+  and older files still open; a count below 100,000 or above 5,000,000, or any
+  other method, is refused as not a login file. Stretching takes about a tenth of
+  a second on a fast laptop (measured in Chromium and WebKit) and is expected to
+  take up to about a second on a phone (not measured).
+  - Choosing such a file asks for its password before anything is tried: one box,
+    in place of the other choices, with Back. A wrong password says "Wrong
+    password, or the file is damaged." and leaves the box there to try again; the
+    cipher cannot tell a wrong password from a protected part that was changed. A
+    file that opens to another account than the one it names is refused.
+  - The password is used to open the file and kept nowhere: not in storage, not
+    in the wallet's record, not in the page's markup while it is typed, and it is
+    sent nowhere. It cannot be recovered. A
+    forgotten password leaves the file of no use, which the window says in view.
+  - There is one password box with a "Show" tick, and no second "confirm" box.
+    Creating never signs in, so the first sign-in with the new file is the check:
+    a mistyped password fails there, while the account is still empty and another
+    file can be made.
+  - After the file is opened, everything is as without a password: the same
+    account on every device, and the key sealed in the browser for its 6 hours,
+    during which the password is not asked for again. Files without a password,
+    and the 12 words alone, work as before.
+  - A password protects the file at rest. It does not protect a signed-in
+    browser, and a short or guessable password can be tried offline by anyone who
+    has the file, at the cost of the stretching per guess.
 - The page cannot tell whether a browser saved the file. The notice says where
   to look ("Check your downloads for …"), and its (?) says what to do if no file
   was saved: built-in browsers of other apps often drop downloads.

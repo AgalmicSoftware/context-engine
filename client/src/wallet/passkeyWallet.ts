@@ -32,10 +32,12 @@ import { indexedDbWalletStorage } from './keystore/storage.js';
 import {
   LoginFileExpiredError,
   createLoginFile,
+  createProtectedLoginFile,
+  isLoginFileProtected,
+  openLoginFile,
   isLoginFileKeyUsable,
   openLoginFileKey,
   wipeLoginFileKey,
-  readLoginFileKey,
   sealLoginFileKey,
 } from './keystore/loginFile.js';
 import { createSoftSessionPolicy } from './session/sessionPolicy.js';
@@ -522,14 +524,18 @@ export class PasskeyEoaWalletClient {
     }
   }
 
-  /** Signs in from a login file's text (or its 12 words): the same account on every device that has the file. */
-  async signInWithLoginFile(text: string): Promise<HexString> {
+  /**
+   * Signs in from a login file's text (or its 12 words): the same account on every device that has the file. A
+   * file with a password needs it here, and only here: it is used to open the file and kept nowhere.
+   */
+  async signInWithLoginFile(text: string, password?: string): Promise<HexString> {
     const generation = ++this.operationGeneration;
     this.transitionInProgress = true;
     let privateKey: HexString | null = null;
     try {
       // Read first: a file that is not a login file leaves the signed-in account as it was.
-      const key = readLoginFileKey(text);
+      const key = await openLoginFile(text, password);
+      this.assertCurrentOperation(generation);
       privateKey = key.privateKey;
       const saved = await this.storage.read();
       this.assertCurrentOperation(generation);
@@ -1046,9 +1052,14 @@ export const createPasskeyWallet = (options: CreateOptions = {}): Promise<HexStr
   getPasskeyWalletClient().createWallet(options);
 export const unlockPasskeyWallet = (options: UnlockOptions = {}): Promise<HexString> =>
   getPasskeyWalletClient().unlockWallet(options);
-export const signInWithLoginFile = (text: string): Promise<HexString> =>
-  getPasskeyWalletClient().signInWithLoginFile(text);
-export { createLoginFile };
+export const signInWithLoginFile = (text: string, password?: string): Promise<HexString> =>
+  getPasskeyWalletClient().signInWithLoginFile(text, password);
+export { createLoginFile, createProtectedLoginFile, isLoginFileProtected };
+export {
+  LOGIN_FILE_PASSWORD_NEEDED_TEXT,
+  LOGIN_FILE_PASSWORD_WRONG_TEXT,
+  LOGIN_FILE_UNREADABLE_TEXT,
+} from './keystore/loginFile.js';
 export const restorePasskeyWalletSession = (options: RestoreOptions = {}): Promise<HexString | null> =>
   getPasskeyWalletClient().restoreSession(options);
 export const logoutPasskeyWallet = (): Promise<void> => getPasskeyWalletClient().disconnect();

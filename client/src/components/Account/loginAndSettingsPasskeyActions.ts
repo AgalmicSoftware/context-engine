@@ -4,6 +4,14 @@ import { PasskeysUnavailableError } from '../../wallet/passkey/unavailable';
 export const PASSKEYS_UNAVAILABLE_MESSAGE = 'Open this link in Safari or Chrome to sign in.';
 /** Shown after "Login failed: " or "Create failed: " where the passkey has no PRF; the console keeps the thrown text. */
 export const PASSKEY_PRF_UNSUPPORTED_TEXT = "This passkey can't be used here.";
+// What the log-in window says of a login file itself; the wallet's own words for the first three.
+export {
+  LOGIN_FILE_PASSWORD_NEEDED_TEXT,
+  LOGIN_FILE_PASSWORD_WRONG_TEXT,
+  LOGIN_FILE_UNREADABLE_TEXT,
+} from '../../wallet/keystore/loginFile';
+/** Shown after "Create failed: " where a login file with a password could not be made. */
+export const LOGIN_FILE_NOT_MADE_TEXT = 'The login file could not be made.';
 /** The status after a Create whose passkey has no PRF: the login then offers to keep the passkey on a phone. */
 export const PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE = `Create failed: ${PASSKEY_PRF_UNSUPPORTED_TEXT}`;
 
@@ -17,7 +25,7 @@ export type PasskeyWalletActionMode = '' | 'create' | 'sign-in';
 
 export type LoginPasskeyWalletPort = {
   createPasskeyWallet: (options?: { anotherDevice?: boolean }) => Promise<unknown>;
-  signInWithLoginFile: (text: string) => Promise<unknown>;
+  signInWithLoginFile: (text: string, password?: string) => Promise<unknown>;
   getPasskeyWalletChain?: () => unknown;
   isMissingPasskeyWalletRecordError?: (error: unknown) => boolean;
   isPasskeyWalletOperationCancelledError?: (error: unknown) => boolean;
@@ -46,10 +54,11 @@ export type LoginPasskeyActionsDeps = {
 export type LoginPasskeyActions = {
   _finalizePasskeyWalletLogin: (address: unknown, targetNetwork?: unknown) => void;
   getPasskeyWalletNetwork: (targetNetwork?: unknown) => unknown;
-  handlePasskeyWalletCreate: () => Promise<void>;
-  handlePasskeyWalletCreateOnAnotherDevice: () => Promise<void>;
-  handlePasskeyWalletSignIn: () => Promise<void>;
-  handleLoginFileSignIn: (text: string) => Promise<void>;
+  // Each resolves to whether it signed the person in.
+  handlePasskeyWalletCreate: () => Promise<boolean>;
+  handlePasskeyWalletCreateOnAnotherDevice: () => Promise<boolean>;
+  handlePasskeyWalletSignIn: () => Promise<boolean>;
+  handleLoginFileSignIn: (text: string, password?: string) => Promise<boolean>;
   syncPasskeyWalletChain: (targetNetwork?: unknown) => unknown;
 };
 
@@ -135,7 +144,7 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
     mode: Exclude<PasskeyWalletActionMode, ''>;
     /** Shown for any failure, in place of the failure's own words. */
     failureMessage?: string;
-  }): Promise<void> => {
+  }): Promise<boolean> => {
     const passkeyActionId = deps.startAction();
     deps.setActionMode(mode);
     deps.setStatus({
@@ -151,13 +160,14 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
     try {
       const passkeyNetwork = getPasskeyWalletNetwork();
       const address = await action();
-      if (!deps.isCurrentAction(passkeyActionId)) return;
+      if (!deps.isCurrentAction(passkeyActionId)) return false;
       _finalizePasskeyWalletLogin(address, passkeyNetwork);
       deps.setActionMode('');
+      return true;
     } catch (error) {
-      if (deps.passkeyWallet.isPasskeyWalletOperationCancelledError?.(error)) return;
+      if (deps.passkeyWallet.isPasskeyWalletOperationCancelledError?.(error)) return false;
       deps.accountLogError(mode === 'create' ? 'Passkey wallet create error:' : 'Passkey wallet sign-in error:', error);
-      if (!deps.isCurrentAction(passkeyActionId)) return;
+      if (!deps.isCurrentAction(passkeyActionId)) return false;
       const isMissingWallet = mode === 'sign-in' && deps.passkeyWallet.isMissingPasskeyWalletRecordError?.(error);
       const message =
         failureMessage ||
@@ -178,6 +188,7 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
       });
       deps.setActionMode('');
       deps.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
+      return false;
     }
   };
 
@@ -205,9 +216,9 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
       }),
     // A login file's account is the same kind as a passkey's from here on: the same provider, signatures and
     // transactions. Only the way its key is reached differs.
-    handleLoginFileSignIn: (text: string) =>
+    handleLoginFileSignIn: (text: string, password?: string) =>
       runPasskeyWalletAction({
-        action: () => deps.passkeyWallet.signInWithLoginFile(text),
+        action: () => deps.passkeyWallet.signInWithLoginFile(text, password),
         mode: 'sign-in',
       }),
     syncPasskeyWalletChain,

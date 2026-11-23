@@ -3,9 +3,15 @@ import { PasskeyEoaWalletClient } from './passkeyWallet.js';
 import { createMemoryWalletStorage } from './keystore/storage.js';
 import {
   LOGIN_FILE_HOURS,
+  LOGIN_FILE_PASSWORD_ITERATIONS,
   LoginFileExpiredError,
+  LoginFilePasswordNeededError,
+  LoginFilePasswordWrongError,
   LoginFileUnreadableError,
   createLoginFile,
+  createProtectedLoginFile,
+  isLoginFileProtected,
+  openLoginFile,
   readLoginFileKey,
 } from './keystore/loginFile.js';
 import { createInMemorySoftSessionClient } from './session/sessionWorkerClient.js';
@@ -98,6 +104,202 @@ describe('a login file', () => {
       expect(() => readLoginFileKey(text)).toThrow(LoginFileUnreadableError);
     },
   );
+});
+
+describe('a login file with a password', () => {
+  const PASSWORD = 'correct horse battery';
+  const edit = (text: string, change: (file: any) => void): string => {
+    const file = JSON.parse(text);
+    change(file);
+    return JSON.stringify(file);
+  };
+  // One file for the cases that only read it; making one stretches the password, which takes a moment.
+  let file: Awaited<ReturnType<typeof createProtectedLoginFile>>;
+  beforeAll(async () => {
+    file = await createProtectedLoginFile(PASSWORD, new Date('2026-11-23T12:00:00Z'));
+  });
+
+  it('holds no words in the clear, and records how it is protected', () => {
+    const parsed = JSON.parse(file.text);
+    expect(parsed).toMatchObject({
+      type: 'context-engine-login-file',
+      version: 2,
+      address: file.address,
+      encryptedRecoveryPhrase: { kdf: 'PBKDF2-SHA256', iterations: 600000, cipher: 'AES-GCM-256' },
+    });
+    expect(LOGIN_FILE_PASSWORD_ITERATIONS).toBe(600000);
+    expect(parsed).not.toHaveProperty('recoveryPhrase');
+    expect(file.text).not.toContain(PASSWORD);
+    // A 16-byte salt and a 12-byte IV, fresh for each file.
+    const bytes = (value: string) => Buffer.from(value, 'base64url').length;
+    expect(bytes(parsed.encryptedRecoveryPhrase.salt)).toBe(16);
+    expect(bytes(parsed.encryptedRecoveryPhrase.iv)).toBe(12);
+    expect(parsed.warning).toMatch(/password cannot be recovered/);
+    expect(isLoginFileProtected(file.text)).toBe(true);
+    expect(file.name).toBe(`context-engine-login-${file.address.slice(2, 8).toLowerCase()}.json`);
+  });
+
+  it('opens with its password to the account it names, every time', async () => {
+    const opened = await openLoginFile(file.text, PASSWORD);
+    expect(opened.address).toBe(file.address);
+    expect(new ethers.Wallet(opened.privateKey).address).toBe(file.address);
+    await expect(openLoginFile(file.text, PASSWORD)).resolves.toEqual(opened);
+  });
+
+  it('gives two files of one password different salts, IVs and accounts', async () => {
+    const other = await createProtectedLoginFile(PASSWORD);
+    const [a, b] = [JSON.parse(file.text).encryptedRecoveryPhrase, JSON.parse(other.text).encryptedRecoveryPhrase];
+    expect(a.salt).not.toBe(b.salt);
+    expect(a.iv).not.toBe(b.iv);
+    expect(other.address).not.toBe(file.address);
+  });
+
+  it('refuses a wrong password, and says a password is needed when none is given', async () => {
+    await expect(openLoginFile(file.text, 'correct horse batterx')).rejects.toThrow(LoginFilePasswordWrongError);
+    await expect(openLoginFile(file.text, `${PASSWORD} `)).rejects.toThrow(LoginFilePasswordWrongError);
+    await expect(openLoginFile(file.text)).rejects.toThrow(LoginFilePasswordNeededError);
+    await expect(openLoginFile(file.text, '')).rejects.toThrow(LoginFilePasswordNeededError);
+    // Read as a file without a password, it is not one.
+    expect(() => readLoginFileKey(file.text)).toThrow(LoginFileUnreadableError);
+  });
+
+  it('refuses to make a file with an empty password', async () => {
+    await expect(createProtectedLoginFile('')).rejects.toThrow('Enter a password for the login file.');
+  });
+
+  it('takes the same password however its letters were composed', async () => {
+    const composed = await createProtectedLoginFile('caf\u00e9 salon');
+    await expect(openLoginFile(composed.text, 'cafe\u0301 salon')).resolves.toMatchObject({
+      address: composed.address,
+    });
+  });
+
+  it.each([
+    [
+      'its ciphertext',
+      (f: any) => (f.encryptedRecoveryPhrase.ciphertext = `A${f.encryptedRecoveryPhrase.ciphertext.slice(1)}`),
+    ],
+    ['its salt', (f: any) => (f.encryptedRecoveryPhrase.salt = Buffer.alloc(16, 7).toString('base64url'))],
+    ['its IV', (f: any) => (f.encryptedRecoveryPhrase.iv = Buffer.alloc(12, 7).toString('base64url'))],
+    ['its iteration count', (f: any) => (f.encryptedRecoveryPhrase.iterations = 600001)],
+    [
+      'a cut-off ciphertext',
+      (f: any) => (f.encryptedRecoveryPhrase.ciphertext = f.encryptedRecoveryPhrase.ciphertext.slice(0, 20)),
+    ],
+  ])('does not open once %s is changed, even with the right password', async (_what, change) => {
+    await expect(openLoginFile(edit(file.text, change), PASSWORD)).rejects.toThrow(LoginFilePasswordWrongError);
+  });
+
+  it('refuses a file that opens to another account than the one it names', async () => {
+    const renamed = edit(file.text, (f) => (f.address = PHRASE_ADDRESS));
+    await expect(openLoginFile(renamed, PASSWORD)).rejects.toThrow(LoginFileUnreadableError);
+  });
+
+  it.each([
+    ['an unknown method', (f: any) => (f.encryptedRecoveryPhrase.kdf = 'scrypt')],
+    ['an unknown cipher', (f: any) => (f.encryptedRecoveryPhrase.cipher = 'AES-CBC')],
+    ['too few iterations to protect anything', (f: any) => (f.encryptedRecoveryPhrase.iterations = 1000)],
+    ['so many iterations that a phone would stall', (f: any) => (f.encryptedRecoveryPhrase.iterations = 50_000_000)],
+    ['a count that is not a whole number', (f: any) => (f.encryptedRecoveryPhrase.iterations = '600000')],
+    ['a missing salt', (f: any) => delete f.encryptedRecoveryPhrase.salt],
+    ['another type', (f: any) => (f.type = 'other')],
+  ])('refuses %s as not a login file, before any password is tried', async (_what, change) => {
+    const changed = edit(file.text, change);
+    await expect(openLoginFile(changed, PASSWORD)).rejects.toThrow(LoginFileUnreadableError);
+    expect(isLoginFileProtected(changed)).toBe(false);
+  });
+
+  it.each([
+    [99_999, false],
+    [100_000, true],
+    [5_000_000, true],
+    [5_000_001, false],
+    [600_000.5, false],
+    [-600_000, false],
+    [Number.NaN, false],
+  ])('takes an iteration count of %p as a protected file: %p', (iterations, taken) => {
+    expect(isLoginFileProtected(edit(file.text, (f) => (f.encryptedRecoveryPhrase.iterations = iterations)))).toBe(
+      taken,
+    );
+  });
+
+  it.each([
+    ['text that is not base64', (f: any) => (f.encryptedRecoveryPhrase.ciphertext = '!!! not base64 !!!')],
+    ['an empty ciphertext', (f: any) => (f.encryptedRecoveryPhrase.ciphertext = '')],
+    [
+      'an IV of the wrong length',
+      (f: any) => (f.encryptedRecoveryPhrase.iv = Buffer.alloc(5, 1).toString('base64url')),
+    ],
+    ['an empty salt', (f: any) => (f.encryptedRecoveryPhrase.salt = '')],
+  ])('refuses %s as a wrong password or a damaged file, never with a raw error', async (_what, change) => {
+    await expect(openLoginFile(edit(file.text, change), PASSWORD)).rejects.toThrow(LoginFilePasswordWrongError);
+  });
+
+  it('goes by the protected part where a file holds words in the clear as well', async () => {
+    const both = edit(file.text, (f) => (f.recoveryPhrase = PHRASE));
+    expect(isLoginFileProtected(both)).toBe(true);
+    await expect(openLoginFile(both)).rejects.toThrow(LoginFilePasswordNeededError);
+    await expect(openLoginFile(both, PASSWORD)).resolves.toMatchObject({ address: file.address });
+  });
+
+  it.each([null, 'x', 0])('reads a protected part of %p as none: the file is one without a password', async (part) => {
+    const plain = JSON.stringify({
+      type: 'context-engine-login-file',
+      recoveryPhrase: PHRASE,
+      encryptedRecoveryPhrase: part,
+    });
+    expect(isLoginFileProtected(plain)).toBe(false);
+    await expect(openLoginFile(plain)).resolves.toMatchObject({ address: PHRASE_ADDRESS });
+  });
+
+  it('refuses an empty protected part as not a login file', async () => {
+    const empty = JSON.stringify({
+      type: 'context-engine-login-file',
+      recoveryPhrase: PHRASE,
+      encryptedRecoveryPhrase: {},
+    });
+    expect(isLoginFileProtected(empty)).toBe(false);
+    await expect(openLoginFile(empty, PASSWORD)).rejects.toThrow(LoginFileUnreadableError);
+  });
+
+  it('opens files without a password, and the 12 words alone, as before', async () => {
+    const plain = createLoginFile();
+    expect(isLoginFileProtected(plain.text)).toBe(false);
+    await expect(openLoginFile(plain.text)).resolves.toMatchObject({ address: plain.address });
+    // A password given for a file that has none is simply not used.
+    await expect(openLoginFile(plain.text, PASSWORD)).resolves.toMatchObject({ address: plain.address });
+    await expect(openLoginFile(PHRASE)).resolves.toMatchObject({ address: PHRASE_ADDRESS });
+    expect(isLoginFileProtected(PHRASE)).toBe(false);
+    expect(isLoginFileProtected('not a file')).toBe(false);
+    await expect(openLoginFile('not a file')).rejects.toThrow(LoginFileUnreadableError);
+  });
+
+  it('signs in with its password as the account it names, and keeps the password nowhere', async () => {
+    const { client, storage } = makeClient();
+    await expect(client.signInWithLoginFile(file.text)).rejects.toThrow(LoginFilePasswordNeededError);
+    await expect(client.signInWithLoginFile(file.text, 'wrong')).rejects.toThrow(LoginFilePasswordWrongError);
+    expect(await storage.read()).toBeNull();
+    await expect(client.signInWithLoginFile(file.text, PASSWORD)).resolves.toBe(file.address);
+    const signature = await client.signMessage('with a password', file.address);
+    expect(ethers.utils.verifyMessage('with a password', signature)).toBe(file.address);
+    // From here on it is a login file's account like any other: sealed for its hours, with no trace of the password.
+    const record = await storage.read();
+    expect(record).toMatchObject({ keyMode: 'login-file', evmAddress: file.address });
+    expect(JSON.stringify(record)).not.toContain(PASSWORD);
+    expect(JSON.stringify(record)).not.toContain(Buffer.from(PASSWORD).toString('base64url'));
+    await client.lock();
+  });
+
+  it('leaves the signed-in account as it was when the password is wrong', async () => {
+    const { client } = makeClient();
+    await client.signInWithLoginFile(
+      JSON.stringify({ type: 'context-engine-login-file', version: 1, recoveryPhrase: PHRASE }),
+    );
+    await expect(client.signInWithLoginFile(file.text, 'wrong')).rejects.toThrow(LoginFilePasswordWrongError);
+    expect(client.isUnlocked()).toBe(true);
+    expect(client.getAddress()).toBe(PHRASE_ADDRESS);
+    await client.lock();
+  });
 });
 
 describe('signing in with a login file', () => {
