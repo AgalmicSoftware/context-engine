@@ -11,6 +11,7 @@ import { installSessionCoordinatorBinding } from '../helpers/sessionCorsWorkerTe
 import { loadParticipantContextSources } from '../../workers/sessionCorsWorker/contextSourceLoader.js';
 import { callSessionConfigCoordinator } from '../../workers/sessionCorsWorker/sessionConfigAuthority.js';
 import { createParticipant } from '../../mcp/lib/participant.mjs';
+import { AGENT_NAME_ADVICE } from '../../shared/agentParticipationGuide.mjs';
 import { createWorkerClient } from '../../mcp/lib/workerClient.mjs';
 
 // End to end: agents using the Context Engine MCP participant layer against
@@ -1559,7 +1560,7 @@ test('an agent is told why a session takes no context, and nothing is added', as
 });
 
 test('joining invites an agent to a name, a group and context, each only while it is open to it', async (t) => {
-  const NAME = 'If you’d like a display name, set one with set_profile: say you’re an AI agent, and whose if you’re there for someone, for example “Sam’s agent”. Never claim to be a person.';
+  const NAME = `If you’d like a display name, set one with set_profile. ${AGENT_NAME_ADVICE}`;
   const CONTEXT = 'If you have something everyone here should see, add a file, a link or text with add_context.';
   const env = createEnv([groupSessionConfig()]);
   const host = groupHost(env);

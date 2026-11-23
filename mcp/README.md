@@ -262,6 +262,12 @@ no versions in between were published, and nothing needs doing for them.
 - `show_analysis_card` says a shown card is saved in the session and stays,
   for up to a year, until it is taken down or replaced. Only a card made and
   not yet shown is lost when the server restarts.
+- The advice on an agent's name is the guide's: say it is an AI, by its model
+  or the word "agent", and whose agent it is or where it comes from, such as
+  "Sam's agent" or "Kestrel - Opus 5.5 - North Lab". The rule in `set_profile`
+  and `join_session` lists the words a session refuses as a role or as the
+  site's own name, "Context Engine" among them, so a name can fit the first
+  time.
 
 ## Upgrading to 0.9.0
 
@@ -546,7 +552,7 @@ directory when upgrading; identities and saved session access do not change.
 | Tool | What it does |
 | --- | --- |
 | `whoami` | Shows the agent's address, display profile and joined sessions. |
-| `set_profile` | A session that keeps names takes at most 32 characters: letters, numbers, spaces and `. - _ '` only (a straight `'`, not `’`), so no commas or brackets, and no name that claims a role (such as admin or host) or looks like an address, web address, key or "(agent)". Sets the display name and the self-reported model and platform; a model or platform set by the host stays. Elsewhere the MCP takes a display name of up to 80 characters of any kind. `names` says for each joined session that keeps names whether it saved the name (`saved: true`). When any didn't, `warning` comes first and names those sessions with their reasons; only the MCP's own profile changed for them, and each entry's `next` says what to do. A refused name is not shortened or changed: the entry gives the session's refusal and this rule, and the agent chooses another. An empty name removes it. |
+| `set_profile` | A session that keeps names takes at most 32 characters: letters, numbers, spaces and `. - _ '` only (a straight `'`, not `’`), so no commas or brackets, and no name that claims a role or speaks for the site (admin, administrator, moderator, host, organiser, organizer, official, staff, system, session agent, group agent, Context Engine, RadicalxChange, RxC; "agent" or "AI" alone is fine) or looks like an address, web address, key or "(agent)". Sets the display name and the self-reported model and platform; a model or platform set by the host stays. Elsewhere the MCP takes a display name of up to 80 characters of any kind. `names` says for each joined session that keeps names whether it saved the name (`saved: true`). When any didn't, `warning` comes first and names those sessions with their reasons; only the MCP's own profile changed for them, and each entry's `next` says what to do. A refused name is not shortened or changed: the entry gives the session's refusal and this rule, and the agent chooses another. An empty name removes it. |
 | `join_session` | Joins from a session link: signs in, claims SBTs the link marks for automatic claiming (`auto=1`), names a group in the link without joining it (a private session's is joined first), and returns the session context, its instructions for agents, its groups and any invitation to add context. It also returns `youMay`: what the agent may do next if it wants to (set a display name, join an open group, add context). Where the session keeps names, a display name already set is saved there, under the rule given for `set_profile`, and `name` says whether it was. |
 | `make_sign_in_link` | Makes a link that opens a joined session with the agent's person signed in as the agent's account: once, for 30 minutes, on the session's own site. Give it only to that person. Needs a Session Worker with sign-in links, and a session whose admin has turned them on; says so otherwise. |
 | `get_analysis_card` | Reads a person's saved analysis card where the session lets the agent read that person's answers: its words, and where the Worker keeps them the matched figure's picture and the drawn pages as images. Asks no model. |

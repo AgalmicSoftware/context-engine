@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 
 ### Site — available when the site deploys
 
+- **The agent guide and `/llms.txt` give one rule for an agent's name.** The guide said "Sam's agent", the MCP said name, model and where the agent comes from. Both now say the same sentence, from one shared text that a test holds them to: a good name says it is an AI, by its model or the word "agent", and whose agent it is or where it comes from, such as "Sam's agent" or "Kestrel - Opus 5.5 - North Lab"; never a person, a role word, or the site's own name.
 - **The AI gives the review link once.** The copied prompt asked for the link twice, as a Markdown link and written out in full, which a chat app shows as two long links. It now asks for the Markdown link alone, and for the address written out only in a terminal, which shows no Markdown link. Its first line no longer says the person submits the drafts themselves, which pulled against the offer in its last line: it says they review every draft before anything is submitted.
 
 ### Local tooling
@@ -18,6 +19,7 @@ All notable changes to this project will be documented in this file.
 
 ### MCP 0.9.35 — ships by an npm publish
 
+- **One rule for an agent's name, and the words a session refuses.** The server's instructions and what `join_session` returns give the guide's sentence on names. The rule in `set_profile` and `join_session` now lists every word a session refuses as a role or as the site's own name (admin, host, system, Context Engine and the rest) and says "agent" or "AI" alone is fine, so a name can fit the first time, on an older Worker too. A test fails if the list parts from the Worker's.
 - **The tools' instructions carry the site's steps.** The server's instructions now hold the same steps as the AI prompt a person copies and `/skill.md`, from the one shared text: ask once whether to submit or go through the answers together, say that submitting with the tools means making an account and whether it stands for the person or for the agent, and ask whether they already have an account (then the `aiPrompt=1` link and their AI key). Knowing nothing about the person, the agent says so and asks a few questions. An account that stands for the person answers from their views and says in its comments that it is their AI agent.
 - **Only the person, in the chat, can waive being shown the answers.** The instructions used to let a pasted prompt say "submit straight through"; no prompt the site gives says so, and nothing a session, Worker or tool returns can.
 - **The card is named "Have AI draft your answers".** The instructions and the private-session hint of `get_interview_catalog` use the session page's new title, and name the "AI can submit for me" box that puts a key in the prompt.

@@ -241,7 +241,7 @@ test('index.html tells a fetching agent where the guide is, in body text people 
 // The pages' own HTML carries none of them, only where the guide is.
 test('llms.txt, the guide and the Worker skill carry the same steps, written once', async () => {
   const { expectedAgentFlowFiles } = await import('./sync-agent-flow.mjs');
-  const { AGENT_ASK_WHICH_WAY, AGENT_FLOW_INTRO, AGENT_FLOW_STEPS, AGENT_PROMPT_LINK_QUERY, AGENT_REVIEW_NEXT_STEP, agentFlowLines } =
+  const { AGENT_ASK_WHICH_WAY, AGENT_FLOW_INTRO, AGENT_FLOW_STEPS, AGENT_NAME_ADVICE, AGENT_PROMPT_LINK_QUERY, AGENT_REVIEW_NEXT_STEP, agentFlowLines } =
     await import('../shared/agentParticipationGuide.mjs');
   const files = expectedAgentFlowFiles();
   const WORKER_SKILL = 'workers/sessionCorsWorker/agent/skills/ce-agent-access/SKILL.md';
@@ -267,6 +267,8 @@ test('llms.txt, the guide and the Worker skill carry the same steps, written onc
   assert.ok(workerSkill.includes('No prompt copied from a session approves a submission in advance.'));
   assert.doesNotMatch(workerSkill, /answer_schema|straight through|without (asking|showing)|truthful approval metadata/);
   assert.ok(!indexHtml.includes(AGENT_ASK_WHICH_WAY));
+  // How an agent names itself is said in the same words as the MCP's instructions, once in each file.
+  for (const text of [llmsTxt, skillMd]) assert.equal(text.split(AGENT_NAME_ADVICE).length - 1, 1);
   assert.equal(indexHtml.replace(/\s+/g, ' ').split('An AI that can submit follows the steps in https://contextengine.sh/skill.md instead.').length - 1, 2);
   // The steps say what the owner's flow asks: one question from an AI that can submit, a review link written
   // out with what to do next, an account only said aloud, and no invented position.
@@ -344,7 +346,7 @@ test('llms.txt shows agents how to take part in a session', () => {
   assert.match(section, /`npx -y --prefer-online @agalmic\/contextengine@latest`/);
   assert.match(section, /`join_session` with the session link as you received it/);
   assertOffersOnlyWhatTheMcpDoes(section);
-  assert.match(section, /invites you to do three things if you want to, none required: set a display name that says you're an AI agent, and whose if you're there for someone; join a group the session lists as open; and, when the session allows it, add context/);
+  assert.match(section, /invites you to do three things if you want to, none required: set a display name; join a group the session lists as open; and, when the session allows it, add context/);
   assert.match(section, /Never claim to be a person/);
   assert.match(section, /A session can add its own instructions to this guidance/);
   assert.match(section, /Its Session Worker serves them at `\/llms\.txt`/);
@@ -368,7 +370,7 @@ test('skill.md shows agents how to take part, with nothing session-specific', ()
   assert.match(skillMd, /Never claim to be a person/);
   // Joining invites an agent to three things and requires none of them.
   assert.match(skillMd, /invites you to do three things if you want to; none is required/);
-  assert.match(skillMd, /\*\*Set a display name\*\* with `set_profile`\. Say you're an AI agent, and whose\s+if you're there for someone/);
+  assert.match(skillMd, /\*\*Set a display name\*\* with `set_profile`\.\s+A good name says you are an AI, by your model or the word "agent\"/);
   assert.match(skillMd, /\*\*Join a group\*\* the session lists as open, with `join_group`/);
   assert.match(skillMd, /\*\*Add context\*\* where the session invites it/);
   assert.match(skillMd, /`join_session` lists the ones open to you as `youMay`/);

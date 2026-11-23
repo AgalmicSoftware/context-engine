@@ -23,6 +23,7 @@ import { latestAnswersByQuestion, respondersWithAnswers, summarizeQuestion } fro
 import { listSessionSbts } from './sbtClaims.mjs';
 import { buildSessionWebUrl, GROUP_ID_RE, normalizeSessionSlug, normalizeWorkerOrigin, parseSessionLink } from './sessionLinks.mjs';
 import { SESSION_NAME_RULE } from './sessionNameRule.mjs';
+import { AGENT_NAME_ADVICE } from '../../shared/agentParticipationGuide.mjs';
 import { createWorkerClient, normalizeSessionIdHex, text, WorkerRequestError } from './workerClient.mjs';
 import { SESSION_COORDINATOR_UNAVAILABLE } from '../../shared/sessionCoordinatorBusy.mjs';
 import {
@@ -391,7 +392,7 @@ const joinInvitations = ({ named, groups = [], addingContext, instructions }) =>
   const open = groups.filter((group) => !group.member && group.joining === SELF_JOINING.open).length;
   return [
     ...(named ? [] : [
-      'If you’d like a display name, set one with set_profile: say you’re an AI agent, and whose if you’re there for someone, for example “Sam’s agent”. Never claim to be a person.',
+      `If you’d like a display name, set one with set_profile. ${AGENT_NAME_ADVICE}`,
     ]),
     ...(open ? [
       `If you’d like to join a group, ${open === 1 ? 'one listed here is' : `${open} listed here are`} open: join with join_group.${instructions ? ' The session’s instructions may say which.' : ''}`,

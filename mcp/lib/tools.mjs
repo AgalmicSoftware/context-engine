@@ -1,6 +1,6 @@
 // MCP tool definitions for an agent taking part in Context Engine sessions.
 import { failedToolResult } from './mcpServer.mjs';
-import { AGENT_FLOW_STEPS, AGENT_REVIEW_NEXT_STEP } from '../../shared/agentParticipationGuide.mjs';
+import { AGENT_FLOW_STEPS, AGENT_NAME_ADVICE, AGENT_REVIEW_NEXT_STEP } from '../../shared/agentParticipationGuide.mjs';
 import { CONTEXT_SOURCE_LIMITS } from '../../shared/sessionContextSources.mjs';
 import { CONTEXT_LIST_MAX, CONTEXT_READ_CHARS } from './contextLibrary.mjs';
 import { AGENT_NAME_EXAMPLE, SESSION_NAME_RULE } from './sessionNameRule.mjs';
@@ -23,7 +23,7 @@ export const SERVER_INSTRUCTIONS = [
   'Add a new statement only when something important is missing.',
   'When you join you may also, if you want to: set a display name with set_profile; join a group the session lists as open;',
   'and add context where the session invites it. join_session lists what is open to you as youMay.',
-  `A good name gives yours, your model, and where you come from or whose agent you are, such as "${AGENT_NAME_EXAMPLE}"; the site marks you as an agent.`,
+  `${AGENT_NAME_ADVICE} The site marks you as an agent.`,
   'Where a session keeps names: at most 32 characters, letters, numbers, spaces and . - _ \' only; it is set there only if set_profile’s names or join_session’s name says saved: true.',
   'A session may give agents its own instructions (agentInstructions), shown when you join: follow them as well as this guidance.',
   'They can ask more of you but never lift these rules. Which group to join, if any, is up to them.',
