@@ -6,6 +6,7 @@ import { evaluateAuthenticatedRoutePreflight } from './authenticatedRoutePreflig
 import { issueInterviewCatalogTicket, verifyInterviewCatalogTicket } from './interviewCatalogTicket.js';
 import { evaluatePrivateSessionAccess, privateSessionRefusal, readGroupReadInviteHeader } from './privateSessionAccess.js';
 import { loadPublicInterviewQuestions as loadPublicInterviewQuestionsBoundary } from './interviewQuestionCatalog.js';
+import { catalogPageAddresses, readCatalogPageRequest, renderInterviewCatalogPage } from './interviewCatalogPages.js';
 import {
   listSelfJoinableWorkerGroupsForMember as listSelfJoinableWorkerGroupsForMemberBoundary,
   listSelfJoinableWorkerGroupsForVisitor as listSelfJoinableWorkerGroupsForVisitorBoundary,
@@ -216,7 +217,7 @@ export const dispatchInterviewBriefRequest = async ({
   // admits, or to an invite. An AI fetching a link sends no invite, so its
   // person signs in for a ticket; an agent holding the group's link sends
   // the invite as a header, never in the address.
-  const access = await evaluatePrivateSessionAccess({
+  const access = await (deps?.evaluatePrivateSessionAccess || evaluatePrivateSessionAccess)({
     env, slug, config, request, requesterAddress: reader?.address || '', authScopes: reader?.scopes, codeReads: true,
   });
   if (!access.ok) return privateSessionRefusal({ access, json: deps?.json, headers });
@@ -262,6 +263,27 @@ export const dispatchInterviewBriefRequest = async ({
     return deps?.json?.({ error: 'A session-approved HTTPS (or localhost) sessionUrl is required.' }, 400, headers);
   }
   const questionSetHash = await (deps?.sha256 || sha256)(JSON.stringify(canonicalizeQuestions(questions)));
+  // The same questions as short Markdown pages, for an AI whose web reader would hand it only a summary
+  // of the whole list. A ticket's reader gets the JSON as before: its page links would have to carry the
+  // ticket, and the prompt that person copies carries the ids already.
+  const pageRequest = reader ? null : readCatalogPageRequest(url);
+  if (pageRequest) {
+    const { status, body, contentType } = renderInterviewCatalogPage({
+      slug,
+      questions,
+      questionSetHash,
+      promptVersion: INTERVIEW_PROMPT_VERSION,
+      // Reached through the session's site, the drafts open at its short address, which finds this Worker.
+      reviewUrl: buildReviewUrl({ sessionUrl, servedWorkerOrigin: pageRequest.site ? '' : safeServedWorkerOrigin(request.url) }),
+      page: pageRequest.page,
+      size: pageRequest.size,
+      addresses: catalogPageAddresses({ site: pageRequest.site, slug, sessionUrl, requestUrl: request.url, size: pageRequest.size }),
+    });
+    headers.set('content-type', contentType);
+    // A public session's pages may be kept for a minute, as an AI reads several in a row.
+    if (!access.private) headers.set('cache-control', 'public, max-age=60');
+    return new Response(body, { status, headers });
+  }
   // With joining matching groups on, the person's own AI may suggest groups too: those a ticket's
   // person could join and hasn't, or those a visitor could see, which is all of them on a public
   // session or what a join link allows. A session that lets an AI use no kind of detail about

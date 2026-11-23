@@ -451,6 +451,40 @@ test('a catalog ticket reads questions and groups as its person, and nothing pas
   assert.equal(body.reviewUrl, 'https://app.example/session/demo?joinGroup=salon&worker=https%3A%2F%2Fworker.example&mode=interview');
 });
 
+test('a page address with a ticket gets the JSON as before, never kept, and the ticket is not echoed', async () => {
+  const env = await signedInEnv();
+  const config = { allowOrigins: ['https://app.example'], interviewMode: {} };
+  const { ticket } = await issueInterviewCatalogTicket({
+    env, config, slug: 'demo', sub: PERSON, parent: SIGN_IN, parentExp: NOW + 3600, deps: { now: () => NOW_MS },
+  });
+  const response = await dispatchInterviewBriefRequest({
+    request: new Request(catalogUrl(`&ticket=${ticket}&site=1`).replace('/agent/interview-catalog?', '/agent/interview-catalog/1?')),
+    env,
+    deps: catalogDeps(config, {
+      loadPublicInterviewQuestions: async () => ({ questions: [{ id: 'q1', type: 'freeform', prompt: 'Members only?', options: [] }], incomplete: false, refused: false }),
+    }),
+  });
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type'), /application\/json/);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.equal((await response.text()).includes(ticket), false);
+});
+
+test('a private session’s pages, opened by its invite, are never kept', async () => {
+  const response = await pagesRequest('/index', '', {
+    evaluatePrivateSessionAccess: async () => ({ ok: true, private: true }),
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), 'text/markdown; charset=utf-8');
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  // And one it refuses gets no page at all.
+  const refused = await pagesRequest('/1', '', {
+    evaluatePrivateSessionAccess: async () => ({ ok: false, status: 403, error: 'Members only.', reason: 'private_session' }),
+  });
+  assert.notEqual(refused.status, 200);
+  assert.doesNotMatch(refused.headers.get('content-type') || '', /markdown/);
+});
+
 test('a ticket that no longer works is refused before any question is read', async () => {
   const env = await signedInEnv();
   const config = { allowOrigins: ['https://app.example'] };
@@ -560,4 +594,89 @@ test('only a person signed in on the session page, with access now, gets a catal
   assert.equal(agent.status, 403);
   assert.equal((await agent.json()).reason, 'catalog_ticket_person_only');
   assert.equal(await status({ payload: { exp: NOW } }), 500, 'a sign-in at its very end');
+});
+
+// The same catalog as short Markdown pages: an AI whose web reader summarizes a long page still gets every id.
+const pagesRequest = (path, query = '', extra = {}) => dispatchInterviewBriefRequest({
+  request: new Request(`https://worker.example/agent/interview-catalog${path}?slug=demo&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fdemo${query}`),
+  env: {},
+  slugHint: '',
+  baseHeaders: {},
+  deps: {
+    resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'demo' }),
+    getSessionConfig: async () => ({ allowOrigins: ['https://app.example'], interviewMode: { enabled: true } }),
+    getCorsContext: async () => ({ ok: true, headers: { 'access-control-allow-origin': '*' } }),
+    loadPublicInterviewQuestions: async () => ({ questions: [
+      { id: '0xaa', type: 'binary', prompt: 'Parks need more money.', options: ['Agree', 'Unsure', 'Disagree'] },
+      { id: '0xbb', type: 'multichoice', prompt: 'Which first?', options: ['Roads', 'Parks'], singleSelect: true },
+    ], incomplete: false }),
+    sha256: async () => 'a'.repeat(64),
+    json,
+    ...extra,
+  },
+});
+
+test('paths under the catalog give it as an index, pages and a link page, built from the same questions', async () => {
+  const route = 'https://worker.example/agent/interview-catalog';
+  const query = '?slug=demo&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fdemo';
+  const index = await pagesRequest('/index');
+  assert.equal(index.status, 200);
+  assert.equal(index.headers.get('content-type'), 'text/markdown; charset=utf-8');
+  assert.equal(index.headers.get('access-control-allow-origin'), '*');
+  assert.equal(index.headers.get('cache-control'), 'public, max-age=60');
+  assert.equal(index.headers.get('referrer-policy'), 'no-referrer');
+  const text = await index.text();
+  assert.ok(text.includes(`questionSetHash: ${'a'.repeat(64)}\nprefillPromptVersion: ${INTERVIEW_PROMPT_VERSION}\n`));
+  assert.ok(text.includes('\n1 0xaa binary\n2 0xbb multichoice\n'));
+  // Asked of the Worker itself, the pages are at the Worker's own addresses and the drafts open with its origin.
+  assert.ok(text.includes(`\n${route}/1${query} (1 to 2)\n`));
+  assert.ok(text.includes('review address: https://app.example/session/demo?worker=https%3A%2F%2Fworker.example&mode=interview\n'));
+  const first = await (await pagesRequest('/1')).text();
+  assert.ok(first.includes('\n1 | 0xaa | binary | Parks need more money. || one of ["Agree","Unsure","Disagree"]\n2 | 0xbb | multichoice | Which first? || choose one of ["Roads","Parks"]\n'));
+  const link = await (await pagesRequest('/link')).text();
+  assert.equal(JSON.parse(link.split('\n').find((line) => line.startsWith('{"version":1,'))).questionSetHash, 'a'.repeat(64));
+  // A page the list does not have is a plain 404 that says where to start.
+  const missing = await pagesRequest('/9');
+  assert.equal(missing.status, 404);
+  assert.ok((await missing.text()).includes(`Start at ${route}/index${query}`));
+  // The catalog route itself is unchanged: the JSON catalog, never kept.
+  const whole = await pagesRequest('', '&page=1&format=md');
+  assert.match(whole.headers.get('content-type'), /application\/json/);
+  assert.equal(whole.headers.get('cache-control'), 'no-store');
+  assert.equal((await whole.json()).questions.length, 2);
+});
+
+test('reached through the session’s site, the pages link to the site’s short addresses', async () => {
+  const text = await (await pagesRequest('/index', '&site=1')).text();
+  assert.ok(text.includes('\nhttps://app.example/questions/demo/1 (1 to 2)\n'));
+  assert.ok(text.includes('review link: https://app.example/questions/demo/link\n'));
+  assert.ok(text.includes('as JSON: https://app.example/questions/demo\n'));
+  assert.ok(text.includes('review address: https://app.example/session/demo?mode=interview\n'));
+  // A page size in the path gives pages of that size, linked at the site's sized addresses.
+  const one = await (await pagesRequest('/size/1/index', '&site=1')).text();
+  assert.ok(one.includes('\nhttps://app.example/questions/demo/size/1/1 (1 to 1)\nhttps://app.example/questions/demo/size/1/2 (2 to 2)\n'));
+  const second = await (await pagesRequest('/size/1/2', '&site=1')).text();
+  assert.ok(second.includes('\n2 | 0xbb | multichoice | ') && !second.includes('| 0xaa |'));
+  // The site is the session page's own origin, which must be one the session allows: no other host is ever printed.
+  const refused = await dispatchInterviewBriefRequest({
+    request: new Request('https://worker.example/agent/interview-catalog/index?slug=demo&sessionUrl=https%3A%2F%2Fevil.example%2Fsession%2Fdemo&site=1'),
+    env: {}, slugHint: '', baseHeaders: {},
+    deps: {
+      resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'demo' }),
+      getSessionConfig: async () => ({ allowOrigins: ['https://app.example'], interviewMode: { enabled: true } }),
+      getCorsContext: async () => ({ ok: true, headers: {} }),
+      loadPublicInterviewQuestions: async () => ({ questions: [{ id: '0xaa', type: 'freeform', prompt: 'Why?', options: [] }], incomplete: false }),
+      sha256: async () => 'a'.repeat(64),
+      json,
+    },
+  });
+  assert.equal(refused.status, 400);
+});
+
+test('the pages keep the catalog’s rules: off with interview mode, and no questions is still no questions', async () => {
+  const off = await pagesRequest('/index', '', { getSessionConfig: async () => ({ allowOrigins: ['https://app.example'], interviewMode: { enabled: false } }) });
+  assert.equal(off.status, 404);
+  const none = await pagesRequest('/index', '', { loadPublicInterviewQuestions: async () => ({ questions: [], incomplete: false, refused: true }) });
+  assert.equal(none.status, 401);
+  assert.equal((await none.json()).reason, 'sign_in_required');
 });
