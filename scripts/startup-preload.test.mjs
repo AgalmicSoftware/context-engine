@@ -49,6 +49,8 @@ test('names the app and its main part, with sizes, and nothing that loads later'
     assert.match(out, new RegExp(`<link rel="modulepreload" data-ce-bytes="${bytes}" crossorigin href="/assets/${file}\\.js">`));
   }
   assert.match(out, /<link rel="preload" as="style" href="\/assets\/shell\.css">/);
+  // As Vite's own stylesheet link is written (no crossorigin), so the preloaded copy is the one used.
+  assert.doesNotMatch(out, /as="style"[^>]*crossorigin|crossorigin[^>]*as="style"/);
   assert.equal(out.match(/vendor-a\.js/g).length, 1, 'a file already linked is not linked twice');
   assert.equal(out.match(/entry\.css/g).length, 1, "the first script's stylesheet is not preloaded again");
   assert.doesNotMatch(out, /later\.js/);

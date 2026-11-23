@@ -40,6 +40,8 @@ export const addStartupPreloads = (html, { bundle, entryFileName }) => {
       ),
     ...[...styles]
       .filter((css) => !entryStyles.has(css))
+      // No crossorigin: Vite adds its stylesheet link without one, and a preload fetched in another mode is
+      // not reused, so the stylesheet would download twice.
       .map((css) => `<link rel="preload" as="style" href="${base}${css}">`),
   ];
   return tags.length ? sized.replace('</head>', `  ${tags.join('\n    ')}\n  </head>`) : sized;
