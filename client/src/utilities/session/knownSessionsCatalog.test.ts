@@ -35,7 +35,9 @@ it("lists each known session's catalog address as its page builds it, and the pr
       listedOrder[1],
     ]);
     // What follows the two addresses says what to do when neither gives the catalog whole.
-    expect(lines[at + 3]).toMatch(/^If you can't get it whole \(a summary, part of the list, no questionSetHash\), /);
+    expect(lines[at + 3]).toMatch(
+      /^From a summary or part of the list, ask your tool again for only the questionSetHash and each question's id and type, in order\. /,
+    );
     // The join panel pins the Worker on the page link; the Worker drops that, so it is the same catalog.
     const pinned = buildExternalInterviewKickoff({
       workerUrl: worker,

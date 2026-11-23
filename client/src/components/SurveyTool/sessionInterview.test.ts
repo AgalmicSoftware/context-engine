@@ -470,10 +470,12 @@ describe('session interview protocol', () => {
     expect(kickoff).toContain(
       "If you can't encode it exactly, end the address #prefill=paste instead and tell me to paste the packet there. Never POST or upload the packet.",
     );
-    // A list that comes back in part is not built on: the person pastes the page, and gets plain drafts meanwhile.
+    // A list that comes back in part is asked for again, by its ids alone; without them the drafts are plain
+    // text. The person is never sent to the address to paste what it shows.
     expect(kickoff).toContain(
-      "If you can't get it whole (a summary, part of the list, no questionSetHash), say how many questions you could read, give your drafts of those as plain text, and ask me to open the address above and paste what it shows so you can make the packet; never make up questions, ids or the hash. A whole one must have type",
+      "From a summary or part of the list, ask your tool again for only the questionSetHash and each question's id and type, in order. Still without them, say how many questions you could read and give drafts of those as plain text, no packet; never make up questions, ids or the hash. A whole one must have type",
     );
+    expect(kickoff).not.toMatch(/paste what it shows|open the address above/);
     // Only an AI that knows nothing at all gives the bare address, and asks.
     expect(kickoff).toContain(
       'Only if you know nothing at all about me: say so, give the address with nothing after it, and ask a few questions whose answers would let you draft most of the answers at once.',

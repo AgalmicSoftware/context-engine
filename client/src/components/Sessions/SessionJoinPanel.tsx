@@ -11,7 +11,7 @@ import { copyText } from '../../utilities/ui/copyText';
 import { buildExternalInterviewKickoff } from '../SurveyTool/sessionInterview';
 import {
   InterviewCatalogSignInError,
-  verifyInterviewKickoffCatalog,
+  readInterviewKickoffCatalog,
 } from '../SurveyTool/sessionInterviewCatalogValidation';
 import styles from './SessionJoinPanel.module.scss';
 
@@ -34,7 +34,10 @@ export default function SessionJoinPanel({
   const [open, setOpen] = useState(false);
   const [resolvedWorker, setResolvedWorker] = useState({ session: '', url: '' });
   const [attempt, setAttempt] = useState(0);
-  const [validation, setValidation] = useState({ key: '', error: '' });
+  const [validation, setValidation] = useState<{ key: string; error: string; catalog?: Record<string, unknown> }>({
+    key: '',
+    error: '',
+  });
   const [copyState, setCopyState] = useState({ key: '', text: '', error: '' });
   const copyFieldRef = useRef<HTMLTextAreaElement>(null);
   // The text shown after a refused copy is selected, ready to copy by hand.
@@ -67,9 +70,17 @@ export default function SessionJoinPanel({
   const voiceUrl = returnUrl ? `${returnUrl}${pinWorker ? '&' : '?'}mode=voice` : '';
   // One recorder link per breakout room; it keeps the voice link's Worker pin.
   const groupRecorderUrl = isAdmin ? buildGroupRecorderLink(returnUrl) : '';
-  // A prompt copied to share never carries anyone's catalog ticket.
+  const checked = returnUrl ? `${activeWorker}\n${returnUrl}` : '';
+  // A prompt copied to share never carries anyone's catalog ticket. It carries the question ids of the catalog
+  // read without one, which is the catalog anyone's AI gets, so an AI that is given only a summary of it can
+  // still make the review link.
   const kickoff = returnUrl
-    ? buildExternalInterviewKickoff({ workerUrl: activeWorker, sessionSlug: slug, sessionUrl: returnUrl })
+    ? buildExternalInterviewKickoff({
+        workerUrl: activeWorker,
+        sessionSlug: slug,
+        sessionUrl: returnUrl,
+        catalog: validation.key === checked ? validation.catalog : undefined,
+      })
     : '';
   useEffect(() => {
     if (!open || !slug) return;
@@ -83,13 +94,17 @@ export default function SessionJoinPanel({
         if (current) setResolvedWorker({ session: slug, url: worker });
         return;
       }
-      await verifyInterviewKickoffCatalog({ workerUrl: activeWorker, sessionSlug: slug, sessionUrl: returnUrl });
-      if (current) setValidation({ key: kickoff, error: '' });
+      const { catalog } = await readInterviewKickoffCatalog({
+        workerUrl: activeWorker,
+        sessionSlug: slug,
+        sessionUrl: returnUrl,
+      });
+      if (current) setValidation({ key: checked, error: '', catalog });
     };
     void check().catch((error: unknown) => {
       if (current)
         setValidation({
-          key: kickoff,
+          key: checked,
           error:
             error instanceof InterviewCatalogSignInError
               ? 'This session’s questions need a sign-in, so each person copies their own prompt from the session page once signed in.'
@@ -101,7 +116,7 @@ export default function SessionJoinPanel({
     return () => {
       current = false;
     };
-  }, [open, slug, activeWorker, returnUrl, kickoff, sessionConfig, attempt]);
+  }, [open, slug, activeWorker, returnUrl, checked, sessionConfig, attempt]);
   const copy = async (text: string) => {
     if (await copyText(text)) {
       setCopyState({ key: returnUrl, text: '', error: '' });
@@ -114,7 +129,7 @@ export default function SessionJoinPanel({
     }
   };
   if (!slug) return null;
-  const compatible = Boolean(kickoff && validation.key === kickoff && !validation.error);
+  const compatible = Boolean(kickoff && validation.key === checked && !validation.error);
   return (
     <section className={styles.panel} data-testid="ce-session-join">
       <button type="button" className={styles.toggle} aria-expanded={open} onClick={() => setOpen(!open)}>

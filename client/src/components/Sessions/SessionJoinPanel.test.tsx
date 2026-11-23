@@ -4,12 +4,12 @@ import SessionJoinPanel from './SessionJoinPanel';
 import { buildExternalInterviewKickoff } from '../SurveyTool/sessionInterview';
 import {
   InterviewCatalogSignInError,
-  verifyInterviewKickoffCatalog,
+  readInterviewKickoffCatalog,
 } from '../SurveyTool/sessionInterviewCatalogValidation';
 
 jest.mock('../SurveyTool/sessionInterviewCatalogValidation', () => ({
   ...jest.requireActual<object>('../SurveyTool/sessionInterviewCatalogValidation'),
-  verifyInterviewKickoffCatalog: jest.fn(),
+  readInterviewKickoffCatalog: jest.fn(),
 }));
 jest.mock('../../utilities/worker/corsProxy.js', () => ({ getCorsProxyUrlOrThrow: jest.fn() }));
 jest.mock('qrcode.react', () => ({
@@ -17,14 +17,26 @@ jest.mock('qrcode.react', () => ({
     <svg data-testid="qr" data-value={value} data-level={level} />
   ),
 }));
-const verify = jest.mocked(verifyInterviewKickoffCatalog);
+const verify = jest.mocked(readInterviewKickoffCatalog);
+// The catalog as anyone may read it: its ids go into the shared prompt.
+const catalog = {
+  type: 'context-engine.interview-question-catalog',
+  version: 1,
+  sessionSlug: 'workshop',
+  questionSetHash: 'sha256:fixture',
+  prefillPromptVersion: 'ce-interview-brief-v6',
+  questions: [
+    { id: '0xq1', type: 'binary', options: ['Agree', 'Unsure', 'Disagree'] },
+    { id: '0xq2', type: 'freeform' },
+  ],
+};
 const sessionUrl =
   'https://site.example/session/workshop?worker=https%3A%2F%2Fworker.example&token=do-not-share#private';
 const cleanUrl = 'https://site.example/session/workshop?worker=https%3A%2F%2Fworker.example';
 const writeText = jest.fn().mockResolvedValue(undefined);
 beforeEach(() => {
   jest.clearAllMocks();
-  verify.mockResolvedValue('');
+  verify.mockResolvedValue({ ticket: '', catalog });
   Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
 });
 
@@ -45,6 +57,7 @@ it('shares the voice link and the existing AI prompt without private query or fr
         workerUrl: 'https://worker.example',
         sessionSlug: 'workshop',
         sessionUrl: cleanUrl,
+        catalog,
       }),
     ),
   );
@@ -53,6 +66,9 @@ it('shares the voice link and the existing AI prompt without private query or fr
     sessionSlug: 'workshop',
     sessionUrl: cleanUrl,
   });
+  // The shared prompt carries the ids of the catalog anyone may read, so a summary of it is enough for an AI.
+  expect(writeText.mock.calls.at(-1)?.[0]).toContain('Question ids: 1 0xq1 binary, 2 0xq2 freeform');
+  expect(writeText.mock.calls.at(-1)?.[0]).not.toMatch(/paste what it shows/);
 });
 
 it('keeps the prompt unavailable when the catalog is incompatible and supports retry', async () => {
@@ -119,6 +135,7 @@ it.each([
         workerUrl: 'https://worker.example',
         sessionSlug: 'workshop',
         sessionUrl: expected,
+        catalog,
       }),
     ),
   );
