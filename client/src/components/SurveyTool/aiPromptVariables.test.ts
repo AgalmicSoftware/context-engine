@@ -40,7 +40,9 @@ it('finds each value a full prompt carries and gives it a name', () => {
     findPromptVariables(full)
       .filter(({ name }) => name === 'SessionLink')
       .map(({ value }) => value),
-  ).toEqual(expect.arrayContaining(['https://app.example/session/demo', '"https://app.example/session/demo"']));
+  ).toEqual(['https://app.example/session/demo']);
+  // The review link's own address, which the packet is pasted at.
+  expect(byName.ReviewLink).toBe('https://app.example/session/demo?worker=https%3A%2F%2Fworker.example&mode=interview');
 });
 
 it('shows a stand-in in place of every value, and no key, ticket or address', () => {
@@ -48,11 +50,11 @@ it('shows a stand-in in place of every value, and no key, ticket or address', ()
   expect(shown).toContain(
     'The key is <AIKey>; it works only for the session with slug <SessionSlug>, at <WorkerAddress>, until <KeyEnds>.',
   );
-  expect(shown).toContain('Follow <WorkerAddress>/api/agent/skill.');
+  expect(shown).toContain('Read <WorkerAddress>/api/agent/skill?sessionSlug=demo first and follow it.');
   expect(shown).toContain('It is only for the session <SessionName> at <SessionLink>.');
-  expect(shown).toContain('To draft, fetch this URL with a plain HTTP GET:\n<QuestionsAddress>\n');
+  expect(shown).toContain('never a summary:\n<QuestionsAddress>\n');
   expect(shown).toContain('Unanswered question IDs, newest first: <UnansweredQuestions>');
-  expect(shown).toContain('only if reviewUrl starts with exactly <SessionLink>;');
+  expect(shown).toContain("not the catalog's reviewUrl:\n<ReviewLink>\nGive the link twice");
   for (const secret of [key.token, ticket, 'worker.example', key.expiresAt]) expect(shown).not.toContain(secret);
   // Only the values change: put back, it is the prompt that is copied.
   const pieces = splitPromptByVariables(full, findPromptVariables(full));

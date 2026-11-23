@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildIndexKey, buildPayloadKey } from './storageRouteExecution.js';
-import { generateResultsAnalysisDraft, loadWorkerCanonicalResultsAnalysisSource } from './resultsAnalysisGeneration.js';
+import { generateResultsAnalysisDraft, loadAdminSnapshotResultsAnalysisSource, loadWorkerCanonicalResultsAnalysisSource } from './resultsAnalysisGeneration.js';
 import { readStoredRating } from './resultsAnalysisAnswerValidation.js';
+import { readMemberAnswers } from './sessionAgentRoute.js';
 import { ratingConformance } from '../../shared/questions/ratingConformance.mjs';
 
 const slug = 'validation-session';
@@ -50,8 +51,8 @@ async function fixture(rows, questionList = questions) {
     await kv.put(buildPayloadKey({ slug, id }), JSON.stringify({ metadata: info, payloadBase64url: Buffer.from(JSON.stringify({ sessionSlug: slug, sessionId, ...payload })).toString('base64url') }));
   }
   for (const question of questionList) await put('questions', question.id, { ...question, prompt: `Question ${question.id}` });
-  for (const [index, [questionId, answer, comment = 'Comments must not rescue an invalid answer']] of rows.entries()) {
-    await put('responses', `r${index}`, { questionId, answer: { value: answer }, additionalComments: comment }, { responder: `0x${(index + 1).toString(16).padStart(40, '0')}` });
+  for (const [index, [questionId, answer, comment = 'Comments must not rescue an invalid answer', metadata = {}]] of rows.entries()) {
+    await put('responses', `r${index}`, { questionId, answer: { value: answer }, additionalComments: comment }, { responder: `0x${(index + 1).toString(16).padStart(40, '0')}`, ...metadata });
   }
   return { CE_STORAGE_INDEX_KV: kv };
 }
@@ -108,6 +109,57 @@ test('empty choice without a comment is excluded, while a comment-only choice su
   assert.equal(source.counts.excludedCount, 1);
   assert.deepEqual(source.snapshot.responses[0].answer, []);
   assert.equal(source.snapshot.responses[0].additional, 'A relevant comment');
+});
+
+test('a cleared quadratic answer, every vote at 0, is no answer: kept only for its comment, as the site reads it', async () => {
+  const env = await fixture([['quadratic', [0, 0], ''], ['quadratic', [0, 0], 'A relevant comment'], ['quadratic', [0, 2], '']]);
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug, config });
+  assert.equal(source.counts.responseCount, 2);
+  assert.equal(source.counts.participantCount, 2);
+  assert.equal(source.counts.excludedCount, 1);
+  assert.deepEqual(source.snapshot.responses.map((row) => row.answer).sort(), ['', 'A: 0; B: +2']);
+  assert.equal(source.snapshot.responses.find((row) => row.answer === '').additional, 'A relevant comment');
+  assert.equal(source.aiSnapshot.responses.some((row) => row.answer.includes('B: 0')), false, 'the AI never reads it as neutral');
+});
+
+test('clearing a quadratic answer withdraws the allocation it replaced', async () => {
+  const one = `0x${'1'.padStart(40, '0')}`;
+  const env = await fixture([
+    ['quadratic', [3, -4], '', { responder: one, createdAt: '2026-09-20T00:00:00.000Z' }],
+    ['quadratic', [0, 0], '', { responder: one, createdAt: '2026-09-21T00:00:00.000Z' }],
+  ]);
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug, config });
+  assert.equal(source.ok, true);
+  assert.equal(source.counts.responseCount, 0);
+  assert.equal(source.counts.participantCount, 0);
+  assert.deepEqual(source.snapshot.responses, []);
+});
+
+test('an admin snapshot reads a cleared quadratic answer as no answer too', async () => {
+  const participant = (digit) => `0x${digit.repeat(40)}`;
+  const source = await loadAdminSnapshotResultsAnalysisSource({ slug, config, body: { source: { kind: 'admin-snapshot', snapshot: {
+    sessionSlug: slug,
+    sessionId,
+    questions: [{ questionId: 'quadratic', prompt: 'Question quadratic', type: 'quadratic', options: ['A', 'B'], voiceCredits: 25 }],
+    responses: [
+      { questionId: 'quadratic', participantId: participant('1'), answer: [0, 0] },
+      { questionId: 'quadratic', participantId: participant('2'), answer: [0, 0], additional: 'A relevant comment' },
+      { questionId: 'quadratic', participantId: participant('3'), answer: [0, 2] },
+    ],
+  } } } });
+  assert.equal(source.ok, true, JSON.stringify(source));
+  assert.equal(source.counts.responseCount, 2);
+  assert.equal(source.counts.participantCount, 2);
+  assert.deepEqual(source.snapshot.responses.map((row) => row.answer).sort(), ['', 'A: 0; B: +2']);
+});
+
+test('the Session Agent leaves a cleared quadratic answer out of members\' answers and their minimum', async () => {
+  const env = await fixture([['quadratic', [0, 2], ''], ['quadratic', [0, 0], '']]);
+  const read = (minAnswers) => readMemberAnswers({ env, slug, config, optedOut: new Set(), minAnswers, deps: {} });
+  assert.deepEqual((await read(1)).groups.map((group) => group.answers), [[{ choices: [], text: 'A: 0; B: +2' }]]);
+  const belowMinimum = await read(2);
+  assert.deepEqual(belowMinimum.groups, []);
+  assert.equal(belowMinimum.leftOut.belowMinAnswers, 1);
 });
 
 // Same cases as client/src/utilities/survey/storedRating.test.ts.

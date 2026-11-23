@@ -47,6 +47,16 @@ export type ResultsBuildSummary = {
 };
 // What a build would send now: the model, and its prompts with the session's data as placeholders.
 export type ResultsBuildNextBuild = { model?: string; prompts?: Record<string, string> };
+// The kind's latest build job, as a Worker that answers a press at once tells those who may build.
+export type ResultsBuildJob = {
+  jobId: string;
+  state: 'running' | 'done';
+  startedAtMs: number;
+  finishedAtMs?: number;
+  ok?: boolean;
+  buildId?: string;
+  error?: string;
+};
 
 export type ResultsBuildReadResult<TBuild extends ResultsBuildSummary> = {
   ok: boolean;
@@ -58,6 +68,8 @@ export type ResultsBuildReadResult<TBuild extends ResultsBuildSummary> = {
   canBuild?: boolean;
   /** Sent to those who may build. */
   nextBuild?: ResultsBuildNextBuild | null;
+  /** Sent to those who may build, by a Worker that answers a press at once. */
+  job?: ResultsBuildJob | null;
 };
 
 export type ResultsBuildResult<TBuild extends ResultsBuildSummary> = {
@@ -69,6 +81,8 @@ export type ResultsBuildResult<TBuild extends ResultsBuildSummary> = {
   active?: { startedAtMs: number };
   /** The press got no response, as when a phone cuts its long request; the build it started may still run. */
   dropped?: boolean;
+  /** The Worker answered at once that the build runs as this job; reads tell how it ends. */
+  started?: { jobId: string; startedAtMs: number };
 };
 
 type AdminActionSigner = (args: {
@@ -142,7 +156,9 @@ export const requestResultsBuild = async <TBuild extends ResultsBuildSummary>({
   try {
     const result = await postSignedAdminWorkerRequest({
       action,
-      body: { sessionSlug, source: { kind: 'worker-canonical' } },
+      // `follow` asks the Worker to answer once the build starts rather than when it ends. An older Worker ignores
+      // it and answers when the build ends, as before.
+      body: { sessionSlug, source: { kind: 'worker-canonical' }, follow: true },
       chainId,
       fetchImpl,
       path: `/admin/${action}`,
@@ -151,6 +167,14 @@ export const requestResultsBuild = async <TBuild extends ResultsBuildSummary>({
     });
     const data = toRecord(result.data);
     const status = result.response?.status || 0;
+    if (data.ok === true && data.jobState === 'running') {
+      const job = toRecord(data.job);
+      return {
+        ok: true,
+        status,
+        started: { jobId: String(job.jobId || ''), startedAtMs: Number(job.startedAtMs) || now() },
+      };
+    }
     if (data.ok !== true || !data.build)
       return { ok: false, status, error: readError(data, `The ${name} build failed.`) };
     return { ok: true, status, build: data.build as TBuild };

@@ -1,6 +1,6 @@
 // The one set of steps an AI follows to take part in a session for a person, and the words for its parts.
-// The site's copied prompts import it; llms.txt, the agent guide and index.html carry it in marked blocks
-// that scripts/sync-agent-flow.mjs writes and scripts/public-discovery.test.js checks.
+// The site's copied prompts import it; llms.txt, the agent guide and the Session Worker's skill carry it in
+// marked blocks that scripts/sync-agent-flow.mjs writes and scripts/public-discovery.test.js checks.
 
 import { AGENT_PROMPT_LINK_QUERY } from './agentPromptLink.mjs';
 

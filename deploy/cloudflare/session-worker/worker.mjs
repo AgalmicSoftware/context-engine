@@ -79811,7 +79811,8 @@ var init_resultsAnalysisAnswerValidation = __esm({
           return unique2.length <= limit ? unique2 : null;
         }
         case "quadratic":
-          return validateQuadraticAllocation(value, question) ? null : formatQuadraticAllocation(value, question.options);
+          if (validateQuadraticAllocation(value, question)) return null;
+          return value.every((vote) => vote === 0) ? "" : formatQuadraticAllocation(value, question.options);
         case "freeform":
         case "text":
           return scalarText(value) || null;
@@ -80930,7 +80931,7 @@ var init_resultsBuildStore = __esm({
       return chunks;
     };
     listedBuild = ({ chunkCount, ...entry2 }) => entry2;
-    dispatchResultsBuildStore = async (coordinator, kindName, operation, payload = {}) => {
+    dispatchResultsBuildStore = async (coordinator, kindName, operation, payload = {}, { job = null } = {}) => {
       const kind = Object.hasOwn(RESULTS_BUILD_KINDS, kindName) ? RESULTS_BUILD_KINDS[kindName] : null;
       if (!kind) return json8({ error: "Not found." }, 404);
       const storage = coordinator.state.storage;
@@ -81022,7 +81023,8 @@ var init_resultsBuildStore = __esm({
           ok: true,
           active: isFresh(index.active, nowMs2) ? { startedAtMs: index.active.startedAtMs } : null,
           builds: index.builds.map(listedBuild),
-          build
+          build,
+          ...job ? { job } : {}
         });
       }
       return json8({ error: "Not found." }, 404);
@@ -81189,7 +81191,7 @@ var init_resultsJobs = __esm({
 });
 
 // workers/sessionCorsWorker/resultsBuild.js
-var RESULTS_BUILD_LIMITS, RESULTS_BUILD_RULES, ADDRESS5, ADDRESS_TEXT, toArray2, trim20, lower9, capitalize, cleanBuildText, listAddresses3, isListedResultsBuilder, canBuildResults, callBuildStore, createBuildId, failure, resultsBuildRefusal, resultsBuildReserveFailure, runResultsBuild, withPrivateNoStoreHeaders, readViewerRefusal, dispatchResultsBuildRead;
+var RESULTS_BUILD_LIMITS, RESULTS_BUILD_RULES, ADDRESS5, ADDRESS_TEXT, toArray2, trim20, lower9, capitalize, cleanBuildText, listAddresses3, isListedResultsBuilder, canBuildResults, callBuildStore, createBuildId, failure, resultsBuildRefusal, resultsBuildReserveFailure, runResultsBuild, withPrivateNoStoreHeaders, readViewerRefusal, builderJob, dispatchResultsBuildRead;
 var init_resultsBuild = __esm({
   "workers/sessionCorsWorker/resultsBuild.js"() {
     init_resultsAnalysisGeneration();
@@ -81352,6 +81354,16 @@ var init_resultsBuild = __esm({
       }
       return null;
     };
+    builderJob = (kind, job) => ({
+      jobId: job.jobId,
+      state: job.state,
+      startedAtMs: job.startedAtMs,
+      ...job.state === "done" ? {
+        finishedAtMs: job.finishedAtMs,
+        ok: job.outcome?.ok === true,
+        ...job.outcome?.ok === true ? { buildId: job.outcome.buildId } : { error: job.outcome?.error || `The ${kind.name} build failed.` }
+      } : {}
+    });
     dispatchResultsBuildRead = async ({
       kindName,
       describeNextBuild,
@@ -81382,10 +81394,11 @@ var init_resultsBuild = __esm({
       if (!result.ok) {
         return deps.json({ ok: false, error: result.body?.error || `${kind.plural} are unavailable; retry.` }, result.status || 503, responseHeaders);
       }
+      const { job, ...stored } = result.body || {};
       return deps.json({
-        ...result.body,
+        ...stored,
         canBuild: builder,
-        ...builder ? { nextBuild: describeNextBuild(config) } : {}
+        ...builder ? { nextBuild: describeNextBuild(config), ...job?.jobId ? { job: builderJob(kind, job) } : {} } : {}
       }, 200, responseHeaders);
     };
   }
@@ -87510,8 +87523,8 @@ ${expiry}`);
         }
         const resultsBuild = url.pathname.match(/^\/session-config\/(debate-atlas|risk-matrix)\/([a-z]+)$/);
         if (resultsBuild) {
-          if (resultsBuild[2] === "read") await readResultsJob(this, resultsBuild[1], this.resultsJobRunners);
-          return dispatchResultsBuildStore(this, resultsBuild[1], resultsBuild[2], payload || {});
+          const job = resultsBuild[2] === "read" ? await readResultsJob(this, resultsBuild[1], this.resultsJobRunners) : null;
+          return dispatchResultsBuildStore(this, resultsBuild[1], resultsBuild[2], payload || {}, { job });
         }
         const resultsJob = url.pathname.match(/^\/session-config\/results-job\/([a-z]+)$/);
         if (resultsJob) return this.executeResultsJob(resultsJob[1], payload || {});
@@ -108613,7 +108626,7 @@ var FEATURES = Object.freeze([
   "worker_groups"
 ]);
 var WORKERS_AI_FEATURE = "workers_ai_v1";
-var workerRelease = () => "0.9.33" ? "0.9.33" : null;
+var workerRelease = () => "0.9.34" ? "0.9.34" : null;
 var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 = {} }) => {
   const deployed = FEATURES.filter((feature) => feature !== WORKER_GROUP_READ_CODE_FEATURE || workerGroupCodeReadsOn(env));
   const body = {
@@ -111579,6 +111592,7 @@ init_resultsJobs();
 init_sessionConfigAuthority();
 var RESULTS_BUILD_WAIT_MS = 5 * 60 * 1e3;
 var RESULTS_ANALYSIS_WAIT_MS = 9 * 60 * 1e3;
+var RESULTS_BUILD_FOLLOW_WAIT_MS = 3 * 1e3;
 var trim28 = (value) => typeof value === "string" ? value.trim() : "";
 var lower14 = (value) => trim28(value).toLowerCase();
 var jobCall = ({ env, slug, kind, deps }) => deps?.callResultsJob ? (operation, payload) => deps.callResultsJob(kind, operation, payload) : (operation, payload) => callSessionConfigCoordinator({ env, slug, path: `results-job/${operation}`, kind, ...payload });
@@ -111593,16 +111607,20 @@ var pressResultsBuild = async ({ env, slug, kindName, config, body = {}, builder
   const kind = RESULTS_BUILD_KINDS[kindName];
   const refusal2 = resultsBuildRefusal(kindName, config, body);
   if (refusal2) return refusal2;
+  const follows = body?.follow === true;
   const waited = await waitFor({
     env,
     slug,
     kind: kindName,
     deps,
-    waitMs: RESULTS_BUILD_WAIT_MS,
+    waitMs: follows ? RESULTS_BUILD_FOLLOW_WAIT_MS : RESULTS_BUILD_WAIT_MS,
     input: { builder: lower14(builderAddress), body: { source: { kind: "worker-canonical" } } }
   });
   if (!waited.ok) return resultsBuildReserveFailure(kindName, waited);
   const { job } = waited;
+  if (job?.state !== "done" && follows) {
+    return { ok: true, status: 202, jobState: "running", job: { jobId: job?.jobId, startedAtMs: job?.startedAtMs } };
+  }
   if (job?.state !== "done") {
     return {
       ok: false,

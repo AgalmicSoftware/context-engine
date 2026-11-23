@@ -717,7 +717,7 @@ test('runWithConcurrency keeps order', async () => {
 });
 
 const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers });
-const readAtlas = async ({ config, address: requester = '', validateAdmin = async () => false, id = '' } = {}) => {
+const readAtlas = async ({ config, address: requester = '', validateAdmin = async () => false, id = '', job = null } = {}) => {
   const storeCalls = [];
   const adminChecks = [];
   const response = await dispatchDebateAtlasReadRequest({
@@ -737,7 +737,7 @@ const readAtlas = async ({ config, address: requester = '', validateAdmin = asyn
       authorizeCloudflareStorageResourceRead: async () => ({ ok: true }),
       callBuildStore: async (_env, _slug, operation, payload) => {
         storeCalls.push([operation, payload]);
-        return { ok: true, status: 200, body: { ok: true, builds: [], build: null, active: null } };
+        return { ok: true, status: 200, body: { ok: true, builds: [], build: null, active: null, ...(job ? { job } : {}) } };
       },
     },
   });
@@ -812,6 +812,20 @@ test('the plan prompt asks for distinct branches of linked topics, with short, c
   assert.match(grouping, /logically distinct from the others/);
   assert.match(grouping, /topics inside one share a clear link/);
   assert.ok(grouping.includes('A topic gathers questions people can disagree about along the same lines.'));
+});
+
+test('only those who may build are told how the latest build went, a failure with why', async () => {
+  const failed = { jobId: 'job1', state: 'done', startedAtMs: 1, finishedAtMs: 2, outcome: { ok: false, status: 422, error: 'Too few answers to build from.', reason: 'thin' } };
+  assert.equal((await readAtlas({ config: publicResults, job: failed })).body.job, undefined);
+  assert.equal((await readAtlas({ config: publicResults, address: address(8), job: failed })).body.job, undefined);
+  const read = (job) => readAtlas({ config: privateResults, address: RESULTS_ADMIN, job }).then(({ body }) => body.job);
+  assert.deepEqual(await read(failed), { jobId: 'job1', state: 'done', startedAtMs: 1, finishedAtMs: 2, ok: false, error: 'Too few answers to build from.' });
+  assert.deepEqual(
+    await read({ jobId: 'job2', state: 'done', startedAtMs: 3, finishedAtMs: 4, outcome: { ok: true, status: 200, buildId: 'atlas_k1_00000001' } }),
+    { jobId: 'job2', state: 'done', startedAtMs: 3, finishedAtMs: 4, ok: true, buildId: 'atlas_k1_00000001' },
+  );
+  assert.deepEqual(await read({ jobId: 'job3', state: 'running', startedAtMs: 5 }), { jobId: 'job3', state: 'running', startedAtMs: 5 });
+  assert.equal(await read(null), undefined);
 });
 
 test('the next build is described with the session model and placeholder prompts', () => {

@@ -2697,11 +2697,11 @@ describe('SessionVoiceModeModal', () => {
     expect(promptToggle).toHaveAttribute('aria-controls', displayedPrompt.id);
     expect(displayedPrompt).toHaveTextContent(/^AI Prompt/);
     // Each value the prompt carries shows as a named stand-in, listed first and again in its place.
-    expect(displayedPrompt).toHaveTextContent('Variables: <QuestionsAddress>, <UnansweredQuestions>, <SessionLink>');
-    expect(displayedPrompt).toHaveTextContent('To draft, fetch this URL with a plain HTTP GET: <QuestionsAddress>');
+    expect(displayedPrompt).toHaveTextContent('Variables: <QuestionsAddress>, <UnansweredQuestions>, <ReviewLink>');
+    expect(displayedPrompt).toHaveTextContent('never a summary: <QuestionsAddress>');
     expect(displayedPrompt).toHaveTextContent('Unanswered question IDs, newest first: <UnansweredQuestions>');
     expect(displayedPrompt).not.toHaveTextContent('worker.example');
-    expect(displayedPrompt).toHaveTextContent('Help me take part in a Context Engine session.');
+    expect(displayedPrompt).toHaveTextContent('Help me draft my answers for a Context Engine session.');
     // Reading it copies nothing; its corner button copies the whole prompt, values included.
     fireEvent.click(displayedPrompt);
     expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
@@ -4137,6 +4137,6 @@ describe('Interview cancellation and recovery', () => {
     fireEvent.click(copy);
     const prompt = jest.mocked(navigator.clipboard.writeText).mock.lastCall?.[0] || '';
     expect(prompt).toContain('Unanswered question IDs, in the session’s order: ["q1","q2"]');
-    expect(prompt).toContain('"promptRevision":"ce-prefill-prompt-3+arranged",');
+    expect(prompt).toContain('"promptRevision":"ce-prefill-prompt-4+arranged",');
   });
 });

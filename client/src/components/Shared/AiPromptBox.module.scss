@@ -16,14 +16,22 @@
 
 .header {
   display: block;
-  margin: 0 44px 6px 0;
+  margin: 0 52px 6px 0;
   font-weight: 800;
+}
+
+// The copy button sits over the top right corner: what follows the header starts below it.
+.withCopy .header {
+  min-height: 38px;
 }
 
 .copy {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 6px;
+  right: 6px;
+  // A thumb's size.
+  min-width: 44px;
+  min-height: 44px;
   padding: 6px 8px;
   border: 0;
   border-radius: var(--ce-radius-6);

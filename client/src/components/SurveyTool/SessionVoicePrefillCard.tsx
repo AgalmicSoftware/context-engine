@@ -50,6 +50,10 @@ const Help = ({ id, label, children }: { id: string; label: string; children: Re
   </>
 );
 
+// Said on the card when the box is ticked and the prompt still has no key.
+export const NO_KEY_YET = 'The prompt has no AI key yet.';
+export const DRAFT_ONLY_SESSION = 'This session lets an AI draft only, so the prompt has no key.';
+
 /**
  * The voice chooser's own-AI option: a prompt to paste into ChatGPT or Claude. Signed in, where the session
  * gives AI keys, ticking "AI can submit for me" puts the person's key in the prompt, so their AI can submit
@@ -124,13 +128,16 @@ export default function SessionVoicePrefillCard({
   );
 
   if (!prefill) return null;
-  const copyPrompt = async (prompt: string) => {
-    setPromptCopied(false);
-    if (!(await copyText(prompt))) return false;
+  const noteCopied = () => {
     agentKey.markCopied();
     setPromptCopied(true);
     if (copyResetRef.current) clearTimeout(copyResetRef.current);
     copyResetRef.current = setTimeout(() => setPromptCopied(false), 1800);
+  };
+  const copyPrompt = async (prompt: string) => {
+    setPromptCopied(false);
+    if (!(await copyText(prompt))) return false;
+    noteCopied();
     return true;
   };
   // A key that was copied works until its time, wherever it was pasted, so the line stays while it does.
@@ -181,7 +188,31 @@ export default function SessionVoicePrefillCard({
         onCopyPrompt={copyPrompt}
         // The prompt is about to take the key: a copy now would give the one without it.
         holdCopy={keysOffered && account && canSubmit && (!worker || agentKey.making) ? 'Adding your AI key…' : ''}
+        onCopiedByHand={noteCopied}
       >
+        {/* Ticked, but the prompt has no key: said, so a copy without one is never a surprise. The status
+            region stays in the page, so a screen reader hears its first message; what went wrong when the
+            person asked is an alert; the button is beside them, not read out with them. */}
+        <div className={styles.sessionVoicePrefillChoice}>
+          <div role="status">
+            {canSubmit && agentKey.keyMissing && !agentKey.error ? (
+              <span data-testid={E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_MISSING}>{NO_KEY_YET}</span>
+            ) : null}
+            {canSubmit && agentKey.draftOnly ? (
+              <span data-testid={E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_MISSING}>{DRAFT_ONLY_SESSION}</span>
+            ) : null}
+          </div>
+          {canSubmit && agentKey.keyMissing && agentKey.error ? (
+            <div role="alert" data-testid={E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_MISSING}>
+              {agentKey.error}
+            </div>
+          ) : null}
+          {canSubmit && agentKey.keyMissing ? (
+            <button type="button" className={styles.sessionVoicePrefillAddKey} onClick={agentKey.ask}>
+              Add my AI key
+            </button>
+          ) : null}
+        </div>
         {expiry ? (
           <div className={styles.sessionVoicePrefillChoice} data-testid={E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE}>
             <span>Key can answer as you until {expiry}</span>

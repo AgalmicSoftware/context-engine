@@ -293,6 +293,7 @@
   "SESSION_VOICE_MODE_GROUP": "ce-session-voice-mode-group",
   "SESSION_VOICE_PREFILL": "ce-session-voice-prefill",
   "SESSION_VOICE_PREFILL_CAN_SUBMIT": "ce-session-voice-prefill-can-submit",
+  "SESSION_VOICE_PREFILL_KEY_MISSING": "ce-session-voice-prefill-key-missing",
   "SESSION_VOICE_PREFILL_KEY_NOTE": "ce-session-voice-prefill-key-note",
   "SESSION_INTERVIEW_PANEL": "ce-session-interview-panel",
   "SESSION_INTERVIEW_CONTEXT": "ce-session-interview-context",

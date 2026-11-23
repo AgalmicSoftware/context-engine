@@ -37,6 +37,11 @@ export const KNOWN_SESSION_CONFIGS: Readonly<Record<string, Record<string, unkno
   ]),
 );
 
+/** Whether the site lists this session on this Worker, so its links need no `worker=`. */
+export const isKnownSessionWorker = ({ workerUrl, sessionSlug }: { workerUrl: string; sessionSlug: string }): boolean =>
+  Object.prototype.hasOwnProperty.call(KNOWN_SESSIONS, sessionSlug) &&
+  KNOWN_SESSIONS[sessionSlug].worker === workerUrl.replace(/\/+$/, '');
+
 // Some chat AIs refuse a Worker's own host, so the site passes each listed catalog through at an
 // address of its own (client/public/_redirects, written by scripts/sync-known-session-catalogs.js).
 // For the listed catalog (the session's own Worker and its hosted page), this returns the two

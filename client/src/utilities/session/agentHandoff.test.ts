@@ -27,7 +27,10 @@ describe('the AI prompt’s key lines', () => {
     );
     expect(lines).toContain('"Authorization: Bearer <key>"');
     expect(lines).toContain('Never repeat or print it');
-    expect(lines).toContain('https://ce-salon.example.workers.dev/api/agent/skill');
+    // The skill's address names the session, for a Worker that serves more than one.
+    expect(lines).toContain(
+      'Read https://ce-salon.example.workers.dev/api/agent/skill?sessionSlug=salon first and follow it.',
+    );
     expect(lines).toContain('This prompt holds my AI key, so you can submit as me, in this session and no other.');
     // An AI that can't use the key drafts, as the prompt's steps say.
     expect(lines).toContain("If you can't send such requests, leave the key unused and draft.");

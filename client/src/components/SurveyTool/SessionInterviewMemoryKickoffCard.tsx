@@ -21,6 +21,8 @@ type SessionInterviewMemoryKickoffCardProps = {
   holdCopy?: string;
   /** The button at a modest width in the middle of its row, for a person sent here to copy. */
   centered?: boolean;
+  /** Called when the prompt was copied by selecting it in the opened box, which the copy button did not see. */
+  onCopiedByHand?: () => void;
   /** Lines under the button, such as the one about the key. */
   children?: ReactNode;
   /** The ids its copy button, its caret and its opened prompt answer to; the voice dialog's by default. */
@@ -47,6 +49,7 @@ export default function SessionInterviewMemoryKickoffCard({
   onCopyPrompt,
   holdCopy = '',
   centered = false,
+  onCopiedByHand,
   children,
   testIds = VOICE_TEST_IDS,
 }: SessionInterviewMemoryKickoffCardProps) {
@@ -56,6 +59,11 @@ export default function SessionInterviewMemoryKickoffCard({
   const [copyError, setCopyError] = useState('');
   // A tap while the session is checked can't copy, since the copy must start in the tap: it says so.
   const [copyWaiting, setCopyWaiting] = useState(false);
+  // The same for a tap while the copy is held, as while a key is made.
+  const [holdWaiting, setHoldWaiting] = useState(false);
+  useEffect(() => {
+    if (!holdCopy) setHoldWaiting(false);
+  }, [holdCopy]);
   // Where copying is refused, the exact prompt is shown selected in a field: the formatted view shortens links.
   // The prompt in that field; it stays through a renewal check and takes the renewed link after it.
   const [manualPrompt, setManualPrompt] = useState('');
@@ -118,20 +126,28 @@ export default function SessionInterviewMemoryKickoffCard({
   const validationError = validation.kickoff === kickoff ? validation.error : '';
   const compatible = !checking && !validationError;
   const prompt = compatible ? validation.prompt : kickoff;
-  const copyPrompt = () => {
-    if (holdCopy) return;
+  // Whether a copy can go ahead now; where it can't, the card says what it is waiting for.
+  const readyToCopy = () => {
+    if (holdCopy) {
+      setHoldWaiting(true);
+      return false;
+    }
     if (checking) {
       setCopyWaiting(true);
-      return;
+      return false;
     }
-    if (!compatible) return;
+    if (!compatible) return false;
     // A timer can sleep through a renewal, as on a closed laptop: check again rather than copy a link
     // that ran out, and the person copies the renewed one.
     if (renewAtMs && Date.now() >= renewAtMs) {
       setCopyWaiting(true);
       setAttempt((value) => value + 1);
-      return;
+      return false;
     }
+    return true;
+  };
+  const copyPrompt = () => {
+    if (!readyToCopy()) return;
     setCopyError('');
     // Safari requires the copy to begin in the tap stack; never await a catalog fetch here.
     void onCopyPrompt(prompt).then((copied) => {
@@ -179,7 +195,8 @@ export default function SessionInterviewMemoryKickoffCard({
           className={styles.aiPromptCopyCaret}
           aria-label={open ? 'Hide the AI prompt' : 'Read the AI prompt'}
           aria-expanded={promptShown}
-          aria-controls={promptId}
+          // Named only while it is there to be found.
+          aria-controls={promptShown ? promptId : undefined}
           aria-disabled={!compatible}
           onClick={() => {
             if (open || compatible) setOpen(!open);
@@ -198,12 +215,18 @@ export default function SessionInterviewMemoryKickoffCard({
           variables={findPromptVariables(prompt)}
           onCopy={copyPrompt}
           copied={promptCopied}
+          // Selected and copied by hand, it is the same prompt under the same rules as the button's.
+          handCopy={() => {
+            if (!readyToCopy()) return null;
+            onCopiedByHand?.();
+            return prompt;
+          }}
         />
       ) : null}
-      {/* Said to a screen reader; on screen the button turns. */}
+      {/* Said to a screen reader while the button turns; shown once a tap found it could not copy yet. */}
       {holdCopy ? (
-        <div role="status" className={styles.sessionListeningSrOnly}>
-          {holdCopy}
+        <div role="status" className={holdWaiting ? undefined : styles.sessionListeningSrOnly}>
+          {holdWaiting ? <InterviewBusyLabel label={`${holdCopy} Tap Copy again when this finishes.`} /> : holdCopy}
         </div>
       ) : null}
       {checking && !holdCopy ? (
@@ -241,6 +264,7 @@ export default function SessionInterviewMemoryKickoffCard({
           rows={6}
           value={manualPrompt}
           aria-label="AI prompt to copy"
+          onCopy={onCopiedByHand}
         />
       ) : null}
     </div>
