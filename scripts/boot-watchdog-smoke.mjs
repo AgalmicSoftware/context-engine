@@ -14,9 +14,14 @@ const WAIT_MS = 12000;
 const LONG_WAIT_MS = 45000;
 const PAGE = '/about';
 const notice = (page) => page.locator('#ce-boot-notice');
-const appShown = (page) => page.evaluate(() => document.getElementById('root').childElementCount > 0);
+// Drawn means something in the root besides what the app puts there before drawing (its empty toast host and its
+// loading line carry data-ce-boot-ignore).
+const drawn = () => [...document.getElementById('root').children].some((el) => !el.hasAttribute('data-ce-boot-ignore'));
+const appShown = (page) => page.evaluate(drawn);
+const waitForApp = (page, timeout) => page.waitForFunction(drawn, null, { timeout });
 const isEntry = (url) => /\/assets\/index-[^/]+\.js$/.test(url.pathname);
 const isAppScript = (url) => /\/assets\/[^/]+\.js$/.test(url.pathname) && !isEntry(url);
+const isMainPart = (url) => /\/assets\/AppShell-[^/]+\.js$/.test(url.pathname);
 
 const open = async (browser, { colorScheme = 'light', routes = async () => {} } = {}) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 664 }, colorScheme });
@@ -72,7 +77,7 @@ for (const name of engineNames) {
       assert(Date.now() - started < WAIT_MS, `${name}: a blocked script is reported without the long wait`);
       blocked = false;
       await button.click();
-      await page.waitForFunction(() => document.getElementById('root').childElementCount > 0, null, { timeout: 30000 });
+      await waitForApp(page, 30000);
       assert.equal(await notice(page).count(), 0, `${name} ${colorScheme}: the message is gone after Reload`);
       await context.close();
     }
@@ -133,7 +138,7 @@ for (const name of engineNames) {
       const started = Date.now();
       await page.goto(`${base}${PAGE}`, { waitUntil: 'load' });
       const loadMs = Date.now() - started;
-      await page.waitForFunction(() => document.getElementById('root').childElementCount > 0, null, { timeout: 60000 });
+      await waitForApp(page, 60000);
       const drawnMs = Date.now() - started;
       await page.waitForTimeout(WAIT_MS + 2000);
       assert.equal(await page.evaluate(() => window.__noticeSeen), false, `${name}: a slow load never shows the message`);
@@ -158,20 +163,47 @@ for (const name of engineNames) {
       assert.equal(await notice(page).count(), 0, `${name}: a slow connection is not told the page failed at the short wait`);
       await notice(page).waitFor({ timeout: LONG_WAIT_MS });
       assert.equal(await page.locator('#ce-agent-note').count(), 0, `${name}: the agents' note is not left beside the message`);
-      await page.waitForFunction(() => document.getElementById('root').childElementCount > 0, null, { timeout: 90000 });
+      await waitForApp(page, 90000);
       assert.equal(await notice(page).count(), 0, `${name}: the message goes once the app draws`);
       await context.close();
     }
 
-    // 6. A normal load: nothing of it shows.
+    // 6. The first script ran, but the main part of the app never arrives (a stalled connection). The app has
+    // already put its toast host in the root; that alone once kept the message away and left a white page. Now
+    // the loading line shows, and the message comes after the long wait.
     {
-      const { context, page } = await open(browser);
-      await page.goto(`${base}${PAGE}`, { waitUntil: 'load' });
-      await page.waitForFunction(() => document.getElementById('root').childElementCount > 0, null, { timeout: 30000 });
-      assert.equal(await notice(page).count(), 0, `${name}: a normal load shows no message`);
+      const { context, page } = await open(browser, { routes: (p) => p.route(isMainPart, () => {}) });
+      await page.goto(`${base}${PAGE}`, { waitUntil: 'commit' });
+      const loading = page.locator('.ce-app-loading');
+      await loading.waitFor({ timeout: 20000 });
+      await page.waitForTimeout(1500);
+      assert.equal(await loading.isVisible(), true, `${name}: the loading line shows while the main part is missing`);
+      assert.equal(await notice(page).count(), 0, `${name}: no message before the long wait`);
+      await notice(page).waitFor({ timeout: LONG_WAIT_MS });
+      await assertNotice(page, `${name}, main part stalled`);
       await context.close();
     }
-    console.log(`[${name}] blank-page message: blocked, removed and failed first scripts report; slow and normal loads do not.`);
+
+    // 7. A normal load: nothing of it shows, not even the loading line.
+    {
+      const { context, page } = await open(browser);
+      await page.addInitScript(() => {
+        window.__loadingSeen = false;
+        const check = () => {
+          const line = document.querySelector('.ce-app-loading');
+          if (line && getComputedStyle(line).visibility === 'visible') window.__loadingSeen = true;
+        };
+        new MutationObserver(check).observe(document, { childList: true, subtree: true });
+        const poll = setInterval(check, 100);
+        setTimeout(() => clearInterval(poll), 15000);
+      });
+      await page.goto(`${base}${PAGE}`, { waitUntil: 'load' });
+      await waitForApp(page, 30000);
+      assert.equal(await notice(page).count(), 0, `${name}: a normal load shows no message`);
+      assert.equal(await page.evaluate(() => window.__loadingSeen), false, `${name}: a normal load never shows the loading line`);
+      await context.close();
+    }
+    console.log(`[${name}] blank-page message: blocked, removed and failed first scripts and a stalled main part report; slow and normal loads do not.`);
   } finally {
     await browser.close();
   }

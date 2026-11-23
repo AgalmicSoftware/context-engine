@@ -7761,3 +7761,23 @@ a[data-toggle='collapse'][aria-expanded='true'] .caret,
   left: 100%;
   top: 12px;
 }
+
+// App.tsx's loading line while the main part of the app arrives: hidden for the first second, so a normal load
+// never flashes it.
+.ce-app-loading {
+  margin: 0;
+  padding: 48px 24px;
+  text-align: center;
+  font-size: 16px;
+  color: var(--ce-panel-text, CanvasText);
+  animation: ce-app-loading-in 0s linear 1s both;
+}
+
+@keyframes ce-app-loading-in {
+  from {
+    visibility: hidden;
+  }
+  to {
+    visibility: visible;
+  }
+}

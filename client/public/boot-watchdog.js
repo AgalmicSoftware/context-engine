@@ -11,9 +11,15 @@
   var NOTICE_ID = 'ce-boot-notice';
   var timer = 0;
 
+  // The app puts a few things in its root before it has drawn anything to see (the empty toast host, the loading
+  // line); they carry this attribute, so a page holding only them still counts as not drawn.
   var appShown = function appShown() {
     var root = document.getElementById('root');
-    return !!root && root.childElementCount > 0;
+    if (!root) return false;
+    for (var child = root.firstElementChild; child; child = child.nextElementSibling) {
+      if (!child.hasAttribute('data-ce-boot-ignore')) return true;
+    }
+    return false;
   };
 
   var hide = function hide() {

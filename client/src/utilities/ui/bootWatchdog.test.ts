@@ -95,6 +95,33 @@ describe('the blank-page message', () => {
     expect(notice()).toBeNull();
   });
 
+  it('still reports a root that holds only what the app puts there before drawing, and goes when it draws', async () => {
+    boot();
+    document.getElementById('ce-agent-note')!.remove();
+    // The app's first script ran and put its empty toast host and loading line in the root; the main part of the
+    // app never arrived. That was a white page with no message.
+    const root = document.getElementById('root')!;
+    for (const tag of ['div', 'p']) {
+      const part = document.createElement(tag);
+      part.setAttribute('data-ce-boot-ignore', '');
+      root.append(part);
+    }
+    await Promise.resolve();
+    jest.advanceTimersByTime(LONG_WAIT_MS);
+    expect(notice()).not.toBeNull();
+    await draw();
+    expect(notice()).toBeNull();
+  });
+
+  it('marks what the app puts in its root before drawing, and nothing that is the app itself', () => {
+    const read = (file: string) => fs.readFileSync(path.join(clientRoot, 'src', 'components', file), 'utf8');
+    expect(read('Shared/CEToaster.tsx')).toMatch(/data-testid="ce-toast-host" data-ce-boot-ignore=""/);
+    const app = read('App.tsx');
+    expect(app).toMatch(/<p className="ce-app-loading" role="status" data-ce-boot-ignore="">/);
+    expect(app).toContain('<Suspense fallback={<AppLoading />}>');
+    expect(app.match(/data-ce-boot-ignore/g)).toHaveLength(1);
+  });
+
   it("reports the app's first script failing to load at once, and no other failed file", () => {
     boot();
     document.getElementById('picture')!.dispatchEvent(new Event('error'));

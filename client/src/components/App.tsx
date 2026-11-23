@@ -21,6 +21,14 @@ import { appQueryFoundation } from '../app/runtime/appQueryClient';
 import { WalletUiProvider } from '../app/runtime/walletUiRuntime.js';
 
 const AppShell = React.lazy(() => import('./MainSite/AppShell'));
+// Shown while the main part of the app arrives, so a slow or stalled load is not a white page. Its style hides it
+// for the first second, so a normal load never flashes it; the attribute keeps public/boot-watchdog.js reporting a
+// load that never finishes.
+const AppLoading = () => (
+  <p className="ce-app-loading" role="status" data-ce-boot-ignore="">
+    Loading…
+  </p>
+);
 const AppQueryClientProvider = appQueryFoundation.Provider;
 
 const log = createLogger('general');
@@ -245,7 +253,7 @@ class App extends React.Component<AppProps> {
                   <Route
                     path="*"
                     element={
-                      <Suspense fallback={null}>
+                      <Suspense fallback={<AppLoading />}>
                         <AppShell path={urlPath} {...siteProps} />
                       </Suspense>
                     }
