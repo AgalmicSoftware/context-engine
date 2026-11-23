@@ -382,6 +382,37 @@ describe('UserPageHeader', () => {
     expect(create.closest('ul')).toBe(setName.closest('ul'));
   });
 
+  it('says Analyze is starting after "Analyze me", then starts it once the page is ready', () => {
+    const me = '0x00000000000000000000000000000000000000aa';
+    const address = `${window.location.pathname}${window.location.search}`;
+    window.history.replaceState(null, '', `/u/${me}?session=demo-one&analyze=1`);
+    window.localStorage.setItem(
+      'ce:analyzeLink',
+      JSON.stringify({ account: me, sessionSlug: 'demo-one', at: Date.now() }),
+    );
+    try {
+      const onAnalyzeUser = jest.fn();
+      const props = createProps({ isOwner: true, onAnalyzeUser });
+      const { rerender } = render(<UserPageHeader {...props} analyzeLinkArriving />);
+      const button = screen.getByRole('button', { name: 'Starting' });
+      expect(button).toHaveAttribute('aria-busy', 'true');
+      expect(button).toHaveAttribute('title', 'Starts when your answers have loaded');
+      expect(button.querySelector('svg')).toHaveAttribute('data-icon', 'spinner');
+      expect(window.location.search).toBe('?session=demo-one');
+      expect(onAnalyzeUser).not.toHaveBeenCalled();
+
+      // A press by hand while it waits starts Analyze then, and nothing starts by itself afterwards.
+      fireEvent.click(button);
+      expect(onAnalyzeUser).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('button', { name: 'Analyze' })).toHaveAttribute('aria-busy', 'false');
+      rerender(<UserPageHeader {...props} analyzeLinkReady />);
+      expect(onAnalyzeUser).toHaveBeenCalledTimes(1);
+    } finally {
+      window.localStorage.removeItem('ce:analyzeLink');
+      window.history.replaceState(null, '', address);
+    }
+  });
+
   it('starts no Analyze by itself on a page nobody sent here', () => {
     jest.useFakeTimers();
     try {

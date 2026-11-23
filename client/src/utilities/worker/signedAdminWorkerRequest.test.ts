@@ -70,5 +70,24 @@ describe('postSignedAdminWorkerRequest', () => {
       reason: 'worker_group_capacity_reconciliation_required',
       status: 503,
     });
+    await expect(request).rejects.not.toHaveProperty('noResponse');
+  });
+
+  it('marks a request that got no response, so a caller can tell it from a refusal', async () => {
+    const request = postSignedAdminWorkerRequest({
+      action: 'debate-atlas/build',
+      path: '/admin/debate-atlas/build',
+      workerUrl: 'https://worker.example.test',
+      retryAttempts: 1,
+      signAdminAction: async () => ({ nonce: 'nonce-1', signature: 'signature-1' }),
+      fetchImpl: async () => {
+        throw new TypeError('Load failed');
+      },
+    });
+
+    await expect(request).rejects.toMatchObject({
+      noResponse: true,
+      message: expect.stringContaining('could not reach https://worker.example.test'),
+    });
   });
 });

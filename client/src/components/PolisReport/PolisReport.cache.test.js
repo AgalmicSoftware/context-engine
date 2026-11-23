@@ -140,6 +140,33 @@ jest.mock('../../utilities/web3/chainGateway.js', () => ({
   getAllSessionSlugs: jest.fn(() => []),
 }));
 
+// The Report's Filter opens Raw Results' filter panel; this stand-in shows what the panel is given.
+jest.mock('../SurveyTool/QuestionFilter', () => {
+  const { createElement } = jest.requireActual('react');
+  return {
+    __esModule: true,
+    default: (props) =>
+      createElement(
+        'div',
+        {
+          'data-testid': 'report-filter-panel',
+          'data-questions': props.questions
+            .map((question) => question.prompt)
+            .filter(Boolean)
+            .join('|'),
+          'data-people': Object.entries(props.questionResponses)
+            .map(([questionId, people]) => `${questionId}:${Object.keys(people).join(',')}`)
+            .join('|'),
+        },
+        createElement(
+          'button',
+          { type: 'button', onClick: () => props.onFilterStateChange({ selectedTags: ['housing'] }) },
+          'Pick housing',
+        ),
+      ),
+  };
+});
+
 beforeAll(() => {
   global.ResizeObserver = class ResizeObserver {
     observe() {}
@@ -2833,6 +2860,163 @@ describe('Polis mixed answer report filtering', () => {
     expect(
       Object.keys(applyFilterStateToAggregator(responses, { id: 84532 }, { questionTypes: ['quadratic'] }, '')),
     ).toEqual(['quadratic']);
+  });
+
+  it('leaves cleared allocations out of the response count that ranks questions', () => {
+    const top = (allocations) =>
+      Object.keys(
+        applyFilterStateToAggregator(
+          { ...responses, quadratic: makeRows('quadratic', allocations) },
+          { id: 84532 },
+          { selectedTags: ['mobility'], topQuestions: { count: 1, by: 'responses' } },
+          '',
+        ),
+      );
+    // Three allocations outrank the rating's two answers, unless two were cleared to every vote at 0.
+    expect(
+      top([
+        [2, -3],
+        [1, 1],
+        [0, 2],
+      ]),
+    ).toEqual(['quadratic']);
+    expect(
+      top([
+        [2, -3],
+        [0, 0],
+        [0, 0],
+      ]),
+    ).toEqual(['rating']);
+  });
+
+  it('opens Raw Results’ filter panel from the Active Filters line, and its changes go to the shared filter', async () => {
+    const onFilterChange = jest.fn();
+    render(
+      <PolisReport
+        {...baseReportProps}
+        questionResponses={responses}
+        filterState={{}}
+        onFilterChange={onFilterChange}
+      />,
+    );
+    const filter = screen.getByRole('button', { name: 'Filter' });
+    // One row: the Active Filters label, the filters, then the button, which stays out of the PDF like the
+    // Report's other controls.
+    const row = filter.closest('.statsItem');
+    expect(row).toHaveClass('activeFiltersItem');
+    expect(row.firstElementChild).toHaveTextContent(/^Active Filters/);
+    const value = row.querySelector('.statValue');
+    expect(value).toHaveTextContent('None');
+    expect(value.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(filter.parentElement).toHaveClass('pdfIgnore');
+    expect(filter).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(filter);
+    const panel = await screen.findByTestId('report-filter-panel');
+    expect(filter).toHaveAttribute('aria-expanded', 'true');
+    expect(panel.parentElement).toHaveClass('pdfIgnore');
+    // The questions with answers, by their cached details, and who answered each.
+    expect(panel.dataset.questions).toBe('Tagged rating|Tagged allocation');
+    expect(panel.dataset.people).toContain('rating:person-0,person-1|quadratic:person-0');
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Pick housing' }));
+    expect(onFilterChange).toHaveBeenCalledWith(expect.objectContaining({ selectedTags: ['housing'] }));
+    fireEvent.click(filter);
+    expect(screen.queryByTestId('report-filter-panel')).not.toBeInTheDocument();
+  });
+
+  it('changes the filter live: the row lists it and the Report follows, with the panel still open', async () => {
+    const LiveReport = () => {
+      const [filterState, setFilterState] = React.useState({});
+      return (
+        <PolisReport
+          {...baseReportProps}
+          questionResponses={responses}
+          filterState={filterState}
+          onFilterChange={setFilterState}
+        />
+      );
+    };
+    render(<LiveReport />);
+    const value = () =>
+      screen.getByRole('button', { name: 'Filter' }).closest('.statsItem').querySelector('.statValue');
+    // Summary and Statistics' question count.
+    const questions = () =>
+      value()
+        .closest('.statsRow')
+        .parentElement.textContent.match(/Questions[^:]*:\s*(\d+)/)?.[1];
+    expect(value()).toHaveTextContent('None');
+    const unfiltered = questions();
+    expect(Number(unfiltered)).toBeGreaterThan(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
+    const panel = await screen.findByTestId('report-filter-panel');
+    fireEvent.click(within(panel).getByRole('button', { name: 'Pick housing' }));
+    // No reload and no other page: the row lists the new filter, the Report narrows to it, and the panel stays.
+    await waitFor(() => expect(value()).toHaveTextContent('Tags: #housing'));
+    expect(questions()).toBe('1');
+    expect(screen.getByText('Other tag')).toBeInTheDocument();
+    expect(screen.queryByText('Tagged rating')).not.toBeInTheDocument();
+    expect(screen.getByTestId('report-filter-panel')).toBe(panel);
+  });
+
+  it('shows no Filter button where the Report cannot change the filter', () => {
+    render(<PolisReport {...baseReportProps} questionResponses={responses} filterState={{}} />);
+    expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument();
+  });
+
+  it('keeps Summary and Statistics and an open panel in place when a filter leaves nothing to show', async () => {
+    const props = { ...baseReportProps, questionResponses: responses, onFilterChange: jest.fn() };
+    const { rerender } = render(<PolisReport {...props} filterState={{}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
+    const panel = await screen.findByTestId('report-filter-panel');
+    const pick = within(panel).getByRole('button', { name: 'Pick housing' });
+    pick.focus();
+
+    rerender(<PolisReport {...props} filterState={{ selectedTags: ['missing'] }} />);
+    expect(screen.getByText('No readable responses match the current filters.')).toBeInTheDocument();
+    // The Filter button stays beside Active Filters, and the panel is the same one, with the person's place in it.
+    expect(screen.getByRole('button', { name: 'Filter' }).closest('.statsItem')).toHaveTextContent(/^Active Filters/);
+    expect(screen.getByTestId('report-filter-panel')).toBe(panel);
+    expect(pick).toHaveFocus();
+    expect(screen.getByTestId('ce-polis-all-questions')).not.toBeVisible();
+
+    rerender(<PolisReport {...props} filterState={{}} />);
+    expect(screen.queryByText('No readable responses match the current filters.')).not.toBeInTheDocument();
+    expect(screen.getByTestId('report-filter-panel')).toBe(panel);
+    expect(pick).toHaveFocus();
+    expect(screen.getByTestId('ce-polis-all-questions')).toBeVisible();
+  });
+
+  it('offers no Filter over demo data, whose questions and tags are its own', () => {
+    const dataset = {
+      comments: [{ commentId: 'demo', commentBody: 'Demo statement', type: 'binary', tags: ['demo-only'] }],
+      participantsVotes: [{ participant: 'person-a', votes: { 0: 1 } }],
+    };
+    render(
+      <PolisReport
+        {...baseReportProps}
+        slug="demo-fixture"
+        demoDataFirstLoad
+        demoDataBySlug={{ 'demo-fixture': dataset }}
+        filterState={{}}
+        onFilterChange={jest.fn()}
+      />,
+    );
+    expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument();
+  });
+
+  it('leaves the Filter button out of the PDF’s footnote for Active Filters, as the PDF leaves it out', () => {
+    render(
+      <PolisReport {...baseReportProps} questionResponses={responses} filterState={{}} onFilterChange={jest.fn()} />,
+    );
+    const footnotes = within(screen.getByText('Footnotes').parentElement)
+      .getAllByRole('listitem')
+      .map((item) => item.textContent);
+    expect(footnotes).toContain('Summary of all active filters applied to this data.');
+    expect(footnotes.join(' ')).not.toMatch(/Filter button/);
   });
 });
 

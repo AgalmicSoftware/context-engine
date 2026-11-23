@@ -1,4 +1,5 @@
 import { getVoiceCredits, validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
+import { isBlankQuadraticAllocation } from '../../utilities/survey/quadraticAnswer';
 import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
 import {
   extractUserPageAnalysisAdditionalComment,
@@ -202,7 +203,8 @@ export const buildUserPageAnalysisQuestions = ({
         (detailedQuestionResponses as Record<string, UserPageUnknownRecord> | null | undefined)?.[q.id as string] || {};
       const ans = readUserPageAnalysisPublicValue(resp.answer);
       if (ans == null) return null;
-      if (q.type === 'quadratic' && validateQuadraticAllocation(ans, q)) return null;
+      if (q.type === 'quadratic' && (validateQuadraticAllocation(ans, q) || isBlankQuadraticAllocation(ans)))
+        return null;
       return {
         id: q.id,
         type: q.type,
@@ -225,7 +227,11 @@ export const buildUserPageAnalysisSurveys = ({
       const responseData = toAnalysisRecord(it?.responseData);
       const v = readUserPageAnalysisPublicValue(responseData.answer);
       const questionData = toAnalysisRecord(it?.questionData);
-      if (questionData.type === 'quadratic' && validateQuadraticAllocation(v, questionData)) return false;
+      if (
+        questionData.type === 'quadratic' &&
+        (validateQuadraticAllocation(v, questionData) || isBlankQuadraticAllocation(v))
+      )
+        return false;
       return !!v;
     });
 

@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 
 import {
   RESULTS_BUILD_ACTIVE_POLL_MS,
+  RESULTS_BUILD_FOLLOW_FAILED_READS,
   RESULTS_BUILD_KEPT_BUILDS,
   useSessionResultsBuild,
 } from './useSessionResultsBuild';
@@ -61,6 +62,25 @@ const renderAtlas = (props: Partial<Props> = {}) =>
     { initialProps: { account: '', enabled: true, sessionConfig: baseConfig, sessionSlug: 'salon', ...props } },
   );
 
+// Lets the reads and presses the tests answer at once settle.
+const flush = () =>
+  act(async () => {
+    for (let tick = 0; tick < 10; tick += 1) await Promise.resolve();
+  });
+const checkBack = async () => {
+  await act(async () => {
+    jest.advanceTimersByTime(RESULTS_BUILD_ACTIVE_POLL_MS);
+  });
+  await flush();
+};
+const originalVisibility = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+const showPage = (state: DocumentVisibilityState) =>
+  act(async () => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: state });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+const dropped = { ok: false, status: 0, dropped: true, error: 'The connection dropped.' };
+
 beforeEach(() => {
   jest.clearAllMocks();
   read.mockResolvedValue(shown('atlas_k2_00000002'));
@@ -68,6 +88,8 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.useRealTimers();
+  if (originalVisibility) Object.defineProperty(document, 'visibilityState', originalVisibility);
+  else Reflect.deleteProperty(document, 'visibilityState');
 });
 
 it('does nothing on a Worker that does not build atlases, even for its admin', () => {
@@ -326,6 +348,194 @@ it("keeps checking back while someone else's build is still running", async () =
     await Promise.resolve();
   });
   expect(read).toHaveBeenCalledTimes(4);
+});
+
+it('follows the build of a press that dropped from the press, reading at once and checking back until it shows', async () => {
+  jest.useFakeTimers();
+  jest.setSystemTime(50_000);
+  requestBuild.mockResolvedValue(dropped);
+  const { result } = renderAtlas({ account: address(1) });
+  await flush();
+  expect(result.current.build?.id).toBe('atlas_k2_00000002');
+  read.mockClear();
+  let answerRead: (value: unknown) => void = () => {};
+  read.mockImplementationOnce(() => new Promise((resolve) => (answerRead = resolve)) as never);
+  let answered: boolean | null = null;
+  act(() => {
+    void result.current.startBuild().then((built) => (answered = built));
+  });
+  await flush();
+  // Not a failure: the Worker may build on, so the build runs from the press and is read at once.
+  expect(result.current.dropped).toBe(true);
+  expect(result.current.error).toBe('');
+  expect(result.current.building).toBe(false);
+  expect(result.current.activeSinceMs).toBe(50_000);
+  expect(result.current.buildStartedAtMs).toBe(50_000);
+  expect(read).toHaveBeenCalledTimes(1);
+  expect(read).toHaveBeenLastCalledWith(expect.objectContaining({ id: '' }));
+  await act(async () => answerRead({ ...shown('atlas_k2_00000002'), active: { startedAtMs: 49_900 } }));
+  expect(result.current.activeSinceMs).toBe(49_900);
+  expect(result.current.dropped).toBe(true);
+  expect(answered).toBeNull();
+
+  // The check-back finds the new atlas: the follow ends, and the press is answered as built, so it opens.
+  read.mockResolvedValue(shown('atlas_k3_00000003'));
+  await checkBack();
+  expect(read).toHaveBeenCalledTimes(2);
+  expect(result.current.build?.id).toBe('atlas_k3_00000003');
+  expect(result.current.activeSinceMs).toBeNull();
+  expect(result.current.dropped).toBe(false);
+  expect(result.current.error).toBe('');
+  expect(answered).toBe(true);
+});
+
+it("says a dropped press's build didn't finish when a read finds none running and no new one", async () => {
+  requestBuild.mockResolvedValue(dropped);
+  const { result } = renderAtlas({ account: address(1) });
+  await waitFor(() => expect(result.current.build?.id).toBe('atlas_k2_00000002'));
+  let built: boolean | null = null;
+  await act(async () => {
+    built = await result.current.startBuild();
+  });
+  expect(built).toBe(false);
+  expect(result.current.dropped).toBe(false);
+  expect(result.current.activeSinceMs).toBeNull();
+  expect(result.current.error).toBe("The atlas build didn't finish. Press Build to try again.");
+  expect(result.current.build?.id).toBe('atlas_k2_00000002');
+});
+
+it('follows a dropped press through failed reads, and says so once it still cannot check', async () => {
+  jest.useFakeTimers();
+  requestBuild.mockResolvedValue(dropped);
+  const { result } = renderAtlas({ account: address(1) });
+  await flush();
+  read.mockClear();
+  const offline = { ok: false, status: 0, error: 'Load failed' };
+  // Offline, back with the build running, then offline for good: a read that comes back starts the count again.
+  read
+    .mockResolvedValueOnce(offline)
+    .mockResolvedValueOnce({ ...shown('atlas_k2_00000002'), active: { startedAtMs: 5 } })
+    .mockResolvedValue(offline);
+  let answered: boolean | null = null;
+  act(() => {
+    void result.current.startBuild().then((built) => (answered = built));
+  });
+  await flush();
+  const reads = 2 + RESULTS_BUILD_FOLLOW_FAILED_READS;
+  for (let done = 1; done < reads; done += 1) {
+    expect(read).toHaveBeenCalledTimes(done);
+    expect(result.current.dropped).toBe(true);
+    expect(result.current.error).toBe('');
+    await checkBack();
+  }
+  expect(read).toHaveBeenCalledTimes(reads);
+  expect(result.current.dropped).toBe(false);
+  expect(result.current.activeSinceMs).toBeNull();
+  // In the site's words, not the browser's.
+  expect(result.current.error).toBe("Couldn't check on the atlas build. Reload to see if it finished.");
+  expect(answered).toBe(false);
+  await checkBack();
+  expect(read).toHaveBeenCalledTimes(reads);
+});
+
+it('reads again when the page is shown while a build is pressed or running, and not otherwise', async () => {
+  let finish: (value: ResultsBuildResult<ResultsBuildSummary>) => void = () => {};
+  requestBuild.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+  const { result } = renderAtlas({ account: address(1) });
+  await waitFor(() => expect(result.current.build?.id).toBe('atlas_k2_00000002'));
+  read.mockClear();
+  await showPage('hidden');
+  await showPage('visible');
+  expect(read).not.toHaveBeenCalled();
+
+  // A press in flight, which a phone may have cut while the page was hidden.
+  let pending: Promise<boolean> = Promise.resolve(false);
+  act(() => {
+    pending = result.current.startBuild();
+  });
+  await showPage('hidden');
+  expect(read).not.toHaveBeenCalled();
+  await showPage('visible');
+  expect(read).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    finish({ ok: true, status: 200, build: build('atlas_kz_0000000f') });
+    await pending;
+  });
+
+  // Someone else's build running.
+  read.mockResolvedValue({ ...shown('atlas_kz_0000000f'), active: { startedAtMs: 5 } });
+  act(() => result.current.selectBuild(''));
+  await waitFor(() => expect(result.current.activeSinceMs).toBe(5));
+  read.mockClear();
+  await showPage('visible');
+  expect(read).toHaveBeenCalledTimes(1);
+});
+
+it("shows a press's failure though a read while it built found its build running", async () => {
+  let finish: (value: ResultsBuildResult<ResultsBuildSummary>) => void = () => {};
+  requestBuild.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+  const { result } = renderAtlas({ account: address(1) });
+  await waitFor(() => expect(result.current.build?.id).toBe('atlas_k2_00000002'));
+  let pending: Promise<boolean> = Promise.resolve(true);
+  act(() => {
+    pending = result.current.startBuild();
+  });
+  // Back on the page while it builds: the read finds the press's own build running.
+  read.mockResolvedValue({ ...shown('atlas_k2_00000002'), active: { startedAtMs: 5 } });
+  await showPage('visible');
+  expect(result.current.activeSinceMs).toBe(5);
+  await act(async () => {
+    finish({ ok: false, status: 502, error: 'Planning the atlas failed.' });
+    await pending;
+  });
+  // Nothing runs to check back on, so the failure stays shown.
+  expect(result.current.activeSinceMs).toBeNull();
+  expect(result.current.error).toBe('Planning the atlas failed.');
+});
+
+it.each([
+  ['an older build as not its own', '2026-11-08T14:05:00.000Z', false],
+  ['a build from after the press as its own', '2026-11-20T10:03:00.000Z', true],
+])('takes, for a dropped press made before any read came back, %s', async (_what, builtAt, built) => {
+  jest.useFakeTimers();
+  jest.setSystemTime(Date.parse('2026-11-20T10:00:00.000Z'));
+  requestBuild.mockResolvedValue(dropped);
+  read.mockImplementationOnce(() => new Promise(() => {}) as never);
+  const { result } = renderAtlas({ account: address(1) });
+  await flush();
+  expect(result.current.loaded).toBe(false);
+  read.mockResolvedValue({
+    ok: true,
+    status: 200,
+    builds: [{ ...summary('atlas_k2_00000002'), builtAt }],
+    build: { ...build('atlas_k2_00000002'), builtAt },
+  });
+  let answered: boolean | null = null;
+  act(() => {
+    void result.current.startBuild().then((value) => (answered = value));
+  });
+  await flush();
+  expect(answered).toBe(built);
+  expect(result.current.dropped).toBe(false);
+  expect(result.current.error).toBe(built ? '' : "The atlas build didn't finish. Press Build to try again.");
+});
+
+it('answers a followed press as not built when the reader changes', async () => {
+  requestBuild.mockResolvedValue(dropped);
+  const { result, rerender } = renderAtlas({ account: address(1) });
+  await waitFor(() => expect(result.current.build?.id).toBe('atlas_k2_00000002'));
+  read.mockResolvedValue({ ...shown('atlas_k2_00000002'), active: { startedAtMs: 5 } });
+  let answered: boolean | null = null;
+  act(() => {
+    void result.current.startBuild().then((value) => (answered = value));
+  });
+  await waitFor(() => expect(result.current.activeSinceMs).toBe(5));
+  expect(result.current.dropped).toBe(true);
+  read.mockResolvedValue({ ok: false, status: 403, error: 'Not visible.' });
+  rerender({ account: address(9), enabled: true, sessionConfig: baseConfig, sessionSlug: 'salon' });
+  await waitFor(() => expect(answered).toBe(false));
+  expect(result.current.dropped).toBe(false);
+  expect(result.current.activeSinceMs).toBeNull();
 });
 
 it('names the Worker that keeps its atlases, and none where it builds none', async () => {

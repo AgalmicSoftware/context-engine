@@ -160,3 +160,17 @@ it("tells a risk matrix refused for its own running build from one refused for t
   });
   expect(await refuse('debate_atlas_build_running')).toEqual({ ok: false, status: 409, error: 'Already building.' });
 });
+
+it('tells a press that got no response, as a phone cutting it, from a refusal, without advice on CORS', async () => {
+  const result = await requestResultsBuild({
+    kind: 'debate-atlas',
+    chainId: 1,
+    fetchImpl: jest.fn(async () => {
+      throw new TypeError('Load failed');
+    }) as unknown as typeof fetch,
+    sessionSlug: 'salon',
+    signAdminAction: signed,
+    workerUrl: 'https://worker.example',
+  });
+  expect(result).toEqual({ ok: false, status: 0, dropped: true, error: 'The connection dropped.' });
+});

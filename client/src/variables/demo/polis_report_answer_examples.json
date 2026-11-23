@@ -79,7 +79,7 @@
     "category": "GOVERNANCE MECHANISMS & INSTITUTIONS",
     "options": ["Independent safety audits", "Public-interest AI research", "Blanket deployment bans", "Automated public decisions"],
     "voiceCredits": 99,
-    "answers": [[7, 5, -3, -2], [6, 5, -4, -3], [5, 6, 2, -4], [4, 7, -3, 0], [7, 4, -5, -2], [3, 4, 6, -5], [5, -3, -4, 5], [0, 0, 0, 0]]
+    "answers": [[7, 5, -3, -2], [6, 5, -4, -3], [5, 6, 2, -4], [4, 7, -3, 0], [7, 4, -5, -2], [3, 4, 6, -5], [5, -3, -4, 5], [2, 1, 0, -1]]
   },
   {
     "id": "report-demo-quadratic-education",

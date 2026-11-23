@@ -1,5 +1,6 @@
 import { optionsOf } from '../../../../shared/questions/answerValue.mjs';
 import { hasAuthorEncryptedText } from '../../utilities/survey/authorEncryptedQuestion';
+import { isBlankQuadraticAllocation } from '../../utilities/survey/quadraticAnswer';
 import { normalizeRatingScale } from '../../utilities/survey/ratingValue';
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope';
 
@@ -135,7 +136,10 @@ export const buildResultsAnalysisBrowserSnapshotFromCacheNode = ({
         skippedCount += 1;
         return;
       }
-      const answer = getAnswerValue(record.answer ?? record.value ?? record.response);
+      const questionType = toText(record.type || toRecord(questionsById[questionId]).type);
+      const storedAnswer = getAnswerValue(record.answer ?? record.value ?? record.response);
+      // A cleared allocation, every vote at 0, is blank, as a cleared choice ([]) is.
+      const answer = questionType === 'quadratic' && isBlankQuadraticAllocation(storedAnswer) ? '' : storedAnswer;
       const additionalField = record.additional ?? record.additionalComments ?? record.comments ?? record.comment;
       const additionalValue = valueLooksLocked(additionalField) ? '' : getAnswerValue(additionalField);
       const additional = Array.isArray(additionalValue)
@@ -153,7 +157,7 @@ export const buildResultsAnalysisBrowserSnapshotFromCacheNode = ({
         answer,
         ...(toText(additional) ? { additionalComments: additional } : {}),
         questionPrompt: toText(toRecord(questionsById[questionId]).prompt),
-        questionType: toText(record.type || toRecord(questionsById[questionId]).type),
+        questionType,
       });
     });
   });

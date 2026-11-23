@@ -4,6 +4,7 @@ import {
   validateQuadraticAllocation,
 } from '../../../../shared/questions/quadraticAllocation.mjs';
 import { buildResultsAnalysisPrompt } from '../../../../shared/resultsAnalysisPrompt.mjs';
+import { isBlankQuadraticAllocation } from '../survey/quadraticAnswer';
 import { normalizeRatingScale, type RatingScale } from '../survey/ratingValue';
 
 export const SESSION_RESULTS_ANALYSIS_ARTIFACT_KIND = 'ce_session_results_analysis_artifact';
@@ -383,10 +384,11 @@ export const buildSessionResultsAnalysisAiPayload = ({
       const questionType = question?.type || toSafeString(response?.questionType);
       const allocation = Array.isArray(response?.answer) ? response.answer : toPlainRecord(response?.answer).value;
       // Label against the full option list before applying context limits; slicing
-      // options first would detach later votes from their option names.
+      // options first would detach later votes from their option names. An allocation
+      // with no votes is a cleared answer, so it stays out like any blank one.
       const answerText =
         questionType === 'quadratic'
-          ? question && !validateQuadraticAllocation(allocation, question)
+          ? question && !validateQuadraticAllocation(allocation, question) && !isBlankQuadraticAllocation(allocation)
             ? formatQuadraticAllocation(allocation, question.options)
             : ''
           : getResponseText(response?.answer);

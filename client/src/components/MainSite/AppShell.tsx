@@ -2298,10 +2298,14 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
 
     this.props.fetchSessionState();
 
-    // Prioritize user load (deep search) if on a user profile
+    // Prioritize user load (deep search) if on a user profile. A session stored on its Worker has no chain scan
+    // to wait for here: its profile page starts the scan itself where the session has on-chain groups.
     const targetUser = this.getUserAddressFromPath(bootstrapPath);
-    if (targetUser) {
-      mainSiteLog.log(`[MainSite] User Profile detected (${targetUser}). Prioritizing Deep Search.`);
+    if (
+      targetUser &&
+      !bootstrapClaimsWorkerAuthority &&
+      !this._routeRenderers.workerCanonicalRoutes.isSessionSlug(slug)
+    ) {
       // Best effort: warm active-chain registry cache without adding another blocking wait.
       try {
         void Promise.resolve(this.ensureRegistryHydratedForProfileScan()).catch(() => null);
@@ -2899,7 +2903,12 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
               if (!isCacheReinitRunActive()) return;
               this.setReadinessStateIfChanged({ isSurveyCacheReady: true });
             }
-          } else {
+          } else if (
+            // A session stored on its Worker that is already verified loads again here, as on Back from a
+            // profile; any other session with no chain has only these two to mark, at once as before.
+            !claimsWorkerCanonicalAuthority(this.getCacheSessionCfg(nextActiveSlug)) ||
+            !(await this.initializeWorkerCanonicalCachesForGroup(nextActiveSlug))
+          ) {
             if (!isCacheReinitRunActive()) return;
             this.setReadinessStateIfChanged({ isQuestionCacheReady: true, isSurveyCacheReady: true });
           }

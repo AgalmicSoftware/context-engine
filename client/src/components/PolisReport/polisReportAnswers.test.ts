@@ -7,7 +7,7 @@ const row = (type: string, value: unknown, responder = 'person-a', extra = {}) =
 });
 
 describe('Polis answer summaries', () => {
-  it('counts zero ratings and neutral allocations but excludes empty, encrypted, invalid and out-of-session answers', () => {
+  it('counts zero ratings but excludes cleared allocations and empty, encrypted, invalid and out-of-session answers', () => {
     const result = buildReportAnswerQuestions(
       {
         rating: [
@@ -17,7 +17,12 @@ describe('Polis answer summaries', () => {
           row('rating', 4, 'person-b', { answer: { encrypted: true, value: '*' } }),
           row('rating', 5, 'person-c', { sessionSlug: 'other', sessionSlugExplicit: true }),
         ],
-        quadratic: [row('quadratic', [0, 0]), row('quadratic', [10, 0], 'person-b')],
+        // Every vote at 0 is what clearing an allocation leaves; [10, 0] costs 100 of 99 credits.
+        quadratic: [
+          row('quadratic', [0, 0]),
+          row('quadratic', [10, 0], 'person-b'),
+          row('quadratic', [3, -2], 'person-c'),
+        ],
         text: [row('freeform', '   ')],
         invalid: [row('quadratic', [3])],
       },
@@ -29,7 +34,7 @@ describe('Polis answer summaries', () => {
       ['rating', 1],
     ]);
     expect(result[1].average).toBe(0);
-    expect(result[0].options.map((option) => option.net)).toEqual([0, 0]);
+    expect(result[0].options.map((option) => option.net)).toEqual([3, -2]);
   });
 
   it('uses canonical labels and custom budgets, sums signed votes, and counts multi-select respondents once', () => {
@@ -151,13 +156,28 @@ describe('Polis response statistics', () => {
       text: [row('freeform', 'A response', 'person-c')],
       rating: [row('rating', 0, 'person-c')],
       choice: [row('multichoice', ['Bus', 'Garden'], 'person-d')],
-      quadratic: [row('quadratic', [0, 0], 'person-d')],
+      quadratic: [row('quadratic', [0, -3], 'person-d')],
     };
     expect(
       buildReportResponseStats(responses, { quadratic: { type: 'quadratic', options: ['Bus', 'Garden'] } }),
     ).toEqual({
       all: { participants: 4, questions: 5, responses: 6, responsesPerParticipant: 1.5 },
       binary: { participants: 2, questions: 1, responses: 2, responsesPerParticipant: 1 },
+    });
+  });
+
+  it('leaves out a participant whose answers were all cleared, a quadratic one included', () => {
+    // Clearing leaves "" for binary, [] for multiple choice and every vote at 0 for a quadratic allocation.
+    const responses = {
+      binary: [row('binary', 'Agree'), row('binary', '', 'cleared')],
+      choice: [row('multichoice', [], 'cleared')],
+      quadratic: [row('quadratic', [0, 0], 'cleared'), row('quadratic', [0, -3], 'person-b')],
+    };
+    expect(
+      buildReportResponseStats(responses, { quadratic: { type: 'quadratic', options: ['Bus', 'Garden'] } }),
+    ).toEqual({
+      all: { participants: 2, questions: 2, responses: 2, responsesPerParticipant: 1 },
+      binary: { participants: 1, questions: 1, responses: 1, responsesPerParticipant: 1 },
     });
   });
 

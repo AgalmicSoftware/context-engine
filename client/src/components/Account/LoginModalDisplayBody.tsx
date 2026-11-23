@@ -222,6 +222,7 @@ type AccountUserPageProps = {
   sessionConfig?: unknown;
   networkChainId?: unknown;
   accountMenuRows?: React.ReactNode;
+  onAnalyzeLinkOpened?: () => void;
 };
 
 type LoginModalDisplayBodyProps = {
@@ -243,6 +244,7 @@ type LoginModalDisplayBodyProps = {
   loginInProgress: boolean;
   network: unknown;
   openBookmarks: () => void;
+  closeAccountDialog: () => void;
   openCryptoModal: () => void;
   passkeyWalletStatusMessage: string;
   passkeyWalletStatusTone: string;
@@ -291,6 +293,7 @@ const LoginModalDisplayBody = ({
   loginInProgress,
   network,
   openBookmarks,
+  closeAccountDialog,
   openCryptoModal,
   passkeyWalletStatusMessage,
   passkeyWalletStatusTone,
@@ -523,6 +526,7 @@ const LoginModalDisplayBody = ({
                     sessionConfig={activeSessionConfig}
                     networkChainId={activeSessionNetworkChainId || undefined}
                     accountMenuRows={menuRows(renderAgentHandoffPanel())}
+                    onAnalyzeLinkOpened={closeAccountDialog}
                   />
                 </Suspense>
               </div>

@@ -1,5 +1,6 @@
 import { normalizeRatingScale } from './ratingValue.js';
 import { getVoiceCredits, validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
+import { isBlankQuadraticAllocation } from './quadraticAnswer';
 /**
  * @file compareUsers.js
  * @module compareUsers
@@ -541,10 +542,12 @@ const responseToCompareQuestion = (qid: string, candidate: unknown, qData: Unkno
   const record = asRecord(response);
   const answer = asRecord(record.answer).value;
   if (!isNonBlankAnswer(answer)) return null;
+  const type = String(qData.type || record.type || 'unknown');
+  if (type === 'quadratic' && isBlankQuadraticAllocation(answer)) return null;
   if (qData.type === 'quadratic' && validateQuadraticAllocation(answer, qData)) return null;
   return {
     id: qid,
-    type: String(qData.type || record.type || 'unknown'),
+    type,
     prompt: String(qData.prompt || record.prompt || 'Unknown Question'),
     answer,
     ...(Array.isArray(qData.options) ? { options: qData.options } : {}),
@@ -765,7 +768,7 @@ export function buildUsersFromCaches(
       });
     });
 
-    // Surveys (only count those with any non-blank answer)
+    // Surveys: only those with an answer that would be compared, so not one left blank, cleared or unreadable.
     const surveys: CompareSurvey[] = [];
     Object.keys(combinedSurveyResponses).forEach((sid) => {
       const perS = combinedSurveyResponses[sid] || {};
@@ -783,9 +786,12 @@ export function buildUsersFromCaches(
       const respRecord = asRecord(respObj);
       if (!respObj || !Array.isArray(respRecord.responses)) return;
 
-      const hasNonBlank = respRecord.responses.some((rawResponse) =>
-        isNonBlankAnswer(asRecord(asRecord(rawResponse).answer).value),
-      );
+      // Read as the comparison reads a survey's answers above.
+      const hasNonBlank = respRecord.responses.some((rawResponse) => {
+        const r = asRecord(rawResponse);
+        const qid = String(r.questionID || '').toLowerCase();
+        return responseToCompareQuestion(qid, r, combinedQuestions[qid] || {}) !== null;
+      });
       if (hasNonBlank) {
         const sData = combinedSurveys[sid] || {};
         surveys.push({

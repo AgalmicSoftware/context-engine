@@ -1,7 +1,8 @@
 import React, { useId, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faQuestionCircle, faSpinner } from '@fortawesome/free-solid-svg-icons';
 
+import CETooltip from '../Shared/CETooltip';
 import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
 import {
   RESULTS_BUILD_KINDS,
@@ -13,6 +14,8 @@ import styles from './ResultsBuildStatus.module.scss';
 type Props = {
   busy: boolean;
   className?: string;
+  // The reader's press lost its connection, and the build it may have started is being followed.
+  dropped?: boolean;
   error?: string;
   kind: ResultsBuildKind;
   nextBuild: ResultsBuildNextBuild | null;
@@ -33,9 +36,20 @@ const PROMPT_SECTIONS: Record<ResultsBuildKind, Array<{ key: string; label: stri
 // A running build: how long it has run, the model it calls and, on request,
 // the prompts it sends, as the question generator shows its own. One live
 // region carries the running build and then its failure, so the failure is read out.
-export default function ResultsBuildStatus({ busy, className = '', error = '', kind, nextBuild, startedAtMs }: Props) {
+export default function ResultsBuildStatus({
+  busy,
+  className = '',
+  dropped = false,
+  error = '',
+  kind,
+  nextBuild,
+  startedAtMs,
+}: Props) {
   const [showPrompt, setShowPrompt] = useState(false);
-  const promptId = `${kind}-prompt-${useId().replace(/:/g, '')}`;
+  const id = useId().replace(/:/g, '');
+  const promptId = `${kind}-prompt-${id}`;
+  const droppedHelpId = `${kind}-dropped-help-${id}`;
+  const { name } = RESULTS_BUILD_KINDS[kind];
   const model = busy ? nextBuild?.model || '' : '';
   const prompts = (busy && nextBuild?.prompts) || {};
   const sections = PROMPT_SECTIONS[kind].filter(({ key }) => prompts[key]);
@@ -46,7 +60,28 @@ export default function ResultsBuildStatus({ busy, className = '', error = '', k
         {busy ? (
           <>
             <FontAwesomeIcon icon={faSpinner} spin aria-hidden="true" />{' '}
-            <ElapsedLoadingLabel label={`Building the ${RESULTS_BUILD_KINDS[kind].name}`} since={startedAtMs} />
+            <ElapsedLoadingLabel label={`Building the ${name}`} since={startedAtMs} />
+            {dropped && (
+              <>
+                <br />
+                Connection dropped. The build keeps running and appears here when done.
+                <button
+                  type="button"
+                  id={droppedHelpId}
+                  className={styles.help}
+                  data-ce-control-appearance="frameless"
+                  aria-label="About the dropped connection"
+                  onClick={(event) => event.currentTarget.focus()}
+                >
+                  <FontAwesomeIcon icon={faQuestionCircle} />
+                </button>
+                <CETooltip target={droppedHelpId} placement="top" trigger="hover focus" autohide={false}>
+                  A phone can cut a long request, for example when its screen locks or its network changes, while the
+                  Worker builds on. This page checks every 20 seconds and when you come back to it, and says so if the
+                  build stopped.
+                </CETooltip>
+              </>
+            )}
           </>
         ) : (
           error

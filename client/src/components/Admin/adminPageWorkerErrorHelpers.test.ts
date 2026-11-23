@@ -36,6 +36,14 @@ describe('adminPageWorkerErrorHelpers', () => {
         workerBase: 'https://worker.example.test',
       }),
     ).toContain('could not reach https://worker.example.test');
+
+    // Safari's words for the same failure.
+    expect(
+      normalizeAdminWorkerFetchError({
+        error: new TypeError('Load failed'),
+        workerBase: 'https://worker.example.test',
+      }),
+    ).toContain('could not reach https://worker.example.test');
   });
 
   it('keeps non-CORS failures and detects retryable nonce errors', () => {

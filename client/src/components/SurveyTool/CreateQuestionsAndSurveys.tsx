@@ -70,6 +70,7 @@ import { createCacheUpdateCoalescer } from '../../utilities/cache/cacheUpdateCoa
 import { generateQuestionId as generateSharedQuestionId } from '../../utilities/shared/questionUtils.mjs';
 import { notify } from '../../utilities/ui/notify.js';
 import { copyText, selectText } from '../../utilities/ui/copyText';
+import { guardLeaving } from '../../utilities/ui/leaveGuards';
 import { t } from '../../utilities/ui/terminology.js';
 import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionDemoCompat.js';
 import { chainHttpRpc, chainHttpRpcNoPath } from '../../variables/chains.js';
@@ -705,6 +706,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   _cacheWatchCoalescer: CacheUpdateCoalescerLike | null = null;
   _cacheWatchCheckNow: CacheWatchCheckNow | null = null;
   _draftSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  _releaseLeaveGuard: () => void = () => {};
   _copySuccessResetTimers: Partial<Record<CreateSurveyCopySuccessStateKey, ReturnType<typeof setTimeout> | null>> = {};
   _promptRefs: Record<string, FocusablePromptElement | null> = {};
   _tagInputRefs: Record<string, FocusablePromptElement | null> = {};
@@ -827,6 +829,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     this._isMounted = true;
     this.props.onDraftQuestionsChange?.(this.state.questions);
     window.addEventListener('beforeunload', this.handleDraftBeforeUnload);
+    this._releaseLeaveGuard = guardLeaving(this.holdsUnsavedDrafts);
     if (this.state.showAIPrompt) {
       this.refreshAIPromptModelLabel();
     }
@@ -852,6 +855,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   componentWillUnmount() {
     this._isMounted = false;
     window.removeEventListener('beforeunload', this.handleDraftBeforeUnload);
+    this._releaseLeaveGuard();
     this.saveToLocalStorage({ immediate: true });
     this.clearCopySuccessTimers();
     this.clearCacheWatch();
@@ -1450,15 +1454,14 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     return JSON.stringify(stateToSave);
   };
 
+  // Whether leaving now would lose drafts: a list kept elsewhere would come back with its uploading drafts still
+  // in it, and a draft whose save failed is only on this page.
+  holdsUnsavedDrafts = (): boolean =>
+    (this.state.isSubmitting && !!this.props.onDraftQuestionsChange) ||
+    (this.state.draftSaveFailed && this.serializeUnfinishedSurveyDraft() !== this._lastSavedUnfinishedSurveyJson);
+
   handleDraftBeforeUnload = (event: BeforeUnloadEvent): void => {
-    // A list kept elsewhere would come back with its uploading drafts still in it.
-    if (this.state.isSubmitting && this.props.onDraftQuestionsChange) {
-      event.preventDefault();
-      event.returnValue = '';
-      return;
-    }
-    if (!this.state.draftSaveFailed) return;
-    if (this.serializeUnfinishedSurveyDraft() === this._lastSavedUnfinishedSurveyJson) return;
+    if (!this.holdsUnsavedDrafts()) return;
     event.preventDefault();
     event.returnValue = '';
   };

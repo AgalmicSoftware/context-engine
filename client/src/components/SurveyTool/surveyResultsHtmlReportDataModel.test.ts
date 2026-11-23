@@ -145,6 +145,28 @@ describe('report answers', () => {
     ]);
   });
 
+  it('reads a cleared allocation, every vote at 0, as no answer', () => {
+    expect(
+      buildSurveyResultsHtmlReportAnswersForExport({
+        aggregatorQuestionResponses: {
+          vote: [
+            row('vote', { answer: { value: [0, 0] } }),
+            row('vote', { answer: { value: [0, 0] }, additional: { value: 'Undecided' } }, other),
+          ],
+          // A question no longer cached is read by the type stored with its answers.
+          gone: [
+            row('gone', { type: 'quadratic', answer: { value: [0, 0, 0] } }),
+            row('gone', { type: 'quadratic', answer: { value: [1, 0, -2] } }, other),
+          ],
+        },
+        networkQuestions: { vote: { type: 'quadratic', prompt: 'Allocate', options: ['A', 'B'], voiceCredits: 9 } },
+      }),
+    ).toEqual([
+      { questionId: 'vote', responder: other, answer: '', comment: 'Undecided' },
+      { questionId: 'gone', responder: other, answer: '1; 0; -2', comment: '' },
+    ]);
+  });
+
   it('takes each responder’s latest answer, as the Results view does', () => {
     expect(
       buildSurveyResultsHtmlReportAnswersForExport({

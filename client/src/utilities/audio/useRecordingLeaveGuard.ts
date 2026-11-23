@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+import { guardLeaving } from '../ui/leaveGuards';
+
 const GUARD_STATE = 'ceRecordingGuard';
 const onGuardEntry = () => Boolean((window.history.state as Record<string, unknown> | null)?.[GUARD_STATE]);
 
@@ -18,7 +20,12 @@ export function useRecordingLeaveGuard(capturing: boolean, unsent: boolean): boo
       event.returnValue = '';
     };
     window.addEventListener('beforeunload', ask);
-    return () => window.removeEventListener('beforeunload', ask);
+    // A link that would swap the page inside the app asks nothing: it is told the page is held.
+    const release = guardLeaving(() => true);
+    return () => {
+      window.removeEventListener('beforeunload', ask);
+      release();
+    };
   }, [capturing, unsent]);
   useEffect(() => {
     setBackBlocked(false);

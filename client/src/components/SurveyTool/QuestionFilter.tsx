@@ -2955,16 +2955,19 @@ class QuestionFilter extends React.Component<any, any> {
             pendingSelectedTypes={pendingSelectedTypes}
           />
 
-          <QuestionFilterResponseStatusSection
-            disabled={isOtherFiltersDisabled}
-            expandedSections={expandedSections}
-            hasConnectedAccount={hasConnectedAccount}
-            onRespondedToggle={this.handleRespondedToggle}
-            onNotRespondedToggle={this.handleNotRespondedToggle}
-            onToggleSection={this.toggleSection}
-            filterByResponded={this.state.filterByResponded}
-            filterByNotResponded={this.state.filterByNotResponded}
-          />
+          {/* A view that can't apply a section's filter hides it: the Report hides this one and the AI Filter. */}
+          {!this.props.hideResponseStatusFilter && (
+            <QuestionFilterResponseStatusSection
+              disabled={isOtherFiltersDisabled}
+              expandedSections={expandedSections}
+              hasConnectedAccount={hasConnectedAccount}
+              onRespondedToggle={this.handleRespondedToggle}
+              onNotRespondedToggle={this.handleNotRespondedToggle}
+              onToggleSection={this.toggleSection}
+              filterByResponded={this.state.filterByResponded}
+              filterByNotResponded={this.state.filterByNotResponded}
+            />
+          )}
 
           {this.props.resultsMode && (
             <WorkerGroupResultsFilterControls
@@ -2987,30 +2990,32 @@ class QuestionFilter extends React.Component<any, any> {
             host={this}
           />
 
-          <QuestionFilterAiSection
-            activeAiTopN={activeAiTopN}
-            aiAccessEnabled={aiAccessState.enabled}
-            aiAccessNeedsSignIn={!!aiAccessState.needsSignIn}
-            aiApplyButtonLabel={aiApplyButtonLabel}
-            aiApplyError={aiApplyError}
-            aiApplying={aiApplying}
-            aiCombineWithOtherFilters={aiCombineWithOtherFilters}
-            aiControlsDisabled={aiControlsDisabled}
-            aiDraftQuery={aiDraftQuery}
-            aiRankingCount={aiRankingCount}
-            aiSearchQuery={aiSearchQuery}
-            aiSectionDisabled={aiSectionDisabled}
-            expandedSections={expandedSections}
-            isAiFilterApplied={this.state.aiFilterApplied}
-            isTopQuestionsModeActive={isTopQuestionsModeActive}
-            onAiCombineWithFiltersChange={this.handleAiCombineWithFiltersChange}
-            onAiDraftQueryChange={this.handleAiDraftQueryChange}
-            onAiTopNChange={this.handleAiTopNChange}
-            onApplyAiFilter={() => {
-              void this.handleApplyAIFilter({ auto: false, source: 'manual-click' });
-            }}
-            onToggleSection={this.toggleSection}
-          />
+          {!this.props.hideAiFilter && (
+            <QuestionFilterAiSection
+              activeAiTopN={activeAiTopN}
+              aiAccessEnabled={aiAccessState.enabled}
+              aiAccessNeedsSignIn={!!aiAccessState.needsSignIn}
+              aiApplyButtonLabel={aiApplyButtonLabel}
+              aiApplyError={aiApplyError}
+              aiApplying={aiApplying}
+              aiCombineWithOtherFilters={aiCombineWithOtherFilters}
+              aiControlsDisabled={aiControlsDisabled}
+              aiDraftQuery={aiDraftQuery}
+              aiRankingCount={aiRankingCount}
+              aiSearchQuery={aiSearchQuery}
+              aiSectionDisabled={aiSectionDisabled}
+              expandedSections={expandedSections}
+              isAiFilterApplied={this.state.aiFilterApplied}
+              isTopQuestionsModeActive={isTopQuestionsModeActive}
+              onAiCombineWithFiltersChange={this.handleAiCombineWithFiltersChange}
+              onAiDraftQueryChange={this.handleAiDraftQueryChange}
+              onAiTopNChange={this.handleAiTopNChange}
+              onApplyAiFilter={() => {
+                void this.handleApplyAIFilter({ auto: false, source: 'manual-click' });
+              }}
+              onToggleSection={this.toggleSection}
+            />
+          )}
         </div>
 
         {filterLoading && (

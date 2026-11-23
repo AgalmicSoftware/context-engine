@@ -27,6 +27,7 @@ import {
 
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import styles from './PolisReport.module.scss';
+import { PolisReportFilterButton, PolisReportFilterPanel } from './PolisReportFilters';
 import { formatPolisReportSessionInfo } from './polisReportSessionInfo';
 import { useWorkerGroupResultsFilter } from '../../domains/worker/useWorkerGroupResultsFilter';
 import {
@@ -212,6 +213,12 @@ export default function PolisReport({
   cacheInitializationError = false,
   onRetryLoad,
   onRequestLogin,
+  // Optional: given these, the Report's Filter opens Raw Results' filter panel.
+  onFilterChange,
+  defaultTags,
+  isSBTCacheReady,
+  sbtCacheRevision,
+  ensureLightSbtUniverse,
 }: PolisReportProps) {
   const [ratingMatrix, setRatingMatrix] = useState<RatingMatrix | null>(null);
   const [retryingLoad, setRetryingLoad] = useState(false);
@@ -371,6 +378,8 @@ export default function PolisReport({
     quadratic: true,
   });
   const [statsOpen, setStatsOpen] = useState<boolean>(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersPanelId = useId();
   const [participantsListOpen, setParticipantsListOpen] = useState<boolean>(true); // NEW: List of Participants section toggle
 
   // Collapsible clusters
@@ -426,10 +435,12 @@ export default function PolisReport({
       className?: string;
       style?: React.CSSProperties;
       title?: string;
+      // The PDF's footnote, when it should differ from the tooltip.
+      footnote?: string;
     } = {},
   ) => {
-    const footnoteNumber = registerFootnote(text);
-    const { ariaLabel, className = styles.tooltipIcon, style, title } = options;
+    const { ariaLabel, className = styles.tooltipIcon, style, title, footnote = text } = options;
+    const footnoteNumber = registerFootnote(footnote);
 
     return (
       <>
@@ -843,6 +854,7 @@ export default function PolisReport({
       { allowDemo: effectiveUseDemoData },
     );
     return {
+      source,
       filtered,
       metadata,
       workerResponseHydrationStatus: cacheContext.workerResponseHydrationStatus,
@@ -2507,6 +2519,40 @@ export default function PolisReport({
    ***************************************************************/
   // When Demo Data is active, bypass cache readiness gates so the report renders deterministically.
   const hasRenderableReport = !!stats || reportData.answers.length > 0;
+  // Raw Results' filter panel, opened here: a change applies to the filter the Report and Raw Results share.
+  // Demo data has questions and tags of its own, while that filter also drives Raw Results on the session's
+  // own answers, so there is no Filter over demo data.
+  const canChangeFilter = !!onFilterChange && !effectiveUseDemoData;
+  // An active filter keeps Summary and Statistics in place even when it leaves nothing to show, so the filter
+  // can be changed back there, and an open panel stays where it is.
+  const keepFilterBox = canChangeFilter && hasActiveReportFilters;
+  const filterButton = canChangeFilter ? (
+    <PolisReportFilterButton
+      open={filtersOpen}
+      panelId={filtersPanelId}
+      onToggle={() => setFiltersOpen((open) => !open)}
+    />
+  ) : null;
+  const filterPanel =
+    canChangeFilter && filtersOpen ? (
+      <PolisReportFilterPanel
+        id={filtersPanelId}
+        rows={reportData.source}
+        questions={reportData.metadata}
+        filterState={filterState}
+        onFilterChange={onFilterChange}
+        provider={provider}
+        network={network}
+        defaultTags={defaultTags}
+        isQuestionCacheReady={isQuestionCacheReady}
+        isSBTCacheReady={isSBTCacheReady}
+        sbtCacheRevision={sbtCacheRevision}
+        questionResponsesNonce={questionResponsesNonce}
+        sessionSlug={activeReportSlug}
+        sessionConfig={sessionConfig}
+        ensureLightSbtUniverse={ensureLightSbtUniverse}
+      />
+    ) : null;
   const isModernStyle = reportStyle === 'modern';
   const isDarkStyle = reportStyle === 'dark';
   const sessionInfoText = formatPolisReportSessionInfo(resolvedSessionInfo, resolvedSessionSlug);
@@ -2793,11 +2839,11 @@ export default function PolisReport({
               </div>
             )}
           </div>
-        ) : !hasRenderableReport ? (
+        ) : !hasRenderableReport && !keepFilterBox ? (
           <p className={styles.noData}>No readable responses match the current filters.</p>
         ) : (
           <>
-            {reportData.responseStats.all.responses > 0 && (
+            {(reportData.responseStats.all.responses > 0 || keepFilterBox) && (
               <div className={styles.sectionCollapse}>
                 <div
                   className={styles.sectionHeaderRow}
@@ -2878,14 +2924,24 @@ export default function PolisReport({
                         </div>
                       </div>
                       <div className={styles.statsRow}>
-                        <div className={styles.statsItem}>
+                        {/* One row: the label, the filters and then the Filter button, wrapping only when they don't fit. */}
+                        <div className={`${styles.statsItem} ${styles.activeFiltersItem}`}>
                           <span className={styles.statLabel}>
                             Active Filters
-                            {renderTooltipReference('Summary of all active filters applied to this data.')}:
+                            {renderTooltipReference(
+                              filterButton
+                                ? 'Summary of all active filters applied to this data. In Results, the Filter button changes them for the Report and Raw Results alike.'
+                                : 'Summary of all active filters applied to this data.',
+                              // The PDF leaves the button out, so its footnote does too.
+                              { footnote: 'Summary of all active filters applied to this data.' },
+                            )}
+                            :
                           </span>
                           <div className={styles.statValue}>{renderActiveFilters()}</div>
+                          {filterButton}
                         </div>
                       </div>
+                      {filterPanel}
 
                       {/* Added row for network and block info */}
                       <div className={styles.statsRow}>
@@ -2907,6 +2963,7 @@ export default function PolisReport({
                 ) : null}
               </div>
             )}
+            {!hasRenderableReport && <p className={styles.noData}>No readable responses match the current filters.</p>}
             <PolisReportFidelitySection
               sessionConfig={sessionConfig}
               questions={reportData.metadata}
@@ -3025,7 +3082,13 @@ export default function PolisReport({
                 </div>
               </>
             )}
-            <section className={styles.sectionCollapse} aria-label="All Questions" data-testid="ce-polis-all-questions">
+            <section
+              className={styles.sectionCollapse}
+              aria-label="All Questions"
+              data-testid="ce-polis-all-questions"
+              // Only a kept Summary and Statistics shows when a filter leaves nothing to show.
+              style={hasRenderableReport ? undefined : { display: 'none' }}
+            >
               <h2 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
                 <button
                   type="button"

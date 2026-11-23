@@ -169,6 +169,7 @@ export type PolisAgentDetail = { model?: string; source?: string };
 export interface PolisReportProps {
   [key: string]: unknown;
   onRequestLogin?: () => void;
+  onFilterChange?: (filterState: unknown) => void;
   questionResponses?: PolisQuestionResponses | UnknownRecord | null;
   network?: UnknownRecord | null;
   disclaimersActive?: boolean;

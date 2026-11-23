@@ -77,6 +77,8 @@ type UserPageHeaderProps = {
   analyzeButtonDisplayState: UserPageAnalyzeButtonDisplayState;
   /** Whether my answers have finished loading, for an Analyze that "Analyze me" starts on arrival. */
   analyzeLinkReady?: boolean;
+  analyzeLinkArriving?: boolean;
+  onAnalyzeLinkOpened?: () => void;
   avatarDisplayState: UserPageAvatarDisplayState;
   bookmarkButtonDisplayState: UserPageBookmarkButtonDisplayState;
   bookmarksHref: string;
@@ -121,6 +123,8 @@ const UserPageHeader = ({
   usernameSavedTo = 'device',
   analyzeButtonDisplayState,
   analyzeLinkReady = false,
+  analyzeLinkArriving = false,
+  onAnalyzeLinkOpened,
   avatarDisplayState,
   bookmarkButtonDisplayState,
   bookmarksHref,
@@ -325,12 +329,6 @@ const UserPageHeader = ({
       </div>
 
       {!minimized && (
-        <AnalyzeLinkArrival
-          ready={!!isOwner && analyzeLinkReady && !analyzeButtonDisplayState.disabled}
-          onStart={() => onAnalyzeUser()}
-        />
-      )}
-      {!minimized && (
         <div className={styles.headerActionsRight}>
           {usernameErrorDisplayState.shouldRenderUsernameError && (
             <span className={styles.error}>{usernameErrorDisplayState.usernameErrorText}</span>
@@ -346,22 +344,38 @@ const UserPageHeader = ({
             {compareButtonDisplayState.shouldRenderCollapseClosedIcon && <FontAwesomeIcon icon={faChevronDown} />}
           </button>
 
-          <button
-            onClick={onAnalyzeUser}
-            className={styles.analyzeButton}
-            disabled={analyzeButtonDisplayState.disabled}
-            aria-busy={analyzeButtonDisplayState.ariaBusy}
-            title={analyzeButtonDisplayState.title}
+          <AnalyzeLinkArrival
+            ready={!!isOwner && analyzeLinkReady && !analyzeButtonDisplayState.disabled}
+            arriving={analyzeLinkArriving}
+            stuck={!!isOwner && analyzeLinkReady && analyzeButtonDisplayState.disabled}
+            onStart={() => onAnalyzeUser()}
           >
-            {analyzeButtonDisplayState.shouldRenderAnalyzing ? (
-              <>
-                <FontAwesomeIcon icon={faSpinner} spin />
-                &nbsp;{analyzeButtonDisplayState.label}
-              </>
-            ) : (
-              analyzeButtonDisplayState.label
-            )}
-          </button>
+            {(starting, startedByHand) => {
+              // After "Analyze me" the button says Analyze is on its way, so the wait for answers reads as one.
+              const waiting = starting && !analyzeButtonDisplayState.shouldRenderAnalyzing;
+              return (
+                <button
+                  onClick={(event) => {
+                    startedByHand();
+                    onAnalyzeUser(event);
+                  }}
+                  className={styles.analyzeButton}
+                  disabled={analyzeButtonDisplayState.disabled}
+                  aria-busy={waiting ? 'true' : analyzeButtonDisplayState.ariaBusy}
+                  title={waiting ? 'Starts when your answers have loaded' : analyzeButtonDisplayState.title}
+                >
+                  {waiting || analyzeButtonDisplayState.shouldRenderAnalyzing ? (
+                    <>
+                      <FontAwesomeIcon icon={faSpinner} spin />
+                      &nbsp;{waiting ? 'Starting' : analyzeButtonDisplayState.label}
+                    </>
+                  ) : (
+                    analyzeButtonDisplayState.label
+                  )}
+                </button>
+              );
+            }}
+          </AnalyzeLinkArrival>
         </div>
       )}
 
@@ -376,7 +390,7 @@ const UserPageHeader = ({
       {/* The account dialog's list: this page's two actions, then the dialog's own rows. */}
       {minimized && (
         <AccountMenu>
-          {analyzeLinkHref ? <AnalyzeMeButton href={analyzeLinkHref} /> : null}
+          {analyzeLinkHref ? <AnalyzeMeButton href={analyzeLinkHref} onOpened={onAnalyzeLinkOpened} /> : null}
           {showUsernameButton && (
             <AccountMenuRow
               icon={faUser}

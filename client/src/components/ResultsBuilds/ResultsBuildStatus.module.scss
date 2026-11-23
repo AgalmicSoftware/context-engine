@@ -19,6 +19,25 @@
   }
 }
 
+// The (?) after a dropped connection's line, as other (?) buttons are drawn.
+.help {
+  appearance: none;
+  border: 0;
+  border-radius: var(--ce-radius-6);
+  margin-left: 6px;
+  padding: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.95em;
+  line-height: 1;
+  vertical-align: middle;
+  cursor: pointer;
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
 .prompts {
   flex-basis: 100%;
   display: flex;

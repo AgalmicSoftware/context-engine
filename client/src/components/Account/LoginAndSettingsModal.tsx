@@ -2644,6 +2644,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       loginComplete: this.props.loginComplete,
       loginInProgress: this.props.loginInProgress,
       network: this.props.network,
+      closeAccountDialog: this.closeLoginModal,
       openBookmarks: () => {
         this.closeLoginModal();
         if (typeof window !== 'undefined') {

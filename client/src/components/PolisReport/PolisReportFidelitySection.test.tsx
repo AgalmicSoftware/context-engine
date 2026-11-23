@@ -177,6 +177,37 @@ describe('PolisReportFidelitySection', () => {
     expect(byPlatform['chatgpt'].value).toBe(1);
   });
 
+  it('scores no draft against an allocation the person cleared, nor against their answer from before', () => {
+    const drafted = row(address(0), 'qq', '');
+    // An allocation whose AI-prefill draft was [3, -2].
+    const allocation = (value: number[]) => ({
+      ...drafted,
+      response: {
+        ...drafted.response,
+        answer: { value, encrypted: false },
+        interviewProvenance: {
+          ...drafted.response.interviewProvenance,
+          originalPrediction: { answer: [3, -2], confidence: 0.8 },
+        },
+      },
+    });
+    const overview = (values: number[][]) =>
+      computeFidelityOverview({
+        questions: { qq: { id: 'qq', type: 'quadratic', prompt: 'Budget', options: ['Parks', 'Transit'] } },
+        // The later row is the person's latest answer.
+        questionResponses: { qq: values.map((value) => allocation(value)) },
+        minParticipants: 1,
+      });
+    expect(overview([[3, -2]])).not.toBeNull();
+    // Clearing leaves every vote at 0.
+    expect(
+      overview([
+        [3, -2],
+        [0, 0],
+      ]),
+    ).toBeNull();
+  });
+
   it('says a hidden-draft score from enough people is withheld, not too small', async () => {
     // Five of seven people had a hidden draft: the total minus it would leave the other two.
     const rows = Array.from({ length: 7 }, (_, index) => [

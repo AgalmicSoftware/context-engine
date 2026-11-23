@@ -3740,12 +3740,15 @@ class UserPage extends Component<any, any> {
           usernameSavedTo={this.state.sessionNamesSource?.enabled ? 'session' : 'device'}
           analyzeButtonDisplayState={analyzeButtonDisplayState}
           analyzeLinkReady={!isQuestionLoadingAny && !isSurveyLoadingAny && !isSbtLoadingAny}
+          // A chain scan still adds to the lists when it lands, so its page waits as one whose answers arrive.
+          analyzeLinkArriving={cacheRefreshDisplayState.loadingState.disabledByCache || isDeepScanning}
           avatarDisplayState={avatarDisplayState}
           bookmarkButtonDisplayState={bookmarkButtonDisplayState}
           bookmarksHref={buildPublicRoute('/bookmarks')}
           compareButtonDisplayState={compareButtonDisplayState}
           copyIconDisplayState={copyIconDisplayState}
           analyzeLinkHref={buildAnalyzeLinkHref(this, !!minimized && isOwner)}
+          onAnalyzeLinkOpened={this.props.onAnalyzeLinkOpened}
           explorerUrl={explorerUrl}
           headerActionVisibility={headerActionVisibility}
           headerBookmarkClassName={headerBookmarkClassName}

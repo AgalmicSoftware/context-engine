@@ -601,6 +601,72 @@ it('retains quadratic option labels and budgets when preparing comparison analys
   expect(users[0].questions[0]).toMatchObject({ options: ['Parks', 'Transit'], voiceCredits: 25, answer: [3, -4] });
 });
 
+it('leaves cleared allocations out of the comparison and the surveys list', () => {
+  const question = { id: 'q1', type: 'quadratic', prompt: 'Priorities', options: ['Parks', 'Transit'] };
+  const cleared = (questionID, value) => ({ questionID, type: 'quadratic', answer: { value } });
+  const users = buildUsersFromCaches(
+    [ADDRESS_A, ADDRESS_B],
+    [],
+    [
+      {
+        11155420: {
+          questions: { q1: question },
+          questionResponses: { q1: { [ADDRESS_A]: { answer: { value: [0, 0] } } } },
+        },
+      },
+    ],
+    [
+      {
+        11155420: {
+          surveys: { s1: { title: 'Survey A' } },
+          surveyResponses: {
+            s1: {
+              // Clearing leaves every vote at 0, whether or not the question's details are at hand.
+              [ADDRESS_A]: { responses: [cleared('q1', [0, 0]), cleared('q2', [0, 0, 0])] },
+              [ADDRESS_B]: { responses: [cleared('q1', [2, -1])] },
+            },
+          },
+        },
+      },
+    ],
+  );
+  expect(users[0]).toMatchObject({ questions: [], surveys: [] });
+  expect(users[1].questions).toEqual([expect.objectContaining({ id: 'q1', answer: [2, -1] })]);
+  expect(users[1].surveys).toEqual([{ id: 's1', title: 'Survey A' }]);
+});
+
+it('lists a survey only for an answer the comparison would show', () => {
+  const question = {
+    id: 'q1',
+    type: 'quadratic',
+    prompt: 'Priorities',
+    options: ['Parks', 'Transit'],
+    voiceCredits: 4,
+  };
+  const answer = (value) => ({ questionID: 'q1', type: 'quadratic', answer: { value } });
+  const users = buildUsersFromCaches(
+    [ADDRESS_A, ADDRESS_B],
+    [],
+    [{ 11155420: { questions: { q1: question }, questionResponses: {} } }],
+    [
+      {
+        11155420: {
+          surveys: { s1: { title: 'Survey A' } },
+          surveyResponses: {
+            // [3, 0] costs 9 of 4 credits, so the comparison leaves it out.
+            s1: { [ADDRESS_A]: { responses: [answer([3, 0])] }, [ADDRESS_B]: { responses: [answer([2, 0])] } },
+          },
+        },
+      },
+    ],
+  );
+  expect(users[0]).toMatchObject({ questions: [], surveys: [] });
+  expect(users[1]).toMatchObject({
+    questions: [expect.objectContaining({ id: 'q1', answer: [2, 0] })],
+    surveys: [{ id: 's1', title: 'Survey A' }],
+  });
+});
+
 test('preserves generated axis endpoints without inventing missing labels', () => {
   const result = sanitizeCompass({
     axes: [
