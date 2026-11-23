@@ -7763,20 +7763,18 @@ a[data-toggle='collapse'][aria-expanded='true'] .caret,
 }
 
 // App.tsx's loading line while the main part of the app arrives: hidden for the first second, so a normal load
-// never flashes it.
+// never flashes it. Hidden by its own style, not by the animation: WebKit paints a frame before an animation starts.
 .ce-app-loading {
   margin: 0;
   padding: 48px 24px;
   text-align: center;
   font-size: 16px;
   color: var(--ce-panel-text, CanvasText);
-  animation: ce-app-loading-in 0s linear 1s both;
+  visibility: hidden;
+  animation: ce-app-loading-in 0s linear 1s forwards;
 }
 
 @keyframes ce-app-loading-in {
-  from {
-    visibility: hidden;
-  }
   to {
     visibility: visible;
   }

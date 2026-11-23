@@ -150,10 +150,13 @@ for (const name of engineNames) {
     // 5. A load slower than even the long wait (the app's first script ran, the rest crawls): no message at the
     // short wait, the message after the long one, and it goes the moment the app draws.
     {
+      // The connection recovers once the message is up: each part of the app that waits on another arrives only
+      // after it, so a crawl that never ends would keep the app from ever drawing.
+      let crawling = true;
       const { context, page } = await open(browser, {
         routes: (p) =>
           p.route(isAppScript, async (route) => {
-            await new Promise((resolve) => setTimeout(resolve, LONG_WAIT_MS + 5000));
+            if (crawling) await new Promise((resolve) => setTimeout(resolve, LONG_WAIT_MS + 5000));
             await route.continue().catch(() => {});
           }),
       });
@@ -162,6 +165,7 @@ for (const name of engineNames) {
       await page.waitForTimeout(WAIT_MS + 3000);
       assert.equal(await notice(page).count(), 0, `${name}: a slow connection is not told the page failed at the short wait`);
       await notice(page).waitFor({ timeout: LONG_WAIT_MS });
+      crawling = false;
       assert.equal(await page.locator('#ce-agent-note').count(), 0, `${name}: the agents' note is not left beside the message`);
       await waitForApp(page, 90000);
       assert.equal(await notice(page).count(), 0, `${name}: the message goes once the app draws`);
