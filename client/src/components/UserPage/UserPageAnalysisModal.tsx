@@ -50,6 +50,8 @@ type UserPageAnalysisModalProps = {
   onOpenAiSettings?: React.MouseEventHandler<HTMLButtonElement>;
   onRefreshAnalysis: React.MouseEventHandler<HTMLButtonElement>;
   onToggle: () => void;
+  /** The card this person shows on their page. It stays in the box while an analysis is awaited or has failed. */
+  savedCard?: React.ReactNode;
 };
 
 // The quick first read, while the analysis is being written or after it failed. Once the analysis is on screen
@@ -96,6 +98,7 @@ const UserPageAnalysisModal = ({
   onOpenAiSettings,
   onRefreshAnalysis,
   onToggle,
+  savedCard = null,
 }: UserPageAnalysisModalProps): React.ReactElement => {
   const firstRead =
     !analysisModalDisplayState.shouldRenderAnalysisBody && aiAnalysis ? (
@@ -173,6 +176,8 @@ const UserPageAnalysisModal = ({
             </div>
           </>
         )}
+        {/* An analysis on screen brings its own card; until then, and when none arrives, the saved one shows. */}
+        {!analysisModalDisplayState.shouldRenderAnalysisBody && savedCard}
         {analysisModalDisplayState.shouldRenderAnalysisBody && (
           <UserPageAnalysisViews
             aiAnalysis={aiAnalysis}

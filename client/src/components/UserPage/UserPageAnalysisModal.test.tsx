@@ -418,6 +418,32 @@ describe('UserPageAnalysisModal', () => {
     analysisName: '',
   };
 
+  it('keeps the saved card in the box while an analysis is awaited or has failed, and not beside an analysis', () => {
+    const savedCard = <section aria-label="Picture card">My saved card</section>;
+    const quiet = { analysisCacheStatusState: { shouldRenderAnalysisCacheStatus: false }, analysisName: '' };
+    const { rerender } = render(
+      <UserPageAnalysisModal {...createProps({ ...quiet, analysisModalDisplayState: waiting, savedCard })} />,
+    );
+    expect(screen.getByRole('region', { name: 'Picture card' })).toHaveTextContent('My saved card');
+
+    rerender(
+      <UserPageAnalysisModal
+        {...createProps({
+          ...quiet,
+          analysisError: 'Unable to reach the AI service.',
+          analysisModalDisplayState: failed,
+          savedCard,
+        })}
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Unable to reach the AI service.');
+    expect(screen.getByRole('region', { name: 'Picture card' })).toBeInTheDocument();
+
+    // An analysis on screen brings its own card.
+    rerender(<UserPageAnalysisModal {...createProps({ savedCard })} />);
+    expect(screen.queryByText('My saved card')).not.toBeInTheDocument();
+  });
+
   it('shows the first read under the waiting line while the full analysis is written', () => {
     render(
       <UserPageAnalysisModal
