@@ -8,6 +8,8 @@ export const CROSS_TAB_LOCK_WAIT_MS = 10_000;
 // Keys another tab held past the wait. Their writes take the lock only if it is free, without waiting, until it is
 // found free again: the tab that held it has let go, and writes wait their turn as before.
 const keysHeldElsewhere = new Set<string>();
+// A browser that blocks site data refuses every lock request. It is then treated as one without the Web Locks API.
+let locksRefused = false;
 
 // Each persisted write of a key also holds a browser-wide lock on it, so tabs
 // write one at a time and an atomic update reads what the last writer saved.
@@ -15,7 +17,7 @@ const keysHeldElsewhere = new Set<string>();
 // is for a key another tab is still holding past the wait.
 export const withCrossTabWriteLock = async <T>(storageKey: string, task: () => Promise<T>): Promise<T> => {
   const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
-  if (typeof locks?.request !== 'function') return task();
+  if (typeof locks?.request !== 'function' || locksRefused) return task();
   const name = `ce-cache:${storageKey}`;
   if (keysHeldElsewhere.has(storageKey)) {
     return (await locks.request(name, { ifAvailable: true }, (lock) => {
@@ -33,6 +35,11 @@ export const withCrossTabWriteLock = async <T>(storageKey: string, task: () => P
       return task();
     })) as T;
   } catch (error) {
+    if (!granted && !wait.signal.aborted && (error as { name?: string } | null)?.name === 'SecurityError') {
+      locksRefused = true;
+      cacheLog.warn('[cacheScripts] The browser refused the cross-tab lock; writing without it', error);
+      return task();
+    }
     if (granted || !wait.signal.aborted) throw error;
     keysHeldElsewhere.add(storageKey);
     cacheLog.warn('[cacheScripts] Another tab held this cache key past the wait; writing it without the lock', {

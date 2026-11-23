@@ -14,6 +14,8 @@ import withRouter from './HooksHOC/withRouterBridge';
 import AppErrorBoundary from './ErrorBoundary/AppErrorBoundary';
 import { readColdLoadOnboardingState } from './Onboarding/onboardingConfig.js';
 import { toastTheme } from '../utilities/ui/toastTheme.js';
+import { showToast } from '../utilities/ui/toastBus.js';
+import { readBlockedStorage } from '../storageFallback';
 
 import { WagmiConfig } from 'wagmi';
 import { chains, wagmiClient } from '../app/runtime/appWagmiRuntime';
@@ -178,6 +180,18 @@ class App extends React.Component<AppProps> {
 
     if (_coldLoadSnapshot?.shouldStartOnboarding) {
       store.dispatch({ type: 'SET_ONBOARDING_STEP', payload: 1 });
+    }
+
+    // The page is running on a stand-in for blocked storage (storageFallback.ts): say what that costs. After the
+    // toast host has subscribed.
+    if (readBlockedStorage().length) {
+      window.setTimeout(() => {
+        showToast(
+          'This browser is blocking site data for Context Engine, so your sign-in and drafts will not be kept ' +
+            'after this tab closes. Allow cookies for this site to keep them.',
+          { kind: 'info', duration: 15000 },
+        );
+      }, 0);
     }
 
     // Dev/E2E-only agent interface (gated; no-op unless enabled). Vite folds
