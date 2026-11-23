@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Site — available when the site deploys
+
+- **A profile in a session stored on its Worker no longer starts with a chain scan.** Opening a profile address used to begin with a scan of the chain for that person, whatever the session; in a session stored on its Worker nothing on the page comes from it, and it kept asking chain nodes for half a minute. It now runs at start-up only for on-chain sessions and profiles outside a session. Where a Worker session has on-chain groups, the profile page still scans for them itself, as before.
+
 ## [0.9.31] - 2026-11-23
 
 A login file can have a password, a Submit that finds it due asks for it there, and it downloads under a passkey-like name; the conviction slider's X sits beside the slider, and an atlas level's title sits under "Up Level". Site only: the Session Worker's code is unchanged and MCP stays 0.9.2. Nothing a session already stores is changed.

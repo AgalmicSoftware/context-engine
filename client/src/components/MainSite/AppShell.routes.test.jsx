@@ -4112,6 +4112,34 @@ describe('AppShell route render smoke', () => {
     );
   });
 
+  it("waits for a profile's chain scan at startup only where the session is not stored on its Worker", async () => {
+    const target = '0x00000000000000000000000000000000000000ab';
+    const mount = async (options) => {
+      const subject = stubMainSiteMountSideEffects(createSubject({ path: `/u/${target}`, ...options }));
+      subject.initializeWorkerCanonicalCachesForGroup = jest.fn(async () => true);
+      subject.scanSpecificUserProfilePriority = jest.fn(async () => null);
+      await act(async () => {
+        await subject.componentDidMount();
+      });
+      subject.componentWillUnmount();
+      return subject.scanSpecificUserProfilePriority;
+    };
+    // An on-chain session's profile, and a profile opened outside any session.
+    expect(await mount({ search: '?session=edge', sessionConfig: buildSessionConfig() })).toHaveBeenCalledWith(target);
+    expect(await mount({})).toHaveBeenCalledWith(target);
+    // A link that names the session's Worker, before the Worker has answered.
+    expect(
+      await mount({ search: '?session=profile-session&worker=https%3A%2F%2Fprofile-session.example.workers.dev' }),
+    ).not.toHaveBeenCalled();
+    // A session the registry already lists as stored on its Worker.
+    const hosted = buildSessionConfig({
+      slug: 'profile-session',
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    expect(await mount({ search: '?session=profile-session', sessionConfig: hosted })).not.toHaveBeenCalled();
+  });
+
   it('keeps an active pure Worker user profile free of SBT scans and wallet-chain context', async () => {
     const target = '0x00000000000000000000000000000000000000ab';
     const sessionConfig = buildSessionConfig({
