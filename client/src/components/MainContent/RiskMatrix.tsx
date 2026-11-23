@@ -579,7 +579,7 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
             className={styles.gridContainer}
             style={{
               gridTemplateColumns: `122px repeat(${numCategories}, minmax(104px, 1fr))`,
-              // At least its columns' least widths, so a label pinned on a phone travels the whole scroll.
+              // At least its columns' least widths, so a pinned label travels the whole scroll.
               minWidth: `max(980px, ${122 + numCategories * (104 + 8)}px)`,
               gridTemplateRows: `auto repeat(${numCategories}, minmax(78px, auto))`,
             }}

@@ -154,7 +154,7 @@ export default function RiskMatrixDetail(props: Props) {
           className={styles.detailGrid}
           style={{
             gridTemplateColumns: `minmax(112px, 0.9fr) repeat(${columns.subcategories.length}, minmax(96px, 1fr))`,
-            // At least its columns' least widths, so a label pinned on a phone travels the whole scroll.
+            // At least its columns' least widths, so a pinned label travels the whole scroll.
             minWidth: `max(100%, ${112 + columns.subcategories.length * (96 + 8) + 10}px)`,
           }}
         >

@@ -2407,14 +2407,14 @@ test('report renders models as participants in a OnePageSession-style results sh
   // The grid's help sits beside its title, with no line of its own.
   assert.doesNotMatch(html, /Open a square to read/);
   assert.match(html, /<\/h3>\s*<details class="detailHelp"><summary aria-label="How to read this grid">/);
-  // On a phone the labels stay in view while the grid scrolls.
+  // The labels stay in view while the grid scrolls sideways, at any width; a phone scrolls it down inside its card too.
   assert.match(html, /class="riskMatrixCell cell riskMatrixCornerCell cornerCell axisTop axisLeft"/);
   assert.match(html, /class="riskMatrixCell cell riskMatrixHeaderCell headerCell axisTop/);
   assert.match(html, /riskMatrixRowHeader axisLeft/);
   assert.match(html, /detailHeading axisTop"/);
   assert.match(html, /detailHeading axisLeft"/);
-  assert.match(html, /@media \(max-width: 768px\) \{\s*\.riskMatrixEmbedded\.embedded \{ padding-left: 0; padding-right: 0; \}\s*\.riskMatrixEmbedded \.riskMatrixSectionCard\.sectionCard \{ padding-left: 8px; padding-right: 8px; \}\s*\.riskMatrixGridScroll\.gridScroll \{ max-height: 70svh; overflow: auto; scroll-padding: 84px 0 0 130px; \}/);
-  assert.match(html, /\.riskMatrixSectionCard \.axisLeft \{ position: sticky; z-index: 1;/);
+  assert.match(html, /\.riskMatrixGridScroll\.gridScroll \{ scroll-padding: 84px 0 0 130px; \}\s*\.riskMatrixSectionCard \.axisTop,\s*\.riskMatrixSectionCard \.axisLeft \{ position: sticky; z-index: 1;/);
+  assert.match(html, /@media \(max-width: 768px\) \{\s*\.riskMatrixEmbedded\.embedded \{ padding-left: 0; padding-right: 0; \}\s*\.riskMatrixEmbedded \.riskMatrixSectionCard\.sectionCard \{ padding-left: 8px; padding-right: 8px; \}\s*\.riskMatrixGridScroll\.gridScroll \{ max-height: 70svh; overflow: auto; \}\s*\}/);
   assert.match(html, /\.axisLeft:focus-visible \{ background: linear-gradient\(rgba\(77, 255, 164, 0\.14\)/);
   assert.match(html, /\.axisLeft:focus-visible \{ outline: 3px solid #4dffa4; outline-offset: -3px; \}/);
   assert.match(html, /\.riskMatrixSectionCard \.detailAxis\.axisLeft \{[^}]*align-self: stretch; \}/);
