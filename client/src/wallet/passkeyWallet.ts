@@ -31,6 +31,7 @@ import { encryptPrivateKey } from './keystore/encryptPrivateKey.js';
 import { indexedDbWalletStorage } from './keystore/storage.js';
 import {
   LoginFileExpiredError,
+  LoginFileOtherAccountError,
   createLoginFile,
   createProtectedLoginFile,
   isLoginFileProtected,
@@ -528,7 +529,13 @@ export class PasskeyEoaWalletClient {
    * Signs in from a login file's text (or its 12 words): the same account on every device that has the file. A
    * file with a password needs it here, and only here: it is used to open the file and kept nowhere.
    */
-  async signInWithLoginFile(text: string, password?: string): Promise<HexString> {
+  async signInWithLoginFile(
+    text: string,
+    password?: string,
+    // `expectedAddress`: the account the page already shows. A file for any other account is refused before
+    // anything is locked or written, so the page's account is never switched under it.
+    { expectedAddress = null }: { expectedAddress?: string | null } = {},
+  ): Promise<HexString> {
     const generation = ++this.operationGeneration;
     this.transitionInProgress = true;
     let privateKey: HexString | null = null;
@@ -536,6 +543,9 @@ export class PasskeyEoaWalletClient {
       // Read first: a file that is not a login file leaves the signed-in account as it was.
       const key = await openLoginFile(text, password);
       this.assertCurrentOperation(generation);
+      if (expectedAddress && normalizeAccount(key.address) !== normalizeAccount(expectedAddress)) {
+        throw new LoginFileOtherAccountError();
+      }
       privateKey = key.privateKey;
       const saved = await this.storage.read();
       this.assertCurrentOperation(generation);
@@ -1052,10 +1062,14 @@ export const createPasskeyWallet = (options: CreateOptions = {}): Promise<HexStr
   getPasskeyWalletClient().createWallet(options);
 export const unlockPasskeyWallet = (options: UnlockOptions = {}): Promise<HexString> =>
   getPasskeyWalletClient().unlockWallet(options);
-export const signInWithLoginFile = (text: string, password?: string): Promise<HexString> =>
-  getPasskeyWalletClient().signInWithLoginFile(text, password);
+export const signInWithLoginFile = (
+  text: string,
+  password?: string,
+  options: { expectedAddress?: string | null } = {},
+): Promise<HexString> => getPasskeyWalletClient().signInWithLoginFile(text, password, options);
 export { createLoginFile, createProtectedLoginFile, isLoginFileProtected };
 export {
+  LOGIN_FILE_OTHER_ACCOUNT_TEXT,
   LOGIN_FILE_PASSWORD_NEEDED_TEXT,
   LOGIN_FILE_PASSWORD_WRONG_TEXT,
   LOGIN_FILE_UNREADABLE_TEXT,

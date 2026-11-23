@@ -1,3 +1,4 @@
+import { isLoginFileDueError } from '../../utilities/session/loginFileDue';
 import {
   getUsableSessionWorkerUrl,
   resolveConfiguredSessionWorkerUrlFromConfig,
@@ -269,8 +270,10 @@ export const readOwnAnswersBeforeUpload = async (
       };
     }
     return { status: 'ready' };
-  } catch {
+  } catch (error) {
     if (!isCurrent()) return { status: 'stale' };
+    // A login file that is due again says so in its own words, which the Submit knows it by.
+    if (isLoginFileDueError(error)) return { status: 'failed', message: String((error as Error).message) };
     return {
       status: 'failed',
       message: timedOut

@@ -1,3 +1,4 @@
+import { askForLoginFile, isLoginFileDueError } from '../../utilities/session/loginFileDue';
 import {
   getChangedInterviewConsentQids,
   capInterviewTranscript,
@@ -2811,6 +2812,16 @@ const handlePileSubmitWithOwnAnswers = async (
     if (outcome.status === 'stale') return outcome;
     if (outcome.status !== 'ready') {
       engine.setState({ pileSubmitTempText: '', submissionError: outcome.message });
+      // The saved answers are read before the upload; a login file that is due again stops this Submit there.
+      // It is asked for as the upload asks, and the Submit starts again once it is back.
+      if (isLoginFileDueError(outcome)) {
+        // Released here, as the `finally` below would, so that the Submit can start again.
+        if (engine._pileOwnAnswersSubmitController === controller) engine._pileOwnAnswersSubmitController = null;
+        if ((await askForLoginFile()) && engine._isMounted) {
+          engine.setState({ submissionError: null });
+          return handlePileSubmitWithOwnAnswers(engine, overrideChangedQids);
+        }
+      }
       return outcome;
     }
     engine.setState({ pileSubmitTempText: '' });

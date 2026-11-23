@@ -4,12 +4,13 @@ import { PasskeysUnavailableError } from '../../wallet/passkey/unavailable';
 export const PASSKEYS_UNAVAILABLE_MESSAGE = 'Open this link in Safari or Chrome to sign in.';
 /** Shown after "Login failed: " or "Create failed: " where the passkey has no PRF; the console keeps the thrown text. */
 export const PASSKEY_PRF_UNSUPPORTED_TEXT = "This passkey can't be used here.";
-// What the log-in window says of a login file itself; the wallet's own words for the first three.
+// What the log-in window says of a login file itself; the wallet's own words for the first three. From the
+// texts alone: this file is loaded with the navbar, and must not bring the wallet's code with it.
 export {
   LOGIN_FILE_PASSWORD_NEEDED_TEXT,
   LOGIN_FILE_PASSWORD_WRONG_TEXT,
   LOGIN_FILE_UNREADABLE_TEXT,
-} from '../../wallet/keystore/loginFile';
+} from '../../utilities/session/loginFileTexts';
 /** Shown after "Create failed: " where a login file with a password could not be made. */
 export const LOGIN_FILE_NOT_MADE_TEXT = 'The login file could not be made.';
 /** The status after a Create whose passkey has no PRF: the login then offers to keep the passkey on a phone. */

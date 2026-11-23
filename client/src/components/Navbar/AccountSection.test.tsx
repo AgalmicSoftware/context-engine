@@ -8,6 +8,7 @@ import rootReducer from '../../reducers/index.js';
 import { LOGIN_ACCOUNT, LOGIN_IN_PROGRESS, TOGGLE_LOGIN_MODAL } from '../../actions/types';
 import AccountSection from './AccountSection';
 import { forgetAgentLinkAccount, holdAgentLinkAccount } from '../../utilities/session/agentLinkAccount';
+import { askForLoginFile } from '../../utilities/session/loginFileDue';
 
 const PASSKEY_ADDRESS = '0x00000000000000000000000000000000000000aa';
 const WALLET_ADDRESS = '0x00000000000000000000000000000000000000bb';
@@ -17,6 +18,24 @@ const mockLoginModalLoaded = jest.fn();
 jest.mock('../../wallet/passkeyWallet.js', () => ({
   getPasskeyWalletChain: () => ({ id: 11155420, name: 'OP Sepolia' }),
   restorePasskeyWalletSession: (options: unknown) => mockRestorePasskeyWalletSession(options),
+}));
+
+const mockDueModal = jest.fn();
+jest.mock('../Account/LoginFileDueModal', () => ({
+  __esModule: true,
+  default: (props: { account: string; onSignedIn: () => void; onClose: () => void }) => {
+    mockDueModal(props.account);
+    return (
+      <div data-testid="login-file-due">
+        <button type="button" onClick={props.onSignedIn}>
+          file chosen
+        </button>
+        <button type="button" onClick={props.onClose}>
+          close
+        </button>
+      </div>
+    );
+  },
 }));
 
 jest.mock('../Account/LoginAndSettingsModal', () => {
@@ -161,5 +180,95 @@ describe('AccountSection passkey restore at app start', () => {
 
     expect(store.getState().profile.account).toBe('');
     expect(store.getState().sessionState.loginComplete).toBe(false);
+  });
+});
+
+describe('AccountSection when a Submit finds the login file due again', () => {
+  beforeEach(() => {
+    mockRestorePasskeyWalletSession.mockReset();
+    mockDueModal.mockClear();
+  });
+
+  const signedIn = async () => {
+    mockRestorePasskeyWalletSession.mockResolvedValue(PASSKEY_ADDRESS);
+    const rendered = renderAccountSection();
+    await screen.findByTestId('account-display');
+    return rendered;
+  };
+  // Asks as a Submit does, and notes the answer when it comes.
+  const ask = () => {
+    const heard: { answer: boolean | null } = { answer: null };
+    act(() => {
+      void askForLoginFile().then((answer) => {
+        heard.answer = answer;
+      });
+    });
+    return heard;
+  };
+
+  it('opens the window for the account the page shows, and answers the Submit once the file is back', async () => {
+    await signedIn();
+    expect(screen.queryByTestId('login-file-due')).not.toBeInTheDocument();
+    const heard = ask();
+    expect(await screen.findByTestId('login-file-due')).toBeInTheDocument();
+    expect(mockDueModal).toHaveBeenLastCalledWith(PASSKEY_ADDRESS);
+    expect(heard.answer).toBeNull();
+
+    await act(async () => screen.getByRole('button', { name: 'file chosen' }).click());
+    expect(heard.answer).toBe(true);
+    expect(screen.queryByTestId('login-file-due')).not.toBeInTheDocument();
+  });
+
+  it('answers no when the window is closed', async () => {
+    await signedIn();
+    const heard = ask();
+    await screen.findByTestId('login-file-due');
+    await act(async () => screen.getByRole('button', { name: 'close' }).click());
+    expect(screen.queryByTestId('login-file-due')).not.toBeInTheDocument();
+    expect(heard.answer).toBe(false);
+  });
+
+  it('ends the window, answering no, when the person signs out while it is open', async () => {
+    const { store } = await signedIn();
+    const heard = ask();
+    await screen.findByTestId('login-file-due');
+    await act(async () => {
+      store.dispatch({
+        type: LOGIN_IN_PROGRESS,
+        payload: { loginComplete: false, loginInProgress: false, provider: null },
+      });
+    });
+    expect(screen.queryByTestId('login-file-due')).not.toBeInTheDocument();
+    expect(heard.answer).toBe(false);
+    // Signed in again later, nothing of it comes back.
+    await act(async () => {
+      store.dispatch({
+        type: LOGIN_IN_PROGRESS,
+        payload: { loginComplete: true, loginInProgress: false, provider: 'passkey_eoa' },
+      });
+    });
+    expect(screen.queryByTestId('login-file-due')).not.toBeInTheDocument();
+  });
+
+  it('answers the earlier Submit no when a later one asks', async () => {
+    await signedIn();
+    const first = ask();
+    await screen.findByTestId('login-file-due');
+    const second = ask();
+    await act(async () => undefined);
+    expect(first.answer).toBe(false);
+    expect(second.answer).toBeNull();
+    await act(async () => screen.getByRole('button', { name: 'file chosen' }).click());
+    expect(second.answer).toBe(true);
+  });
+
+  it('takes no request on a page that shows no account, so the Submit fails at once as before', async () => {
+    mockRestorePasskeyWalletSession.mockResolvedValue(null);
+    renderAccountSection();
+    await act(async () => undefined);
+    const heard = ask();
+    await act(async () => undefined);
+    expect(heard.answer).toBe(false);
+    expect(screen.queryByTestId('login-file-due')).not.toBeInTheDocument();
   });
 });

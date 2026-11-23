@@ -1,6 +1,13 @@
 import { Wallet } from 'ethers';
 import type { HexString, LoginFileWalletRecord, PasskeyWalletConfig } from '../types.js';
 import { base64URLToBuffer, bufferSourceToWebCryptoBufferSource, bufferToBase64URL } from '../passkey/encoding.js';
+import {
+  LOGIN_FILE_DUE_TEXT,
+  LOGIN_FILE_OTHER_ACCOUNT_TEXT,
+  LOGIN_FILE_PASSWORD_NEEDED_TEXT,
+  LOGIN_FILE_PASSWORD_WRONG_TEXT,
+  LOGIN_FILE_UNREADABLE_TEXT,
+} from '../../utilities/session/loginFileTexts';
 
 // A login file signs someone in where no passkey can: it holds a 12-word recovery phrase, the standard kind, and
 // the account is the first Ethereum address of that phrase. Whoever holds the file holds the account.
@@ -11,10 +18,12 @@ export const LOGIN_FILE_HOURS = 6;
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
-// What the log-in window says of a login file itself. It tells these from a passkey's errors by their exact words.
-export const LOGIN_FILE_UNREADABLE_TEXT = 'That is not a Context Engine login file.';
-export const LOGIN_FILE_PASSWORD_NEEDED_TEXT = 'This login file has a password. Enter it to log in.';
-export const LOGIN_FILE_PASSWORD_WRONG_TEXT = 'Wrong password, or the file is damaged.';
+export {
+  LOGIN_FILE_OTHER_ACCOUNT_TEXT,
+  LOGIN_FILE_PASSWORD_NEEDED_TEXT,
+  LOGIN_FILE_PASSWORD_WRONG_TEXT,
+  LOGIN_FILE_UNREADABLE_TEXT,
+};
 
 export class LoginFileUnreadableError extends Error {
   constructor() {
@@ -27,8 +36,16 @@ export class LoginFileExpiredError extends Error {
   constructor() {
     // A page that was open when the hours ran out still shows the account, and that window has no file to
     // choose. A reload shows signed out, keeps the tab's unsent answers, and offers the file.
-    super('Your login file is needed again. Reload the page, then log in with your file. Unsent answers are kept.');
+    super(`${LOGIN_FILE_DUE_TEXT} Reload the page, then log in with your file. Unsent answers are kept.`);
     this.name = 'LoginFileExpiredError';
+  }
+}
+
+/** The file opens another account than the one it was asked to sign back in. */
+export class LoginFileOtherAccountError extends Error {
+  constructor() {
+    super(LOGIN_FILE_OTHER_ACCOUNT_TEXT);
+    this.name = 'LoginFileOtherAccountError';
   }
 }
 

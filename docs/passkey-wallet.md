@@ -321,11 +321,27 @@ stays first.
   "Your login file is needed again." rather than asked for a passkey. A browser
   that never opens the site again keeps the sealed key until it does.
 - A page left open past the 6 hours still shows the account until it is
-  reloaded, and its account window has no file to choose. The message therefore
-  says what to do: "Reload the page, then log in with your file. Unsent answers
-  are kept." A reload shows signed out and keeps that tab's unsent answers, which
-  return once the same file signs in. Disconnect would discard them, and asks
-  first.
+  reloaded. When a Submit of answers meets that, a window opens at once ("LOGIN
+  FILE": "Your unsent answers are kept.", **Login with file**, Close), and the
+  Submit waits behind it. The same file, chosen there, signs the account back in
+  with no reload, and that Submit then starts again and goes ahead, as one
+  Submit with one outcome; a file with a password is asked for it in the same
+  window. A file for another account is refused ("That file is for another
+  account.") before anything is locked or written, so the page's account is
+  never switched.
+  - Closing the window, signing out, or moving to another session while it is
+    open sends nothing. The Submit then fails as before, with its line under the
+    Submit bar: "Your login file is needed again. Reload the page, then log in
+    with your file. Unsent answers are kept." A reload shows signed out and keeps
+    that tab's unsent answers, which return once the same file signs in.
+    Disconnect would discard them, and asks first.
+  - The window is asked for once per Submit, by `askForLoginFile` in
+    `utilities/session/loginFileDue.ts`, and shown by the navbar's account
+    section. Every Submit of answers goes through it: the pile, All questions,
+    a survey, the one-question page and the interview's Submit, and the read of
+    saved answers that comes before a pile Submit. Anything else that needs a
+    signature past the 6 hours (joining a group, for one) fails with the same
+    message and no window.
 - **A password, if asked for.** "Add a password", under "Create login file",
   takes a password, and the file made then (version 2) holds its 12 words
   encrypted: PBKDF2-SHA256 with 600,000 iterations and a random 16-byte salt

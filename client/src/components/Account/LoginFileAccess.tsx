@@ -35,7 +35,7 @@ export const saveLoginFile = ({ name, text }: { name: string; text: string }): v
 /** Between ways to sign in: larger than the text, so each reads as its own way. */
 export const OrLine = () => <div className={styles.passkeyOr}>or</div>;
 
-const Help = ({ id, label, text }: { id: string; label: string; text: string }) => (
+export const Help = ({ id, label, text }: { id: string; label: string; text: string }) => (
   <>
     <button
       type="button"
@@ -67,7 +67,7 @@ const Help = ({ id, label, text }: { id: string; label: string; text: string }) 
  * typed can be read back. The box keeps what is typed to itself (it is not a controlled input, which would copy
  * the password into the page's markup); the caller reads it through `inputRef` at the moment it is used.
  */
-const PasswordField = ({
+export const PasswordField = ({
   inputRef,
   autoComplete,
   testId,
@@ -209,14 +209,17 @@ const CreateLoginFileLine = ({ onCreate, help }: { onCreate: CreateLoginFile; he
 /**
  * "Login with file": the button, and the hidden file input it opens. The chosen file goes to `onChoose`.
  */
-const LoginWithFileButton = ({
+export const LoginWithFileButton = ({
   onChoose,
   testId,
   inputTestId,
+  disabled = false,
 }: {
   onChoose: (file: ChosenLoginFile) => void;
   testId: string;
   inputTestId: string;
+  /** Held while a chosen file is signing in. */
+  disabled?: boolean;
 }) => {
   const [unreadable, setUnreadable] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -228,6 +231,7 @@ const LoginWithFileButton = ({
         color="primary"
         className={styles.passkeyCopyAnswersButton}
         data-testid={testId}
+        disabled={disabled}
         onClick={() => input.current?.click()}
       >
         Login with file

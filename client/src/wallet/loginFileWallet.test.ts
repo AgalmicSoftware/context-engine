@@ -447,6 +447,43 @@ describe('signing in with a login file', () => {
     await client.lock();
   });
 
+  it('comes back on an open page after its hours, by the same file only, with the account never switched', async () => {
+    const { client, clock, storage } = makeClient();
+    await client.signInWithLoginFile(fileText);
+    clock.now += LOGIN_FILE_HOURS * HOUR + 1;
+    await expect(client.signMessage('too late', PHRASE_ADDRESS)).rejects.toThrow(LoginFileExpiredError);
+    // The page still shows the account, and asks for its file: another account's file is refused, and nothing
+    // of it is kept.
+    const other = createLoginFile();
+    await expect(
+      client.signInWithLoginFile(other.text, undefined, { expectedAddress: PHRASE_ADDRESS }),
+    ).rejects.toThrow('That file is for another account.');
+    expect(client.getAddress()).toBe(PHRASE_ADDRESS);
+    expect(await storage.read()).toMatchObject({ evmAddress: PHRASE_ADDRESS });
+    expect(await storage.read()).not.toHaveProperty('sealKey');
+    await expect(client.signMessage('still due', PHRASE_ADDRESS)).rejects.toThrow(LoginFileExpiredError);
+
+    // The same file, in whatever case the page holds the address: signed in again, with no reload.
+    await expect(
+      client.signInWithLoginFile(fileText, undefined, { expectedAddress: PHRASE_ADDRESS.toLowerCase() }),
+    ).resolves.toBe(PHRASE_ADDRESS);
+    const signature = await client.signMessage('back again', PHRASE_ADDRESS);
+    expect(ethers.utils.verifyMessage('back again', signature)).toBe(PHRASE_ADDRESS);
+    await client.lock();
+  });
+
+  it('refuses another account’s file while the page’s account is still unlocked, and leaves it unlocked', async () => {
+    const { client } = makeClient();
+    await client.signInWithLoginFile(fileText);
+    const other = createLoginFile();
+    await expect(
+      client.signInWithLoginFile(other.text, undefined, { expectedAddress: PHRASE_ADDRESS }),
+    ).rejects.toThrow('That file is for another account.');
+    expect(client.isUnlocked()).toBe(true);
+    expect(client.getAddress()).toBe(PHRASE_ADDRESS);
+    await client.lock();
+  });
+
   it('wipes the key on sign-out, and another tab on the account is told to bring the file', async () => {
     const { client, storage, clock } = makeClient();
     const otherTab = makeClient({ storage, clock });
