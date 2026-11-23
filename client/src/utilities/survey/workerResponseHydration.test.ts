@@ -6,6 +6,7 @@ import {
   mergeWorkerQuestionResponses,
   mergeWorkerUserResponses,
   RESPONSE_BATCH_CONCURRENCY,
+  RESPONSE_LIST_PAGE_SIZE,
   SIGNED_IN_READ_LIMIT_MS,
 } from './workerResponseHydration.js';
 import { hydrateWorkerCanonicalResponses, resolveWorkerResponseHydrationRun } from './workerResponseHydrationRuntime';
@@ -34,37 +35,55 @@ const workerConfig = {
 };
 
 describe('workerCanonicalResponseHydration', () => {
-  it('returns a flagged partial result for a 12,000-row listing', async () => {
-    const onPartial = jest.fn();
-    const listPage = jest.fn(async ({ cursor }: any) => {
+  // A Worker lists what it is asked for up to its own most a page: 500 now, 100 before that.
+  const listingOf = (total: number, workerMost: number) =>
+    jest.fn(async ({ cursor, limit }: any) => {
       const start = Number(cursor || 0);
+      const end = Math.min(total, start + Math.min(limit, workerMost));
       return {
-        items: Array.from({ length: 100 }, (_, i) => ({
+        items: Array.from({ length: end - start }, (_, i) => ({
           storageRef: { id: `ref-${start + i}` },
           metadata: { responder: 'participant' },
         })),
-        cursor: String(start + 100),
-        listComplete: start + 100 >= 12000,
+        cursor: String(end),
+        listComplete: end >= total,
       };
     });
+  const readAnswer = async () =>
+    new Response(
+      JSON.stringify({ sessionSlug: 'demo-sh', sessionId: SESSION_ID, questionId: 'q1', answer: { value: 'answer' } }),
+    );
+
+  it.each([
+    ['a Worker that lists 500 a page', 500, 3],
+    ['an older Worker that lists 100 a page', 100, 13],
+  ])('lists 1,240 answers from %s in %i requests', async (_label, workerMost, requests) => {
+    const listPage = listingOf(1240, workerMost);
+    const onPartial = jest.fn();
     const rows = await loadWorkerResponses(
       { sessionSlug: 'demo-sh', sessionConfig: workerConfig, onPartial },
-      {
-        listSessionStorageRefsPage: listPage,
-        readSessionStorageBlob: async () =>
-          new Response(
-            JSON.stringify({
-              sessionSlug: 'demo-sh',
-              sessionId: SESSION_ID,
-              questionId: 'q1',
-              answer: { value: 'answer' },
-            }),
-          ),
-      },
+      { listSessionStorageRefsPage: listPage, readSessionStorageBlob: readAnswer },
+    );
+    expect(rows).toHaveLength(1240);
+    expect(listPage).toHaveBeenCalledTimes(requests);
+    expect(listPage.mock.calls.every(([options]) => options.limit === RESPONSE_LIST_PAGE_SIZE)).toBe(true);
+    expect(onPartial).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [500, 20],
+    [100, 100],
+  ])('returns a flagged partial result for a 12,000-row listing, %i a page', async (workerMost, requests) => {
+    const onPartial = jest.fn();
+    const listPage = listingOf(12000, workerMost);
+    const rows = await loadWorkerResponses(
+      { sessionSlug: 'demo-sh', sessionConfig: workerConfig, onPartial },
+      { listSessionStorageRefsPage: listPage, readSessionStorageBlob: readAnswer },
     );
     expect(rows).toHaveLength(10000);
     expect(onPartial).toHaveBeenCalledTimes(1);
-    expect(listPage).toHaveBeenCalledTimes(100);
+    expect(onPartial).toHaveBeenCalledWith('10000');
+    expect(listPage).toHaveBeenCalledTimes(requests);
   });
 
   it('fails closed before storage listing for an incomplete Worker profile', async () => {
@@ -190,7 +209,7 @@ describe('workerCanonicalResponseHydration', () => {
       workerUrl: WORKER_URL,
       resource: 'responses',
       cursor: null,
-      limit: 100,
+      limit: 500,
     });
     expect(listSessionStorageRefsPage).toHaveBeenNthCalledWith(
       2,
@@ -200,7 +219,7 @@ describe('workerCanonicalResponseHydration', () => {
           providerLike: 'gated-provider',
         },
         cursor: 'page-two',
-        limit: 100,
+        limit: 500,
         resource: 'responses',
         workerUrl: WORKER_URL,
       }),

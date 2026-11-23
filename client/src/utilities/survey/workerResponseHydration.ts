@@ -45,6 +45,11 @@ export type WorkerCanonicalResponseRow = {
 };
 
 const MAX_RESPONSE_LIST_PAGES = 100;
+// Answers asked for in one request. The Worker lists up to 500; one from before that lists 100 and hands back a
+// cursor, so both are read to the end.
+export const RESPONSE_LIST_PAGE_SIZE = 500;
+// One load lists this many answers at most, whatever the page size; the rest are reached from its last cursor.
+const MAX_LISTED_RESPONSES = MAX_RESPONSE_LIST_PAGES * 100;
 const RESPONSE_READ_CONCURRENCY = 8;
 // Batch reads in flight at once while the listing continues: each costs the Worker a few seconds cold.
 export const RESPONSE_BATCH_CONCURRENCY = 6;
@@ -336,7 +341,7 @@ export const loadWorkerResponses = async (
   };
 
   try {
-    for (let pageIndex = 0; ownResponses || pageIndex < MAX_RESPONSE_LIST_PAGES; pageIndex += 1) {
+    for (let pageIndex = 0; ; pageIndex += 1) {
       signal?.throwIfAborted();
       if (failure) break;
       const page = await listPage({
@@ -351,7 +356,7 @@ export const loadWorkerResponses = async (
         // A load told to stop drops the page it is waiting for, too.
         ...(signal ? { signal } : {}),
         cursor,
-        limit: 100,
+        limit: RESPONSE_LIST_PAGE_SIZE,
       });
       const pageItems = Array.isArray(page.items) ? page.items.filter(isRecord) : [];
       items.push(...pageItems);
@@ -375,8 +380,9 @@ export const loadWorkerResponses = async (
       }
       seenCursors.add(nextCursor);
       cursor = nextCursor;
-      if (!ownResponses && pageIndex === MAX_RESPONSE_LIST_PAGES - 1) {
+      if (!ownResponses && (pageIndex === MAX_RESPONSE_LIST_PAGES - 1 || items.length >= MAX_LISTED_RESPONSES)) {
         onPartial?.(nextCursor);
+        break;
       }
     }
     if (queued.length) chunks.push(queued);

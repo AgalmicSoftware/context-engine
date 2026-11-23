@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Site — available when the site deploys
 
 - **A profile in a session stored on its Worker no longer starts with a chain scan.** Opening a profile address used to begin with a scan of the chain for that person, whatever the session; in a session stored on its Worker nothing on the page comes from it, and it kept asking chain nodes for half a minute. It now runs at start-up only for on-chain sessions and profiles outside a session. Where a Worker session has on-chain groups, the profile page still scans for them itself, as before.
+- **A session's answers are listed 500 a request.** The site asked the Worker for 100 answers at a time, one request after another, though a Worker since 0.9.17 lists up to 500: 1,240 answers now take 3 requests, not 13. An older Worker still answers with 100 and a cursor, and is read to the end as before. One load still lists 10,000 answers at most.
 
 ## [0.9.31] - 2026-11-23
 
