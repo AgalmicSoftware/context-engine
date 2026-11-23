@@ -20,6 +20,10 @@ type SessionInterviewMemoryKickoffCardProps = {
   /** Resolves false when the prompt could not be copied, so it is shown selected instead. */
   onCopyPrompt: (prompt: string) => Promise<boolean>;
   onTogglePrompt: () => void;
+  /** The prompt as the card's own view shows it, such as with a key hidden; the copy keeps the whole prompt. */
+  shownPrompt?: (prompt: string) => string;
+  /** While set, nothing is copied and this is said instead: the prompt is about to change, as while a key is made. */
+  holdCopy?: string;
   /** Shows one copy button in place of the card's copy row and its prompt toggle, and under it, once the
    * session is checked, whatever `renderPreview` makes of the prompt that a copy would give. */
   copyButton?: {
@@ -44,6 +48,8 @@ export default function SessionInterviewMemoryKickoffCard({
   showAgentPrompt,
   onCopyPrompt,
   onTogglePrompt,
+  shownPrompt,
+  holdCopy = '',
   copyButton,
 }: SessionInterviewMemoryKickoffCardProps) {
   const [attempt, setAttempt] = useState(0);
@@ -114,6 +120,7 @@ export default function SessionInterviewMemoryKickoffCard({
   const compatible = !checking && !validationError;
   const prompt = compatible ? validation.prompt : kickoff;
   const copyPrompt = () => {
+    if (holdCopy) return;
     if (checking) {
       setCopyWaiting(true);
       return;
@@ -154,7 +161,12 @@ export default function SessionInterviewMemoryKickoffCard({
   }, [manualPrompt]);
   const status = (
     <>
-      {checking ? (
+      {holdCopy ? (
+        <div role="status">
+          <InterviewBusyLabel label={holdCopy} />
+        </div>
+      ) : null}
+      {checking && !holdCopy ? (
         <div role="status">
           <InterviewBusyLabel
             label={
@@ -180,6 +192,7 @@ export default function SessionInterviewMemoryKickoffCard({
         </div>
       ) : null}
       {copyError ? <div role="alert">{copyError}</div> : null}
+      {/* The whole prompt, any key in it included: this field is what the person copies by hand. */}
       {manualPrompt && !validationError ? (
         <textarea
           ref={manualCopyRef}
@@ -200,12 +213,12 @@ export default function SessionInterviewMemoryKickoffCard({
             type="button"
             className={copyButton.className}
             onClick={copyPrompt}
-            aria-disabled={!compatible}
+            aria-disabled={!compatible || Boolean(holdCopy)}
             aria-label={copyButton.ariaLabel}
             data-testid={copyButton.testId}
           >
             <FontAwesomeIcon icon={promptCopied ? faCheck : faCopy} />
-            {promptCopied ? 'Copied' : 'Copy prompt'}
+            {promptCopied ? 'Copied' : 'Copy AI prompt'}
           </button>
           {compatible ? copyButton.addon : null}
         </div>
@@ -237,7 +250,7 @@ export default function SessionInterviewMemoryKickoffCard({
               copyPrompt();
             }
           }}
-          aria-disabled={!compatible}
+          aria-disabled={!compatible || Boolean(holdCopy)}
           aria-label={promptCopied ? 'Memory augmentation prompt copied' : 'Copy memory augmentation prompt'}
           title={promptCopied ? 'Copied' : 'Copy memory augmentation prompt'}
           data-ce-control-appearance="frameless"
@@ -301,7 +314,7 @@ export default function SessionInterviewMemoryKickoffCard({
               Allows your agent to predict your responses and raise better interview questions.
             </UncontrolledTooltip>
           </div>
-          <SessionInterviewPrompt prompt={prompt} />
+          <SessionInterviewPrompt prompt={shownPrompt ? shownPrompt(prompt) : prompt} />
         </div>
       ) : null}
     </div>

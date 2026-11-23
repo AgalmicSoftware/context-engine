@@ -3840,6 +3840,28 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
+// A tick or a disclosure of the card's, with its "?" beside it.
+.sessionVoicePrefillChoice {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-weight: 700;
+    cursor: pointer;
+  }
+}
+
+.sessionVoicePrefill p {
+  margin: 0;
+  color: var(--ce-panel-text-muted);
+  font-size: 0.9rem;
+}
+
 .sessionInterviewPanel {
   display: flex;
   flex-direction: column;

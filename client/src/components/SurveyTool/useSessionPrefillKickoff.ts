@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
 import { orderInterviewQuestionPool, buildInterviewQuestionPriority } from './sessionInterviewQuestionOrder';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
-import { buildExternalInterviewKickoff, normalizeInterviewQuestions } from './sessionInterview';
+import { buildExternalInterviewKickoff, normalizeInterviewQuestions, type KickoffAgentKey } from './sessionInterview';
 import { InterviewCatalogSignInError, verifyInterviewKickoffCatalog } from './sessionInterviewCatalogValidation';
 import { getInterviewCatalogTicket, INTERVIEW_CATALOG_TICKET_RENEW_MS } from './interviewCatalogTicket';
 import { buildInterviewReturnSessionUrl } from './sessionInterviewReturnUrl';
@@ -23,8 +23,10 @@ export type SessionPrefillKickoffInput = {
   sessionUrl?: string;
   /** Names the session in the prompt. */
   sessionName?: string;
-  /** A line of the caller's, at the end of the prompt. */
-  note?: string;
+  /** The session gives a signed-in person an AI key, so a prompt without one says how they get it. */
+  agentKeysOffered?: boolean;
+  /** The person's AI key, which lets their AI submit as them. */
+  agentKey?: KickoffAgentKey | null;
 };
 
 export type SessionPrefillKickoff = {
@@ -47,8 +49,14 @@ export const useSessionPrefillKickoff = ({
   existingResponseSlice,
   sessionUrl: givenSessionUrl,
   sessionName,
-  note,
-}: SessionPrefillKickoffInput): { ready: boolean; kickoff: SessionPrefillKickoff | null } => {
+  agentKeysOffered,
+  agentKey,
+}: SessionPrefillKickoffInput): {
+  ready: boolean;
+  kickoff: SessionPrefillKickoff | null;
+  /** The session's Worker, once found. */
+  workerUrl: string;
+} => {
   const [resolved, setResolved] = useState({ key: '', workerUrl: '' });
   const activeWorkerUrl = workerUrl || (resolved.key === sessionSlug ? resolved.workerUrl : '');
   // The pile rebuilds `context` on every render, so the lookup keys on its values
@@ -74,7 +82,8 @@ export const useSessionPrefillKickoff = ({
     };
   }, [activeWorkerUrl, sessionSlug, hasSessionConfig, account, providerLike, chainId]);
 
-  if (!activeWorkerUrl) return { ready: Boolean(workerUrl) || resolved.key === sessionSlug, kickoff: null };
+  if (!activeWorkerUrl)
+    return { ready: Boolean(workerUrl) || resolved.key === sessionSlug, kickoff: null, workerUrl: '' };
   const sessionUrl = givenSessionUrl || buildInterviewReturnSessionUrl();
   const { questionOrder } = normalizeInterviewSettings(sessionConfig?.interviewMode);
   const questions = questionPool
@@ -91,7 +100,9 @@ export const useSessionPrefillKickoff = ({
       questionPriority,
       catalogTicket,
       sessionName,
-      note,
+      hasAccount: Boolean(account),
+      agentKeysOffered,
+      agentKey,
     });
   const accountKey = String(account || '').toLowerCase();
   // Someone signed in gets a ticket in their prompt only when the catalog without one leaves out questions they
@@ -141,5 +152,5 @@ export const useSessionPrefillKickoff = ({
       throw error;
     }
   };
-  return { ready: true, kickoff: { accountKey, kickoff: buildKickoff(), validateKickoff } };
+  return { ready: true, kickoff: { accountKey, kickoff: buildKickoff(), validateKickoff }, workerUrl: activeWorkerUrl };
 };

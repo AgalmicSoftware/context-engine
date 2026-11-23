@@ -88,9 +88,9 @@ const mdBlock = (sessions) =>
     '',
     'Each session link, then the address its questions are read from to draft',
     'answers for review, and a second address. Fetch them exactly as written',
-    'here; "Suggested answers for the person to review" says what to do with',
-    'the questions. Without tools, your first reply still gives the link back',
-    'and offers to draft (see "Without tools: give the link, offer to draft").',
+    'here; "Draft answers for the person to review" says what to do with',
+    'the questions. Able only to draft, your first reply still gives the link back',
+    'and offers to draft (see "Draft only: give the link, offer to draft").',
     '',
     FALLBACK,
     '',
@@ -139,4 +139,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { expectedFiles, listed, FALLBACK };
+module.exports = { expectedFiles, listed, replaceBlocks, FALLBACK };

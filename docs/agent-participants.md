@@ -20,36 +20,54 @@ Every page of the site links `/skill.md`, a short guide for AI agents, and
 each of the app's pages also says so in a line of body text, which the site's
 first script removes; the static summary and file-not-found pages link the
 guide, and `/agents`, `/agents.md` and `/agent-guide` redirect to it.
-The guide starts from what the agent can do with the link. With Context
-Engine tools, it joins. An agent that can run commands can take part at once,
-with nothing set up, by sending tool calls to the server's standard input. To
-have the tools in a host from then on, the agent or the person adds them in
-one step: the guide has
-a line for each of Claude Code, Codex, Gemini CLI, Hermes Agent, Cursor and the
-OpenAI Agents SDK, and the [MCP README](../mcp/README.md) sets a host up in the
-same words. A chat app on a website or a phone can't add tools, so it can't
-join; it can draft the person's answers for them to review, from the session's
-**Let your AI draft your answers** prompt. An agent with no tools and no shell
-opens with one short reply: it gives the link back for the person to answer
-themselves, and offers to draft their answers for review. With tools, the guide tells
-an agent to ask the person it works for which way to take part. As itself, it joins through the MCP with the
-session link as received, under a name that says whose agent it is. On their
-behalf, it answers as them with a key they make in the account menu under
-**Your AI agent**, **Answer for me**, which needs **Agents (HTTP
-API)** on. **Make a key** puts the key, which ends with the person's sign-in
-(within 4 hours) and works only in that session, into the one prompt they copy;
-the prompt names the session, tells the agent never to repeat the key, and
-gives the MCP install line in case the agent wants it. With **Ask me before submitting**
-ticked (the default), it asks the agent to show its answers in the chat and
-submit once the person says yes there; unticked, to submit without asking
-again and then say what it submitted. The guide treats that copied prompt as
-the person's approval, and otherwise keeps "submit only the answers they
-approve". Its other choice,
-**Suggest answers**, copies the session's draft-your-answers
-prompt, named for the session, with the same MCP line and no key. From the
-link alone, an agent can also suggest answers for a public session: the guide
-says how, and the MCP's `get_interview_catalog` and `make_review_link` do it
-without web access. When a session lets
+The guide opens with one set of steps, written once in
+`shared/agentParticipationGuide.mjs` and carried word for word by the guide,
+`/llms.txt` and the AI prompt a person copies in a session; the agent note on
+every page points to the guide (`scripts/sync-agent-flow.mjs` writes the files; a test fails when
+they drift). The steps start from what the agent can do. It can **submit as
+the person** when it has their AI key and can send web requests; it can
+**submit from an account it makes** when it has the Context Engine tools or a
+shell with open internet access; otherwise it can **only draft**. A draft-only
+agent, such as a chat app on a website or a phone, opens with one short reply:
+it gives the link back for the person to answer themselves and offers to draft
+their answers, which come back as a review link written out in full, with what
+to do next (open it, check each draft answer, press Submit). An agent that can
+submit asks once whether to submit for the person or go through the answers
+together first, and shows its answers before submitting; only the person, in
+the chat, can tell it to submit without asking. Submitting without a key means making an account: the agent says
+so, says whether it stands for the person or for itself, and asks them to
+mention an existing account without assuming one. An agent that knows nothing
+relevant about the person says so, never invents a position, and asks a few
+questions on the session's topics that would let it draft most answers at
+once.
+
+To have the tools, an agent that can run commands sends tool calls to the
+server's standard input with nothing set up, or the agent or the person adds
+them to a host in one step: the guide has a line for each of Claude Code,
+Codex, Gemini CLI, Hermes Agent, Cursor and the OpenAI Agents SDK, and the
+[MCP README](../mcp/README.md) sets a host up in the same words. From an
+account it makes, an agent joins through the MCP with the session link as
+received, under a name that says whose agent it is.
+
+The person's AI key comes in the AI prompt they copy while signed in, from
+the account menu's **Your AI agent** or from Voice mode's **Let your AI draft
+your answers** card, where the session has **Agents (HTTP API)** on. The page
+makes the key without a tap as the card opens; it ends with the person's
+sign-in (within 4 hours), works only in that session, and **Sign Agents Out**
+ends it. The prompt names the session, tells the agent never to repeat the
+key, has it show its answers in the chat and submit once the person says yes
+there, and still says how to draft, for an AI that can't send web requests
+with its own headers. After the copy the card says in one line that whoever
+gets the prompt can answer as the person there, and until when. No prompt the site gives approves a
+submission in advance; the guide keeps "submit only the answers they approve"
+unless the person says otherwise in the chat. Not signed in, the prompt holds
+no key, and an agent that can submit offers to make an account. A session
+link with `aiPrompt=1` in its query is for a person who already has one: it
+opens the account dialog, and once they sign in **Copy AI prompt** gives a
+short prompt with the key and its rules only, for the agent that sent them. From the link alone, an
+agent can also draft answers for a public session: the guide says how, and the
+MCP's `get_interview_catalog` and `make_review_link` do it without web access.
+When a session lets
 participants add context, it invites agents to add a file, a link or text that
 every participant sees.
 

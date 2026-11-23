@@ -2681,8 +2681,7 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   text-align: left;
 }
 
-.agentHandoffHeader,
-.agentHandoffActions {
+.agentHandoffHeader {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -2694,159 +2693,6 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   color: inherit;
   font-size: 1.15rem;
   font-weight: 700;
-}
-
-// An option: its title and line, with its Copy prompt button beside them; its tick and prompt below.
-.agentHandoffOption {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px 16px;
-  align-items: start;
-  padding: 12px 0;
-
-  & + & {
-    border-top: 1px solid var(--ce-settings-border);
-  }
-
-  // The prompt card's own wrappers step aside, so its button and prompt take this grid's places.
-  // No type selector here, so the slot rule below, as specific and later, still places the button.
-  .agentHandoffKickoff,
-  .agentHandoffKickoff > * {
-    display: contents;
-  }
-
-  > *,
-  .agentHandoffKickoff > * > * {
-    grid-column: 1 / -1;
-  }
-
-  > .agentHandoffOptionText {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .agentHandoffOptionSlot {
-    grid-column: 2;
-    grid-row: 1;
-    align-self: center;
-    min-width: 11rem;
-    margin: 0;
-  }
-
-  // "Make a key" and its "?" on one line.
-  .agentHandoffActions.agentHandoffOptionSlot {
-    flex-wrap: nowrap;
-
-    .agentHandoffPrimary {
-      flex: 1 1 auto;
-      width: auto;
-    }
-  }
-
-  // On a phone, one column in the page's order: title and line, the tick, the full-width Copy prompt button, its prompt.
-  @media (max-width: 768px) {
-    grid-template-columns: minmax(0, 1fr);
-
-    .agentHandoffOptionSlot {
-      grid-column: 1;
-      grid-row: auto;
-      min-width: 0;
-    }
-  }
-}
-
-.agentHandoffOptionTitleRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-// A check drawn as a box that fills and takes a tick when ticked.
-.agentHandoffRadio {
-  position: relative;
-  display: inline-flex;
-  flex: none;
-  width: 24px;
-  height: 24px;
-  margin-top: 1px;
-
-  // Panel-scoped, to outweigh the theme rule that frames every input as a field.
-  .agentHandoffPanel & input[type='checkbox'] {
-    appearance: none;
-    width: 24px;
-    height: 24px;
-    margin: 0;
-    border: 2px solid currentColor;
-    border-radius: 50%;
-    background: transparent;
-    cursor: pointer;
-
-    &:checked {
-      border-color: var(--ce-action-accent);
-      background: var(--ce-action-accent);
-    }
-
-    &:focus-visible {
-      outline: none;
-    }
-  }
-}
-
-// Square, for "Ask me before submitting".
-.agentHandoffPanel .agentHandoffCheck input[type='checkbox'] {
-  border-radius: 4px;
-}
-
-.agentHandoffAskRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 12px;
-}
-
-.agentHandoffAsk {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0;
-  color: inherit;
-  font-size: 1rem;
-  font-weight: 650;
-  cursor: pointer;
-
-  &:focus-within {
-    outline: 2px solid var(--ce-action-accent);
-    outline-offset: 2px;
-    border-radius: 4px;
-  }
-}
-
-.agentHandoffRadioTick {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  color: var(--ce-action-accent-text);
-  font-size: 0.8rem;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-
-.agentHandoffOptionText {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.agentHandoffOptionTitle {
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.3;
-}
-
-.agentHandoffOptionDetail {
-  font-size: 0.92rem;
-  line-height: 1.4;
 }
 
 // The box's one main action: full width and tall enough to tap.
@@ -2915,6 +2761,23 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   &:disabled {
     cursor: progress;
   }
+}
+
+// The open row: the Copy prompt button, then one line about the key.
+.agentHandoffBody {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+// Opened by a link for its prompt: the Copy prompt button takes the middle.
+.agentHandoffArrived .agentHandoffSplit {
+  justify-self: center;
+  width: min(100%, 22rem);
 }
 
 // A "?" here reads as a mark, not a button, so hovering it draws no square behind it.

@@ -4,17 +4,17 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import styles from './SurveyTool.module.scss';
 
 type Props = {
-  /** Imports the pasted packet: '' when it was used, otherwise why it wasn't. */
-  onImport: (json: string) => string;
+  /** Imports what was pasted: '' when it was used, otherwise why it wasn't. */
+  onImport: (text: string) => string;
 };
 
-// When a prefill link doesn't open, the JSON packet the AI gives with it does the same job.
+// What the AI gave as text does the same job as its review link: its packet of draft answers, or the link itself.
 export default function SessionInterviewPrefillPaste({ onImport }: Props) {
   const [json, setJson] = useState('');
   const [error, setError] = useState('');
   return (
     <div className={styles.sessionInterviewContext} data-testid={E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_PASTE}>
-      <label htmlFor="ce-interview-prefill-json">Paste the JSON packet your AI gave you</label>
+      <label htmlFor="ce-interview-prefill-json">Paste your AI’s answers</label>
       <Input
         id="ce-interview-prefill-json"
         type="textarea"
@@ -31,7 +31,7 @@ export default function SessionInterviewPrefillPaste({ onImport }: Props) {
         disabled={!json.trim()}
         onClick={() => setError(onImport(json))}
       >
-        Review these drafts
+        Review draft answers
       </Button>
       {error ? (
         <p className={styles.sessionListeningError} role="alert">

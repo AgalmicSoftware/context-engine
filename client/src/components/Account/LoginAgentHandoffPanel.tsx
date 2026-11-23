@@ -1,23 +1,11 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCaretDown,
-  faCaretUp,
-  faCheck,
-  faCopy,
-  faQuestionCircle,
-  faUserCog,
-} from '@fortawesome/free-solid-svg-icons';
-import {
-  ASK_BEFORE_SUBMIT_DEFAULT,
-  AgentDelegateKeyError,
-  agentKeyFailureMessage,
-  MCP_PROMPT_LINE,
-  buildOnMyBehalfPrompt,
-  type AgentDelegateKey,
-} from '../../utilities/session/agentHandoff';
-import { copyText, selectText } from '../../utilities/ui/copyText';
+import { faCaretDown, faCaretUp, faQuestionCircle, faUserCog } from '@fortawesome/free-solid-svg-icons';
+import { buildAgentKeyHandover, maskAgentKey, type AgentDelegateKey } from '../../utilities/session/agentHandoff';
+import { useAgentKey } from '../../utilities/session/useAgentKey';
+import type { KickoffAgentKey } from '../SurveyTool/sessionInterview';
+import { copyText } from '../../utilities/ui/copyText';
 import SessionInterviewMemoryKickoffCard from '../SurveyTool/SessionInterviewMemoryKickoffCard';
 import { useSessionPrefillKickoff } from '../SurveyTool/useSessionPrefillKickoff';
 import AgentPromptPreview, { PromptCaret, maskPromptTicket } from './AgentPromptPreview';
@@ -29,26 +17,18 @@ export type LoginAgentHandoffPanelProps = {
   // The session's title, or its slug where it has none.
   sessionName: string;
   sessionSlug: string;
-  // What the suggestions prompt needs to read the session's questions as this person.
+  // What the prompt needs to read the session's questions as this person.
   sessionConfig?: Record<string, unknown> | null;
   context?: unknown;
   workerUrl?: string;
-  requestKey: () => Promise<AgentDelegateKey>;
-  /** "Sign Agents Out", under both options. */
+  /** Makes the person's AI key; `prompt` false asks them nothing, and fails where a sign-in would be needed. */
+  requestKey: (options: { prompt: boolean }) => Promise<AgentDelegateKey>;
+  /** "Sign Agents Out", under the prompt. */
   signAgentsOut?: React.ReactNode;
-  /** Counts each Sign Agents Out: the key shown and the suggestions prompt's ticket are dead after one. */
+  /** Counts each Sign Agents Out: the key shown and the prompt's ticket are dead after one. */
   agentsSignedOut?: number;
-};
-
-const MASKED_KEY = 'ceagt_••••••••';
-
-const keyErrorMessage = (error: unknown): string => {
-  const { reason, status } = error instanceof AgentDelegateKeyError ? error : { reason: '', status: 0 };
-  if (reason === 'agent_http_disabled') return 'Agents (HTTP API) are off in this session.';
-  if (reason === 'agent_delegate_person_required') return 'Sign in as yourself to make a key.';
-  if (status === 401) return 'Sign in again, then make a key.';
-  // Anything else is said as it happened, so a report of it says what to look at.
-  return agentKeyFailureMessage(error);
+  /** The person came by a link their AI gave them to fetch the AI prompt: the box opens on it. */
+  promptRequested?: boolean;
 };
 
 // Drafts come back to this page when it is the session's own, which keeps its join link; else to the session.
@@ -103,63 +83,42 @@ const Help = ({
   </>
 );
 
-const SUGGEST = { id: 'ce-agent-handoff-option-suggest', title: 'Suggest answers' };
-const SUBMIT = { id: 'ce-agent-handoff-option-submit', title: 'Answer for me' };
+const LABEL = 'Your AI agent';
 
-// One of the two things your agent can do: its title and one line on the left, its Copy prompt button on the
-// right (under them on a phone), then its own settings and its prompt, once shown.
-const AgentOption = ({
-  id,
-  title,
-  detail,
-  help = null,
-  children,
-}: {
-  id: string;
-  title: string;
-  detail: string;
-  help?: React.ReactNode;
-  children: React.ReactNode;
-}) => (
-  <div
-    role="group"
-    aria-labelledby={`${id}-title`}
-    aria-describedby={`${id}-detail`}
-    className={styles.agentHandoffOption}
-    data-testid={id}
-  >
-    <div className={styles.agentHandoffOptionText}>
-      <span className={styles.agentHandoffOptionTitleRow}>
-        <span id={`${id}-title`} className={styles.agentHandoffOptionTitle}>
-          {title}
-        </span>
-        {help}
-      </span>
-      <span id={`${id}-detail`} className={styles.agentHandoffOptionDetail}>
-        {detail}
-      </span>
-    </div>
-    {children}
-  </div>
-);
-
-// "Suggest answers": the voice dialog's prefill prompt, named for this session, behind one split copy button.
-const SuggestAnswers = ({
+// The AI prompt behind one split copy button, whose caret opens it to read.
+const PromptCopy = ({
   sessionSlug,
   sessionUrl,
   sessionName,
   sessionConfig,
   context,
   workerUrl,
+  agentHttpEnabled,
+  agentKey,
+  keyOnly,
+  holdCopy,
+  keyShown,
+  tools,
   onCopied,
 }: Pick<
   LoginAgentHandoffPanelProps,
-  'sessionSlug' | 'sessionUrl' | 'sessionName' | 'sessionConfig' | 'context' | 'workerUrl'
-> & { onCopied: () => void }) => {
+  'sessionSlug' | 'sessionUrl' | 'sessionName' | 'sessionConfig' | 'context' | 'workerUrl' | 'agentHttpEnabled'
+> & {
+  agentKey: KickoffAgentKey | null;
+  /** The person came for their key: the prompt is the short one that hands it over. */
+  keyOnly: boolean;
+  /** Said in place of a copy while the key is made: a copy then would give the prompt without it. */
+  holdCopy: string;
+  keyShown: boolean;
+  tools: React.ReactNode;
+  onCopied: () => void;
+}) => {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const copiedTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(copiedTimer.current), []);
+  // The prompt just changed, so an earlier "Copied" no longer describes it.
+  useEffect(() => setCopied(false), [agentKey?.key.token]);
   const { ready, kickoff } = useSessionPrefillKickoff({
     sessionSlug,
     sessionConfig,
@@ -167,19 +126,19 @@ const SuggestAnswers = ({
     workerUrl,
     sessionUrl: suggestReturnUrl(sessionSlug, sessionUrl),
     sessionName,
-    note: MCP_PROMPT_LINE,
+    agentKeysOffered: agentHttpEnabled,
+    agentKey,
   });
-  if (!ready)
-    return <p className={`${styles.agentHandoffHint} ${styles.agentHandoffOptionSlot}`}>Checking {sessionName}…</p>;
-  if (!kickoff) {
+  // Their AI already has the steps and the questions: it asked only for the key.
+  const handover = keyOnly && agentKey ? buildAgentKeyHandover({ key: agentKey.key, sessionName, sessionUrl }) : '';
+  const handoverCheck = useRef(async () => undefined);
+  if (!handover && !ready) return <p className={styles.agentHandoffHint}>Checking {sessionName}…</p>;
+  if (!handover && !kickoff) {
     return (
-      <p
-        className={`${styles.agentHandoffHint} ${styles.agentHandoffOptionSlot}`}
-        data-testid="ce-agent-handoff-suggest-off"
-      >
+      <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-off">
         Not available in {sessionName}
-        <Help id="ce-agent-handoff-suggest-off-about" placement="bottom">
-          Suggestions read the session&apos;s questions from its Worker, and this session has none.
+        <Help id="ce-agent-handoff-off-about" placement="bottom">
+          The prompt reads the session&apos;s questions from its Worker, and this session has none.
         </Help>
       </p>
     );
@@ -197,34 +156,35 @@ const SuggestAnswers = ({
     <div className={styles.agentHandoffKickoff}>
       <SessionInterviewMemoryKickoffCard
         // Another account is checked afresh, for its own ticket.
-        key={kickoff.accountKey}
-        kickoff={kickoff.kickoff}
-        validateKickoff={kickoff.validateKickoff}
+        key={handover ? 'handover' : kickoff?.accountKey}
+        kickoff={handover || kickoff?.kickoff || ''}
+        validateKickoff={handover || !kickoff ? handoverCheck.current : kickoff.validateKickoff}
         promptCopied={copied}
         showAgentPrompt={false}
         onCopyPrompt={copyPrompt}
         onTogglePrompt={() => undefined}
+        holdCopy={holdCopy}
         copyButton={{
           className: styles.agentHandoffPrimary,
-          testId: 'ce-agent-handoff-suggest-copy',
-          ariaLabel: `Copy prompt: ${SUGGEST.title}`,
-          rowClassName: `${styles.agentHandoffSplit} ${styles.agentHandoffOptionSlot}`,
+          testId: 'ce-agent-handoff-copy',
+          rowClassName: styles.agentHandoffSplit,
           addon: (
             <PromptCaret
-              textId="ce-agent-handoff-suggest-prompt-text"
-              testId="ce-agent-handoff-suggest-prompt-expand"
-              label={SUGGEST.title}
+              textId="ce-agent-handoff-prompt-text"
+              testId="ce-agent-handoff-prompt-expand"
+              label={LABEL}
               expanded={expanded}
               onToggle={() => setExpanded(!expanded)}
             />
           ),
           renderPreview: (prompt) => (
             <AgentPromptPreview
-              prompt={maskPromptTicket(prompt)}
-              textId="ce-agent-handoff-suggest-prompt-text"
-              testId="ce-agent-handoff-suggest-prompt"
-              label={SUGGEST.title}
+              prompt={maskPromptTicket(keyShown ? prompt : maskAgentKey(prompt))}
+              textId="ce-agent-handoff-prompt-text"
+              testId="ce-agent-handoff-prompt"
+              label={LABEL}
               expanded={expanded}
+              tools={tools}
             />
           ),
         }}
@@ -244,178 +204,47 @@ const LoginAgentHandoffPanel = ({
   requestKey,
   signAgentsOut = null,
   agentsSignedOut = 0,
+  promptRequested = false,
 }: LoginAgentHandoffPanelProps) => {
-  // Starts closed so the sign-in dialog stays short; closing only hides it, so a key or tick survives.
-  const [open, setOpen] = useState(false);
-  // The key lives only here, never in browser storage, and goes when the dialog closes.
-  const [key, setKey] = useState<AgentDelegateKey | null>(null);
+  const signedIn = Boolean((context as { account?: unknown } | null | undefined)?.account);
+  // Starts closed so the sign-in dialog stays short; a link for the prompt opens it.
+  const [open, setOpen] = useState(promptRequested);
+  // Signed in, where the session gives keys, the prompt holds the person's: made once the row is open, since
+  // only an open row should ask the session anything.
+  const agentKey = useAgentKey(requestKey, agentHttpEnabled && signedIn && open);
+  const { promptKey } = agentKey;
   const [keyShown, setKeyShown] = useState(false);
-  const [submitExpanded, setSubmitExpanded] = useState(false);
-  const [askFirst, setAskFirst] = useState(ASK_BEFORE_SUBMIT_DEFAULT);
-  const [making, setMaking] = useState(false);
-  const [error, setError] = useState('');
+  // The key of the prompt last copied: the line about it shows only once that prompt has been copied.
+  const [copiedKey, setCopiedKey] = useState('');
   const [copyStatus, setCopyStatus] = useState('');
   // A new node for each copy, so a screen reader announces a repeated message.
   const [copyCount, setCopyCount] = useState(0);
-  // The step whose icon shows a tick, for a moment after it was copied.
-  const [copiedStep, setCopiedStep] = useState('');
-  // The step whose text is selected, once shown, because copying it was refused.
-  const [selectStep, setSelectStep] = useState('');
-  const copiedTimer = useRef<ReturnType<typeof setTimeout>>();
-  useEffect(() => () => clearTimeout(copiedTimer.current), []);
   // After Sign Agents Out the key is dead, so it goes, and the row closes, as reopening it is what checks the
   // session again; Sign Agents Out's message stays in view under it until the row is next closed.
   const signedOutSeen = useRef(agentsSignedOut);
-  // Bumped at each sign-out, so a key asked for before it is not shown.
-  const keyRound = useRef(0);
   const [signOutShown, setSignOutShown] = useState(false);
+  const resetKey = useRef(agentKey.reset);
+  resetKey.current = agentKey.reset;
   useEffect(() => {
     if (signedOutSeen.current === agentsSignedOut) return;
     signedOutSeen.current = agentsSignedOut;
-    keyRound.current += 1;
+    resetKey.current();
     setOpen(false);
     setSignOutShown(true);
-    setKey(null);
-    setError('');
     setKeyShown(false);
-    setSubmitExpanded(false);
     setCopyStatus('');
-    setCopiedStep('');
   }, [agentsSignedOut]);
 
-  const announce = (message: string) => {
-    setCopyStatus(message);
-    setCopyCount((count) => count + 1);
-  };
-
-  const copy = async (step: string, what: string, text: string) => {
-    clearTimeout(copiedTimer.current);
-    setCopiedStep('');
-    if (await copyText(text)) {
-      announce(`Copied the ${what}.`);
-      setCopiedStep(step);
-      copiedTimer.current = setTimeout(() => setCopiedStep(''), 1800);
-    } else {
-      announce(`Copying isn't allowed here, so the ${what} is selected. Copy it yourself.`);
-      // A hidden key is shown, and the whole prompt, since the masked or shortened one is no use to copy.
-      if (step === 'submit-prompt') {
-        setKeyShown(true);
-        setSubmitExpanded(true);
-      }
-      setSelectStep(step);
-    }
-  };
-  useLayoutEffect(() => {
-    if (!selectStep) return;
-    setSelectStep('');
-    selectText(document.getElementById(`ce-agent-handoff-${selectStep}-text`));
-  }, [selectStep]);
-
-  const makeKey = async () => {
-    const round = keyRound.current;
-    setMaking(true);
-    setError('');
-    try {
-      const made = await requestKey();
-      if (round !== keyRound.current) return;
-      setKey(made);
-      setKeyShown(false);
-    } catch (err) {
-      if (round === keyRound.current) setError(keyErrorMessage(err));
-    } finally {
-      setMaking(false);
-    }
-  };
-
-  const expiry = key ? new Date(key.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-  const submitPrompt = key ? buildOnMyBehalfPrompt({ key, sessionName, sessionUrl, askFirst }) : '';
-  const shownSubmitPrompt = key
-    ? buildOnMyBehalfPrompt({ key, sessionName, sessionUrl, askFirst, shownToken: keyShown ? key.token : MASKED_KEY })
+  const expiry = promptKey
+    ? new Date(promptKey.key.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : '';
-
-  // Moot while agents are off, and once the key's reply says the session doesn't let agents submit.
-  const askChoice =
-    !agentHttpEnabled || (key && !key.submitAnswers) ? null : (
-      <div className={styles.agentHandoffAskRow}>
-        <label className={styles.agentHandoffAsk} data-testid="ce-agent-handoff-ask">
-          <span className={`${styles.agentHandoffRadio} ${styles.agentHandoffCheck}`}>
-            <input
-              type="checkbox"
-              checked={askFirst}
-              onChange={(event) => {
-                setAskFirst(event.target.checked);
-                setCopyStatus('');
-                // The prompt just changed, so an earlier "Copied" no longer describes it.
-                clearTimeout(copiedTimer.current);
-                setCopiedStep('');
-              }}
-              aria-describedby="ce-agent-handoff-ask-help-about"
-            />
-            {askFirst ? <FontAwesomeIcon icon={faCheck} className={styles.agentHandoffRadioTick} /> : null}
-          </span>
-          Ask me before submitting
-        </label>
-        <Help id="ce-agent-handoff-ask-help" placement="bottom">
-          Ticked, your agent shows you its answers in the chat and submits them once you say yes there. Unticked, it
-          submits without asking and tells you afterwards what it submitted. The prompt you copy follows this tick.
-        </Help>
-      </div>
-    );
-
-  // In the Copy prompt button's place: what is missing first, while the session is off or there is no key yet.
-  const submitAction = !agentHttpEnabled ? (
-    <p
-      className={`${styles.agentHandoffHint} ${styles.agentHandoffOptionSlot}`}
-      data-testid="ce-agent-handoff-submit-off"
-    >
-      Not on in {sessionName}
-      <Help id="ce-agent-handoff-off-about" placement="bottom">
-        Session admins can turn on Agents (HTTP API).
-      </Help>
-    </p>
-  ) : !key ? (
-    <div className={`${styles.agentHandoffActions} ${styles.agentHandoffOptionSlot}`}>
-      <button
-        type="button"
-        className={styles.agentHandoffPrimary}
-        onClick={makeKey}
-        disabled={making}
-        data-testid="ce-agent-handoff-make-key"
-      >
-        {making ? 'Making a key…' : 'Make a key'}
-      </button>
-      <Help id="ce-agent-handoff-key-about" placement="bottom">
-        The key goes into the prompt you copy. With it, your agent reads this session&apos;s questions and submits
-        answers as you (once you say yes in the chat, while Ask me before submitting is ticked), where the session lets
-        agents submit; otherwise it shows you drafts. It stops when your sign-in ends (within 4 hours) or when you make
-        a new one. It needs an agent that can send web requests, such as Claude Code or Codex.
-      </Help>
-    </div>
-  ) : (
-    <div className={`${styles.agentHandoffSplit} ${styles.agentHandoffOptionSlot}`}>
-      <button
-        type="button"
-        className={styles.agentHandoffPrimary}
-        onClick={() => copy('submit-prompt', 'prompt', submitPrompt)}
-        aria-label={`Copy prompt: ${SUBMIT.title}`}
-        data-testid="ce-agent-handoff-submit-copy"
-      >
-        <FontAwesomeIcon icon={copiedStep === 'submit-prompt' ? faCheck : faCopy} />
-        {copiedStep === 'submit-prompt' ? 'Copied' : 'Copy prompt'}
-      </button>
-      <PromptCaret
-        textId="ce-agent-handoff-submit-prompt-text"
-        testId="ce-agent-handoff-submit-prompt-expand"
-        label={SUBMIT.title}
-        expanded={submitExpanded}
-        onToggle={() => setSubmitExpanded(!submitExpanded)}
-      />
-    </div>
-  );
-
   return (
     <section
-      className={styles.agentHandoffPanel}
+      className={
+        promptRequested && signedIn
+          ? `${styles.agentHandoffPanel} ${styles.agentHandoffArrived}`
+          : styles.agentHandoffPanel
+      }
       aria-labelledby="ce-agent-handoff-title"
       data-testid="ce-agent-handoff-panel"
     >
@@ -428,6 +257,8 @@ const LoginAgentHandoffPanel = ({
             aria-expanded={open}
             aria-controls="ce-agent-handoff-body"
             onClick={() => {
+              // Opening it again after Sign Agents Out is the tap that lets a new key be made.
+              if (!open) agentKey.resume();
               setOpen(!open);
               setSignOutShown(false);
             }}
@@ -435,66 +266,39 @@ const LoginAgentHandoffPanel = ({
           >
             {/* Its row's icon in the account dialog's list. */}
             <FontAwesomeIcon icon={faUserCog} className={styles.accountMenuIcon} aria-hidden="true" fixedWidth />
-            Your AI agent
+            {LABEL}
             <FontAwesomeIcon icon={open ? faCaretUp : faCaretDown} className={styles.settingsSectionChevron} />
           </button>
         </h3>
         <Help id="ce-agent-handoff-about">
-          Your AI agent can work for you in this session. It can suggest your answers, which come back to you as a link
-          to review and submit yourself, or, with a key you make here, answer for you in full.
+          Copy the prompt and paste it into ChatGPT, Claude or another AI. It drafts answers from what it knows about
+          you and gives back a link that opens them here for you to review and submit. Signed in, where this session
+          allows it, the prompt also holds a key that lets an AI submit answers as you: yours is told to show you its
+          answers and wait for your yes, but nothing stops whoever holds the prompt, so paste it only into your own AI.
         </Help>
       </div>
-      <div id="ce-agent-handoff-body" hidden={!open}>
-        <AgentOption
-          id={SUGGEST.id}
-          title={SUGGEST.title}
-          detail="Your AI drafts answers for you to review"
-          help={
-            <Help id="ce-agent-handoff-suggest-about" placement="bottom">
-              Paste it into ChatGPT, Claude or another AI. It reads this session&apos;s questions, drafts answers from
-              what it knows about you, and gives back a link that opens them here for you to review. No key is needed.
-            </Help>
-          }
-        >
-          {/* Mounted only once opened: its check may ask to sign in to the session, which only an open box should. */}
-          {open ? (
-            <SuggestAnswers
-              sessionSlug={sessionSlug}
-              sessionUrl={sessionUrl}
-              sessionName={sessionName}
-              sessionConfig={sessionConfig}
-              context={context}
-              workerUrl={workerUrl}
-              onCopied={() => announce('Copied the prompt.')}
-            />
-          ) : null}
-        </AgentOption>
-
-        <AgentOption id={SUBMIT.id} title={SUBMIT.title} detail="Your AI submits answers as you">
-          {askChoice}
-          {submitAction}
-          {key ? (
-            <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-expiry">
-              Your key works in {sessionName} only, until {expiry}.
-              <Help id="ce-agent-handoff-expiry-about" placement="bottom">
-                It ends when your sign-in ends or when you make a new key. The prompt you copy holds it, so paste it
-                only into your own agent.
-              </Help>
-            </p>
-          ) : null}
-          {key && !key.submitAnswers ? (
-            <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-drafts-only">
-              {sessionName} doesn&apos;t let agents submit, so your agent shows you drafts.
-            </p>
-          ) : null}
-          {key ? (
-            <AgentPromptPreview
-              prompt={shownSubmitPrompt}
-              textId="ce-agent-handoff-submit-prompt-text"
-              testId="ce-agent-handoff-submit-prompt"
-              label={SUBMIT.title}
-              expanded={open && submitExpanded}
-              tools={
+      <div id="ce-agent-handoff-body" className={styles.agentHandoffBody} hidden={!open}>
+        {/* Mounted only once opened: its check may ask to sign in to the session, which only an open box should. */}
+        {open ? (
+          <PromptCopy
+            sessionSlug={sessionSlug}
+            sessionUrl={sessionUrl}
+            sessionName={sessionName}
+            sessionConfig={sessionConfig}
+            context={context}
+            workerUrl={workerUrl}
+            agentHttpEnabled={agentHttpEnabled}
+            agentKey={promptKey}
+            keyOnly={promptRequested}
+            holdCopy={agentKey.making ? 'Adding your AI key…' : ''}
+            keyShown={keyShown}
+            onCopied={() => {
+              setCopiedKey(promptKey?.key.token || '');
+              setCopyStatus('Copied the prompt.');
+              setCopyCount((count) => count + 1);
+            }}
+            tools={
+              promptKey ? (
                 <button
                   type="button"
                   className={styles.agentHandoffButton}
@@ -505,25 +309,42 @@ const LoginAgentHandoffPanel = ({
                 >
                   {keyShown ? 'Hide key' : 'Show key'}
                 </button>
-              }
-            />
-          ) : null}
-        </AgentOption>
-
+              ) : null
+            }
+          />
+        ) : null}
+        {promptKey && copiedKey === promptKey.key.token ? (
+          <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-expiry">
+            Whoever gets this prompt can answer as you here until {expiry}
+            <Help id="ce-agent-handoff-expiry-about" placement="bottom">
+              The prompt holds a key to {sessionName} only. Paste it only into your own AI: a chat app keeps what you
+              paste in its history. The key ends when your sign-in ends or when you sign agents out.
+            </Help>
+          </p>
+        ) : null}
+        {/* Someone who came by the link came for the key. Where it needs a fresh sign-in to the session, that
+            is theirs to start: a link alone never raises a signing prompt. */}
+        {promptRequested && agentKey.quietFailed ? (
+          <button
+            type="button"
+            className={styles.agentHandoffButton}
+            onClick={agentKey.ask}
+            data-testid="ce-agent-handoff-add-key"
+          >
+            Add my AI key
+          </button>
+        ) : null}
         {/* Live regions stay mounted, so screen readers hear their first message too. */}
         <div role="alert">
-          {error ? (
+          {agentKey.error ? (
             <div className={styles.agentHandoffError} data-testid="ce-agent-handoff-error">
-              {error}
+              {agentKey.error}
             </div>
           ) : null}
         </div>
-        <div role="status">
-          {copyStatus ? (
-            <div key={copyCount} className={styles.agentHandoffHint}>
-              {copyStatus}
-            </div>
-          ) : null}
+        {/* Read out only: on screen the button itself turns to "Copied". */}
+        <div role="status" className={styles.srOnly}>
+          {copyStatus ? <div key={copyCount}>{copyStatus}</div> : null}
         </div>
       </div>
       {/* Outside the body, in one place, so its message outlives the row closing after it is used. */}

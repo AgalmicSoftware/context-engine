@@ -17,6 +17,7 @@ import { AccountDisplayTorus } from './AccountDisplay';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import { holdsAgentLinkAccountForPath } from 'utilities/session/agentLinkAccount';
+import { noteAiPromptRequest, requestsAiPrompt, withoutAiPromptRequest } from 'utilities/session/aiPromptLink';
 // The event's name alone, and the request's shape: the asking itself is loaded with the Submit, not the navbar.
 import { LOGIN_FILE_DUE_EVENT } from 'utilities/session/loginFileTexts';
 import type { LoginFileDueRequest } from 'utilities/session/loginFileDue';
@@ -55,6 +56,22 @@ class AccountSection extends Component<AccountSectionProps, AccountSectionState>
   _passkeyRestoreId = 0;
 
   componentDidMount() {
+    // A link an AI gave its person for their AI prompt opens the account dialog, which shows it, once: the
+    // request leaves the address, so neither a reload nor a later opening of the dialog repeats it.
+    const address = `${window.location.search}${window.location.hash}`;
+    if (requestsAiPrompt(address)) {
+      noteAiPromptRequest();
+      try {
+        window.history.replaceState(
+          window.history.state,
+          '',
+          `${window.location.pathname}${withoutAiPromptRequest(address)}`,
+        );
+      } catch {
+        // An address the browser won't rewrite keeps the request; the dialog still takes it only once.
+      }
+      this.props.toggleLoginModal(true);
+    }
     void this.restorePasskeyLogin();
     window.addEventListener(LOGIN_FILE_DUE_EVENT, this.askForLoginFile);
   }

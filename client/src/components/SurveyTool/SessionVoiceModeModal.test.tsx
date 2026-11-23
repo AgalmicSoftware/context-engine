@@ -1280,7 +1280,7 @@ describe('SessionVoiceModeModal', () => {
     expect(draftIds()).toEqual(['q1']);
   });
 
-  it('offers a paste box for the AI’s JSON packet when a prefill link is broken', async () => {
+  it('offers a paste box for the AI’s answers when a prefill link is broken', async () => {
     const onImportPrefillJson = jest.fn((_json: string) => 'This interview prefill belongs to a different session.');
     const { rerender } = render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_PASTE)).not.toBeInTheDocument();
@@ -1295,9 +1295,9 @@ describe('SessionVoiceModeModal', () => {
     const paste = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_PASTE);
     // The link's reason shows even though the review was already open.
     expect(screen.getByText('This link is incomplete: it was cut off when it was copied.')).toBeInTheDocument();
-    const button = within(paste).getByRole('button', { name: 'Review these drafts' });
+    const button = within(paste).getByRole('button', { name: 'Review draft answers' });
     expect(button).toBeDisabled();
-    fireEvent.change(within(paste).getByLabelText('Paste the JSON packet your AI gave you'), {
+    fireEvent.change(within(paste).getByLabelText('Paste your AI’s answers'), {
       target: { value: '{"version":1}' },
     });
     fireEvent.click(button);
@@ -2678,7 +2678,7 @@ describe('SessionVoiceModeModal', () => {
     await act(async () => fireEvent.click(copyButton));
     await waitFor(() =>
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        expect.stringContaining('review-only Context Engine interview prefill'),
+        expect.stringContaining('Help me take part in a Context Engine session.'),
       ),
     );
     expect(copyButton).toHaveAccessibleName('Memory augmentation prompt copied');
@@ -2712,14 +2712,14 @@ describe('SessionVoiceModeModal', () => {
         .map((paragraph) => paragraph.textContent)
         .join(' ')
         .replace(/\s+/g, ' '),
-    ).toContain(
-      'Fetch this URL with a plain HTTP GET; that is all this needs, with no MCP, sign-in or tool to install: worker.example/agent/interview-catalog…',
-    );
+    ).toContain('To draft, fetch this URL with a plain HTTP GET: worker.example/agent/interview-catalog…');
     const codeBlock = displayedPrompt.querySelector('pre code');
     expect(codeBlock).toBeInTheDocument();
     expect(codeBlock?.textContent).toContain('\n  "version": 1,');
     expect(codeBlock?.textContent).toContain('\n  "responses": [');
-    const promptLink = displayedPrompt.querySelector('a');
+    // The guide's link comes first; the questions' link is the one the drafts are read from.
+    expect(displayedPrompt.querySelector('a')).toHaveAttribute('href', `${window.location.origin}/skill.md`);
+    const promptLink = displayedPrompt.querySelector('a[href*="interview-catalog"]');
     expect(promptLink).toHaveAttribute(
       'href',
       expect.stringContaining('https://worker.example/agent/interview-catalog'),
@@ -2733,7 +2733,7 @@ describe('SessionVoiceModeModal', () => {
 
     expect(promptToggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).toHaveTextContent(
-      /review-only Context Engine interview prefill.*worker\.example\/agent\/interview-catalog…/,
+      /Help me take part in a Context Engine session\..*worker\.example\/agent\/interview-catalog…/,
     );
 
     fireEvent.click(promptToggle);
@@ -4164,6 +4164,6 @@ describe('Interview cancellation and recovery', () => {
     fireEvent.click(copy);
     const prompt = jest.mocked(navigator.clipboard.writeText).mock.lastCall?.[0] || '';
     expect(prompt).toContain('Unanswered question IDs, in the session’s order: ["q1","q2"]');
-    expect(prompt).toContain('"promptRevision":"ce-prefill-prompt-2+arranged",');
+    expect(prompt).toContain('"promptRevision":"ce-prefill-prompt-3+arranged",');
   });
 });

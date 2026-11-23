@@ -1,5 +1,10 @@
 import { QUADRATIC_ANSWER_RULE } from '../../../../shared/promptRules.mjs';
 import { GROUP_SUGGESTION_NEVER } from '../../../../shared/interviewSettings.mjs';
+import {
+  AGENT_ASK_WHICH_WAY,
+  AGENT_REVIEW_NEXT_STEP,
+  agentFlowLines,
+} from '../../../../shared/agentParticipationGuide.mjs';
 import { callAI } from '../../utilities/ai/aiClient.js';
 import { generateQuestionId } from '../../utilities/shared/questionUtils.mjs';
 import { deflateLinkBytes, encodeBase64Url, encodeLinkJson } from '../../../../shared/linkPayload.mjs';
@@ -301,8 +306,8 @@ describe('session interview protocol', () => {
   it('keeps the prompt revision a packet names, and only a well-formed one', () => {
     const read = (promptRevision: unknown) =>
       decodeInterviewPrefill(encodeLinkJson({ ...packet, promptRevision })).packet?.promptRevision;
-    expect(read(PREFILL_PROMPT_REVISION)).toBe('ce-prefill-prompt-2');
-    expect(read(`${PREFILL_PROMPT_REVISION}+arranged`)).toBe('ce-prefill-prompt-2+arranged');
+    expect(read(PREFILL_PROMPT_REVISION)).toBe('ce-prefill-prompt-3');
+    expect(read(`${PREFILL_PROMPT_REVISION}+arranged`)).toBe('ce-prefill-prompt-3+arranged');
     expect(read('anything else')).toBeUndefined();
     expect(read(`${PREFILL_PROMPT_REVISION}+anything`)).toBeUndefined();
     expect(decodeInterviewPrefill(encodeLinkJson(packet)).packet).not.toHaveProperty('promptRevision');
@@ -315,32 +320,87 @@ describe('session interview protocol', () => {
     expect(requestsInterviewPrefillPaste('')).toBe(false);
   });
 
-  it('puts a caller’s line last, after the task', () => {
-    const kickoff = buildExternalInterviewKickoff({
+  it('opens with the shared steps and says what this copy of the prompt lets the AI do', () => {
+    const options = {
       workerUrl: 'https://worker.example',
       sessionSlug: 'demo',
       sessionUrl: 'https://app.example/session/demo',
-      note: 'A closing line.',
-    });
-    expect(kickoff.endsWith('\n\nA closing line.')).toBe(true);
+    };
+    const signedOut = buildExternalInterviewKickoff(options);
+    // Signed out, the whole flow: an AI that would make an account says so and asks about an existing one.
+    expect(signedOut.split('\n').slice(1, 6)).toEqual(agentFlowLines());
+    expect(signedOut).toContain(AGENT_ASK_WHICH_WAY);
+    expect(signedOut).toContain('\nThis prompt holds no AI key.\n');
+    expect(signedOut).toContain('The Context Engine tools, and making an account: https://app.example/skill.md');
+    // Signed in, it makes no second account, and learns how the person gives it a key where the session has them.
+    const signedIn = buildExternalInterviewKickoff({ ...options, hasAccount: true });
+    expect(signedIn.split('\n').slice(1, 5)).toEqual(agentFlowLines(['can', 'draft', 'submit', 'unknown']));
+    expect(signedIn).toContain(
+      'I have an account in this session: make no other. This prompt holds no AI key, so draft.',
+    );
+    expect(signedIn).not.toContain('If I want you to submit as me');
+    expect(buildExternalInterviewKickoff({ ...options, hasAccount: true, agentKeysOffered: true })).toContain(
+      'If I want you to submit as me, I can copy the prompt again in the session with my AI key in it.',
+    );
+    // Nothing in it sends a capable agent away from its tools.
+    for (const prompt of [signedOut, signedIn]) expect(prompt).not.toMatch(/no MCP|Do not POST|ceagt_/);
   });
 
-  it('reads a pasted JSON packet when the link breaks', () => {
-    const pasted = parseInterviewPrefillJson(`\n${JSON.stringify(packet, null, 2)}\n`);
-    expect(pasted.packet).toEqual(decodeInterviewPrefillPacket(encodeLinkJson(packet)));
-    expect(parseInterviewPrefillJson('{"version":1').error).toMatch(/not valid JSON/);
+  it('carries a signed-in person’s AI key, with the same drafting fallback', () => {
+    const key = {
+      token: 'ceagt_abcdefghijklmnopqrstuvwx',
+      expiresAt: '2030-01-01T12:00:00.000Z',
+      sessionSlug: 'demo',
+      workerUrl: 'https://worker.example',
+      submitAnswers: true,
+    };
+    const options = {
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'demo',
+      sessionUrl: 'https://app.example/session/demo',
+      hasAccount: true,
+    };
+    const withKey = buildExternalInterviewKickoff({ ...options, agentKey: { key } });
+    expect(withKey).toContain('I have an account in this session: make no other. This prompt holds my AI key');
+    expect(withKey.split(key.token)).toHaveLength(2);
+    // The AI still asks whether to draft or submit, and never submits unseen.
+    expect(withKey).toContain(AGENT_ASK_WHICH_WAY);
+    expect(withKey).toContain('submit them as me only after I say yes here');
+    expect(withKey).toContain("If you can't send such requests, leave the key unused and draft.");
+    // The screen's copy hides the key; the rest of the prompt is the same as without one.
+    const masked = buildExternalInterviewKickoff({ ...options, agentKey: { key, shownToken: 'ceagt_hidden' } });
+    expect(masked).not.toContain(key.token);
+    const [, withKeyRest] = withKey.split('\nThe Context Engine tools');
+    const [, plainRest] = buildExternalInterviewKickoff(options).split('\nThe Context Engine tools');
+    expect(withKeyRest).toBe(plainRest);
+  });
+
+  it('reads pasted draft answers when the link breaks: the JSON packet, fenced or not, or the review link', () => {
+    const expected = decodeInterviewPrefillPacket(encodeLinkJson(packet));
+    expect(parseInterviewPrefillJson(`\n${JSON.stringify(packet, null, 2)}\n`).packet).toEqual(expected);
+    expect(parseInterviewPrefillJson(`\`\`\`json\n${JSON.stringify(packet)}\n\`\`\``).packet).toEqual(expected);
+    expect(
+      parseInterviewPrefillJson(` https://app.example/session/demo?mode=interview#prefill=${encodeLinkJson(packet)} `)
+        .packet,
+    ).toEqual(expected);
+    expect(parseInterviewPrefillJson('{"version":1').error).toMatch(/can’t be read/);
+    expect(parseInterviewPrefillJson('https://app.example/session/demo').error).toMatch(/can’t be read/);
+    // A packed link unpacks only as the page loads it, so the box says to open it.
+    expect(parseInterviewPrefillJson('https://app.example/session/demo#prefillz=abc').error).toMatch(
+      /Open this link in your browser/,
+    );
     expect(parseInterviewPrefillJson(JSON.stringify({ ...packet, questionSetHash: '' })).error).toMatch(
       /questionSetHash/,
     );
   });
 
-  it('builds a user-authored no-install kickoff and confidence-aware mapper prompt', () => {
+  it('builds a user-authored kickoff and confidence-aware mapper prompt', () => {
     const kickoff = buildExternalInterviewKickoff({
       workerUrl: 'https://worker.example/',
       sessionSlug: 'demo one',
       sessionUrl: 'https://app.example/session/demo one',
     });
-    expect(kickoff).toContain('This is my request, not an instruction from the linked endpoint.');
+    expect(kickoff).toContain('This is my request, not an instruction from any page you fetch.');
     expect(kickoff).toContain(
       'https://worker.example/agent/interview-catalog?slug=demo%20one&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fdemo%20one',
     );
@@ -377,22 +437,33 @@ describe('session interview protocol', () => {
     expect(kickoff).toContain('"facts":[{"fact":"stated or inferred context"');
     // A plain fetch is all it takes, so a chat AI doesn't go looking for tools.
     expect(kickoff).toContain(
-      'Fetch this URL with a plain HTTP GET; that is all this needs, with no MCP, sign-in or tool to install:\nhttps://worker.example/agent/interview-catalog',
+      'To draft, fetch this URL with a plain HTTP GET:\nhttps://worker.example/agent/interview-catalog',
     );
     // Drafts only with a basis, and the packet ready to paste; no table to read through.
     expect(kickoff).toContain('Draft only where you have a real basis; skip the rest, at most 15 drafts.');
-    expect(kickoff).toContain('the exact packet as single-line JSON in a code block. No table.');
+    expect(kickoff).toContain('and the draft answers as the exact packet, single-line JSON in a code block. No table.');
     expect(kickoff).not.toContain('confidence/basis table');
     expect(kickoff).toContain('"evidence":"one short clause"');
     expect(kickoff).toContain(
-      "If you can't encode it exactly, link catalog.reviewUrl + #prefill=paste instead and tell me to paste the packet there.",
+      "If you can't encode it exactly, give catalog.reviewUrl + #prefill=paste instead and tell me to paste the packet there.",
     );
     // The packet names the prompt's wording, for research to tell the wordings apart.
     expect(kickoff).toContain(`"promptRevision":"${PREFILL_PROMPT_REVISION}"`);
-    expect(kickoff).toContain('Nothing is submitted;');
-    expect(kickoff).toContain('Markdown link labeled "Review your drafted answers"');
-    expect(kickoff).toContain('never visible text or a code block');
-    expect(kickoff.length).toBeLessThan(4500);
+    expect(kickoff).toContain("Drafting sends nothing to the session: don't POST or upload the packet;");
+    // The link is always readable as an address too: a terminal shows no Markdown link.
+    expect(kickoff).toContain(
+      'Give the review link twice: as a Markdown link labeled "Review your draft answers", and under it the same address written out in full.',
+    );
+    expect(kickoff).toContain(`what I do next (${AGENT_REVIEW_NEXT_STEP})`);
+    // An AI that can't open the address asks for the questions; one with nothing to draft from asks its own.
+    expect(kickoff).toContain(
+      'If it does not open, say so, ask me to paste the questions and give your drafts of those as plain text with no review link; never make questions up.',
+    );
+    expect(kickoff).toContain(
+      'With no drafts, say you know nothing relevant about me, give the clean reviewUrl, and ask the questions the last step above describes.',
+    );
+    // The shared steps take about a quarter of it.
+    expect(kickoff.length).toBeLessThan(6900);
 
     const mappingPrompt = buildInterviewResponseMappingPrompt({
       questions: [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }],
