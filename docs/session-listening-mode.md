@@ -128,7 +128,13 @@ The client asks the configured session AI to draft questions on its own, as `rec
 is transcribed; a recording closed on **Stop** drafts when it is reopened, and recording more and stopping again
 drafts what is left of `recordingQuestionCount`, at least one. Set to **after each part**, it drafts up to the count after every
 transcribed three-minute part, from the conversation so far. It writes only questions the discussion clearly
-supports and the session doesn't already ask, so fewer or none is normal. The part completed last decides: text
+supports and the session doesn't already ask, so fewer or none is normal. **Pause** drafts nothing. The model can
+answer with no questions by chance, where the same request again gives some, so the draft after Stop that adds no
+question is asked once more, at the cost of one more AI call. If that adds none either, the note reads "No new
+questions from this discussion. Press Generate questions to ask again." with **Generate questions** beside it,
+even where drafts already hide the one below the transcript; a draft after Stop that fails shows it there too. If
+**Record more** starts while that draft runs, it is not asked again and leaves no note. A draft pressed by hand, or
+after each part, is asked once. The part completed last decides: text
 pasted or uploaded after the last transcribed part waits for **Generate questions**, while a part that finishes
 transcribing after such text still drafts on its own. New drafts append to the existing editor, while exact
 ID or prompt duplicates are skipped and prior generated prompts are included as avoidance context. Manual retry
