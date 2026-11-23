@@ -225,7 +225,17 @@ test('index.html tells a fetching agent where the guide is, in body text that is
     assert.equal(sent.origin + sent.pathname, shown.origin + shown.pathname);
     assert.deepEqual([...sent.searchParams], [...shown.searchParams]);
     assert.ok(!target.includes('%'));
+    // The same catalog's Markdown pages: the index at <questions>.md and each page under <questions>/,
+    // as paths under the Worker's catalog route, told they are reached through the site.
+    const route = `${sent.origin}${sent.pathname}`;
+    const query = target.slice(route.length);
+    for (const [from, to] of [[`${questions}.md`, 'index'], [`${questions}/:page`, ':page'], [`${questions}/size/:size/:page`, 'size/:size/:page']]) {
+      const rule = redirects.indexOf(`${from.slice('https://contextengine.sh'.length)} ${route}/${to}${query}&site=1 200`);
+      assert.ok(rule > at && rule < redirects.indexOf('/* /index.html 200'), `${slug}: ${from} passes through to its page`);
+    }
   }
+  // No rule takes the app's own /questions/results pages.
+  assert.ok(redirects.every((line) => !line.startsWith('/questions/results')));
   // A fetcher that keeps <noscript> reads the agents' paragraph before any GitHub link.
   assert.ok(noscript.indexOf('AI agents: to take part') < noscript.indexOf('github.com'));
   // Changing a listed address changes the generated text.
@@ -246,6 +256,7 @@ test('index.html tells a fetching agent where the guide is, in body text that is
     { 'rxc-ra-2': { ...salonEntry, worker: 'https://ce-other.example.workers.dev' } },
     { 'rxc-ra-2': { ...salonEntry, interviewCatalog: salonEntry.interviewCatalog.replace('%2Frxc-ra-2', '%2Fother') } },
     { 'Rxc:2': { ...salonEntry, interviewCatalog: salonEntry.interviewCatalog.replace(/rxc-ra-2/g, 'Rxc:2') } },
+    { results: { ...salonEntry, interviewCatalog: salonEntry.interviewCatalog.replace(/rxc-ra-2/g, 'results') } },
   ]) {
     assert.throws(() => expectedFiles(bad));
   }

@@ -2,7 +2,11 @@
 
 // Gives each session in known-sessions.json with an interviewCatalog an address
 // on the site, https://contextengine.sh/questions/<slug>, which the host passes
-// through to that catalog (a 200 rule in client/public/_redirects). Many chat
+// through to that catalog (a 200 rule in client/public/_redirects), and the same
+// questions as short Markdown pages at /questions/<slug>.md (every id and type, and
+// the page links) and /questions/<slug>/<page> (ten questions whole, or "link"),
+// or /questions/<slug>/size/<k>/<page> for k a page, which a chat app's web reader
+// passes on whole where it would summarize the whole list and drop the ids. Many chat
 // apps open only an address they were shown, and some refuse a Worker's own
 // host, so the site address is written out word for word in the site's agent
 // note (client/index.html, served for every session link), llms.txt and the top
@@ -29,6 +33,8 @@ const passThroughTarget = (slug, entry) => {
   const keys = [...url.searchParams.keys()];
   if (
     !PLAIN_SLUG.test(slug) ||
+    // The app's own /questions/results pages.
+    slug === 'results' ||
     url.origin !== entry.worker ||
     url.pathname !== '/agent/interview-catalog' ||
     keys.join() !== 'slug,sessionUrl' ||
@@ -39,6 +45,10 @@ const passThroughTarget = (slug, entry) => {
   }
   return `${url.origin}${url.pathname}?slug=${slug}&sessionUrl=${page}`;
 };
+
+// The Worker serves the pages at paths under the catalog route; site=1 has them link to the site's
+// short addresses. A placeholder is substituted in a rule's target path, so the page goes there.
+const pageTarget = (target, page) => target.replace('/agent/interview-catalog?', `/agent/interview-catalog/${page}?`) + '&site=1';
 
 // The order chat AIs try a listed session's two addresses in: the site's own first, since some chat
 // AIs refuse a Worker's host and stop after a first failure; the Worker's catalog second. The prompt
@@ -97,8 +107,21 @@ const mdBlock = (sessions) =>
     ...sessions.map(({ page, title, first, second }) => `- ${page} (${title}):\n  ${first}\n  second address: ${second}`),
   ].join('\n');
 
-// Before the catch-all, so the host's first match is the pass-through.
-const rulesBlock = (sessions) => sessions.map(({ questions, target }) => `${questions.slice(SITE.length)} ${target} 200`).join('\n');
+// Before the catch-all, so the host's first match is the pass-through. A placeholder matches one path
+// segment; the Worker answers only index, link and a page number, with a size of 1 to 40 or none.
+// The size is in the path because the host drops a visitor's query on a rule whose target has one.
+const rulesBlock = (sessions) =>
+  sessions
+    .flatMap(({ questions, target }) => {
+      const at = questions.slice(SITE.length);
+      return [
+        `${at} ${target} 200`,
+        `${at}.md ${pageTarget(target, 'index')} 200`,
+        `${at}/:page ${pageTarget(target, ':page')} 200`,
+        `${at}/size/:size/:page ${pageTarget(target, 'size/:size/:page')} 200`,
+      ];
+    })
+    .join('\n');
 
 const replaceBlocks = (text, render, file, [begin, end]) => {
   const parts = text.split(begin);
