@@ -3482,6 +3482,22 @@ describe('Polis sponsored cluster analysis', () => {
     expect(provider.request).not.toHaveBeenCalled();
   });
 
+  it('says "Analyzing cluster…" while the request runs', async () => {
+    let finish;
+    fetchWorkerWithAuth.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    fireEvent.click(await showReport());
+    expect(await screen.findByText('Analyzing cluster…')).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.POLIS_CLUSTER_ANALYSIS)).toHaveAttribute('data-ce-analysis-state', 'loading');
+    finish(reply());
+    expect(await screen.findByText('Cluster 0: Shared infrastructure')).toBeInTheDocument();
+    expect(screen.queryByText('Analyzing cluster…')).not.toBeInTheDocument();
+  });
+
   it('shows a sponsored request failure and retries without caching a heuristic as AI output', async () => {
     fetchWorkerWithAuth.mockResolvedValue({ ok: false, json: async () => ({ error: 'Synthetic AI access denied' }) });
     const button = await showReport();

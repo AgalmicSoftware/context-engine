@@ -1962,7 +1962,7 @@ export default function PolisReport({
                         <span className={styles.elapsedTimer} aria-live="polite">
                           {elapsed}
                         </span>
-                        <span className={styles.analysisNote}>Analyzing group...</span>
+                        <span className={styles.analysisNote}>Analyzing cluster…</span>
                       </div>
                     )}
                     {analysis && (

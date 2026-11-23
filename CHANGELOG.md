@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - **The page's note for AI agents is no longer hidden text.** The note every page carries for an AI that fetches it without running it was kept off screen in a one-pixel clipped box, which is how phishing pages hide text and may be why a security tool flagged the site. The same words are now an ordinary "For AI agents" section anyone may open, after the app in the page and below the loading line; the site's first script still removes it as the app starts.
 - **The site says where to report a security problem.** `/.well-known/security.txt` points to the public repository's private report page. No email address is published.
 - **The web app manifest gives the product's name**, "Context Engine", and a description.
+- **The Report says "Analyzing cluster…" while it summarizes a cluster.** Under Opinion Clusters, each cluster said "Analyzing group..." while the AI summarized it. Elsewhere on the site a group is a membership group, so the line now uses the section's own word.
 
 ## [0.9.35] - 2026-11-23
 
