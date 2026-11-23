@@ -90,6 +90,7 @@ import {
 import { isHostedAgentSessionConfig } from '../../utilities/session/sessionBackendKind';
 import { isSessionModeProfileAgentHttpEnabled } from '../../utilities/session/sessionModeProfile';
 import { agentHandoffPanelKey, requestAgentDelegateKey } from '../../utilities/session/agentHandoff';
+import { takeAiPromptRequest } from '../../utilities/session/aiPromptLink';
 import SignAgentsOutControl from './SignAgentsOutControl';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import {
@@ -216,6 +217,8 @@ interface LoginAndSettingsModalState {
   agentTokenStatus: string;
   // Counts each Sign Agents Out, so the "Your AI agent" box starts afresh without its now dead key.
   agentsSignedOut: number;
+  // The dialog was opened by a link for the person's AI prompt.
+  agentPromptRequested: boolean;
   agentTokenError: string;
   walletBalanceWei: ethers.BigNumber | null;
 }
@@ -386,6 +389,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       agentTokenInput: '',
       agentTokenStatus: '',
       agentsSignedOut: 0,
+      // A link an AI gave its person for their AI prompt (the navbar opens this dialog for it): "Your AI agent"
+      // opens on the prompt.
+      agentPromptRequested: takeAiPromptRequest(),
       agentTokenError: '',
       walletBalanceWei: null,
     };
@@ -961,6 +967,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       this.getTestFundsRequestContextKey(this.props, this.state) !==
       this.getTestFundsRequestContextKey(prevProps, prevState);
     const accountChanged = this.props.account !== prevProps.account;
+    // The link's request for the AI prompt was for whoever signed in from it, not for the next account.
+    if (accountChanged && prevProps.account && this.state.agentPromptRequested) {
+      this.setStateIfMounted({ agentPromptRequested: false });
+    }
     if ((accountChanged || activeSessionChanged) && this.state.agentTokenStatus === 'loading') {
       this.setStateIfMounted({ agentTokenInput: '', agentTokenStatus: '', agentTokenError: '' });
     }
@@ -997,7 +1007,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       if (completedPurposefulPasskeyAction) {
         this.setStateIfMounted({ firstModalAfterLogin: true });
       }
-      if (completedPurposefulPasskeyAction && this.props.loginModalToggled) {
+      // Opened by a link for the AI prompt, it stays open: the prompt to copy appears once signed in.
+      if (completedPurposefulPasskeyAction && this.props.loginModalToggled && !this.state.agentPromptRequested) {
         if (this._autoCloseTimer) clearTimeout(this._autoCloseTimer);
         this._autoCloseTimer = setTimeout(() => {
           this._autoCloseTimer = null;
@@ -1584,13 +1595,15 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     );
   };
 
-  requestAgentKey = async () => {
+  requestAgentKey = async ({ prompt }: { prompt: boolean }) => {
     const { agentWorkerUrl, sessionConfig, sessionSlug } = this.getAgentTokenLoginSessionContext();
     const workerToken = await getWorkerSessionToken({
       sessionSlug,
       sessionConfig,
       context: this.getWorkerTokenContext(),
+      prompt,
     });
+    if (!workerToken) throw new Error('sign in to this session first');
     return requestAgentDelegateKey({ agentWorkerUrl, sessionSlug, workerToken });
   };
 
@@ -1621,6 +1634,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         requestKey={this.requestAgentKey}
         // The box drops the key it may still show after this: that key is dead now.
         agentsSignedOut={this.state.agentsSignedOut}
+        promptRequested={this.state.agentPromptRequested}
         signAgentsOut={
           <SignAgentsOutControl
             provider={this.props.provider}

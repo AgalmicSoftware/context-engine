@@ -349,7 +349,7 @@ it('keeps a notice on the page while signed in from a link, with one button: Cre
   jest.mocked(attachPasskeyHere).mockResolvedValue(null);
   gate({ account: ACCOUNT, provider: 'agent_link' });
   const text = notice()?.textContent || '';
-  expect(text).toMatch(/You are signed in as 0xa1a1…a1a1, the account your AI agent set up/);
+  expect(text).toMatch(/Signed in as 0xa1a1…a1a1, the account your agent set up/);
   // Short: who the account is, and nothing more.
   expect(text).not.toMatch(/Whoever runs the agent|did not come from your own agent/);
   expect(notice()?.className).toMatch(/noticeLarge/);
@@ -421,7 +421,7 @@ it('goes when its person dismisses it, stays away over a reload, and comes back 
   act(() => void held());
   const first = gate({ account: ACCOUNT, provider: 'agent_link' });
   // Shown in full first: nothing dismisses it but the person.
-  expect(notice()?.textContent).toMatch(/You are signed in as 0xa1a1…a1a1/);
+  expect(notice()?.textContent).toMatch(/Signed in as 0xa1a1…a1a1/);
   await screen.findByTestId('ce-agent-account-add-passkey');
   fireEvent.click(screen.getByTestId('ce-agent-sign-in-dismiss'));
   expect(notice()).toBeNull();
@@ -442,7 +442,7 @@ it('goes when its person dismisses it, stays away over a reload, and comes back 
   act(() => forgetAgentLinkAccount());
   act(() => void held());
   gate({ account: ACCOUNT, provider: 'agent_link' });
-  expect(notice()?.textContent).toMatch(/You are signed in as 0xa1a1…a1a1/);
+  expect(notice()?.textContent).toMatch(/Signed in as 0xa1a1…a1a1/);
 });
 
 it('shows the notice again after a new link signs in to the same account that was dismissed', async () => {
@@ -466,7 +466,7 @@ it('shows the notice again after a new link signs in to the same account that wa
   jest.mocked(enterAgentLinkAccount).mockImplementation(() => held() as never);
   gate({ account: ACCOUNT, provider: 'agent_link' });
   await waitFor(() => expect(enterAgentLinkAccount).toHaveBeenCalled());
-  await waitFor(() => expect(notice()?.textContent).toMatch(/Signed in from your agent’s link/));
+  await waitFor(() => expect(notice()?.textContent).toMatch(/Signed in as 0xa1a1…a1a1/));
 });
 
 it('says when a sign-in from a link has ended, and shows the notice for no other account', () => {
@@ -550,7 +550,7 @@ it('shows nothing extra to someone signed in from a link whose account already h
   await act(async () => {});
   // Who the account is, and no more: no Create passkey, and no word of the passkey that is there.
   expect(notice()?.querySelector('p')?.textContent).toMatch(
-    /You are signed in as 0xa1a1…a1a1, the account your AI agent set up\.$/,
+    /Signed in as 0xa1a1…a1a1, the account your agent set up\.$/,
   );
   expect(Array.from(notice()?.querySelectorAll('button') || []).map((button) => button.textContent)).toEqual([
     'Dismiss',

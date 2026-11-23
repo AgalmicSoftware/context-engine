@@ -196,12 +196,13 @@ export const signInWithLoginFile = async (page, { wallet, file, password }) => {
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
 };
 
-export const createJourneySession = ({ baseUrl, slug }) => {
+// `configure` changes the session's config before the Worker first reads it, such as to switch a surface on.
+export const createJourneySession = ({ baseUrl, slug, configure = (config) => config }) => {
   const appOrigin = new URL(baseUrl).origin;
   const admin = passkeyFixture('admin');
   const requestScope = new AsyncLocalStorage();
   const network = { kvDelayMs: 0 };
-  const config = buildSessionConfig({ slug, baseUrl: appOrigin, admin: admin.wallet.address });
+  const config = configure(buildSessionConfig({ slug, baseUrl: appOrigin, admin: admin.wallet.address }));
   const groupKv = createLimitedKv(requestScope, network);
   groupKv.values.set(`session:${slug}:config`, JSON.stringify(config));
   const env = installSessionCoordinatorBinding({

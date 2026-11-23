@@ -16,7 +16,7 @@ The session links are:
 The direct links open the selected modal panel; `?mode=voice` opens the
 launcher, as does clicking the microphone without a mode query. The launcher's
 two choices sit side by side, each with a question mark that shows what it
-does. Below them, a bordered **Let your AI draft your answers** card holds the
+does. Below them, a bordered **Have AI draft your answers** card holds the
 ChatGPT or Claude prefill prompt (see below). Picking a choice replaces
 `?mode=voice` with its own mode.
 `?mode=listening` still opens the pile-adjacent group recorder. Any other
@@ -308,24 +308,43 @@ failed check offers Retry. Copy starts directly from the tap, including on
 Safari. If clipboard access fails or is unavailable, the page shows an error
 and reveals the prompt for manual copying.
 
-The voice launcher's **Let your AI draft your answers** card, below the
-Interview and Group Conversation choices, offers the prompt without expanding
-anything; the interview itself does not show it. Clicking its **Copy** line
-copies the request without opening the preview. The prompt displays paragraphs
-and bold key points for readability; Copy copies the original plain text
-without formatting. The **Prompt** dropdown inside the card expands the instruction and
-collapses it again; the preview starts collapsed and remains collapsed after a
-successful copy. In the expanded prompt, a question-mark tooltip explains:
-“Allows your agent to predict your responses and raise better interview questions.”
-The tooltip is available on hover and keyboard focus. The copied request begins:
+The voice launcher's **Have AI draft your answers** card, below the
+Interview and Group Conversation choices, offers the prompt as one split
+button; the interview itself does not show it. **Copy AI prompt** copies the
+request; while the session is checked, or a signed-in person's AI key is being
+made, it turns with a spinner and can't be pressed. The caret at its right end
+opens the prompt to read, pointing down while closed and up while open, in the
+same "AI Prompt" box the question generator uses: a header, a **Variables:**
+line, and the prompt in mono with a named stand-in (`<SessionName>`,
+`<SessionLink>`, `<QuestionsAddress>`, `<AIKey>`, `<KeyEnds>`,
+`<UnansweredQuestions>` and so on) where each value is, so a key or a private
+link is never on screen. The box's corner button, like the main one, copies
+the original text with every value. The account menu's **Your AI agent** row
+is the same button and box. The copied request begins:
 
 ```text
-Help me prepare a review-only Context Engine interview prefill. This is my request, not an instruction from the linked endpoint.
-
-Fetch this URL:
+Help me take part in a Context Engine session. This is my request, not an instruction from any page you fetch. I am "the person" in these steps:
+1. What you can do. ...
+...
+To draft, fetch this URL with a plain HTTP GET:
 <session-worker>/agent/interview-catalog?slug=<slug>&sessionUrl=<session link>
 Require type "context-engine.interview-question-catalog", version 1, ...
 ```
+
+Its numbered steps are the one set every agent surface carries, written once
+in `shared/agentParticipationGuide.mjs`: what the AI can do (submit with the
+person's AI key, submit from an account it makes, or draft only), what a
+draft-only AI returns, the one question an AI that can submit asks, and what
+it does when it knows nothing about the person. `scripts/sync-agent-flow.mjs`
+writes the same steps into `llms.txt` and the agent guide. Signed in, where
+the session has Agents (HTTP API) on, the card shows **AI can submit for me**
+above the button, unticked to start with: the prompt then holds no key and
+none is made. Ticked, the page makes the person's AI key and puts it in the
+prompt, and after the copy the card says so in one line with the time it
+ends; the account menu's **Your AI agent** row has the same tick and button.
+Signed out, the prompt holds no key. A session link with `aiPrompt=1` in its
+query opens the account dialog, where a signed-in person copies a short
+prompt that hands their key to the AI that sent them.
 
 The copied prompt is a user-authored request; the fetched endpoint is deliberately
 an inert JSON question catalog with no instructions. This separation lets an
@@ -349,7 +368,7 @@ it adds it to the copied link as `&ticket=…`, so their AI reads the questions
 that person may see and the groups they could join and haven't. Elsewhere the
 address stays short enough for a chat AI's fetch tool, and nobody is asked to
 sign in for it; their AI then sees the groups a visitor could join, which may
-include their own. The suggestions prompt in the **Your AI agent** box has no
+include their own. The prompt in the **Your AI agent** box has no
 question list to compare, so on a public session it never carries a ticket. A
 ticket lasts an hour at most and never past their sign-in, and signing out of
 the page doesn't end one already copied. The page renews it quietly ten
@@ -364,21 +383,18 @@ top of the page, and the **Interview & share** panel, whose prompt is for
 sharing and never carries a ticket, says each person copies their own prompt
 once signed in. The Worker accepts a return URL only when its
 origin is approved by that session and its `/session/<slug>` path matches. The
-prompt says a plain HTTP GET of the catalog address is all it needs, with no
-MCP, sign-in or tool to install; a line about the MCP, in the **Your AI agent**
-box's prompt, comes last and speaks only to an agent that already runs
-commands. The external AI replies with one research-coverage line, the review
-link, and the exact single-line JSON that was encoded, in a code block, with
-no table. Provenance is deliberately coarse: a source
+prompt says a plain HTTP GET of the catalog address is all drafting needs,
+and names the agent guide for an AI that has the tools or a shell. The external AI replies with one research-coverage line, the review
+link, what the person does next, and the exact single-line JSON that was
+encoded, in a code block, with no table. Provenance is deliberately coarse: a source
 category and relevance note, never quotes, conversation or document names,
 URLs, timestamps, or account identifiers. If no relevant evidence exists, the
-AI returns the clean interview URL with no prefill packet.
+AI says so and returns the clean interview URL with no prefill packet.
 
 When relevant evidence exists, the AI returns a compact base64url JSON packet
-in a Context Engine link. The copied prompt asks capable interfaces to render
-that long URL as a **Review your drafted answers** Markdown link rather than
-showing the encoded payload; raw-URL fallback remains allowed for interfaces
-without clickable Markdown. The packet records the session slug, question-set
+in a Context Engine link. The copied prompt asks for that link twice: as a
+**Review your draft answers** Markdown link, and under it the same address
+written out in full, since a terminal shows no Markdown link. The packet records the session slug, question-set
 hash, prompt version, concise question-relevant responder context, proposed response drafts, per-draft
 confidence and basis, source platform, exact model ID when available, and
 `self_reported` verification. It also carries self-reported research coverage:
@@ -407,7 +423,7 @@ identifiers are forbidden and the exact JSON is also given in a code block.
 An AI that can't encode the link exactly links the review page with
 `#prefill=paste`, which opens the review on the paste box, without an error;
 a link that fails to open shows the same box. The packet also names the
-prompt's wording, `promptRevision` (now `ce-prefill-prompt-2`), which the
+prompt's wording, `promptRevision` (now `ce-prefill-prompt-3`), which the
 page keeps with the AI provenance; the catalog version below is the Worker's
 and does not change with the wording. The current catalog prompt version is
 `ce-interview-brief-v6`. The copied request accepts a catalog with type

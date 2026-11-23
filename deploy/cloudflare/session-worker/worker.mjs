@@ -64002,7 +64002,10 @@ function buildAgentResponsePayload({
   questionRef = {},
   answer = {},
   accountAddress = "",
-  createdAt = null
+  createdAt = null,
+  // Set on a Worker session: its answers name their session, as the browser's do, and the session page
+  // leaves out a saved answer that does not.
+  sessionId = ""
 } = {}) {
   const normalized = normalizeAnswerForPayload(answer, questionRef);
   if (questionRef.questionType === "quadratic" || normalized.questionType === "quadratic") {
@@ -64043,7 +64046,8 @@ function buildAgentResponsePayload({
     },
     source: "session-agent",
     responder: safeString(accountAddress),
-    encryptionRequested: false
+    encryptionRequested: false,
+    ...sessionId ? { sessionId: safeString(sessionId), sessionSlug: safeString(sessionSlug || questionRef.sessionSlug) } : {}
   };
   assertNoSecretShape(payload, "Agent on-chain response payloads must not serialize secrets.");
   return payload;
@@ -64111,7 +64115,14 @@ async function submitAgentResponseOnChain({
     if (!sessionSlug || !qid || !idempotencyKey) return { ok: false, skipped: true, reason: "submission_identity_required" };
     let payload;
     try {
-      payload = buildAgentResponsePayload({ sessionSlug, questionRef, answer, accountAddress: env.AGENT_CONTEXT.address, createdAt });
+      payload = buildAgentResponsePayload({
+        sessionSlug,
+        questionRef,
+        answer,
+        accountAddress: env.AGENT_CONTEXT.address,
+        createdAt,
+        sessionId: env.AGENT_CONTEXT.sessionId
+      });
     } catch (error) {
       return { ok: false, reason: safeString(error.message), retryable: false, safeToRetry: true, status: 422 };
     }
@@ -81381,7 +81392,7 @@ var init_resultsBuild = __esm({
 });
 
 // workers/sessionCorsWorker/debateAtlasBuild.js
-var DEBATE_ATLAS_BUILD_ACTION, DEBATE_ATLAS_LIMITS, toArray3, trim21, text7, unit, buildDebateAtlasPlanPrompt, buildDebateAtlasTopicPrompt, buildDebateAtlasQuestionPrompt, describeNextDebateAtlasBuild, planQuestion, normalizeDebateAtlasPlan, normalizeCompass, normalizeDebateAtlasTopic, normalizeDebateAtlasQuestion, runWithConcurrency, failure2, buildDebateAtlas, dispatchDebateAtlasReadRequest;
+var DEBATE_ATLAS_BUILD_ACTION, DEBATE_ATLAS_LIMITS, toArray3, trim21, text7, unit, PLAN_RULES, buildDebateAtlasPlanPrompt, buildDebateAtlasTopicPrompt, buildDebateAtlasQuestionPrompt, describeNextDebateAtlasBuild, planQuestion, normalizeDebateAtlasPlan, normalizeCompass, normalizeDebateAtlasTopic, normalizeDebateAtlasQuestion, runWithConcurrency, failure2, buildDebateAtlas, dispatchDebateAtlasReadRequest;
 var init_debateAtlasBuild = __esm({
   "workers/sessionCorsWorker/debateAtlasBuild.js"() {
     init_atlasQuestionSummaries();
@@ -81408,13 +81419,18 @@ var init_debateAtlasBuild = __esm({
       const number2 = Number(value);
       return Number.isFinite(number2) ? Math.min(1, Math.max(0, Math.round(number2 * 1e3) / 1e3)) : null;
     };
-    buildDebateAtlasPlanPrompt = ({ sessionName = "", questions = [], contextText = "" } = {}) => `You are planning a debate atlas for a Context Engine session from its survey questions.
-Group the questions into 2 to ${DEBATE_ATLAS_LIMITS.branches} branches and each branch into 1 to 4 topics, at most ${DEBATE_ATLAS_LIMITS.topics} topics in all. A topic gathers questions people can disagree about along the same lines. Put each question that has responses in exactly one topic; leave out questions with none.
+    PLAN_RULES = Object.freeze([
+      "Use only the question IDs listed below.",
+      "Name branches and topics after what the questions ask, in plain words.",
+      `Branch labels are the atlas's top-level titles, shown side by side: keep each short and clear, one plain subject and not a list. No two share a main word or mean nearly the same, and none is a catch-all such as "Other" or "General".`
+    ]);
+    buildDebateAtlasPlanPrompt = ({ sessionName = "", questions = [], contextText = "" } = {}) => `You are planning a debate atlas for a group sensemaking session: people answered the survey questions below so the group can see where it agrees and where it splits.
+Group the questions into 2 to ${DEBATE_ATLAS_LIMITS.branches} branches and each branch into 1 to 4 topics, at most ${DEBATE_ATLAS_LIMITS.topics} topics in all. Branches are the atlas's top level: the few big things this session is about that a curious reader would most want to open. Each is logically distinct from the others, and the topics inside one share a clear link. A topic gathers questions people can disagree about along the same lines. Put each question that has responses in exactly one topic; leave out questions with none.
 Return one JSON object with no Markdown fences and no tool calls, in this shape:
 { "title": "short atlas title", "branches": [{ "label": "2-5 word branch name", "summary": "one neutral sentence", "topics": [{ "label": "2-6 word topic name", "questionIds": ["q1"] }] }] }
 
 Rules:
-${[...RESULTS_BUILD_RULES, "Use only the question IDs listed below.", "Name branches and topics after what the questions ask, in plain words."].map((rule) => `- ${rule}`).join("\n")}
+${[...RESULTS_BUILD_RULES, ...PLAN_RULES].map((rule) => `- ${rule}`).join("\n")}
 
 Session: ${JSON.stringify(text7(sessionName, 200))}
 Questions (responses is how many answers each has):
@@ -100916,7 +100932,7 @@ init_redaction();
 
 // workers/sessionCorsWorker/agent/httpConstants.mjs
 var DEFAULT_AGENT_RAW_SKILL_URL = "https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/workers/sessionCorsWorker/agent/skills/ce-agent-access/SKILL.md";
-var CE_AGENT_ACCESS_SKILL_VERSION = "2026-11-20 (v47)";
+var CE_AGENT_ACCESS_SKILL_VERSION = "2026-11-23 (v48)";
 var DEFAULT_SESSION_WRAPPED_RAW_SKILL_URL = "https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/workers/sessionCorsWorker/agent/skills/ce-session-wrapped/SKILL.md";
 var CE_SESSION_WRAPPED_SKILL_VERSION = "2026-10-27 (session-wrapped-v1.5)";
 var QUESTION_VOTE_KV_PREFIX = "telegram:mini-app-question-vote:v1:";
@@ -108597,7 +108613,7 @@ var FEATURES = Object.freeze([
   "worker_groups"
 ]);
 var WORKERS_AI_FEATURE = "workers_ai_v1";
-var workerRelease = () => "0.9.32" ? "0.9.32" : null;
+var workerRelease = () => "0.9.33" ? "0.9.33" : null;
 var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 = {} }) => {
   const deployed = FEATURES.filter((feature) => feature !== WORKER_GROUP_READ_CODE_FEATURE || workerGroupCodeReadsOn(env));
   const body = {

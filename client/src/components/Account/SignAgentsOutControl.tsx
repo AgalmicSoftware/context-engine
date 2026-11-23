@@ -6,6 +6,7 @@
 // agent set up has no such key to end; neither is offered it.
 import React, { useState } from 'react';
 
+import { AGENTS_SIGNED_OUT_EVENT } from '../../utilities/session/agentHandoff';
 import { signAgentsOut } from '../../utilities/session/signAgentsOut';
 
 export const SIGN_AGENTS_OUT_HELP =
@@ -37,6 +38,8 @@ export default function SignAgentsOutControl({
         text: 'Agents signed out. To let one in again, copy a new prompt from Your AI agent.',
         isError: false,
       });
+      // Any card that holds a key for an agent drops it.
+      window.dispatchEvent(new Event(AGENTS_SIGNED_OUT_EVENT));
       onDone?.();
     } catch (error) {
       setSaid({

@@ -13,7 +13,8 @@
   --docs-link: var(--ce-link);
   --docs-control: var(--ce-control-face);
   --docs-control-text: var(--ce-control-text);
-  --docs-code-bg: var(--ce-overlay-base);
+  // Overlay text is made to be read on the overlay surface; on the base it can be the same colour.
+  --docs-code-bg: var(--ce-overlay-surface);
   --docs-code-text: var(--ce-overlay-text);
 
   padding: 24px;
@@ -932,6 +933,16 @@
   max-height: 60vh;
   user-select: text;
   cursor: text;
+}
+
+// The template's placeholders, listed above it.
+.promptMeta {
+  padding: 10px 14px 0;
+  background: var(--docs-code-bg);
+  color: var(--docs-code-text);
+  font-family: var(--ce-font-mono);
+  font-size: 0.82rem;
+  line-height: 1.9;
 }
 
 .promptWindowOpen {

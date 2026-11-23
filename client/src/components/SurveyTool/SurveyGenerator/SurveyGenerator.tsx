@@ -29,6 +29,7 @@ import {
 } from '../../../utilities/ai/aiClient.js';
 import { getEffectiveAiConfig } from '../../../utilities/ai/aiSettings.js';
 import { getAllSessionSlugs, getSessionConfigBySlug } from '../../../utilities/web3/chainGateway.js';
+import { PromptStandInList, PromptText } from '../../Shared/AiPromptStandIns';
 import AudioInput from '../../Shared/AudioInput/AudioInput';
 import CompactImageChooser from '../../Shared/CompactImageChooser';
 import { readCompactImageClipboard } from '../../Shared/compactImageClipboard.js';
@@ -1533,30 +1534,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     });
   };
 
-  const highlightPromptVariables = (str: unknown) => {
-    if (!str) return null;
-    const text = String(str);
-    const re = /<([A-Za-z][A-Za-z0-9_]*)>/g;
-    const parts: React.ReactNode[] = [];
-    let lastIndex = 0;
-    let match;
-
-    while ((match = re.exec(text)) !== null) {
-      if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
-      parts.push(
-        <span key={match.index} className={styles.aiVar}>
-          {'<'}
-          {match[1]}
-          {'>'}
-        </span>,
-      );
-      lastIndex = re.lastIndex;
-    }
-
-    if (lastIndex < text.length) parts.push(text.slice(lastIndex));
-    return parts;
-  };
-
   const handleDatabaseSessionSelect = (slugIn: unknown) => {
     setLocalSessionOverrideTouched(true);
     setLocalSessionOverrideSlug(normalizeSessionSlug(slugIn || ''));
@@ -2259,14 +2236,11 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                 </div>
                 <div className={styles.aiPromptMeta}>
                   Variables:&nbsp;
-                  <span className={styles.aiVar}>&lt;SourceDocContent&gt;</span>,{' '}
-                  <span className={styles.aiVar}>&lt;NumSeedStatements&gt;</span>,{' '}
-                  <span className={styles.aiVar}>&lt;Types&gt;</span>,{' '}
-                  <span className={styles.aiVar}>&lt;DefaultTags&gt;</span>
+                  <PromptStandInList prompt={aiPromptText || ''} className={styles.aiVar} />
                 </div>
                 <div className={styles.jsonDisplayWrapper}>
                   <pre className={styles.jsonDisplay}>
-                    {highlightPromptVariables(aiPromptText || '(Prompt not available)')}
+                    <PromptText prompt={aiPromptText || '(Prompt not available)'} className={styles.aiVar} />
                   </pre>
                 </div>
               </div>

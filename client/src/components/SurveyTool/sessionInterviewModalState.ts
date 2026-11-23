@@ -231,14 +231,6 @@ export const describeInterviewStatus = ({
   return { guidance, idle, statusLabel, statusTone };
 };
 
-export const shouldIgnorePromptCopyEvent = (target: EventTarget | null): boolean => {
-  if (!(target instanceof HTMLElement)) return true;
-  if (target.closest('button, a, input, textarea, select, [contenteditable="true"]')) return true;
-  if (target.closest('[data-ce-no-background-copy="true"]')) return true;
-  const selection = target.ownerDocument.defaultView?.getSelection?.();
-  return Boolean(selection?.toString().trim());
-};
-
 export const buildResearchPacket = (
   prefillPacket: InterviewPrefillPacket | null,
   sessionSlug: string,

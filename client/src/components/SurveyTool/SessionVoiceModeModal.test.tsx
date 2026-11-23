@@ -1280,7 +1280,7 @@ describe('SessionVoiceModeModal', () => {
     expect(draftIds()).toEqual(['q1']);
   });
 
-  it('offers a paste box for the AI’s JSON packet when a prefill link is broken', async () => {
+  it('offers a paste box for the AI’s answers when a prefill link is broken', async () => {
     const onImportPrefillJson = jest.fn((_json: string) => 'This interview prefill belongs to a different session.');
     const { rerender } = render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_PASTE)).not.toBeInTheDocument();
@@ -1295,9 +1295,9 @@ describe('SessionVoiceModeModal', () => {
     const paste = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_PASTE);
     // The link's reason shows even though the review was already open.
     expect(screen.getByText('This link is incomplete: it was cut off when it was copied.')).toBeInTheDocument();
-    const button = within(paste).getByRole('button', { name: 'Review these drafts' });
+    const button = within(paste).getByRole('button', { name: 'Review draft answers' });
     expect(button).toBeDisabled();
-    fireEvent.change(within(paste).getByLabelText('Paste the JSON packet your AI gave you'), {
+    fireEvent.change(within(paste).getByLabelText('Paste your AI’s answers'), {
       target: { value: '{"version":1}' },
     });
     fireEvent.click(button);
@@ -2307,13 +2307,13 @@ describe('SessionVoiceModeModal', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent(groupAbout);
     fireEvent.blur(help);
     expect(help).toHaveAccessibleDescription(`Interview ${interviewAbout} Group Conversation ${groupAbout}`);
-    const prefill = screen.getByRole('region', { name: 'Let your AI draft your answers' });
+    const prefill = screen.getByRole('region', { name: 'Have AI draft your answers' });
     // Its description is only read out with its "?", not shown as text.
     const prefillAbout =
       'Your AI drafts answers from what it knows about you, and you review them here before anything is submitted.';
     expect(within(prefill).getByText(prefillAbout)).not.toBeVisible();
     expect(
-      within(prefill).getByRole('button', { name: 'About letting your AI draft your answers' }),
+      within(prefill).getByRole('button', { name: 'About having AI draft your answers' }),
     ).toHaveAccessibleDescription(prefillAbout);
     expect(prefill).toHaveAttribute('data-testid', E2E_TESTIDS.SESSION_VOICE_PREFILL);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_CHOOSER)).not.toContainElement(prefill);
@@ -2494,7 +2494,7 @@ describe('SessionVoiceModeModal', () => {
       fireEvent.click(copy);
       expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
       inClick = false;
-      await screen.findByRole('button', { name: 'Memory augmentation prompt copied' });
+      await screen.findByRole('button', { name: 'Copied' });
     } finally {
       fetchMock.mockRestore();
     }
@@ -2522,12 +2522,12 @@ describe('SessionVoiceModeModal', () => {
         'Copying isn’t allowed here, so the prompt below is selected. Copy it yourself.',
       );
       // The exact prompt, links whole: the formatted view shortens them.
-      const field = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Memory augmentation prompt to copy' });
+      const field = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'AI prompt to copy' });
       expect(field.value).toContain('https://');
       expect(field.value).toContain('Context Engine');
       expect(document.activeElement).toBe(field);
       expect([field.selectionStart, field.selectionEnd]).toEqual([0, field.value.length]);
-      expect(screen.queryByRole('button', { name: 'Memory augmentation prompt copied' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Copied' })).not.toBeInTheDocument();
     } finally {
       fetchMock.mockRestore();
     }
@@ -2568,7 +2568,7 @@ describe('SessionVoiceModeModal', () => {
       render(<SessionVoiceModeModal {...baseProps} />);
       await act(async () => {});
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
-      expect(await screen.findByRole('button', { name: 'Memory augmentation prompt copied' })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument();
       expect(copied).toHaveLength(1);
       expect(copied[0]).toContain('Context Engine');
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -2647,7 +2647,7 @@ describe('SessionVoiceModeModal', () => {
     await act(async () => {});
   });
 
-  it('keeps the copied memory prompt collapsed and confirms clipboard success with a checkmark', async () => {
+  it('copies the AI prompt from one split button, whose caret opens it to read with stand-ins for its values', async () => {
     const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -2661,86 +2661,59 @@ describe('SessionVoiceModeModal', () => {
 
     expect(screen.queryByText(/A realtime voice interviewer will cover/i)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Copy memory augmentation prompt' })).toBeInTheDocument();
+    const copyButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
+    expect(copyButton).toHaveAccessibleName('Copy AI prompt');
+    // While the session is checked the button turns and can't be pressed.
+    expect(copyButton).toHaveAttribute('aria-disabled', 'true');
+    expect(copyButton.querySelector('[data-icon="spinner"]')).toBeInTheDocument();
     const promptToggle = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE);
-    expect(promptToggle).toHaveAccessibleName('Prompt');
-    expect(screen.queryByRole('button', { name: 'About the interview prompt' })).not.toBeInTheDocument();
-    expect(screen.queryByText(/allows your agent to predict your responses/i)).not.toBeInTheDocument();
+    expect(promptToggle).toHaveAccessibleName('Read the AI prompt');
+    expect(promptToggle.querySelector('[data-icon="caret-down"]')).toBeInTheDocument();
     expect(promptToggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
-    const copyButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
-    expect(copyButton).toHaveAccessibleName('Copy memory augmentation prompt');
-    expect(copyButton).toHaveTextContent('Copy and paste this prompt into ChatGPT or Claude.');
-    expect(copyButton).toHaveTextContent('Copy');
-    expect(screen.queryByText('Copy prompt')).not.toBeInTheDocument();
+    // One button, said once: no second "Prompt" control and no sentence about where to paste.
+    expect(screen.queryByRole('button', { name: 'Prompt' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/paste this prompt into ChatGPT or Claude/)).not.toBeInTheDocument();
 
-    await waitFor(() => expect(screen.queryByText('Checking session compatibility…')).not.toBeInTheDocument());
+    await waitFor(() => expect(copyButton).toHaveAttribute('aria-disabled', 'false'));
+    expect(copyButton.querySelector('[data-icon="copy"]')).toBeInTheDocument();
     await act(async () => fireEvent.click(copyButton));
-    await waitFor(() =>
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        expect.stringContaining('review-only Context Engine interview prefill'),
-      ),
-    );
-    expect(copyButton).toHaveAccessibleName('Memory augmentation prompt copied');
-    expect(copyButton.querySelector('[data-icon="check"]')).toBeInTheDocument();
-    await act(async () => fireEvent.keyDown(copyButton, { key: ' ', code: 'Space' }));
-    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(2);
-    const promptCard = copyButton.parentElement?.parentElement;
-    expect(promptCard).not.toBeNull();
-    await act(async () => fireEvent.click(promptCard!));
-    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(3);
-
-    fireEvent.click(promptToggle);
-    expect(promptToggle).toHaveAccessibleName('Prompt');
-    const displayedPrompt = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT);
-    expect(copyButton.closest('[class]')?.parentElement?.parentElement).toContainElement(displayedPrompt);
-    const helpButton = displayedPrompt.querySelector('[aria-label="About the interview prompt"]');
-    expect(helpButton).toBeInTheDocument();
-    fireEvent.click(helpButton!);
-    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(3);
     const plainPrompt = buildExternalInterviewKickoff({
       questionPriority: { unansweredQuestionIds: ['q1'], answeredQuestionIds: [] },
       workerUrl: baseProps.workerUrl,
       sessionSlug: baseProps.sessionSlug,
       sessionUrl: `${window.location.origin}${window.location.pathname}`,
     });
-    const displayedParagraphs = Array.from(displayedPrompt.querySelectorAll('p'));
-    expect(displayedParagraphs.length).toBeGreaterThan(8);
-    expect(displayedPrompt.querySelectorAll('strong').length).toBeGreaterThan(3);
-    expect(
-      displayedParagraphs
-        .map((paragraph) => paragraph.textContent)
-        .join(' ')
-        .replace(/\s+/g, ' '),
-    ).toContain(
-      'Fetch this URL with a plain HTTP GET; that is all this needs, with no MCP, sign-in or tool to install: worker.example/agent/interview-catalog…',
-    );
-    const codeBlock = displayedPrompt.querySelector('pre code');
-    expect(codeBlock).toBeInTheDocument();
-    expect(codeBlock?.textContent).toContain('\n  "version": 1,');
-    expect(codeBlock?.textContent).toContain('\n  "responses": [');
-    const promptLink = displayedPrompt.querySelector('a');
-    expect(promptLink).toHaveAttribute(
-      'href',
-      expect.stringContaining('https://worker.example/agent/interview-catalog'),
-    );
-    fireEvent.click(promptLink!);
-    fireEvent.click(displayedPrompt);
-    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(3);
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(plainPrompt);
-    expect(plainPrompt).toContain('{"version":1,"sessionSlug":');
-    expect(plainPrompt).not.toMatch(/<strong>|\*\*/);
-
-    expect(promptToggle).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).toHaveTextContent(
-      /review-only Context Engine interview prefill.*worker\.example\/agent\/interview-catalog…/,
-    );
+    expect(copyButton).toHaveAccessibleName('Copied');
+    expect(copyButton.querySelector('[data-icon="check"]')).toBeInTheDocument();
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
 
     fireEvent.click(promptToggle);
-    expect(promptToggle).toHaveAccessibleName('Prompt');
+    expect(promptToggle).toHaveAccessibleName('Hide the AI prompt');
+    expect(promptToggle.querySelector('[data-icon="caret-up"]')).toBeInTheDocument();
+    expect(promptToggle).toHaveAttribute('aria-expanded', 'true');
+    const displayedPrompt = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT);
+    expect(promptToggle).toHaveAttribute('aria-controls', displayedPrompt.id);
+    expect(displayedPrompt).toHaveTextContent(/^AI Prompt/);
+    // Each value the prompt carries shows as a named stand-in, listed first and again in its place.
+    expect(displayedPrompt).toHaveTextContent('Variables: <QuestionsAddress>, <UnansweredQuestions>, <SessionLink>');
+    expect(displayedPrompt).toHaveTextContent('To draft, fetch this URL with a plain HTTP GET: <QuestionsAddress>');
+    expect(displayedPrompt).toHaveTextContent('Unanswered question IDs, newest first: <UnansweredQuestions>');
+    expect(displayedPrompt).not.toHaveTextContent('worker.example');
+    expect(displayedPrompt).toHaveTextContent('Help me take part in a Context Engine session.');
+    // Reading it copies nothing; its corner button copies the whole prompt, values included.
+    fireEvent.click(displayedPrompt);
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
+    await act(async () => fireEvent.click(within(displayedPrompt).getByRole('button', { name: /AI prompt/ })));
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(2);
+    expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(plainPrompt);
+    expect(plainPrompt).toContain('{"version":1,"sessionSlug":');
+
+    fireEvent.click(promptToggle);
+    expect(promptToggle).toHaveAccessibleName('Read the AI prompt');
     expect(promptToggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'About the interview prompt' })).not.toBeInTheDocument();
     fetchMock.mockRestore();
   });
 
@@ -4164,6 +4137,6 @@ describe('Interview cancellation and recovery', () => {
     fireEvent.click(copy);
     const prompt = jest.mocked(navigator.clipboard.writeText).mock.lastCall?.[0] || '';
     expect(prompt).toContain('Unanswered question IDs, in the session’s order: ["q1","q2"]');
-    expect(prompt).toContain('"promptRevision":"ce-prefill-prompt-2+arranged",');
+    expect(prompt).toContain('"promptRevision":"ce-prefill-prompt-3+arranged",');
   });
 });

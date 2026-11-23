@@ -2,13 +2,25 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SessionVoicePrefillCard from './SessionVoicePrefillCard';
 import { getInterviewCatalogTicket } from './interviewCatalogTicket';
+import { getWorkerSessionToken } from '../../utilities/worker/workerAuth';
+import { QUIET_RETRY_DELAYS_MS } from '../../utilities/session/useAgentKey';
 
+jest.mock('../../utilities/worker/workerAuth', () => ({
+  ...jest.requireActual<object>('../../utilities/worker/workerAuth'),
+  getWorkerSessionToken: jest.fn(),
+}));
+jest.mock('../../utilities/worker/corsProxy.js', () => ({
+  ...jest.requireActual<object>('../../utilities/worker/corsProxy.js'),
+  // Only a card given no Worker address looks one up; here that lookup never ends.
+  getCorsProxyUrlOrThrow: jest.fn(() => new Promise<string>(() => undefined)),
+}));
 jest.mock('./interviewCatalogTicket', () => ({
   ...jest.requireActual<object>('./interviewCatalogTicket'),
   getInterviewCatalogTicket: jest.fn(),
 }));
 
 const ticketMock = jest.mocked(getInterviewCatalogTicket);
+const tokenMock = jest.mocked(getWorkerSessionToken);
 // The card remembers whom it asked for as long as the page is open, so each test signs in as someone new.
 let people = 0;
 let ACCOUNT = '';
@@ -54,7 +66,11 @@ const copy = async () => {
   return writeText.mock.calls.at(-1)?.[0] || '';
 };
 
+// A quiet try for the key that fails is not tried again here.
+const RETRY_DELAYS = [...QUIET_RETRY_DELAYS_MS];
+afterAll(() => void QUIET_RETRY_DELAYS_MS.splice(0, QUIET_RETRY_DELAYS_MS.length, ...RETRY_DELAYS));
 beforeEach(() => {
+  QUIET_RETRY_DELAYS_MS.length = 0;
   people += 1;
   ACCOUNT = `0x${String(people).padStart(40, '0')}`;
   ticketMock.mockReset();
@@ -181,18 +197,18 @@ it('keeps the prompt to copy by hand through a renewal, with the renewed link, w
     await act(async () => {});
     await copy();
     const field = await screen.findByRole<HTMLTextAreaElement>('textbox', {
-      name: 'Memory augmentation prompt to copy',
+      name: 'AI prompt to copy',
     });
     expect(field.value).toContain('&ticket=ic1.first');
     expect(document.activeElement).toBe(field);
-    const elsewhere = screen.getByRole('button', { name: 'Prompt' });
+    const elsewhere = screen.getByRole('button', { name: 'Read the AI prompt' });
     elsewhere.focus();
     await act(async () => {
       jest.advanceTimersByTime(60 * 1000);
     });
     await act(async () => {});
     expect(ticketMock).toHaveBeenCalledTimes(2);
-    expect(screen.getByRole('textbox', { name: 'Memory augmentation prompt to copy' })).toBe(field);
+    expect(screen.getByRole('textbox', { name: 'AI prompt to copy' })).toBe(field);
     expect(field.value).toContain('&ticket=ic1.second');
     expect(document.activeElement).toBe(elsewhere);
   } finally {
@@ -211,14 +227,14 @@ it('hides the prompt to copy by hand when its renewal check fails', async () => 
     renderCard();
     await act(async () => {});
     await copy();
-    expect(await screen.findByRole('textbox', { name: 'Memory augmentation prompt to copy' })).toBeInTheDocument();
+    expect(await screen.findByRole('textbox', { name: 'AI prompt to copy' })).toBeInTheDocument();
     fetchMock.mockImplementation(async () => signInRequired());
     await act(async () => {
       jest.advanceTimersByTime(60 * 1000);
     });
     await act(async () => {});
     expect(screen.getByText(/Could not check this session’s Worker/)).toBeInTheDocument();
-    expect(screen.queryByRole('textbox', { name: 'Memory augmentation prompt to copy' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'AI prompt to copy' })).toBeNull();
   } finally {
     jest.useRealTimers();
   }
@@ -271,4 +287,213 @@ it('checks again rather than copy a link whose renewal a sleeping timer missed',
   } finally {
     jest.useRealTimers();
   }
+});
+
+describe('the AI key in a signed-in person’s prompt', () => {
+  const AGENT_SESSION = {
+    slug: 'demo',
+    sessionName: 'Demo "one"',
+    sessionModeProfile: { authority: { mode: 'worker_canonical' }, surfaces: { agentHttp: true } },
+  };
+  const KEY = 'ceagt_abcdefghijklmnopqrstuvwx';
+  const KEY_LINE = `The key is ${KEY};`;
+  const delegate = (submitAnswers = true) =>
+    new Response(
+      JSON.stringify({
+        ok: true,
+        token: KEY,
+        expiresAt: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+        sessionSlug: 'demo',
+        submitAnswers,
+      }),
+    );
+  const renderAgentCard = (account = ACCOUNT, workerUrl = 'https://worker.example') =>
+    render(
+      <SessionVoicePrefillCard
+        sessionSlug="demo"
+        sessionConfig={AGENT_SESSION}
+        context={account ? { account } : {}}
+        workerUrl={workerUrl}
+      />,
+    );
+  const canSubmit = () => screen.getByRole('checkbox', { name: 'AI can submit for me' });
+  const keyRequests = () => fetchMock.mock.calls.filter(([url]) => String(url).includes('/credentials/delegate'));
+  const serve = (submitAnswers = true) =>
+    fetchMock.mockImplementation(async (input) =>
+      String(input).endsWith('/api/agent/credentials/delegate') ? delegate(submitAnswers) : catalog(),
+    );
+  beforeEach(() => {
+    tokenMock.mockReset();
+    tokenMock.mockResolvedValue('session-token');
+  });
+
+  it('offers no tick, and asks for no key, where the session gives no AI keys', async () => {
+    fetchMock.mockImplementation(async () => catalog());
+    renderCard();
+    await copy();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(keyRequests()).toHaveLength(0);
+  });
+
+  it('starts with "AI can submit for me" unticked: no key is made or copied until the person ticks it', async () => {
+    serve();
+    renderAgentCard();
+    expect(canSubmit()).not.toBeChecked();
+    const draft = await copy();
+    expect(draft).not.toContain('ceagt_');
+    expect(draft).toContain('This prompt holds no AI key, so draft.');
+    expect(keyRequests()).toHaveLength(0);
+    expect(tokenMock).not.toHaveBeenCalled();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE)).not.toBeInTheDocument();
+
+    // Ticked, the key is asked of the session's Worker with the page's sign-in, asking the person nothing.
+    fireEvent.click(canSubmit());
+    const prompt = await copy();
+    expect(tokenMock).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: false, workerUrl: 'https://worker.example' }),
+    );
+    const [[url, init]] = keyRequests();
+    expect(url).toBe('https://worker.example/api/agent/credentials/delegate');
+    expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer session-token');
+    // The line about the key shows once the prompt holding it has been copied.
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE)).toHaveTextContent(
+      /^Key can answer as you until /,
+    );
+    expect(prompt).toContain(KEY_LINE);
+    expect(prompt).toContain('submit them as me only after I say yes here');
+    // It names its session, and still says how to draft.
+    expect(prompt).toContain('It is only for the session "Demo \\"one\\"" at ');
+    expect(prompt).toContain('/agent/interview-catalog?slug=demo');
+    // Opened to read, the key is a stand-in.
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE));
+    const shown = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT);
+    expect(shown).toHaveTextContent('The key is <AIKey>;');
+    expect(shown).toHaveTextContent('until <KeyEnds>.');
+    expect(shown).not.toHaveTextContent(KEY);
+
+    // Unticked again, the key leaves the prompt. The line stays, since the key that was copied still works.
+    fireEvent.click(canSubmit());
+    expect(await copy()).not.toContain('ceagt_');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE)).toHaveTextContent(
+      /^Key can answer as you until /,
+    );
+    expect(keyRequests()).toHaveLength(1);
+    // The page kept no key: ticked again, it asks for a new one.
+    fireEvent.click(canSubmit());
+    expect(await copy()).toContain(KEY_LINE);
+    expect(keyRequests()).toHaveLength(2);
+    expect(canSubmit()).toHaveAccessibleDescription(
+      'If checked, the prompt can hold a key and the AI can act on your behalf.',
+    );
+  });
+
+  it('takes no key that arrives after the box is unticked again', async () => {
+    let release: (response: Response) => void = () => {};
+    fetchMock.mockImplementation(async (input) =>
+      String(input).endsWith('/api/agent/credentials/delegate')
+        ? new Promise<Response>((done) => (release = done))
+        : catalog(),
+    );
+    renderAgentCard();
+    fireEvent.click(canSubmit());
+    await waitFor(() => expect(keyRequests()).toHaveLength(1));
+    fireEvent.click(canSubmit());
+    await act(async () => release(delegate()));
+    expect(await copy()).not.toContain('ceagt_');
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE)).not.toBeInTheDocument();
+  });
+
+  it('signed out, gives a prompt without a key and nothing to tick', async () => {
+    serve();
+    renderAgentCard('');
+    expect(await copy()).toContain('\nThis prompt holds no AI key.\n');
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(keyRequests()).toHaveLength(0);
+    expect(tokenMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the key out where the session lets no AI submit', async () => {
+    serve(false);
+    renderAgentCard();
+    fireEvent.click(canSubmit());
+    await waitFor(() => expect(keyRequests()).toHaveLength(1));
+    expect(await copy()).not.toContain('ceagt_');
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE)).not.toBeInTheDocument();
+  });
+
+  it('gives the prompt without a key where the key needs a fresh sign-in to the session, asking nothing', async () => {
+    serve();
+    tokenMock.mockRejectedValue(new Error('sign in needed'));
+    renderAgentCard();
+    fireEvent.click(canSubmit());
+    const without = await copy();
+    expect(without).not.toContain('ceagt_');
+    expect(without).toContain(
+      'If I want you to submit as me, I can copy the prompt again in the session with "AI can submit for me" ticked',
+    );
+    expect(tokenMock).toHaveBeenCalledTimes(1);
+    expect(tokenMock).toHaveBeenCalledWith(expect.objectContaining({ prompt: false }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE)).not.toBeInTheDocument();
+  });
+
+  it('shows nothing, and asks for no key, until the session’s Worker is found', async () => {
+    serve();
+    // No Worker address given: the card looks it up, and the key could only be asked of that Worker.
+    renderAgentCard(ACCOUNT, '');
+    await act(async () => undefined);
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(tokenMock).not.toHaveBeenCalled();
+  });
+
+  it('holds the copy while the key is made', async () => {
+    let release: (response: Response) => void = () => {};
+    fetchMock.mockImplementation(async (input) =>
+      String(input).endsWith('/api/agent/credentials/delegate')
+        ? new Promise<Response>((done) => (release = done))
+        : catalog(),
+    );
+    renderAgentCard();
+    fireEvent.click(canSubmit());
+    expect(await screen.findByText('Adding your AI key…')).toBeInTheDocument();
+    const button = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    await act(async () => fireEvent.click(button));
+    expect(writeText).not.toHaveBeenCalled();
+    await act(async () => release(delegate()));
+    expect(await copy()).toContain(KEY_LINE);
+  });
+
+  it('drops the key at Sign Agents Out without making another, and starts another account on drafting only', async () => {
+    serve();
+    const view = renderAgentCard();
+    fireEvent.click(canSubmit());
+    expect(await copy()).toContain(KEY_LINE);
+    expect(keyRequests()).toHaveLength(1);
+    // The key in the prompt is dead: it goes, and nothing asks for another while the card stays as it is.
+    act(() => void window.dispatchEvent(new Event('ce-agents-signed-out')));
+    expect(await copy()).not.toContain('ceagt_');
+    // The copied key is dead too, so the line goes, and the box is back where it starts: unticked.
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE)).not.toBeInTheDocument();
+    expect(canSubmit()).not.toBeChecked();
+    expect(keyRequests()).toHaveLength(1);
+    fireEvent.click(canSubmit());
+    expect(await copy()).toContain(KEY_LINE);
+    expect(keyRequests()).toHaveLength(2);
+
+    view.rerender(
+      <SessionVoicePrefillCard
+        sessionSlug="demo"
+        sessionConfig={AGENT_SESSION}
+        context={{ account: `0x${'9'.repeat(40)}` }}
+        workerUrl="https://worker.example"
+      />,
+    );
+    // Another person starts where everyone does: drafting only, with no key asked for.
+    await waitFor(() => expect(canSubmit()).not.toBeChecked());
+    expect(await copy()).not.toContain('ceagt_');
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE)).not.toBeInTheDocument();
+    expect(keyRequests()).toHaveLength(2);
+  });
 });

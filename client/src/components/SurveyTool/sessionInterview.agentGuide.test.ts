@@ -14,6 +14,8 @@ it('prints in the agent guide the same prompt the session page gives, with the l
       '<worker>/agent/interview-catalog?slug=<slug>&sessionUrl=<session page>',
     )
     .replace('sessionSlug "fixture-slug"', 'sessionSlug "<slug>"')
+    // The guide is read on the site itself, so its own address stands for the session page's site.
+    .replace('https://app.example.test/skill.md', 'https://contextengine.sh/skill.md')
     .replace(`starts with exactly ${JSON.stringify(page)}`, 'starts with exactly "<session page>"');
   expect(prompt).not.toMatch(/example\.test|fixture-slug/);
   expect(guide).toContain(`\n\`\`\`text\n${prompt}\n\`\`\`\n`);

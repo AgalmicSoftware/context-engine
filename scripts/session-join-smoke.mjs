@@ -50,7 +50,7 @@ async function main() {
         await page.getByRole('button', { name: 'Copy voice link' }).click();
         assert.equal(await page.evaluate(() => navigator.clipboard.readText()), voice);
         await page.getByRole('button', { name: 'Copy AI prompt' }).click();
-        assert.match(await page.evaluate(() => navigator.clipboard.readText()), /review-only Context Engine interview prefill/);
+        assert.match(await page.evaluate(() => navigator.clipboard.readText()), /Help me take part in a Context Engine session\./);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
         await page.getByTestId('ce-session-join').screenshot({ path: path.join(output, `join-${mode}-${theme}-${width}.png`) });
         console.log(`PASS Join panel ${mode} ${theme} ${width}`);

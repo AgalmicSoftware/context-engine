@@ -5,6 +5,7 @@ import {
   DEBATE_ATLAS_BUILD_ACTION,
   DEBATE_ATLAS_LIMITS,
   buildDebateAtlas,
+  buildDebateAtlasPlanPrompt,
   describeNextDebateAtlasBuild,
   dispatchDebateAtlasReadRequest,
   normalizeDebateAtlasPlan,
@@ -785,6 +786,32 @@ test('everyone who sees full Results reads atlases; elsewhere only those who may
   assert.equal(viewer.body.nextBuild, undefined);
   assert.equal(signedInViewer.body.nextBuild, undefined);
   assert.deepEqual(resultsAdmin.body.nextBuild, describeNextDebateAtlasBuild(privateResults));
+});
+
+test('the plan prompt asks for distinct branches of linked topics, with short, clear labels', () => {
+  const prompt = buildDebateAtlasPlanPrompt({ sessionName: 'Salon', questions: [{ id: 'q1', prompt: 'Cap rents?', type: 'binary', responses: 3 }] });
+  // The reply's shape and limits are as before: the branch labels' rule is the only change.
+  assert.ok(prompt.includes(`2 to ${DEBATE_ATLAS_LIMITS.branches} branches`) && prompt.includes(`at most ${DEBATE_ATLAS_LIMITS.topics} topics in all`));
+  assert.ok(prompt.includes('{ "title": "short atlas title", "branches": [{ "label": "2-5 word branch name", "summary": "one neutral sentence", "topics": [{ "label": "2-6 word topic name", "questionIds": ["q1"] }] }] }'));
+  const rules = prompt.split('\nRules:\n')[1].split('\n\n')[0].split('\n');
+  const branchRules = rules.filter((rule) => rule.startsWith('- Branch labels'));
+  assert.equal(branchRules.length, 1);
+  assert.match(branchRules[0], /short and clear/);
+  assert.match(branchRules[0], /not a list/);
+  assert.match(branchRules[0], /No two share a main word or mean nearly the same/);
+  assert.match(branchRules[0], /none is a catch-all/);
+  // Topics keep their one naming rule, and the rules stay ahead of the session's own text.
+  assert.ok(rules.includes('- Name branches and topics after what the questions ask, in plain words.'));
+  assert.ok(prompt.indexOf('- Branch labels') < prompt.indexOf('Session: "Salon"'));
+  // The opening says what a session is in plain words, with no product name a model would not know.
+  const [opening, grouping] = prompt.split('\n');
+  assert.match(opening, /^You are planning a debate atlas for a group sensemaking session: /);
+  assert.ok(!prompt.includes('Context Engine'));
+  // Branches: distinct from one another, their topics linked; a topic is defined as before.
+  assert.match(grouping, /Branches are the atlas's top level/);
+  assert.match(grouping, /logically distinct from the others/);
+  assert.match(grouping, /topics inside one share a clear link/);
+  assert.ok(grouping.includes('A topic gathers questions people can disagree about along the same lines.'));
 });
 
 test('the next build is described with the session model and placeholder prompts', () => {

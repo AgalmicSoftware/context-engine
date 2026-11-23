@@ -2681,8 +2681,7 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   text-align: left;
 }
 
-.agentHandoffHeader,
-.agentHandoffActions {
+.agentHandoffHeader {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -2694,192 +2693,6 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   color: inherit;
   font-size: 1.15rem;
   font-weight: 700;
-}
-
-// An option: its title and line, with its Copy prompt button beside them; its tick and prompt below.
-.agentHandoffOption {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px 16px;
-  align-items: start;
-  padding: 12px 0;
-
-  & + & {
-    border-top: 1px solid var(--ce-settings-border);
-  }
-
-  // The prompt card's own wrappers step aside, so its button and prompt take this grid's places.
-  // No type selector here, so the slot rule below, as specific and later, still places the button.
-  .agentHandoffKickoff,
-  .agentHandoffKickoff > * {
-    display: contents;
-  }
-
-  > *,
-  .agentHandoffKickoff > * > * {
-    grid-column: 1 / -1;
-  }
-
-  > .agentHandoffOptionText {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .agentHandoffOptionSlot {
-    grid-column: 2;
-    grid-row: 1;
-    align-self: center;
-    min-width: 11rem;
-    margin: 0;
-  }
-
-  // "Make a key" and its "?" on one line.
-  .agentHandoffActions.agentHandoffOptionSlot {
-    flex-wrap: nowrap;
-
-    .agentHandoffPrimary {
-      flex: 1 1 auto;
-      width: auto;
-    }
-  }
-
-  // On a phone, one column in the page's order: title and line, the tick, the full-width Copy prompt button, its prompt.
-  @media (max-width: 768px) {
-    grid-template-columns: minmax(0, 1fr);
-
-    .agentHandoffOptionSlot {
-      grid-column: 1;
-      grid-row: auto;
-      min-width: 0;
-    }
-  }
-}
-
-.agentHandoffOptionTitleRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-// A check drawn as a box that fills and takes a tick when ticked.
-.agentHandoffRadio {
-  position: relative;
-  display: inline-flex;
-  flex: none;
-  width: 24px;
-  height: 24px;
-  margin-top: 1px;
-
-  // Panel-scoped, to outweigh the theme rule that frames every input as a field.
-  .agentHandoffPanel & input[type='checkbox'] {
-    appearance: none;
-    width: 24px;
-    height: 24px;
-    margin: 0;
-    border: 2px solid currentColor;
-    border-radius: 50%;
-    background: transparent;
-    cursor: pointer;
-
-    &:checked {
-      border-color: var(--ce-action-accent);
-      background: var(--ce-action-accent);
-    }
-
-    &:focus-visible {
-      outline: none;
-    }
-  }
-}
-
-// Square, for "Ask me before submitting".
-.agentHandoffPanel .agentHandoffCheck input[type='checkbox'] {
-  border-radius: 4px;
-}
-
-.agentHandoffAskRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 12px;
-}
-
-.agentHandoffAsk {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0;
-  color: inherit;
-  font-size: 1rem;
-  font-weight: 650;
-  cursor: pointer;
-
-  &:focus-within {
-    outline: 2px solid var(--ce-action-accent);
-    outline-offset: 2px;
-    border-radius: 4px;
-  }
-}
-
-.agentHandoffRadioTick {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  color: var(--ce-action-accent-text);
-  font-size: 0.8rem;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-
-.agentHandoffOptionText {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.agentHandoffOptionTitle {
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.3;
-}
-
-.agentHandoffOptionDetail {
-  font-size: 0.92rem;
-  line-height: 1.4;
-}
-
-// The box's one main action: full width and tall enough to tap.
-.agentHandoffPrimary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 48px;
-  padding: 8px 16px;
-  border: 0;
-  border-radius: var(--ce-radius-8);
-  background: var(--ce-action-accent);
-  color: var(--ce-action-accent-text);
-  font-size: 1rem;
-  font-weight: 700;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--ce-action-accent-hover, var(--ce-action-accent));
-  }
-
-  &:focus-visible {
-    outline: 2px solid currentColor;
-    outline-offset: -4px;
-  }
-
-  &:disabled,
-  &[aria-disabled='true'] {
-    cursor: progress;
-    opacity: 0.75;
-  }
 }
 
 .agentHandoffToggle {
@@ -2917,52 +2730,37 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
+// "AI can submit for me", above the button, with its "?" beside it.
+.agentHandoffCanSubmit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-weight: 650;
+    cursor: pointer;
+  }
+}
+
+// The open row: the Copy prompt button, then one line about the key.
+.agentHandoffBody {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+
+  &[hidden] {
+    display: none;
+  }
+}
+
 // A "?" here reads as a mark, not a button, so hovering it draws no square behind it.
 .agentHandoffHelp:hover {
   background: transparent !important;
   opacity: 0.75;
-}
-
-// "Copy prompt" and its caret as one split button: the caret opens the whole prompt to read.
-.agentHandoffSplit {
-  display: flex;
-  flex: 1 1 auto;
-  align-items: stretch;
-  gap: 2px;
-  min-width: 0;
-
-  > .agentHandoffPrimary:first-child {
-    flex: 1 1 auto;
-    width: auto;
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-  }
-}
-
-.agentHandoffSplit > .agentHandoffPrimary.agentHandoffCaret {
-  flex: none;
-  width: 52px;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-}
-
-// Bootstrap colours code pink; commands here read as the panel's text.
-.agentHandoffCommand {
-  display: block;
-  margin: 8px 0 0;
-  padding: 8px 10px;
-  border: 1px solid var(--ce-settings-border);
-  border-radius: var(--ce-radius-6);
-  background: var(--ce-settings-field-bg);
-  color: inherit;
-  font-size: 0.9rem;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-
-  // Its display: block would otherwise outweigh the hidden attribute.
-  &[hidden] {
-    display: none;
-  }
 }
 
 // "Sign Agents Out" and its message, under both options.
@@ -2977,58 +2775,6 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   &:empty,
   &[hidden] {
     display: none;
-  }
-}
-
-// An option's prompt, to read: a small box under it, or large over the account panel.
-.agentHandoffPromptBox {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-
-  &[hidden] {
-    display: none;
-  }
-
-  .agentHandoffCommand {
-    max-height: 9rem;
-    margin: 0;
-    overflow: auto;
-  }
-}
-
-.agentHandoffPromptTools {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-
-  .agentHandoffButton {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 36px;
-  }
-}
-
-// Over the whole account panel, scrolling inside, until Minimize or Escape.
-.agentHandoffPromptLarge {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  padding: 16px;
-  border: 1px solid var(--ce-settings-border);
-  border-radius: var(--ce-radius-8);
-  // The panel colour over the surface: some themes' panel colour is a tint, and the rows must not show through.
-  background: linear-gradient(var(--ce-settings-panel-bg), var(--ce-settings-panel-bg)), var(--ce-surface);
-  color: var(--ce-settings-text);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--ce-overlay-base) 35%, transparent);
-
-  .agentHandoffCommand {
-    flex: 1 1 auto;
-    max-height: none;
-    font-size: 1rem;
   }
 }
 

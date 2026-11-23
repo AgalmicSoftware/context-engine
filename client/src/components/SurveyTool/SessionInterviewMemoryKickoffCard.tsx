@@ -1,12 +1,11 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCheck, faCopy, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faCheck, faCopy, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import SessionInterviewPrompt from './SessionInterviewPrompt';
+import AiPromptBox from '../Shared/AiPromptBox';
+import { findPromptVariables } from './aiPromptVariables';
 import { InterviewBusyLabel } from './SessionInterviewModalHeader';
-import { shouldIgnorePromptCopyEvent } from './sessionInterviewModalState';
 
 /** The prompt a check approved, when it differs from `kickoff`, and when to check again before its link runs out. */
 export type ValidatedKickoff = { prompt: string; renewAtMs?: number };
@@ -16,36 +15,42 @@ type SessionInterviewMemoryKickoffCardProps = {
   /** `retry` is true when the person pressed Retry. */
   validateKickoff: (request: { retry: boolean }) => Promise<ValidatedKickoff | void>;
   promptCopied: boolean;
-  showAgentPrompt: boolean;
   /** Resolves false when the prompt could not be copied, so it is shown selected instead. */
   onCopyPrompt: (prompt: string) => Promise<boolean>;
-  onTogglePrompt: () => void;
-  /** Shows one copy button in place of the card's copy row and its prompt toggle, and under it, once the
-   * session is checked, whatever `renderPreview` makes of the prompt that a copy would give. */
-  copyButton?: {
-    className: string;
-    testId: string;
-    /** Its name for screen readers where more than one copy button shares a list. */
-    ariaLabel?: string;
-    /** Beside the button, in a row of `rowClassName`, such as the caret of a split button. */
-    addon?: ReactNode;
-    rowClassName?: string;
-    renderPreview?: (prompt: string) => ReactNode;
-  };
+  /** While set, nothing is copied and the button turns: the prompt is about to change, as while a key is made. */
+  holdCopy?: string;
+  /** The button at a modest width in the middle of its row, for a person sent here to copy. */
+  centered?: boolean;
+  /** Lines under the button, such as the one about the key. */
+  children?: ReactNode;
+  /** The ids its copy button, its caret and its opened prompt answer to; the voice dialog's by default. */
+  testIds?: { copy: string; toggle: string; prompt: string };
+};
+
+const VOICE_TEST_IDS = {
+  copy: E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT,
+  toggle: E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE,
+  prompt: E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT,
 };
 
 // A renewal never runs sooner than this, so a link that can't be renewed isn't checked in a loop.
 const MIN_RENEW_DELAY_MS = 30 * 1000;
 
+/**
+ * The AI prompt as one split button: "Copy AI prompt" on the left, and on the right a caret that opens the
+ * prompt to read, in the "AI Prompt" box. The session is checked before anything can be copied.
+ */
 export default function SessionInterviewMemoryKickoffCard({
   kickoff,
   validateKickoff,
   promptCopied,
-  showAgentPrompt,
   onCopyPrompt,
-  onTogglePrompt,
-  copyButton,
+  holdCopy = '',
+  centered = false,
+  children,
+  testIds = VOICE_TEST_IDS,
 }: SessionInterviewMemoryKickoffCardProps) {
+  const [open, setOpen] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [validation, setValidation] = useState({ kickoff: '', pending: true, error: '', prompt: '', renewAtMs: 0 });
   const [copyError, setCopyError] = useState('');
@@ -114,6 +119,7 @@ export default function SessionInterviewMemoryKickoffCard({
   const compatible = !checking && !validationError;
   const prompt = compatible ? validation.prompt : kickoff;
   const copyPrompt = () => {
+    if (holdCopy) return;
     if (checking) {
       setCopyWaiting(true);
       return;
@@ -136,7 +142,6 @@ export default function SessionInterviewMemoryKickoffCard({
       setSelectRequest((value) => value + 1);
     });
   };
-  const promptShown = showAgentPrompt && compatible;
   const renewedPrompt = compatible ? validation.prompt : '';
   useEffect(() => {
     if (renewedPrompt) setManualPrompt((current) => (current ? renewedPrompt : current));
@@ -152,10 +157,57 @@ export default function SessionInterviewMemoryKickoffCard({
     const field = manualCopyRef.current;
     if (field && document.activeElement === field) field.setSelectionRange(0, field.value.length);
   }, [manualPrompt]);
-  const status = (
-    <>
-      {checking ? (
-        <div role="status">
+  const busy = Boolean(holdCopy) || checking;
+  const promptId = `${testIds.prompt}-box`;
+  // A refused copy shows the field below instead, so the prompt never shows twice.
+  const promptShown = open && compatible && !manualPrompt;
+  return (
+    <div className={styles.aiPromptCopyForm}>
+      <div className={centered ? `${styles.aiPromptCopy} ${styles.aiPromptCopyCentered}` : styles.aiPromptCopy}>
+        <button
+          type="button"
+          className={styles.aiPromptCopyMain}
+          onClick={copyPrompt}
+          aria-disabled={!compatible || Boolean(holdCopy)}
+          data-testid={testIds.copy}
+        >
+          <FontAwesomeIcon icon={busy ? faSpinner : promptCopied ? faCheck : faCopy} spin={busy} />
+          {promptCopied && !busy ? 'Copied' : 'Copy AI prompt'}
+        </button>
+        <button
+          type="button"
+          className={styles.aiPromptCopyCaret}
+          aria-label={open ? 'Hide the AI prompt' : 'Read the AI prompt'}
+          aria-expanded={promptShown}
+          aria-controls={promptId}
+          aria-disabled={!compatible}
+          onClick={() => {
+            if (open || compatible) setOpen(!open);
+          }}
+          data-testid={testIds.toggle}
+        >
+          <FontAwesomeIcon icon={open ? faCaretUp : faCaretDown} />
+        </button>
+      </div>
+      {children}
+      {promptShown ? (
+        <AiPromptBox
+          id={promptId}
+          testId={testIds.prompt}
+          prompt={prompt}
+          variables={findPromptVariables(prompt)}
+          onCopy={copyPrompt}
+          copied={promptCopied}
+        />
+      ) : null}
+      {/* Said to a screen reader; on screen the button turns. */}
+      {holdCopy ? (
+        <div role="status" className={styles.sessionListeningSrOnly}>
+          {holdCopy}
+        </div>
+      ) : null}
+      {checking && !holdCopy ? (
+        <div role="status" className={copyWaiting ? undefined : styles.sessionListeningSrOnly}>
           <InterviewBusyLabel
             label={
               copyWaiting
@@ -180,6 +232,7 @@ export default function SessionInterviewMemoryKickoffCard({
         </div>
       ) : null}
       {copyError ? <div role="alert">{copyError}</div> : null}
+      {/* The whole prompt, any key in it included: this field is what the person copies by hand. */}
       {manualPrompt && !validationError ? (
         <textarea
           ref={manualCopyRef}
@@ -187,122 +240,8 @@ export default function SessionInterviewMemoryKickoffCard({
           readOnly
           rows={6}
           value={manualPrompt}
-          aria-label="Memory augmentation prompt to copy"
+          aria-label="AI prompt to copy"
         />
-      ) : null}
-    </>
-  );
-  if (copyButton) {
-    return (
-      <div className={styles.sessionAgentKickoffButtonForm}>
-        <div className={copyButton.rowClassName}>
-          <button
-            type="button"
-            className={copyButton.className}
-            onClick={copyPrompt}
-            aria-disabled={!compatible}
-            aria-label={copyButton.ariaLabel}
-            data-testid={copyButton.testId}
-          >
-            <FontAwesomeIcon icon={promptCopied ? faCheck : faCopy} />
-            {promptCopied ? 'Copied' : 'Copy prompt'}
-          </button>
-          {compatible ? copyButton.addon : null}
-        </div>
-        {/* A refused copy shows the field below instead, so the prompt never shows twice. */}
-        {compatible && !manualPrompt && copyButton.renderPreview ? copyButton.renderPreview(prompt) : null}
-        {status}
-      </div>
-    );
-  }
-  return (
-    <div
-      className={styles.sessionAgentKickoff}
-      onClick={(event) => {
-        if (!shouldIgnorePromptCopyEvent(event.target)) copyPrompt();
-      }}
-    >
-      <div className={styles.sessionAgentKickoffRow}>
-        <div
-          role="button"
-          tabIndex={0}
-          className={`${styles.sessionAgentKickoffCopyTarget} ${promptCopied ? styles.sessionAgentKickoffCopied : ''}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            copyPrompt();
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              copyPrompt();
-            }
-          }}
-          aria-disabled={!compatible}
-          aria-label={promptCopied ? 'Memory augmentation prompt copied' : 'Copy memory augmentation prompt'}
-          title={promptCopied ? 'Copied' : 'Copy memory augmentation prompt'}
-          data-ce-control-appearance="frameless"
-          data-testid={E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT}
-        >
-          <span className={styles.sessionAgentKickoffTitle}>
-            <span className={styles.sessionAgentKickoffCopyBadge} aria-hidden="true">
-              <FontAwesomeIcon icon={promptCopied ? faCheck : faCopy} />
-              <span>{promptCopied ? 'Copied' : 'Copy'}</span>
-            </span>
-            <span>{promptCopied ? ' prompt to clipboard' : ' and paste this prompt into ChatGPT or Claude.'}</span>
-          </span>
-        </div>
-        <div className={styles.sessionAgentKickoffActions}>
-          <button
-            type="button"
-            className={styles.sessionAgentKickoffToggle}
-            data-ce-control-appearance="frameless"
-            onClick={() => {
-              if (showAgentPrompt || compatible) onTogglePrompt();
-            }}
-            aria-expanded={promptShown}
-            aria-controls="ce-session-interview-agent-prompt"
-            data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE}
-          >
-            <span>Prompt</span>
-            <FontAwesomeIcon
-              icon={faCaretDown}
-              className={`${styles.sessionAgentKickoffCaret} ${
-                showAgentPrompt ? styles.sessionAgentKickoffCaretExpanded : ''
-              }`}
-            />
-          </button>
-        </div>
-      </div>
-      {status}
-      {promptShown ? (
-        <div
-          id="ce-session-interview-agent-prompt"
-          className={styles.sessionAgentKickoffPrompt}
-          data-testid={E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT}
-          data-ce-no-background-copy="true"
-        >
-          <div className={styles.sessionAgentKickoffPromptHelpRow}>
-            <button
-              type="button"
-              id="ce-interview-agent-prompt-help"
-              className={styles.sessionInterviewHeaderButton}
-              data-ce-control-appearance="frameless"
-              aria-label="About the interview prompt"
-            >
-              <FontAwesomeIcon icon={faQuestionCircle} />
-            </button>
-            <UncontrolledTooltip
-              target="ce-interview-agent-prompt-help"
-              placement="top-end"
-              fade={false}
-              trigger="hover focus"
-              autohide={false}
-            >
-              Allows your agent to predict your responses and raise better interview questions.
-            </UncontrolledTooltip>
-          </div>
-          <SessionInterviewPrompt prompt={prompt} />
-        </div>
       ) : null}
     </div>
   );

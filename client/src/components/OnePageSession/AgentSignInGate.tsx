@@ -83,7 +83,6 @@ export default function AgentSignInGate({
   const codeArrivals = useSyncExternalStore(subscribeAgentSignInCode, readAgentSignInCodeArrivals);
   const [phase, setPhase] = useState<Phase>('idle');
   const [note, setNote] = useState<{ text: string; isError: boolean } | null>(null);
-  const [fromLink, setFromLink] = useState(false);
   // Counts the person's dismissals, so the notice goes at once; what is dismissed is kept with the account.
   const [, setDismissals] = useState(0);
   // Whose place the link's sign-in would take, shown when asking.
@@ -121,7 +120,6 @@ export default function AgentSignInGate({
       // A new sign-in from a link is told in full, whatever was dismissed before.
       showAgentNoticeAgain();
       enterAgentLinkAccount(target, reply);
-      setFromLink(true);
       setPhase('idle');
     },
     [target],
@@ -487,10 +485,7 @@ export default function AgentSignInGate({
   if (here.via !== 'passkey_link') {
     if (dismissed) return null;
     return notice(
-      <>
-        {fromLink ? 'Signed in from your agent’s link. ' : ''}You are signed in as {who}, the account your AI agent set
-        up.
-      </>,
+      <>Signed in as {who}, the account your agent set up.</>,
       // With a passkey already attached, or while that is being asked, no passkey button is shown.
       <>
         {passkeyAttached === false ? panel : null}

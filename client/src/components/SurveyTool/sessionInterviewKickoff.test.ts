@@ -68,7 +68,8 @@ it('negotiates v4 to v6, binds the session and exact version/hash, and distingui
   expect(kickoff).toContain(
     'Never say where I live more precisely than my country anywhere in the packet; leave questions asking for a smaller place unanswered.',
   );
-  expect(kickoff.length).toBeLessThan(4500);
+  // The shared steps take about a quarter of it.
+  expect(kickoff.length).toBeLessThan(6900);
 });
 
 it('keeps the review link on this page’s own session URL whatever the Worker’s catalog says', () => {
@@ -120,7 +121,7 @@ it('puts a signed-in person’s ticket only in their catalog link, with a line s
   // The rest of the request is the same, so the served-client check still reads its versions.
   expect(kickoff.replace(`&ticket=${ticket}`, '').replace(/The link is private to me[^\n]*\n/, '')).toBe(plain);
   expect(plain).not.toMatch(/ticket|private to me/);
-  expect(kickoff.length).toBeLessThan(4800);
+  expect(kickoff.length).toBeLessThan(7200);
 });
 
 it('reads the person’s AI’s group picks from a packet: listed IDs once each, reasons trimmed, confidence 0-1', () => {
