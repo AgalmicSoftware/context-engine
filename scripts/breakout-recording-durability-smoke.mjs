@@ -396,7 +396,7 @@ try {
     return chunks.length >= count && chunks.slice(0, count).every((chunk) => chunk.status === 'complete') && chunks;
   });
   const recorderReady = async (page) => {
-    await page.getByRole('checkbox', { name: 'Label speakers' }).waitFor({ timeout: 60_000 });
+    await page.getByRole('checkbox', { name: 'More than 4 people in the room' }).waitFor({ timeout: 60_000 });
     await page.waitForFunction(() => {
       const record = document.querySelector('[data-testid="ce-session-listening-start"]');
       return record && !record.disabled && [...document.querySelectorAll('.modal, .modal-dialog')].every((element) => getComputedStyle(element).opacity === '1');

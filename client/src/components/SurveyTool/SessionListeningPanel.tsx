@@ -99,6 +99,9 @@ export { formatSessionRecordingElapsed };
 
 const KEEP_AUDIO_HELP =
   'Closes without waiting for transcription. Audio still waiting for it stays on this device and resumes uploading when you reopen this recording.';
+const MANY_VOICES_KEY = 'ce:record-more-than-four:v1';
+const MANY_VOICES_HELP =
+  "Ticked, the transcript is plain text, with no speaker labels and no part for each person. Unticked, OpenAI labels who spoke as Person 1, Person 2…: up to four voices keep their number; with more, numbers may change. Numbers don't identify people.";
 
 const getSessionInstructions = (sessionConfig: unknown) =>
   sessionConfig && typeof sessionConfig === 'object'
@@ -120,7 +123,6 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     closeActionRef,
     onBusyChange,
   } = props;
-  const [labelSpeakers, setLabelSpeakers] = useState(true);
   const [speakerLabelsSupported, setSpeakerLabelsSupported] = useState<boolean | null>(null);
   const [speakerLabelsCheckTimedOut, setSpeakerLabelsCheckTimedOut] = useState(false);
   const recordPressedRef = useRef(false);
@@ -159,8 +161,19 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       return false;
     }
   });
+  // More voices than speaker labels keep apart: a plain transcript, with no part for each person. Kept on this
+  // device, so a recording reopened in the same room stays plain.
+  const [manyVoices, setManyVoices] = useState(() => {
+    try {
+      return window.localStorage.getItem(MANY_VOICES_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+  // Only where the choice is shown: one kept from an OpenAI session does nothing where labels aren't offered.
+  const plainRoom = manyVoices && speakerLabelsSupported === true;
   const speakerHelpId = `ce-record-speaker-help-${useId().replace(/:/g, '')}`;
-  const labelsHelpId = `ce-speaker-labels-help-${useId().replace(/:/g, '')}`;
+  const manyVoicesHelpId = `ce-many-voices-help-${useId().replace(/:/g, '')}`;
   const keepHelpId = `ce-keep-audio-help-${useId().replace(/:/g, '')}`;
   const recordingContext = useMemo(
     () => ({
@@ -175,7 +188,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     context: recordingContext,
     workerUrl,
     chunkMs: DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
-    labelSpeakers: panelMode === 'recordGroup' && speakerLabelsSupported === true && labelSpeakers,
+    labelSpeakers: panelMode === 'recordGroup' && speakerLabelsSupported === true && !plainRoom,
     recordSpeakerAudio: panelMode === 'recordGroup' && recordSpeakerAudio,
   });
   const transcriptContext = useTranscriptContextUpload({
@@ -735,23 +748,34 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
               <label>
                 <input
                   type="checkbox"
-                  checked={labelSpeakers}
+                  checked={manyVoices}
+                  aria-describedby={`${manyVoicesHelpId}-about`}
                   disabled={isRecorderSessionActive || recorder.isBusy || Boolean(recorder.labelsUnavailableReason)}
-                  onChange={(event) => setLabelSpeakers(event.target.checked)}
+                  onChange={(event) => {
+                    setManyVoices(event.target.checked);
+                    try {
+                      window.localStorage.setItem(MANY_VOICES_KEY, String(event.target.checked));
+                    } catch {
+                      /* The option still works when browser storage is unavailable. */
+                    }
+                  }}
                 />{' '}
-                Label speakers
+                More than 4 people in the room
               </label>
               <button
                 type="button"
-                id={labelsHelpId}
+                id={manyVoicesHelpId}
                 className={styles.sessionInterviewHeaderButton}
-                aria-label="About speaker labels"
+                aria-label="About more than 4 people in the room"
+                aria-describedby={`${manyVoicesHelpId}-about`}
               >
                 <FontAwesomeIcon icon={faQuestionCircle} />
               </button>
-              <UncontrolledTooltip target={labelsHelpId} trigger="hover focus" autohide={false}>
-                Shows who spoke as Person 1, Person 2… using OpenAI. Up to four voices keep their number across the
-                conversation; a fifth may change number. Numbers don&apos;t identify people.
+              <span id={`${manyVoicesHelpId}-about`} hidden>
+                {MANY_VOICES_HELP}
+              </span>
+              <UncontrolledTooltip target={manyVoicesHelpId} trigger="hover focus" autohide={false}>
+                {MANY_VOICES_HELP}
               </UncontrolledTooltip>
             </span>
           ) : null}
@@ -850,11 +874,11 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             recorder.segments.some((segment) => !['complete', 'failed'].includes(segment.status))
           }
           onClear={() => setConfirmClear(true)}
-          onSelectSpeaker={panelMode === 'recordGroup' ? setClaimPerson : undefined}
+          onSelectSpeaker={panelMode === 'recordGroup' && !plainRoom ? setClaimPerson : undefined}
         />
       )}
 
-      {panelMode === 'recordGroup' && hasTranscript ? (
+      {panelMode === 'recordGroup' && hasTranscript && !plainRoom ? (
         <SessionTranscriptClaimShare
           transcript={shownTranscript}
           sessionSlug={sessionSlug}

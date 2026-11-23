@@ -1715,28 +1715,78 @@ it('remembers the optional speaker-audio setting and locks it while recording', 
   window.localStorage.removeItem('ce:record-speaker-audio:v1');
 });
 
-it('defaults speaker labels on for OpenAI Group Conversation and lets the recorder opt out', async () => {
-  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
-  const { rerender } = render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
-  const toggle = await screen.findByRole('checkbox', { name: 'Label speakers' });
-  expect(toggle).toBeChecked();
-  expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
-  fireEvent.click(toggle);
-  expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
-  rerender(<SessionListeningPanel sessionSlug="workshop" panelMode="listening" />);
-  expect(screen.queryByRole('checkbox', { name: 'Label speakers' })).not.toBeInTheDocument();
-  expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+it('labels speakers by default, and gives a room of more than 4 a plain transcript with no parts', async () => {
+  const key = 'ce:record-more-than-four:v1';
+  window.localStorage.removeItem(key);
+  const labelled =
+    'Person 1: Enough words here for a whole part of the talk.\nPerson 2: And quite a lot more from another person.';
+  const choice = () => screen.findByRole('checkbox', { name: 'More than 4 people in the room' });
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ transcript: labelled }));
+  try {
+    const { unmount } = render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+    expect(await choice()).not.toBeChecked();
+    // The "?" help is read with the box and with its button, not only shown on hover.
+    expect(await choice()).toHaveAccessibleDescription(/^Ticked, the transcript is plain text/);
+    expect(screen.getByRole('button', { name: 'About more than 4 people in the room' })).toHaveAccessibleDescription(
+      /up to four voices keep their number/,
+    );
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Person 2:' })).toBeInTheDocument();
+    fireEvent.click(await choice());
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+    // Labels from an earlier part stay in its text, but no part is given out.
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Person 2:' })).toBeNull();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).toHaveTextContent('Person 2:');
+    expect(window.localStorage.getItem(key)).toBe('true');
+    // Reopened on this device, the room stays plain.
+    unmount();
+    const { rerender } = render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+    expect(await choice()).toBeChecked();
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({ transcript: labelled, isRecording: true, status: 'recording' }),
+    );
+    rerender(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+    expect(await choice()).toBeDisabled();
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ transcript: labelled }));
+    rerender(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+    fireEvent.click(await choice());
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeInTheDocument();
+    expect(window.localStorage.getItem(key)).toBe('false');
+    rerender(<SessionListeningPanel sessionSlug="workshop" panelMode="listening" />);
+    expect(screen.queryByRole('checkbox', { name: 'More than 4 people in the room' })).not.toBeInTheDocument();
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+  } finally {
+    window.localStorage.removeItem(key);
+  }
 });
 
-it.each(['custom', 'local'])('hides speaker labels for the effective %s transcription provider', async (provider) => {
+it.each(['custom', 'local'])('hides the label choice for the effective %s transcription provider', async (provider) => {
   jest
     .mocked(getEffectiveTranscriptionConfig)
     .mockResolvedValueOnce({ provider } as Awaited<ReturnType<typeof getEffectiveTranscriptionConfig>>);
-  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
-  render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
-  await waitFor(() => expect(getEffectiveTranscriptionConfig).toHaveBeenCalled());
-  expect(screen.queryByRole('checkbox', { name: 'Label speakers' })).not.toBeInTheDocument();
-  expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+  // Ticked in an OpenAI session on this device: hidden here, the choice hides no part either.
+  window.localStorage.setItem('ce:record-more-than-four:v1', 'true');
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({
+      transcript:
+        'Person 1: Enough words here for a whole part of the talk.\nPerson 2: And quite a lot more from another person.',
+    }),
+  );
+  try {
+    render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+    await waitFor(() => expect(getEffectiveTranscriptionConfig).toHaveBeenCalled());
+    await nextFrame();
+    expect(screen.queryByRole('checkbox', { name: 'More than 4 people in the room' })).not.toBeInTheDocument();
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Person 2:' })).toBeInTheDocument();
+  } finally {
+    window.localStorage.removeItem('ce:record-more-than-four:v1');
+  }
 });
 
 it('shows when recording continues without speaker labels', async () => {
@@ -1777,7 +1827,7 @@ it('waits for the transcription provider before starting Group Conversation with
     resolve({ provider: 'openai' } as Config);
   });
   expect(start).toBeEnabled();
-  expect(screen.getByRole('checkbox', { name: 'Label speakers' })).toBeChecked();
+  expect(screen.getByRole('checkbox', { name: 'More than 4 people in the room' })).not.toBeChecked();
   expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
   fireEvent.click(start);
   expect(startRecording).toHaveBeenCalledTimes(1);
@@ -1950,7 +2000,7 @@ it('applies a provider check that answers after two seconds as long as Record ha
     await act(async () => {
       resolve({ provider: 'openai' } as Config);
     });
-    expect(screen.getByRole('checkbox', { name: 'Label speakers' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'More than 4 people in the room' })).not.toBeChecked();
     expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
     expect(screen.queryByText(/Speaker label check timed out/)).not.toBeInTheDocument();
   } finally {
@@ -1988,7 +2038,7 @@ it('makes Record available with plain transcription after two seconds and ignore
       resolve({ provider: 'openai' } as Config);
     });
     expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
-    expect(screen.queryByRole('checkbox', { name: 'Label speakers' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'More than 4 people in the room' })).not.toBeInTheDocument();
   } finally {
     jest.useRealTimers();
   }
