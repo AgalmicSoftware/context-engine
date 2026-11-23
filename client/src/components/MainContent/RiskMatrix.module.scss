@@ -1169,13 +1169,75 @@ button.cell {
   }
 }
 
-// Phones scroll a grid both ways inside its card, so its labels stay in view: the row labels at the left, the column
-// labels at the top, the corner over both. A label keeps the tint it has on the card, laid over the card and the
-// Results panel beneath (the card is see-through in some themes), with a rim of the same over the gaps, so squares
-// passing beneath never show through. The rim outranks the theme's button shadow (and its frameless reset), or it
-// would not draw on the headings.
+// A grid wider than its card scrolls sideways inside it with its labels in view: the row labels stay at the left, the
+// corner over them. A phone also scrolls the grid down inside its card, so there the column labels stay at the top. A
+// label keeps the tint it has on the card, laid over the card and the Results panel beneath (the card is see-through in
+// some themes), with a rim of the same over the gaps, so squares passing beneath never show through. The rim outranks
+// the theme's button shadow (and its frameless reset), or it would not draw on the headings.
 @mixin pinned-face($tint) {
   background: linear-gradient($tint, $tint), linear-gradient($card-bg, $card-bg), var(--ce-surface-sunken);
+}
+
+.pinnedScroll {
+  // A square reached by keyboard stops clear of the pinned labels (the header row is at least 72px, plus its rim).
+  scroll-padding: 84px 0 0 130px;
+}
+
+.axisTop,
+.axisLeft {
+  position: sticky;
+  z-index: 1;
+  @include pinned-face(color-mix(in srgb, var(--ce-text-inverse) 8%, transparent));
+  box-shadow:
+    0 0 0 6px $card-bg,
+    0 0 0 6px var(--ce-surface-sunken) !important;
+
+  &:hover,
+  &:focus-visible {
+    @include pinned-face(color-mix(in srgb, var(--ce-action-accent) 14%, transparent));
+  }
+
+  // The ring is drawn inside the label: outside, a neighbour's rim or the scroll edge would cover it. A theme's own
+  // ring keeps its look; only its offset is moved in.
+  &:focus-visible {
+    outline: 3px solid var(--ce-focus-ring);
+    outline-offset: -3px !important;
+  }
+}
+
+// A square's ring is drawn inside it too: outside, the rim of a label beside it would cover that side.
+.gridCell:focus-visible {
+  outline-offset: -3px !important;
+}
+
+.axisTop {
+  top: 0;
+}
+
+.axisLeft {
+  left: 0;
+}
+
+.axisTop.axisLeft {
+  z-index: 2;
+}
+
+// The corner is no control, so it keeps its face under the pointer.
+.cornerCell,
+.cornerCell:hover {
+  @include pinned-face(color-mix(in srgb, var(--ce-text-inverse) 4%, transparent));
+}
+
+.activeHeaderCell {
+  @include pinned-face(color-mix(in srgb, var(--ce-action-accent) 18%, transparent));
+}
+
+// The corner fills its cell, so headings scrolled beneath it never show above or below its words.
+.detailAxis.axisLeft {
+  @include pinned-face(transparent);
+  display: flex;
+  align-items: center;
+  align-self: stretch;
 }
 
 @media (max-width: 768px) {
@@ -1188,60 +1250,9 @@ button.cell {
     padding-inline: 8px;
   }
 
+  // The grid scrolls down inside its card as well, so the column labels stay at the top.
   .pinnedScroll {
     max-height: 70svh;
     overflow: auto;
-    // A square reached by keyboard stops clear of the pinned labels (the header row is at least 72px, plus its rim).
-    scroll-padding: 84px 0 0 130px;
-  }
-
-  .axisTop,
-  .axisLeft {
-    position: sticky;
-    z-index: 1;
-    @include pinned-face(color-mix(in srgb, var(--ce-text-inverse) 8%, transparent));
-    box-shadow:
-      0 0 0 6px $card-bg,
-      0 0 0 6px var(--ce-surface-sunken) !important;
-
-    &:hover,
-    &:focus-visible {
-      @include pinned-face(color-mix(in srgb, var(--ce-action-accent) 14%, transparent));
-    }
-
-    // The ring is drawn inside the label: outside, a neighbour's rim or the scroll edge would cover it. A theme's own
-    // ring keeps its look; only its offset is moved in.
-    &:focus-visible {
-      outline: 3px solid var(--ce-focus-ring);
-      outline-offset: -3px !important;
-    }
-  }
-
-  .axisTop {
-    top: 0;
-  }
-
-  .axisLeft {
-    left: 0;
-  }
-
-  .axisTop.axisLeft {
-    z-index: 2;
-  }
-
-  .cornerCell {
-    @include pinned-face(color-mix(in srgb, var(--ce-text-inverse) 4%, transparent));
-  }
-
-  .activeHeaderCell {
-    @include pinned-face(color-mix(in srgb, var(--ce-action-accent) 18%, transparent));
-  }
-
-  // The corner fills its cell, so headings scrolled beneath it never show above or below its words.
-  .detailAxis.axisLeft {
-    @include pinned-face(transparent);
-    display: flex;
-    align-items: center;
-    align-self: stretch;
   }
 }

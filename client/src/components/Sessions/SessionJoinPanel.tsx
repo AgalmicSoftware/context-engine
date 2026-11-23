@@ -177,13 +177,12 @@ export default function SessionJoinPanel({
           <div className={styles.heading}>For your AI</div>
           <button
             type="button"
-            aria-label="Copy AI prompt"
             disabled={!compatible}
             onClick={() => {
               void copy(kickoff);
             }}
           >
-            Copy prompt
+            {validation.error || compatible ? 'Copy AI prompt' : 'Loading questions…'}
           </button>
           {validation.error ? (
             <div role="alert">
@@ -193,7 +192,7 @@ export default function SessionJoinPanel({
               </button>
             </div>
           ) : !compatible ? (
-            <div role="status">Checking session compatibility…</div>
+            <div role="status">Loading the session’s questions…</div>
           ) : null}
           {returnUrl && copyState.key === returnUrl ? (
             <div role={copyState.error ? 'alert' : 'status'}>

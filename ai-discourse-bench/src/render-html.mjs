@@ -4556,28 +4556,30 @@ export const renderHtmlReport = (inputReport) => {
     .riskMatrixHeaderCell.headerCell.detailHeading:hover { border-color: rgba(190, 199, 230, 0.82); background: rgba(255, 255, 255, 0.08); box-shadow: none; }
     .riskMatrixCell.cell.detailHeading { min-height: 56px; border-color: rgba(190, 199, 230, 0.82); font-size: 0.82rem; hyphens: auto; }
     .subgridContainer.detailGrid { padding: 5px; }
-    /* Phones scroll a grid both ways inside its card, so its labels stay in view: row labels at the left, column labels
-       at the top, the corner over both. Each keeps its tint, laid over the card and the page, with a rim of the same over
-       the gaps, so squares passing beneath never show through. */
+    /* A grid wider than its card scrolls sideways inside it with its labels in view: row labels at the left, the corner
+       over them. A phone also scrolls the grid down inside its card, so there the column labels stay at the top. Each
+       label keeps its tint, laid over the card and the page, with a rim of the same over the gaps, so squares passing
+       beneath never show through. */
+    .riskMatrixGridScroll.gridScroll { scroll-padding: 84px 0 0 130px; }
+    .riskMatrixSectionCard .axisTop,
+    .riskMatrixSectionCard .axisLeft { position: sticky; z-index: 1; background: linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08)), linear-gradient(var(--ce-card-bg), var(--ce-card-bg)), var(--ce-color-bg); box-shadow: 0 0 0 6px var(--ce-card-bg), 0 0 0 6px var(--ce-color-bg); }
+    .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.axisTop:hover,
+    .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.axisLeft:hover,
+    .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.axisTop:focus-visible,
+    .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.axisLeft:focus-visible { background: linear-gradient(rgba(77, 255, 164, 0.14), rgba(77, 255, 164, 0.14)), linear-gradient(var(--ce-card-bg), var(--ce-card-bg)), var(--ce-color-bg); box-shadow: 0 0 0 6px var(--ce-card-bg), 0 0 0 6px var(--ce-color-bg); }
+    /* The ring is drawn inside the label: outside, a neighbour's rim or the scroll edge would cover it. */
+    .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.axisTop:focus-visible,
+    .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.axisLeft:focus-visible { outline: 3px solid #4dffa4; outline-offset: -3px; }
+    .riskMatrixSectionCard .axisTop { top: 0; }
+    .riskMatrixSectionCard .axisLeft { left: 0; }
+    .riskMatrixSectionCard .axisTop.axisLeft { z-index: 2; }
+    .riskMatrixSectionCard .riskMatrixCornerCell.cornerCell.axisTop { background: linear-gradient(rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.04)), linear-gradient(var(--ce-card-bg), var(--ce-card-bg)), var(--ce-color-bg); }
+    .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.activeHeaderCell { background: linear-gradient(rgba(77, 255, 164, 0.18), rgba(77, 255, 164, 0.18)), linear-gradient(var(--ce-card-bg), var(--ce-card-bg)), var(--ce-color-bg); }
+    .riskMatrixSectionCard .detailAxis.axisLeft { background: linear-gradient(var(--ce-card-bg), var(--ce-card-bg)), var(--ce-color-bg); display: flex; align-items: center; align-self: stretch; }
     @media (max-width: 768px) {
       .riskMatrixEmbedded.embedded { padding-left: 0; padding-right: 0; }
       .riskMatrixEmbedded .riskMatrixSectionCard.sectionCard { padding-left: 8px; padding-right: 8px; }
-      .riskMatrixGridScroll.gridScroll { max-height: 70svh; overflow: auto; scroll-padding: 84px 0 0 130px; }
-      .riskMatrixSectionCard .axisTop,
-      .riskMatrixSectionCard .axisLeft { position: sticky; z-index: 1; background: linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08)), linear-gradient(var(--ce-card-bg), var(--ce-card-bg)), var(--ce-color-bg); box-shadow: 0 0 0 6px var(--ce-card-bg), 0 0 0 6px var(--ce-color-bg); }
-      .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.axisTop:hover,
-      .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.axisLeft:hover,
-      .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.axisTop:focus-visible,
-      .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.axisLeft:focus-visible { background: linear-gradient(rgba(77, 255, 164, 0.14), rgba(77, 255, 164, 0.14)), linear-gradient(var(--ce-card-bg), var(--ce-card-bg)), var(--ce-color-bg); box-shadow: 0 0 0 6px var(--ce-card-bg), 0 0 0 6px var(--ce-color-bg); }
-      /* The ring is drawn inside the label: outside, a neighbour's rim or the scroll edge would cover it. */
-      .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.axisTop:focus-visible,
-      .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.axisLeft:focus-visible { outline: 3px solid #4dffa4; outline-offset: -3px; }
-      .riskMatrixSectionCard .axisTop { top: 0; }
-      .riskMatrixSectionCard .axisLeft { left: 0; }
-      .riskMatrixSectionCard .axisTop.axisLeft { z-index: 2; }
-      .riskMatrixSectionCard .riskMatrixCornerCell.cornerCell.axisTop { background: linear-gradient(rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.04)), linear-gradient(var(--ce-card-bg), var(--ce-card-bg)), var(--ce-color-bg); }
-      .riskMatrixSectionCard .riskMatrixHeaderCell.headerCell.activeHeaderCell { background: linear-gradient(rgba(77, 255, 164, 0.18), rgba(77, 255, 164, 0.18)), linear-gradient(var(--ce-card-bg), var(--ce-card-bg)), var(--ce-color-bg); }
-      .riskMatrixSectionCard .detailAxis.axisLeft { background: linear-gradient(var(--ce-card-bg), var(--ce-card-bg)), var(--ce-color-bg); display: flex; align-items: center; align-self: stretch; }
+      .riskMatrixGridScroll.gridScroll { max-height: 70svh; overflow: auto; }
     }
     .riskMatrixCell.cell.detailCell { flex-direction: column; gap: 4px; min-height: 72px; border-color: rgba(190, 199, 230, 0.82); }
     .riskMatrixCell.cell.detailCellEmpty { background: transparent; border-style: dashed; }

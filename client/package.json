@@ -1,6 +1,6 @@
 {
   "name": "client",
-  "version": "0.9.35",
+  "version": "0.9.36",
   "description": "Context Engine — React client for sessions, surveys, and SBT-gated encryption",
   "author": "Context Engine Contributors",
   "license": "MPL-2.0",
@@ -60,8 +60,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "jest",
     "test:coverage": "npm run test:coverage:full-universe",
-    "test:coverage:full-universe": "node --max-old-space-size=4096 node_modules/jest/bin/jest.js --config jest.full-universe.config.cjs --watchAll=false --runInBand --coverage --coverageReporters=json --coverageReporters=json-summary --coverageReporters=lcov --coverageReporters=text-summary",
-    "test:coverage:shard": "node --max-old-space-size=4096 node_modules/jest/bin/jest.js --config jest.full-universe.config.cjs --watchAll=false --runInBand --coverage --coverageReporters=json",
+    "test:coverage:full-universe": "node --max-old-space-size=6144 node_modules/jest/bin/jest.js --config jest.full-universe.config.cjs --watchAll=false --runInBand --coverage --coverageReporters=json --coverageReporters=json-summary --coverageReporters=lcov --coverageReporters=text-summary",
+    "test:coverage:shard": "node --max-old-space-size=6144 node_modules/jest/bin/jest.js --config jest.full-universe.config.cjs --watchAll=false --runInBand --coverage --coverageReporters=json",
     "parity:fixtures": "GENERATE_PARITY_FIXTURES=1 jest --runTestsByPath src/utilities/survey/parityFixtures.test.js --watchAll=false",
     "commonground:export": "GENERATE_COMMONGROUND_EXPORT=1 jest --runTestsByPath src/utilities/survey/commongroundExport.test.js --watchAll=false",
     "typecheck": "tsc --noEmit",

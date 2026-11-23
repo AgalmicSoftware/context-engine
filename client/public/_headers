@@ -25,6 +25,11 @@
   Content-Type: text/markdown; charset=utf-8
   X-Content-Type-Options: nosniff
 
+# Where to report a security problem (RFC 9116): plain text, never a page.
+/.well-known/security.txt
+  Content-Type: text/plain; charset=utf-8
+  X-Content-Type-Options: nosniff
+
 # Published media uses versioned filenames. List only files that exist; never a wildcard.
 /media/product-film/v1/context-engine-film-720p.mp4
   Cache-Control: public, max-age=31536000, immutable

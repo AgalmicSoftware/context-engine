@@ -144,6 +144,14 @@
   // after the long wait is reported.
   window.setTimeout(show, WAIT_WHILE_LOADING_MS);
 
+  // This script ran, so it speaks for a load that fails: the shell's own last sentence is for when it cannot.
+  var dropShellMessage = function dropShellMessage() {
+    var blocked = document.getElementById('ce-boot-blocked');
+    if (blocked) blocked.remove();
+  };
+  if (document.getElementById(LOADING_ID)) dropShellMessage();
+  else document.addEventListener('DOMContentLoaded', dropShellMessage);
+
   // The loading line: its bar moves as files arrive, and a slow load is told that it is slow, not broken.
   progressTimer = window.setInterval(showProgress, 300);
   window.setTimeout(function saySlow() {
@@ -170,6 +178,8 @@
         stopLoading();
       }
     }).observe(root, { childList: true });
+    // The app may have drawn before this began to watch.
+    if (appShown()) stopLoading();
   };
   if (document.getElementById('root')) watchRoot();
   else document.addEventListener('DOMContentLoaded', watchRoot);

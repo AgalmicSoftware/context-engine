@@ -1,5 +1,5 @@
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SessionJoinPanel from './SessionJoinPanel';
 import { buildExternalInterviewKickoff } from '../SurveyTool/sessionInterview';
 import {
@@ -71,12 +71,34 @@ it('shares the voice link and the existing AI prompt without private query or fr
   expect(writeText.mock.calls.at(-1)?.[0]).not.toMatch(/paste what it shows/);
 });
 
+it('says it is loading until the session’s questions are read, and never copies a prompt without their ids', async () => {
+  let served: (value: { ticket: string; catalog: Record<string, unknown> }) => void = () => {};
+  verify.mockReturnValueOnce(new Promise((resolve) => (served = resolve)));
+  render(<SessionJoinPanel sessionUrl={sessionUrl} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Interview & share' }));
+  // The button is named by what it shows.
+  const copyButton = screen.getByRole('button', { name: 'Loading questions…' });
+  expect(copyButton).toBeDisabled();
+  expect(screen.getByRole('status')).toHaveTextContent('Loading the session’s questions…');
+  fireEvent.click(copyButton);
+  expect(writeText).not.toHaveBeenCalled();
+  await act(async () => served({ ticket: '', catalog }));
+  expect(copyButton).toBeEnabled();
+  expect(copyButton).toHaveAccessibleName('Copy AI prompt');
+  fireEvent.click(copyButton);
+  await waitFor(() =>
+    expect(writeText.mock.calls.at(-1)?.[0]).toContain('Question ids: 1 0xq1 binary, 2 0xq2 freeform'),
+  );
+});
+
 it('keeps the prompt unavailable when the catalog is incompatible and supports retry', async () => {
   verify.mockRejectedValueOnce(new Error('The session needs an updated catalog.'));
   render(<SessionJoinPanel sessionUrl={sessionUrl} />);
   fireEvent.click(screen.getByRole('button', { name: 'Interview & share' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('updated catalog');
   expect(screen.getByRole('button', { name: 'Copy AI prompt' })).toBeDisabled();
+  // An error is not a loading state: the button names what it would copy, and Retry is beside it.
+  expect(screen.queryByRole('button', { name: 'Loading questions…' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Copy AI prompt' })).toBeEnabled());
 });

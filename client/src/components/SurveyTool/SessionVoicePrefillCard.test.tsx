@@ -24,13 +24,15 @@ const tokenMock = jest.mocked(getWorkerSessionToken);
 // The card remembers whom it asked for as long as the page is open, so each test signs in as someone new.
 let people = 0;
 let ACCOUNT = '';
-const catalog = (questionIds: string[] = []) =>
+// A session always lists something: a prompt is only given with its question ids.
+const catalog = (questionIds: string[] = ['listed']) =>
   new Response(
     JSON.stringify({
       type: 'context-engine.interview-question-catalog',
       version: 1,
       sessionSlug: 'demo',
       prefillPromptVersion: 'ce-interview-brief-v6',
+      questionSetHash: 'f'.repeat(64),
       questions: questionIds.map((id) => ({ id, prompt: `${id}?`, type: 'freeform' })),
     }),
   );
@@ -385,9 +387,9 @@ describe('the AI key in a signed-in person’s prompt', () => {
     const [[url, init]] = keyRequests();
     expect(url).toBe('https://worker.example/api/agent/credentials/delegate');
     expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer session-token');
-    // The line about the key shows once the prompt holding it has been copied.
+    // While the box is ticked and the prompt holds the key, the line under the box says so, with its end time.
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE)).toHaveTextContent(
-      /^Key can answer as you until /,
+      /^The prompt holds your AI key, for this session only, until \d/,
     );
     expect(prompt).toContain(KEY_LINE);
     expect(prompt).toContain('submit them as me only after I say yes here');
@@ -636,7 +638,11 @@ describe('the AI key in a signed-in person’s prompt', () => {
     expect(setData.mock.calls[0][0]).toBe('text/plain');
     expect(setData.mock.calls[0][1]).toContain(KEY_LINE);
     expect(setData.mock.calls[0][1]).not.toContain('<AIKey>');
-    // A key that left the page by hand is said to have, as one copied by the button is.
+    // A key that left the page by hand is said to have, as one copied by the button is, once the box is unticked.
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE)).toHaveTextContent(
+      /^The prompt holds your AI key, for this session only, until /,
+    );
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL_CAN_SUBMIT));
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE)).toHaveTextContent(
       /^Key can answer as you until /,
     );

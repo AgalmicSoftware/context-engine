@@ -94,17 +94,17 @@ test('index.html uses deployment-relative discovery asset links for the active P
 });
 
 // A fetcher that runs no scripts, and drops the head and <noscript>, reads only the body.
-test('index.html tells a fetching agent where the guide is, in body text people never meet', () => {
+test('index.html tells a fetching agent where the guide is, in body text that is not hidden', () => {
   // The head's own <noscript> holds only a style, so it cannot swallow the body.
   const [head = '', afterHead = ''] = indexHtml.split('</head>');
   for (const block of head.match(/<noscript>[\s\S]*?<\/noscript>/g) || []) {
     assert.match(block, /^<noscript><style>[^<]*<\/style><\/noscript>$/);
   }
   const body = afterHead.split('</noscript>').at(-1) || '';
-  // The note comes before the app's root; only the loading line, shown to people, may sit between.
-  const [, style = '', note = ''] =
+  // The note follows the app's root as ordinary content anyone may open, before the app's first script.
+  const [, note = ''] =
     body.match(
-      /<p id="ce-agent-note" style="([^"]*)">([\s\S]*?)<\/p>\s*(?:<!--[\s\S]*?-->\s*)?(?:<div id="ce-boot-loading"[^>]*>(?:(?!<div)[\s\S])*?<\/div>\s*)?<div id="root"><\/div>/
+      /<div id="root"><\/div>\s*(?:<!--[\s\S]*?-->\s*)?<details id="ce-agent-note">\s*<summary>For AI agents<\/summary>\s*<p>([\s\S]*?)<\/p>\s*<\/details>\s*<script type="module"/
     ) || [];
   assert.match(note, /AI agents: to take part in a session, read\s+<a href="__PUBLIC_URL__\/skill\.md">\/skill\.md<\/a>/);
   assert.match(note, /an invitation that names a group included, goes to the Context Engine\s+MCP server's join_session as it is/);
@@ -234,11 +234,13 @@ test('index.html tells a fetching agent where the guide is, in body text people 
   assert.match(guide, /Don't list ways to set up, don't open by asking them to add tools/);
   assert.doesNotMatch(guide, /Ask them to add the tools in one step/);
   assert.ok(mcpTools.includes("name: 'join_session'"));
-  // Off screen until the site's first script, which removes it before the app loads: an app that
-  // fails to start must not leave it to be read out or tabbed to.
-  for (const rule of ['position:absolute', 'width:1px', 'height:1px', 'overflow:hidden', 'clip-path:inset(50%)']) {
-    assert.ok(style.split(';').includes(rule), rule);
-  }
+  // Nothing hides it: text kept from people by a style is what a phishing filter looks for. It is below the
+  // loading line, which fills the screen until the app draws, and the site's first script removes it as the app
+  // starts, so nobody using the app hears it read out or tabs to it.
+  const shellStyle = (indexHtml.match(/<style>([\s\S]*?)<\/style>/) || [])[1] || '';
+  const noteRule = (shellStyle.match(/#ce-agent-note \{([^}]*)\}/) || [])[1] || '';
+  assert.ok(noteRule && !/display|visibility|opacity|position|height|overflow|clip|font-size:\s*0|text-indent/.test(noteRule));
+  assert.match(shellStyle, /#ce-boot-loading \{[^}]*min-height: 100vh;/);
   const firstScript = fs.readFileSync(path.join(repoRoot, 'client', 'src', 'viteEntry.ts'), 'utf8');
   const removal = firstScript.indexOf("document.getElementById('ce-agent-note')?.remove();");
   assert.ok(removal > 0 && removal < firstScript.indexOf("import('./index')"));
@@ -298,6 +300,24 @@ test('llms.txt, the guide and the Worker skill carry the same steps, written onc
   for (const text of [indexHtml, llmsTxt, skillMd]) {
     assert.doesNotMatch(text, /with no MCP|Do not POST or upload it|which they want: that you answer and submit/);
   }
+});
+
+// A site with no security contact reads as less trustworthy to reputation checkers. The contact is the public
+// repository's private report page: no email address is published.
+test('security.txt names the repository as the contact, is dated, and is served as text', () => {
+  const securityTxt = fs.readFileSync(path.join(repoRoot, 'client', 'public', '.well-known', 'security.txt'), 'utf8');
+  assert.match(securityTxt, /^Contact: https:\/\/github\.com\/AgalmicSoftware\/context-engine\/security\/advisories\/new$/m);
+  assert.match(securityTxt, /^Canonical: https:\/\/contextengine\.sh\/\.well-known\/security\.txt$/m);
+  assert.doesNotMatch(securityTxt, /mailto:|@/);
+  const expires = new Date((securityTxt.match(/^Expires: (.+)$/m) || [])[1]);
+  // Fails a month before the date, so the file is renewed before a checker finds it stale.
+  assert.ok(expires.getTime() - Date.now() > 30 * 24 * 60 * 60 * 1000, 'renew Expires in security.txt');
+  assert.ok(expires.getTime() - Date.now() < 366 * 24 * 60 * 60 * 1000, 'Expires is within a year');
+  const headers = fs.readFileSync(path.join(repoRoot, 'client', 'public', '_headers'), 'utf8');
+  assert.match(headers, /^\/\.well-known\/security\.txt\n  Content-Type: text\/plain; charset=utf-8$/m);
+  // The catch-all for /.well-known/ is not forced, so the host serves the real file first.
+  const redirects = fs.readFileSync(path.join(repoRoot, 'client', 'public', '_redirects'), 'utf8');
+  assert.match(redirects, /^\/\.well-known\/\* \/404\.html 404$/m);
 });
 
 // The file-not-found page answers agents probing /.well-known/ addresses.

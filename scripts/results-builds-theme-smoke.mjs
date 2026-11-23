@@ -70,8 +70,8 @@ const note = (cell, valence, intensity, comment, participantCount) => ({
   questionIds: ['q-b1t1'],
 });
 // A strong and a faint cell of each kind, one with both kinds of note, and pairs with none. Eight areas, one with
-// three parts, so on a phone the grid scrolls down as well as sideways, wider than its least width, and the detail
-// grid scrolls too.
+// three parts: the grid is wider than its least width, so it scrolls sideways wherever the Results panel is narrower
+// than it, and on a phone it scrolls down as well and the detail grid scrolls too.
 const riskMatrix = {
   id: 'risk_mh1_0a1b2c3d',
   builtAt: '2026-11-08T14:20:00.000Z',
@@ -510,22 +510,26 @@ async function assertHeaderRow(view) {
   assert.equal(result.sameRow, result.fits, `The version header ${result.sameRow ? 'shares' : 'splits'} its row (fits: ${result.fits})`);
 }
 
-// On a phone a grid scrolls inside its card and keeps its labels in view: scrolled to its far corner, the row
-// labels still sit at its left and the column labels at its top, opaque and on top. On a desktop none stick.
-async function assertPinnedAxes(grid, name, phone, { mustScroll = true } = {}) {
+// A grid wider than its card scrolls inside it and keeps its labels in view, at any width: scrolled to its far corner,
+// the row labels still sit at its left, opaque and on top, and on a phone, where it scrolls down too, the column labels
+// at its top.
+async function assertPinnedAxes(grid, name, { mustScroll = true } = {}) {
   // Focus as the keyboard does, so the labels' focus ring is the one a keyboard user sees.
   await grid.page().keyboard.press('Shift');
-  const result = await grid.evaluate((root, phone) => {
-    const rows = root.querySelectorAll('[data-testid*="header-y-"]');
+  const result = await grid.evaluate((root) => {
+    const rows = [...root.querySelectorAll('[data-testid*="header-y-"]')];
     const columns = root.querySelectorAll('[data-testid*="header-x-"]');
-    const rowHead = rows[rows.length - 1];
     const columnHead = columns[columns.length - 1];
-    if (!phone) return { sticky: [rowHead, columnHead].some((el) => getComputedStyle(el).position === 'sticky') };
-    let box = rowHead.parentElement;
+    const square = root.querySelector('[data-testid*="cell-"]');
+    let box = rows[0].parentElement;
     while (box && !/auto|scroll/.test(getComputedStyle(box).overflowX)) box = box.parentElement;
-    if (box.scrollWidth <= box.clientWidth + 1) return { fits: true };
+    // The labels stick at any width, even where the grid fits its card and nothing scrolls.
+    const sticky = [rows[0], columnHead].every((el) => getComputedStyle(el).position === 'sticky');
+    if (box.scrollWidth <= box.clientWidth + 1) return { fits: true, sticky };
     box.scrollIntoView({ block: 'start' });
     box.scrollTo(box.scrollWidth, box.scrollHeight);
+    // The lowest row label in the window: on a desktop the grid scrolls with the page and can be taller than it.
+    const rowHead = rows.filter((el) => el.getBoundingClientRect().bottom <= window.innerHeight).pop() || rows[0];
     const edge = box.getBoundingClientRect();
     // Each is read where nothing pinned covers it: a row label at its left, a column label at its right.
     const onTop = (el, x) => {
@@ -548,8 +552,8 @@ async function assertPinnedAxes(grid, name, phone, { mustScroll = true } = {}) {
       // The rim over the gaps between labels draws (a theme's button shadow must not win over it).
       rim: [rowHead, columnHead].every((el) => /0px 0px 0px 6px/.test(getComputedStyle(el).boxShadow)),
       backgrounds: [rowHead, columnHead].map((el) => getComputedStyle(el).backgroundColor).join(' | '),
-      // A focused label draws its ring inside itself: outside, a neighbour's rim or the scroll edge covers it.
-      ring: [rowHead, columnHead].map((el) => {
+      // A focused label or square draws its ring inside itself: outside, a neighbour's rim or the scroll edge covers it.
+      ring: [rowHead, columnHead, square].map((el) => {
         el.focus({ preventScroll: true });
         const style = getComputedStyle(el);
         const inside =
@@ -564,12 +568,9 @@ async function assertPinnedAxes(grid, name, phone, { mustScroll = true } = {}) {
     };
     box.scrollTo(0, 0);
     return out;
-  }, phone);
-  if (!phone) {
-    assert(!result.sticky, `${name}: labels stick on a desktop`);
-    return;
-  }
+  });
   if (result.fits) {
+    assert(result.sticky, `${name}: the labels don't stick`);
     assert(!mustScroll, `${name}: the grid doesn't scroll sideways`);
     return;
   }
@@ -580,7 +581,7 @@ async function assertPinnedAxes(grid, name, phone, { mustScroll = true } = {}) {
   assert(result.opaque, `${name}: the labels are see-through (${result.backgrounds})`);
   assert(result.cornerCovers, `${name}: a heading or square shows in the corner`);
   assert(result.rim, `${name}: the rim between the labels doesn't draw`);
-  assert(result.ring.every((ring) => ring === true), `${name}: a focused label's ring isn't drawn inside it (${result.ring})`);
+  assert(result.ring.every((ring) => ring === true), `${name}: a focused label's or square's ring isn't drawn inside it (${result.ring})`);
 }
 
 // A built risk matrix: its stamp, picker and "?", its cells in each state, a
@@ -614,7 +615,7 @@ export async function inspectRiskMatrix(page, { screenshotDir = '', tag = '' } =
   await step('risk matrix header row', () => assertHeaderRow(view));
   const phone = page.viewportSize().width <= 768;
   const matrix = view.locator('section').filter({ has: page.locator('[data-testid^="ce-risk-matrix-header-y-"]') }).last();
-  await step('risk matrix pinned labels', () => assertPinnedAxes(matrix, 'risk matrix', phone));
+  await step('risk matrix pinned labels', () => assertPinnedAxes(matrix, 'risk matrix', { mustScroll: phone }));
   // On a phone the grid takes the Results panel's width: only the card's border and thin side remain (16px on a desktop).
   await step('risk matrix side room', async () => {
     const inset = await view.evaluate((root) => {
@@ -674,7 +675,7 @@ export async function inspectRiskMatrix(page, { screenshotDir = '', tag = '' } =
   });
   await modal.getByRole('button', { name: 'Close', exact: true }).last().click();
   await modal.waitFor({ state: 'hidden' });
-  await step('detail grid pinned labels', () => assertPinnedAxes(subgrid, 'detail grid', phone, { mustScroll: false }));
+  await step('detail grid pinned labels', () => assertPinnedAxes(subgrid, 'detail grid', { mustScroll: false }));
   const detailOverflow = await page.evaluate(() => document.scrollingElement.scrollWidth - window.innerWidth);
   assert(detailOverflow <= 1, `The page scrolls sideways by ${detailOverflow}px with the detail grid open`);
   if (screenshotDir) await subgrid.screenshot({ path: `${screenshotDir}/risk-matrix-detail-${tag}.png` });

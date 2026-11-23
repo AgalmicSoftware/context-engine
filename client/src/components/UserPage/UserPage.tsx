@@ -3653,6 +3653,18 @@ class UserPage extends Component<any, any> {
           )
         : null;
 
+    // The card this person shows on their page: in the side column, and in the Analyze box until an analysis
+    // brings its own, so a person whose analysis is slow or fails still sees the card others see.
+    const savedAnalysisCard = (
+      <UserPageSavedAnalysisCard
+        viewAddress={propViewAddress}
+        account={account}
+        pageSlug={String(this.props.activeSessionSlug || this.props.sessionSlug || '')}
+        profileKey={analysisProfileKey(this.props)}
+        loadOptions={this.resolveSavedAnalysisCardOptions}
+      />
+    );
+
     const headerPassiveDisplayState = resolveUserPageHeaderPassiveDisplayState({
       account,
       cachedNickname: cachedNicknameForThis,
@@ -3892,15 +3904,7 @@ class UserPage extends Component<any, any> {
               onChainProfileEnabled: this.props.onChainProfileEnabled,
               provider,
               // The shown card leads the side column, on my own page as on anyone else's.
-              savedCard: (
-                <UserPageSavedAnalysisCard
-                  viewAddress={propViewAddress}
-                  account={account}
-                  pageSlug={String(this.props.activeSessionSlug || this.props.sessionSlug || '')}
-                  profileKey={analysisProfileKey(this.props)}
-                  loadOptions={this.resolveSavedAnalysisCardOptions}
-                />
-              ),
+              savedCard: savedAnalysisCard,
               sessionConfig: this.props.sessionConfig,
               sbtSectionProps: {
                 heading: `${t('minted')} ${t('sbts')}:`,
@@ -3954,6 +3958,7 @@ class UserPage extends Component<any, any> {
               this.clearAnalysisTimer();
             }
           }}
+          savedCard={savedAnalysisCard}
         />
 
         <UserPageFullProfileModal

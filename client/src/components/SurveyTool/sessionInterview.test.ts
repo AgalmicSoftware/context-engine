@@ -302,8 +302,8 @@ describe('session interview protocol', () => {
   it('keeps the prompt revision a packet names, and only a well-formed one', () => {
     const read = (promptRevision: unknown) =>
       decodeInterviewPrefill(encodeLinkJson({ ...packet, promptRevision })).packet?.promptRevision;
-    expect(read(PREFILL_PROMPT_REVISION)).toBe('ce-prefill-prompt-4');
-    expect(read(`${PREFILL_PROMPT_REVISION}+arranged`)).toBe('ce-prefill-prompt-4+arranged');
+    expect(read(PREFILL_PROMPT_REVISION)).toBe('ce-prefill-prompt-5');
+    expect(read(`${PREFILL_PROMPT_REVISION}+arranged`)).toBe('ce-prefill-prompt-5+arranged');
     expect(read('anything else')).toBeUndefined();
     expect(read(`${PREFILL_PROMPT_REVISION}+anything`)).toBeUndefined();
     expect(decodeInterviewPrefill(encodeLinkJson(packet)).packet).not.toHaveProperty('promptRevision');

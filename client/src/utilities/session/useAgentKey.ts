@@ -89,6 +89,15 @@ export const useAgentKey = (
     }
   };
 
+  // A key's end is acted on when it comes, not at the next redraw: the page stops saying the prompt holds
+  // it, and where one is still wanted another is made.
+  const [, setEnded] = useState(0);
+  useEffect(() => {
+    const left = key ? Date.parse(key.expiresAt) - Date.now() : 0;
+    if (left <= 0) return undefined;
+    const timer = setTimeout(() => setEnded((count) => count + 1), left);
+    return () => clearTimeout(timer);
+  }, [key]);
   const good = stillGood(key);
   useEffect(() => {
     if (wanted && !paused && !good && !making && !waiting && !quietFailed && !error) void make(false);

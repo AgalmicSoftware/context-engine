@@ -223,10 +223,13 @@ const LoginAgentHandoffPanel = ({
   useEffect(() => {
     if (signOuts) setCanSubmit(false);
   }, [signOuts]);
-  // A key that was copied works until its time, wherever it was pasted, so the line stays while it does.
-  const expiry = agentKey.copiedUntil
-    ? new Date(agentKey.copiedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : '';
+  const clock = (time: string) => new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  // Ticked, with the key in the prompt: said under the box before anything is copied, so the person knows what
+  // the text they are about to paste holds.
+  const heldUntil = canSubmit && promptKey ? clock(promptKey.key.expiresAt) : '';
+  // A key that was copied works until its time, wherever it was pasted, so its line stays while it does, once
+  // the prompt no longer holds one.
+  const expiry = !heldUntil && agentKey.copiedUntil ? clock(agentKey.copiedUntil) : '';
   // The line about a key that was copied. It shows while that key works, with the copy button or without it.
   const keyLine = expiry ? (
     <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-expiry">
@@ -296,6 +299,11 @@ const LoginAgentHandoffPanel = ({
               If checked, the prompt can hold a key and the AI can act on your behalf.
             </Help>
           </div>
+        ) : null}
+        {heldUntil ? (
+          <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-key-held">
+            The prompt holds your AI key, for this session only, until {heldUntil}.
+          </p>
         ) : null}
         {/* Mounted only once opened: its check may ask to sign in to the session, which only an open box should.
             Someone who came by the link came for the key: until there is one, nothing is offered to copy, since

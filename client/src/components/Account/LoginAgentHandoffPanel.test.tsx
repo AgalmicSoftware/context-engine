@@ -28,6 +28,8 @@ const catalog = () =>
       version: 1,
       sessionSlug: 'salon',
       prefillPromptVersion: 'ce-interview-brief-v6',
+      questionSetHash: 'f'.repeat(64),
+      questions: [{ id: 'listed', prompt: 'Listed?', type: 'freeform' }],
     }),
   );
 
@@ -128,7 +130,11 @@ it('starts with "AI can submit for me" unticked: no key is made or copied until 
   expect(requestKey).toHaveBeenCalledWith({ prompt: false });
   expect(screen.getByTestId('ce-agent-handoff-copy')).toHaveTextContent('Copied');
   expect(await screen.findByText('Copied the prompt.')).toBeInTheDocument();
-  expect(screen.getByTestId('ce-agent-handoff-expiry')).toHaveTextContent(/^Key can answer as you until /);
+  // Ticked, with the key in the prompt, the line under the box says what the text holds, and until when.
+  expect(screen.getByTestId('ce-agent-handoff-key-held')).toHaveTextContent(
+    /^The prompt holds your AI key, for this session only, until \d/,
+  );
+  expect(screen.queryByTestId('ce-agent-handoff-expiry')).not.toBeInTheDocument();
   expect(prompt).toContain(KEY_LINE);
   expect(prompt).toContain('I have an account in this session: make no other. This prompt holds my AI key');
   expect(prompt).toContain('submit them as me only after I say yes here');
@@ -274,8 +280,11 @@ it('holds the copy while the key is made, so the prompt copied is the one with i
 it('copies from one split button, whose caret points down and opens the whole prompt, then up', async () => {
   renderPanel();
   const copy = await screen.findByTestId('ce-agent-handoff-copy');
-  expect(copy).toHaveAccessibleName('Copy AI prompt');
+  // Until the session's questions are read it says so and can't be pressed.
+  expect(copy).toHaveAccessibleName('Loading questions…');
+  expect(copy).toHaveAttribute('aria-disabled', 'true');
   await waitFor(() => expect(copy).toHaveAttribute('aria-disabled', 'false'));
+  expect(copy).toHaveAccessibleName('Copy AI prompt');
   const caret = screen.getByRole('button', { name: 'Read the AI prompt' });
   expect(caret).toHaveAttribute('aria-expanded', 'false');
   expect(caret.querySelector('[data-icon="caret-down"]')).not.toBeNull();
@@ -367,10 +376,11 @@ it('holds Sign Agents Out under the prompt; after it, drops the dead key and clo
   expect(signOut).toBeVisible();
   fireEvent.click(canSubmit());
   expect(await copyPrompt()).toContain(KEY_LINE);
-  const expiry = screen.getByTestId('ce-agent-handoff-expiry');
-  expect(expiry.compareDocumentPosition(signOut) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  const held = screen.getByTestId('ce-agent-handoff-key-held');
+  expect(held.compareDocumentPosition(signOut) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
   rerender(<LoginAgentHandoffPanel {...props} agentsSignedOut={1} />);
+  expect(screen.queryByTestId('ce-agent-handoff-key-held')).not.toBeInTheDocument();
   expect(screen.queryByTestId('ce-agent-handoff-expiry')).not.toBeInTheDocument();
   // Closed, so the session is checked again only when it is reopened; the same message stays in view.
   expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -504,7 +514,7 @@ it('by the link, keeps the line about a copied key while it works, though nothin
   });
   renderClosedPanel({ promptRequested: true, requestKey });
   expect(await copyPrompt()).toContain(KEY_LINE);
-  expect(screen.getByTestId('ce-agent-handoff-expiry')).toHaveTextContent(/^Key can answer as you until /);
+  expect(screen.getByTestId('ce-agent-handoff-key-held')).toHaveTextContent(/^The prompt holds your AI key/);
   // Unticked and ticked again, and this time no key can be added: the copied one still works.
   fail = true;
   fireEvent.click(canSubmit());

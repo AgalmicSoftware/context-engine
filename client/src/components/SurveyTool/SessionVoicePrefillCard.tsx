@@ -140,10 +140,13 @@ export default function SessionVoicePrefillCard({
     noteCopied();
     return true;
   };
-  // A key that was copied works until its time, wherever it was pasted, so the line stays while it does.
-  const expiry = agentKey.copiedUntil
-    ? new Date(agentKey.copiedUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : '';
+  const clock = (time: string) => new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  // Ticked, with the key in the prompt: said under the box before anything is copied, so the person knows what
+  // the text they are about to paste holds.
+  const heldUntil = canSubmit && agentKey.promptKey ? clock(agentKey.promptKey.key.expiresAt) : '';
+  // A key that was copied works until its time, wherever it was pasted, so its line stays while it does, once
+  // the prompt no longer holds one.
+  const expiry = !heldUntil && agentKey.copiedUntil ? clock(agentKey.copiedUntil) : '';
   return (
     <section
       className={styles.sessionVoicePrefill}
@@ -176,6 +179,14 @@ export default function SessionVoicePrefillCard({
           </label>
           <Help id="ce-session-voice-prefill-submit-help" label="About letting AI submit for you">
             {CAN_SUBMIT_ABOUT}
+          </Help>
+        </div>
+      ) : null}
+      {heldUntil ? (
+        <div className={styles.sessionVoicePrefillChoice} data-testid={E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE}>
+          <span>The prompt holds your AI key, for this session only, until {heldUntil}.</span>
+          <Help id="ce-session-voice-prefill-key-help" label="About your AI key">
+            {KEY_ABOUT}
           </Help>
         </div>
       ) : null}
