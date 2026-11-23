@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.9.35] - 2026-11-23
+
+A slow or stuck load shows a loading bar instead of a white page and the site works with site data blocked; the AI gives the review link once; MCP 0.9.35 carries the site's steps and one rule for an agent's name; a refused name says which word.
 
 ### Session Worker — needs a Worker update
 
@@ -21,6 +23,7 @@ All notable changes to this project will be documented in this file.
 - **The AI gives the review link once.** The copied prompt asked for the link twice, as a Markdown link and written out in full, which a chat app shows as two long links. It now asks for the Markdown link alone, and for the address written out only in a terminal, which shows no Markdown link. Its first line no longer says the person submits the drafts themselves, which pulled against the offer in its last line: it says they review every draft before anything is submitted.
 - **The Report's Filter button takes the Active Filters label's place.** In Summary and Statistics the row now starts with the button, then its (?) and the filters in use, or "None", on one line where they fit. The button's name says how many filters are on, such as "Filter: none active". The PDF, print and a Report with no Filter button, as over demo data, still say "Active Filters".
 - **About's Demo button opens the `rxc-ra-2` session.** The About page's **Demo** button and the Docs page's "Try the demo session" link open `rxc-ra-2`, the Reverse Alignment session, in place of the test session `rxc-ra-test-5`.
+- **Deploy helper.** It deploys the 0.9.34 Worker bundles. A Worker updated from the site gets this release's.
 
 ### Local tooling
 
