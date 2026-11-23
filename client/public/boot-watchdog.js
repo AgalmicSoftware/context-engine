@@ -178,6 +178,8 @@
         stopLoading();
       }
     }).observe(root, { childList: true });
+    // The app may have drawn before this began to watch.
+    if (appShown()) stopLoading();
   };
   if (document.getElementById('root')) watchRoot();
   else document.addEventListener('DOMContentLoaded', watchRoot);

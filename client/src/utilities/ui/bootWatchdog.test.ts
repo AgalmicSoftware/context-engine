@@ -171,6 +171,12 @@ describe('the blank-page message', () => {
     expect(document.getElementById('ce-boot-loading')).not.toBeNull();
   });
 
+  it('takes the loading line away when the app had already drawn before it began to watch', () => {
+    document.body.innerHTML = '<div id="ce-boot-loading"></div><div id="root"><main></main></div>';
+    new Function(source)();
+    expect(document.getElementById('ce-boot-loading')).toBeNull();
+  });
+
   it('takes the loading line away once the app draws', async () => {
     boot();
     expect(document.getElementById('ce-boot-loading')).not.toBeNull();

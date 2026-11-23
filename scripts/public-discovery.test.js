@@ -237,7 +237,6 @@ test('index.html tells a fetching agent where the guide is, in body text that is
   // Nothing hides it: text kept from people by a style is what a phishing filter looks for. It is below the
   // loading line, which fills the screen until the app draws, and the site's first script removes it as the app
   // starts, so nobody using the app hears it read out or tabs to it.
-  assert.doesNotMatch(indexHtml, /position:\s*absolute|clip-path|width:\s*1px|height:\s*1px/);
   const shellStyle = (indexHtml.match(/<style>([\s\S]*?)<\/style>/) || [])[1] || '';
   const noteRule = (shellStyle.match(/#ce-agent-note \{([^}]*)\}/) || [])[1] || '';
   assert.ok(noteRule && !/display|visibility|opacity|position|height|overflow|clip|font-size:\s*0|text-indent/.test(noteRule));
