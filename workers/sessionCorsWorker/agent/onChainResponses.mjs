@@ -321,6 +321,9 @@ export function buildAgentResponsePayload({
   answer = {},
   accountAddress = '',
   createdAt = null,
+  // Set on a Worker session: its answers name their session, as the browser's do, and the session page
+  // leaves out a saved answer that does not.
+  sessionId = '',
 } = {}) {
   const normalized = normalizeAnswerForPayload(answer, questionRef);
   if (questionRef.questionType === 'quadratic' || normalized.questionType === 'quadratic') {
@@ -365,6 +368,7 @@ export function buildAgentResponsePayload({
     source: 'session-agent',
     responder: safeString(accountAddress),
     encryptionRequested: false,
+    ...(sessionId ? { sessionId: safeString(sessionId), sessionSlug: safeString(sessionSlug || questionRef.sessionSlug) } : {}),
   };
   assertNoSecretShape(payload, "Agent on-chain response payloads must not serialize secrets.");
   return payload;
@@ -433,7 +437,10 @@ export async function submitAgentResponseOnChain({
   if (session.sessionModeProfile?.authority?.mode === 'worker_canonical') {
     if (!sessionSlug || !qid || !idempotencyKey) return { ok: false, skipped: true, reason: 'submission_identity_required' };
     let payload;
-    try { payload = buildAgentResponsePayload({ sessionSlug, questionRef, answer, accountAddress: env.AGENT_CONTEXT.address, createdAt }); }
+    try {
+      payload = buildAgentResponsePayload({ sessionSlug, questionRef, answer, accountAddress: env.AGENT_CONTEXT.address, createdAt,
+        sessionId: env.AGENT_CONTEXT.sessionId });
+    }
     catch (error) { return { ok: false, reason: safeString(error.message), retryable: false, safeToRetry: true, status: 422 }; }
     try {
       // Reuse the admitted bytes even after a later question wording edit.

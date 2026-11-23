@@ -47,6 +47,11 @@ test("a person's key lets their agent draft, then submit answers that count as t
     .map(([, value]) => JSON.parse(Buffer.from(JSON.parse(value).payloadBase64url, 'base64url').toString()))
     .filter(payload => payload.questionID === question.questionId);
   assert.deepEqual(stored.map(payload => [payload.responder, payload.source, payload.answer.value]), [[person, 'session-agent', 'Agree']]);
+  // The session page shows a saved answer only when it names this session, as the page's own answers do.
+  assert.deepEqual(stored.map(payload => [payload.sessionSlug, payload.sessionId]), [['fixture', sessionId]]);
+  // The Worker lists each person's latest answer, which AI Results builds read, only from that too.
+  const listed = [...f.records].filter(([name]) => name.startsWith('ce-storage:fixture:responses:')).map(([, value]) => JSON.parse(value));
+  assert.deepEqual(listed.map(entry => [entry.answerQuestionId, entry.answerSessionId]), [[question.questionId.toLowerCase(), sessionId]]);
 
   const asked = await f.request('/api/agent/questions/create', { method: 'POST', token: key.token,
     body: { questions: [{ prompt: 'A question the key may not add?', questionType: 'binary' }] } });

@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Session Worker — needs a Worker update
 
 - **An atlas's top-level titles are asked to be short, clear and distinct.** The planning call that groups a session's questions into branches now asks that each branch's title be short and clear, one plain subject and not a list, that no two titles share a main word or mean nearly the same, and that none be a catch-all. The same call now describes the session in plain words, as a group sensemaking session, in place of the product's name, and asks that the branches be logically distinct from one another and that the topics inside a branch share a clear link. The reply's shape, the limits of 5 branches and 12 topics, and how a reply is checked are unchanged. Only atlases built after the Worker is updated are affected; a build already kept keeps its titles.
+- **Answers sent with a person's AI key show as their saved answers.** An answer the Worker stores for a key now names its session (`sessionId` and `sessionSlug`), as the site's own answers do. The session page leaves out a saved answer that names no session, so these answers were stored but drawn as unanswered on the person's page; the site reads answers for Results through the same check, and the Worker's AI Results builds left them out too. Answers stored before the update, or accepted before it and sent after, stay as they are.
 
 ## [0.9.32] - 2026-11-23
 
