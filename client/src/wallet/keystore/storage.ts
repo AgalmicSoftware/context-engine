@@ -131,19 +131,34 @@ export const createWalletStorage = (
   isBlocked: () => boolean = () => readBlockedStorage().length > 0,
 ): PasskeyWalletStorage => {
   let inMemory = false;
+  // Once the database has answered, a record may be in it: a later failure must stay a failure, or a sign-out
+  // would clear the empty memory copy and leave the stored record signed in.
+  let primaryWorked = false;
   const run = async <T>(op: (storage: PasskeyWalletStorage) => Promise<T>): Promise<T> => {
     if (inMemory) return op(memory);
     try {
-      return await op(primary);
+      const result = await op(primary);
+      primaryWorked = true;
+      return result;
     } catch (error) {
-      if (!isBlocked()) throw error;
+      if (primaryWorked || !isBlocked()) throw error;
       inMemory = true;
       return op(memory);
     }
   };
+  // A record whose key exists nowhere else (the encrypted-private-key mode; not this site's default) is never
+  // kept only in memory: the account would be lost for good at the next reload.
+  const onlyCopyOfKey = (record: PasskeyWalletRecord) =>
+    record.keyMode !== 'passkey-derived' && record.keyMode !== 'login-file';
   return {
     read: () => run((storage) => storage.read()),
-    write: (record) => run((storage) => storage.write(record)),
+    write: (record) =>
+      run((storage) => {
+        if (storage === memory && onlyCopyOfKey(record)) {
+          return Promise.reject(new Error('This browser blocks site data, so this account cannot be kept here.'));
+        }
+        return storage.write(record);
+      }),
     clear: () => run((storage) => storage.clear()),
   };
 };

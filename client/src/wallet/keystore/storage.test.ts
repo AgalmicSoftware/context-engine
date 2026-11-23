@@ -36,6 +36,30 @@ describe('wallet record storage', () => {
     await expect(storage.read()).rejects.toThrow('denied permission');
   });
 
+  it('never takes over from a database that has worked: a sign-out must reach the stored record', async () => {
+    const stored = createMemoryWalletStorage(record);
+    let failing = false;
+    const primary: PasskeyWalletStorage = {
+      read: () => (failing ? Promise.reject(new Error('transient')) : stored.read()),
+      write: (next) => stored.write(next),
+      clear: () => stored.clear(),
+    };
+    const storage = createWalletStorage(primary, createMemoryWalletStorage(), () => true);
+    await expect(storage.read()).resolves.toEqual(record);
+    failing = true;
+    await expect(storage.read()).rejects.toThrow('transient');
+    failing = false;
+    await storage.clear();
+    await expect(stored.read()).resolves.toBeNull();
+  });
+
+  it('refuses to keep the only copy of a key in memory', async () => {
+    const storage = createWalletStorage(refusing(), createMemoryWalletStorage(), () => true);
+    const encrypted = { id: 'e', evmAddress: '0x02' } as unknown as PasskeyWalletRecord;
+    await expect(storage.write(encrypted)).rejects.toThrow('cannot be kept here');
+    await expect(storage.read()).resolves.toBeNull();
+  });
+
   it('uses the database whenever it answers, blocked notice or not', async () => {
     const primary = createMemoryWalletStorage();
     const memory = createMemoryWalletStorage();
