@@ -34,16 +34,20 @@ const LEFT_TO_RAW_RESULTS = ['aiFilter', 'aiTopN', 'aiCombine', 'responseStatus'
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
-type FilterButtonProps = { open: boolean; panelId: string; onToggle: () => void };
+type FilterButtonProps = { open: boolean; panelId: string; activeCount: number; onToggle: () => void };
 
-/** Opens and closes the panel. Like the Report's other controls, it stays out of the PDF. */
-export function PolisReportFilterButton({ open, panelId, onToggle }: FilterButtonProps) {
+/**
+ * Opens and closes the panel. It takes the Active Filters label's place, so its name says how many filters are on.
+ * Like the Report's other controls, it stays out of the PDF.
+ */
+export function PolisReportFilterButton({ open, panelId, activeCount, onToggle }: FilterButtonProps) {
   return (
     // The display is set here, as for the Report's other controls, since .pdfIgnore sets one of its own.
     <span className={reportStyles.pdfIgnore} style={{ display: 'inline-flex' }}>
       <button
         type="button"
         className={styles.button}
+        aria-label={`Filter: ${activeCount ? `${activeCount} active` : 'none active'}`}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         onClick={onToggle}

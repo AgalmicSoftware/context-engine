@@ -414,10 +414,10 @@ export const USE_CASES = [
   },
 ];
 
-// The Demo button opens a listed session whose Worker runs voice interviews,
-// group recording and the prompt for a person's own AI. demo-sh's Worker
-// predates them.
-export const ABOUT_DEMO_SESSION_SLUG = 'rxc-ra-test-5';
+// The Demo button opens the Reverse Alignment session, a listed one. demo-sh's
+// Worker predates voice interviews, group recording and the prompt for a
+// person's own AI.
+export const ABOUT_DEMO_SESSION_SLUG = 'rxc-ra-2';
 
 export const getAboutDemoSessionPath = (selection = readStoredGlobalSessionSelection()) => {
   const scopeMode = String(selection?.selectedSessionScope || '')

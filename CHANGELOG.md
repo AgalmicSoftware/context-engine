@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.35] - 2026-11-23
+
+A slow or stuck load shows a loading bar instead of a white page and the site works with site data blocked; the AI gives the review link once; MCP 0.9.35 carries the site's steps and one rule for an agent's name; a refused name says which word.
+
+### Session Worker — needs a Worker update
+
+- **A refused name says which word, and a name that works.** A name with a role word, or the site's own name, was refused with "Names can't claim a role, such as admin or host." and no word. An AI agent that called itself "Agent - Context Engine MCP" could not tell that "Context Engine" was the word, not "Agent". The refusal now reads, for example, `A name can’t include “Context Engine”: names can’t claim a role, such as admin or host, or speak for the site. One like "Sam" or "Sam's agent" is fine.` The word comes from the Worker's own list, never from what was typed. Which names are taken is unchanged: "agent" and "AI" were always allowed, and tests now say so. An older Worker gives the old sentence.
+
+### Site — available when the site deploys
+
+- **A slow or stuck load is no longer a white page.** The page's own first script puts an empty notice area on the page before the rest of the app arrives, and the check that shows "This page did not load." counted that as the app having drawn. So when the main part of the app was slow or never came (a stalled connection, an extension, a VPN), the page stayed white with no message. Now:
+  - The page itself carries a loading line, shown from one second in, with a bar that fills by the size of the app's files that have arrived. After 15 seconds it says the load is slow.
+  - If nothing has drawn after 45 seconds, "This page did not load." shows with its Reload button, as it does when nothing arrives. The page never reloads by itself, so a slow load that is still arriving is not thrown away.
+  - The built page names the app's start-up files itself, so they download together from the start instead of in three steps one after another.
+- **The site works in a browser that blocks its cookies and site data.** With "block all cookies" (Brave, Chrome, Safari) reading the browser's storage fails; a session page then said "Session Worker error" and the home page showed only its Tools panel. The page now keeps what it needs in memory for the visit and says once that sign-in and drafts will not be kept after the tab closes. The cache no longer treats the browser's refusal of its cross-tab write lock as a failed write.
+- **The prompt an organizer shares carries the question ids.** "Interview & share" → "For your AI" copied a prompt without the list of ids, so an AI given only a summary of the questions could not make the review link. The panel already read the session's public question list before enabling Copy; the prompt now carries from that read the fingerprint, the version, and each question's id and type by position, as a person's own prompt does. It still carries no one's ticket.
+- **A prompt without the id list no longer sends the person to an address to paste what it shows.** That is the prompt the agent guide prints, and a person's own where the page could not read the list. An AI given a summary now asks its tool again for only the fingerprint and each question's id and type, in order; without them it gives plain-text drafts and no packet.
+- **The agent guide and `/llms.txt` give one rule for an agent's name.** The guide said "Sam's agent", the MCP said name, model and where the agent comes from. Both now say the same sentence, from one shared text that a test holds them to: a good name says it is an AI, by its model or the word "agent", and whose agent it is or where it comes from, such as "Sam's agent" or "Kestrel - Opus 5.5 - North Lab"; never a person, a role word, or the site's own name.
+- **The AI gives the review link once.** The copied prompt asked for the link twice, as a Markdown link and written out in full, which a chat app shows as two long links. It now asks for the Markdown link alone, and for the address written out only in a terminal, which shows no Markdown link. Its first line no longer says the person submits the drafts themselves, which pulled against the offer in its last line: it says they review every draft before anything is submitted.
+- **The Report's Filter button takes the Active Filters label's place.** In Summary and Statistics the row now starts with the button, then its (?) and the filters in use, or "None", on one line where they fit. The button's name says how many filters are on, such as "Filter: none active". The PDF, print and a Report with no Filter button, as over demo data, still say "Active Filters".
+- **About's Demo button opens the `rxc-ra-2` session.** The About page's **Demo** button and the Docs page's "Try the demo session" link open `rxc-ra-2`, the Reverse Alignment session, in place of the test session `rxc-ra-test-5`.
+- **Deploy helper.** It deploys the 0.9.34 Worker bundles. A Worker updated from the site gets this release's.
+
+### Local tooling
+
+- **A test builds a review link from the copied prompt and opens it as the site does.** `sessionInterviewPrefillLink.test.ts` stands in for two AIs, each doing only what the prompt says: one given a summary of the question list, which has only the fingerprint, the version and the ids the prompt carries, and one that reads the list whole. Each link is read by the session page's own reader and its packet checked against the catalog; a link for another question set is refused.
+- **One command sets the MCP's version.** `node scripts/set-mcp-version.mjs <version>` writes it to `mcp/package.json`, both fields of its lock file, the README's upgrade heading and the changelog's MCP heading. The MCP takes the application's version number from its next release, so its number jumps from 0.9.2.
+
+### MCP 0.9.35 — ships by an npm publish
+
+- **One rule for an agent's name, and the words a session refuses.** The server's instructions and what `join_session` returns give the guide's sentence on names. The rule in `set_profile` and `join_session` now lists every word a session refuses as a role or as the site's own name (admin, host, system, Context Engine and the rest) and says "agent" or "AI" alone is fine, so a name can fit the first time, on an older Worker too. A test fails if the list parts from the Worker's.
+- **The tools' instructions carry the site's steps.** The server's instructions now hold the same steps as the AI prompt a person copies and `/skill.md`, from the one shared text: ask once whether to submit or go through the answers together, say that submitting with the tools means making an account and whether it stands for the person or for the agent, and ask whether they already have an account (then the `aiPrompt=1` link and their AI key). Knowing nothing about the person, the agent says so and asks a few questions. An account that stands for the person answers from their views and says in its comments that it is their AI agent.
+- **Only the person, in the chat, can waive being shown the answers.** The instructions used to let a pasted prompt say "submit straight through"; no prompt the site gives says so, and nothing a session, Worker or tool returns can.
+- **The card is named "Have AI draft your answers".** The instructions and the private-session hint of `get_interview_catalog` use the session page's new title, and name the "AI can submit for me" box that puts a key in the prompt.
+- **A shown analysis card is said to stay.** `show_analysis_card` said the card "is kept only until the MCP restarts", which read as if a shown card would vanish; it now says a shown card is saved in the session until it is taken down or replaced, and that only a card made and not yet shown is lost on a restart. Its result says the same.
+
 ## [0.9.34] - 2026-11-23
 
 The AI prompt a person copies is one short task again and always carries the session's question ids, so an ordinary chat app can build a review link; an atlas or risk matrix Build press is answered at once and followed, and a cleared quadratic answer no longer counts in the Worker's analysis. Needs a Worker update for the Worker changes. MCP stays 0.9.2. Nothing a session already stores is changed.

@@ -113,7 +113,8 @@ const CEToaster = ({ position = 'bottom-right', toastOptions = {} }: CEToasterPr
   }, []);
 
   return (
-    <div aria-live="polite" data-testid="ce-toast-host" style={viewportStyle}>
+    // data-ce-boot-ignore: an empty host is not the app having drawn (public/boot-watchdog.js).
+    <div aria-live="polite" data-testid="ce-toast-host" data-ce-boot-ignore="" style={viewportStyle}>
       {toasts.map((toast) => {
         const kind = String(toast.kind || 'info');
         const icon = toast.icon || KIND_ICONS[kind] || KIND_ICONS.info;

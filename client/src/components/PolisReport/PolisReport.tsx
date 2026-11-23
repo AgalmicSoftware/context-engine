@@ -2377,13 +2377,15 @@ export default function PolisReport({
   /***************************************************************
    * Render Filter Info (from filterState) - Comprehensive Version
    ***************************************************************/
-  function renderActiveFilters() {
+  // The filters in use, as the Active Filters row lists them, and how many it lists, which the Filter button's name
+  // gives in the label's place.
+  function renderActiveFilters(): { count: number; node: React.ReactNode } {
     if (effectiveUseDemoData && !hasActiveReportFilters) {
-      return <span>None (Demo Data Active)</span>;
+      return { count: 0, node: <span>None (Demo Data Active)</span> };
     }
 
     if (!filterState || typeof filterState !== 'object') {
-      return <span>None</span>;
+      return { count: 0, node: <span>None</span> };
     }
 
     const { onlyVerifiedHumans, questionTypes, selectedTags, topQuestions } = filterState;
@@ -2504,14 +2506,17 @@ export default function PolisReport({
 
     // Handle the old `sbtFilterString` for basic backward compatibility if `filterState` is simple
     if (activeFilterElements.length === 0 && sbtFilterString) {
-      return <span>{sbtFilterString}</span>;
+      return { count: 1, node: <span>{sbtFilterString}</span> };
     }
 
     if (activeFilterElements.length === 0) {
-      return <span>None</span>;
+      return { count: 0, node: <span>None</span> };
     }
 
-    return <div className={styles.filterList}>{activeFilterElements}</div>;
+    return {
+      count: activeFilterElements.length,
+      node: <div className={styles.filterList}>{activeFilterElements}</div>,
+    };
   }
 
   /***************************************************************
@@ -2526,10 +2531,12 @@ export default function PolisReport({
   // An active filter keeps Summary and Statistics in place even when it leaves nothing to show, so the filter
   // can be changed back there, and an open panel stays where it is.
   const keepFilterBox = canChangeFilter && hasActiveReportFilters;
+  const activeFilters = renderActiveFilters();
   const filterButton = canChangeFilter ? (
     <PolisReportFilterButton
       open={filtersOpen}
       panelId={filtersPanelId}
+      activeCount={activeFilters.count}
       onToggle={() => setFiltersOpen((open) => !open)}
     />
   ) : null;
@@ -2924,10 +2931,13 @@ export default function PolisReport({
                         </div>
                       </div>
                       <div className={styles.statsRow}>
-                        {/* One row: the label, the filters and then the Filter button, wrapping only when they don't fit. */}
+                        {/* One row: the Filter button in the Active Filters label's place, its (?) beside it, then the
+                            filters, wrapping only when they don't fit. The PDF and print leave the button out and keep
+                            the label and its colon, as a Report with no Filter button does. */}
                         <div className={`${styles.statsItem} ${styles.activeFiltersItem}`}>
+                          {filterButton}
                           <span className={styles.statLabel}>
-                            Active Filters
+                            <span className={filterButton ? styles.replacedLabel : undefined}>Active Filters</span>
                             {renderTooltipReference(
                               filterButton
                                 ? 'Summary of all active filters applied to this data. In Results, the Filter button changes them for the Report and Raw Results alike.'
@@ -2935,10 +2945,9 @@ export default function PolisReport({
                               // The PDF leaves the button out, so its footnote does too.
                               { footnote: 'Summary of all active filters applied to this data.' },
                             )}
-                            :
+                            <span className={filterButton ? styles.replacedLabel : undefined}>:</span>
                           </span>
-                          <div className={styles.statValue}>{renderActiveFilters()}</div>
-                          {filterButton}
+                          <div className={styles.statValue}>{activeFilters.node}</div>
                         </div>
                       </div>
                       {filterPanel}

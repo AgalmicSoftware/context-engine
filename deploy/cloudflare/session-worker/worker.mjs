@@ -77401,7 +77401,7 @@ var init_sessionNames = __esm({
     addressOf2 = (value) => typeof value === "string" ? value.trim().toLowerCase() : "";
     isNameHolder = (value) => ADDRESS4.test(addressOf2(value));
     sessionNameKey = (address3) => PREFIX3 + addressOf2(address3);
-    ROLE_WORDS = [
+    ROLE_WORDS = Object.freeze([
       "admin",
       "administrator",
       "moderator",
@@ -77411,13 +77411,12 @@ var init_sessionNames = __esm({
       "official",
       "staff",
       "system",
-      "results admin",
       "session agent",
       "group agent",
-      "context engine",
-      "radicalxchange",
-      "rxc"
-    ];
+      "Context Engine",
+      "RadicalxChange",
+      "RxC"
+    ]);
     DOMAIN = /(^|\s)(www\.|[\p{L}\p{N}-]+\.(com|org|net|io|ai|app|dev|xyz|co|me|gg|so|info|link|site|online)(\s|$))/iu;
     REFUSALS = Object.freeze({
       empty: "Write a name first.",
@@ -77429,9 +77428,10 @@ var init_sessionNames = __esm({
       ens: "That looks like an ENS name; choose a name.",
       url_or_email: "That looks like a web address; choose a name.",
       secret: "That looks like a key or password; choose a name.",
-      role: "Names can\u2019t claim a role, such as admin or host."
+      // Says which word, from the list above and never from what was typed, and a name that is taken as written.
+      role: (word) => `A name can\u2019t include \u201C${word}\u201D: names can\u2019t claim a role, such as admin or host, or speak for the site. One like "Sam" or "Sam's agent" is fine.`
     });
-    refuse2 = (reason) => ({ ok: false, reason, error: REFUSALS[reason] });
+    refuse2 = (reason, detail) => ({ ok: false, reason, error: typeof REFUSALS[reason] === "function" ? REFUSALS[reason](detail) : REFUSALS[reason] });
     SHAPES = {
       a: "\u0410\u0430\u0391\u03B1\u0251\uA4EE\u13AA\u15E9\u1D00\u2C80\u2C81\u023A\xC6\xE6\u13D7",
       b: "\u0412\u0432\u0392\u03B2\uA4D0\u13F4\u15F7\u0299\u2C82\u2C83\u0180\u0253",
@@ -77482,7 +77482,8 @@ var init_sessionNames = __esm({
       if (DOMAIN.test(seen)) return refuse2("url_or_email");
       if (looksSecret(name)) return refuse2("secret");
       const words2 = ` ${seen.replace(/[._'-]+/gu, " ").replace(/\s+/gu, " ")} `;
-      if (ROLE_WORDS.some((word) => words2.includes(` ${word} `))) return refuse2("role");
+      const role = ROLE_WORDS.find((word) => words2.includes(` ${word.toLowerCase()} `));
+      if (role) return refuse2("role", role);
       return { ok: true, name };
     };
     json5 = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -108626,7 +108627,7 @@ var FEATURES = Object.freeze([
   "worker_groups"
 ]);
 var WORKERS_AI_FEATURE = "workers_ai_v1";
-var workerRelease = () => "0.9.34" ? "0.9.34" : null;
+var workerRelease = () => "0.9.35" ? "0.9.35" : null;
 var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 = {} }) => {
   const deployed = FEATURES.filter((feature) => feature !== WORKER_GROUP_READ_CODE_FEATURE || workerGroupCodeReadsOn(env));
   const body = {

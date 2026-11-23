@@ -29,6 +29,16 @@ describe('PolisReport graph scroll controls', () => {
   });
 });
 
+describe('PolisReport Active Filters row', () => {
+  it('hides the label the Filter button replaces on screen only: the PDF and print, which leave the button out, show it', () => {
+    const scss = readPolisReportScss();
+
+    expect(scss).toMatch(/\.activeFiltersItem\s*{[\s\S]*?\.replacedLabel\s*{\s*display:\s*none;/);
+    expect(scss).toMatch(/\.pdfMode \.activeFiltersItem \.replacedLabel\s*{\s*display:\s*inline;/);
+    expect(scss).toMatch(/@media print\s*{\s*\.activeFiltersItem \.replacedLabel\s*{\s*display:\s*inline;/);
+  });
+});
+
 describe('PolisReport settings toggle', () => {
   it('renders as an unboxed icon control in both report themes', () => {
     const scss = readPolisReportScss();

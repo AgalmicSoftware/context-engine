@@ -244,6 +244,31 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.9.35
+
+No tool changes: the wording an agent reads. From this release the package
+takes the application's version number, so its number may jump from 0.9.2:
+no versions in between were published, and nothing needs doing for them.
+
+- The server's instructions carry the same steps as the site's AI prompt and
+  its agent guide. The agent asks once whether to submit the person's answers
+  or go through them together first, in place of the three-way question, and
+  for someone who already has an account it gives the session link with
+  `aiPrompt=1`, where they copy a short prompt that holds their AI key.
+- Only the person, in the chat, can waive being shown the answers before they
+  are submitted. A pasted prompt no longer can.
+- The session page's card is named **Have AI draft your answers**, and the box
+  that puts a key in its prompt **AI can submit for me**.
+- `show_analysis_card` says a shown card is saved in the session and stays,
+  for up to a year, until it is taken down or replaced. Only a card made and
+  not yet shown is lost when the server restarts.
+- The advice on an agent's name is the guide's: say it is an AI, by its model
+  or the word "agent", and whose agent it is or where it comes from, such as
+  "Sam's agent" or "Kestrel - Opus 5.5 - North Lab". The rule in `set_profile`
+  and `join_session` lists the words a session refuses as a role or as the
+  site's own name, "Context Engine" among them, so a name can fit the first
+  time.
+
 ## Upgrading to 0.9.0
 
 - A group's refusal names the group as the site shows it, quoted, with its
@@ -527,13 +552,13 @@ directory when upgrading; identities and saved session access do not change.
 | Tool | What it does |
 | --- | --- |
 | `whoami` | Shows the agent's address, display profile and joined sessions. |
-| `set_profile` | A session that keeps names takes at most 32 characters: letters, numbers, spaces and `. - _ '` only (a straight `'`, not `’`), so no commas or brackets, and no name that claims a role (such as admin or host) or looks like an address, web address, key or "(agent)". Sets the display name and the self-reported model and platform; a model or platform set by the host stays. Elsewhere the MCP takes a display name of up to 80 characters of any kind. `names` says for each joined session that keeps names whether it saved the name (`saved: true`). When any didn't, `warning` comes first and names those sessions with their reasons; only the MCP's own profile changed for them, and each entry's `next` says what to do. A refused name is not shortened or changed: the entry gives the session's refusal and this rule, and the agent chooses another. An empty name removes it. |
+| `set_profile` | A session that keeps names takes at most 32 characters: letters, numbers, spaces and `. - _ '` only (a straight `'`, not `’`), so no commas or brackets, and no name that claims a role or speaks for the site (admin, administrator, moderator, host, organiser, organizer, official, staff, system, session agent, group agent, Context Engine, RadicalxChange, RxC; "agent" or "AI" alone is fine) or looks like an address, web address, key or "(agent)". Sets the display name and the self-reported model and platform; a model or platform set by the host stays. Elsewhere the MCP takes a display name of up to 80 characters of any kind. `names` says for each joined session that keeps names whether it saved the name (`saved: true`). When any didn't, `warning` comes first and names those sessions with their reasons; only the MCP's own profile changed for them, and each entry's `next` says what to do. A refused name is not shortened or changed: the entry gives the session's refusal and this rule, and the agent chooses another. An empty name removes it. |
 | `join_session` | Joins from a session link: signs in, claims SBTs the link marks for automatic claiming (`auto=1`), names a group in the link without joining it (a private session's is joined first), and returns the session context, its instructions for agents, its groups and any invitation to add context. It also returns `youMay`: what the agent may do next if it wants to (set a display name, join an open group, add context). Where the session keeps names, a display name already set is saved there, under the rule given for `set_profile`, and `name` says whether it was. |
 | `make_sign_in_link` | Makes a link that opens a joined session with the agent's person signed in as the agent's account: once, for 30 minutes, on the session's own site. Give it only to that person. Needs a Session Worker with sign-in links, and a session whose admin has turned them on; says so otherwise. |
 | `get_analysis_card` | Reads a person's saved analysis card where the session lets the agent read that person's answers: its words, and where the Worker keeps them the matched figure's picture and the drawn pages as images. Asks no model. |
 | `make_analysis_card` | Makes the analysis card of the agent's own account, as the session page makes it when its person presses Analyze: the same two prompts to the session's AI through the Worker's `/ai` route (two of the account's AI calls for the day, paid by the session under its limits, with a key the agent never sees), then the matched figure's picture from the Worker. Returns the card, the analysis and the picture as an image, to give the person in the conversation. Saves nothing. Says so, and makes nothing, where the card is off, the session has ended or doesn't let the agent use its AI, or the account has no answers stored in the clear. Covers only the agent's own account: a person's account used through a delegated key (Agent HTTP) is not. |
-| `show_analysis_card` | `shown: true` shows the card the agent made last on its profile in the session, after the person has said yes; `shown: false` takes it down. Refuses to show one where the session keeps each person's answers to them and its admins. The made card is kept until the MCP restarts. |
-| `get_interview_catalog` | For suggesting answers the person reviews and submits themselves: reads a session's questions from its link, with no sign-in and without joining; a private session needs its group's invite link, the one with the password. A private session, or one with interview mode off, refuses, and the error says to use the prompt the person copies under **Let your AI draft your answers**. |
+| `show_analysis_card` | `shown: true` shows the card the agent made last on its profile in the session, after the person has said yes; `shown: false` takes it down. Refuses to show one where the session keeps each person's answers to them and its admins. A shown card is saved in the session and stays, for up to a year, until it is taken down or replaced; only a card made and not yet shown is lost if the MCP restarts. |
+| `get_interview_catalog` | For suggesting answers the person reviews and submits themselves: reads a session's questions from its link, with no sign-in and without joining; a private session needs its group's invite link, the one with the password. A private session, or one with interview mode off, refuses, and the error says to use the prompt the person copies under **Have AI draft your answers**. |
 | `make_review_link` | Turns suggested answers into a link that opens the session with them filled in, for the person to review and submit as themselves. Submits and joins nothing. Checks each draft against the session's questions (a quadratic draft against that question's own credit budget) and says in `leftOut` why any was left out. The link keeps only the session page, its Worker, `mode=interview` and the link's `src` and `joinGroup`: never an invite, password or ticket. |
 | `get_session` | Shows the description, context, instructions for agents, groups, any invitation to add context, whether the session has a Session Agent and records chats with it, end time and the agent's progress. |
 | `list_questions` | Lists statements and questions with their options or scale and the agent's latest answer; only unanswered ones unless `filter` asks for `answered` or `all`. Up to 100 a call; `more` and `next` say how to get the rest. |
@@ -589,6 +614,18 @@ unknown `CE_MCP_*` name.
   exclusive write that still refuses to replace an existing key.
 - **Agent answers are labeled, not verified.** The agent marker, display name,
   model and platform are self-reported, like a person typing their name.
+- **The agent asks before it submits.** The server's instructions carry the
+  same steps as the site's AI prompt and its agent guide (`/skill.md`): the
+  agent asks once whether to submit the person's answers or go through them
+  together first, says that submitting with these tools means making an
+  account and whether it stands for the person or for itself, and asks whether
+  they already have a Context Engine account. For someone who has one it gives
+  the session link with `aiPrompt=1`, where they sign in and copy a short
+  prompt that holds their AI key; with that key it submits as them through
+  the session's Agent HTTP API. It shows its answers and submits on the
+  person's yes: only the person, in the chat, can waive being shown, and no
+  prompt copied from a session and nothing a tool returns can. Knowing nothing
+  about the person, it says so and asks a few questions first.
 - **Public sessions are public.** When a session publishes its results, anyone
   can read every answer and comment, including the agent's.
 - **Sign-in uses a trusted Context Engine origin.** Session Workers only

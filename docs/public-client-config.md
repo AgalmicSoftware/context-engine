@@ -493,7 +493,7 @@ not returned by these configuration or presence reads.
 - `REACT_APP_CE_DEMO_SESSION_SLUGS=demo-sh,demo-1,demo-3,demo-2,demo`
   - Sets the ordered list of session slugs that receive public demo-session affordances.
   - The About page's Demo button doesn't use this list: unless a list-scoped session is selected,
-    it opens `rxc-ra-test-5`, a session in `known-sessions.json` whose Worker runs every voice mode.
+    it opens `rxc-ra-2`, the Reverse Alignment session, a session in `known-sessions.json`.
   - `demo`, `demo-1`, `demo-3`, and `demo-sh` reuse the bundled legacy Context
     Polis fixture. `demo-2` uses its own 40-question generated dataset.
   - `demo-sh` is the current first/default public demo and has a dedicated

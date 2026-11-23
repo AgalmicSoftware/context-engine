@@ -9,7 +9,8 @@ import { ethers } from 'ethers';
 import { createParticipant } from './participant.mjs';
 import { AGENT_NAME_EXAMPLE, SESSION_NAME_RULE } from './sessionNameRule.mjs';
 import { SERVER_INSTRUCTIONS, buildTools } from './tools.mjs';
-import { SESSION_NAME_LIMITS, normalizeSessionName } from '../../workers/sessionCorsWorker/sessionNames.js';
+import { ROLE_WORDS, SESSION_NAME_LIMITS, normalizeSessionName } from '../../workers/sessionCorsWorker/sessionNames.js';
+import { AGENT_NAME_ADVICE, AGENT_NAME_EXAMPLES } from '../../shared/agentParticipationGuide.mjs';
 
 const fixture = JSON.parse(await readFile(new URL('../../tests/fixtures/worker-compat/previous-minor.json', import.meta.url), 'utf8'));
 
@@ -18,7 +19,10 @@ test('the names rule the tools state is the Worker’s own', () => {
   assert.equal(said('x'.repeat(SESSION_NAME_LIMITS.chars + 1)), `A name can be at most ${SESSION_NAME_LIMITS.chars} characters`);
   assert.ok(SESSION_NAME_RULE.includes(`at most ${SESSION_NAME_LIMITS.chars} characters`));
   assert.ok(SESSION_NAME_RULE.includes(said('Civic bot!')), said('Civic bot!'));
-  assert.ok(SESSION_NAME_RULE.includes(said('Admin').match(/such as [^.]+/)[0]));
+  // Every word the Worker refuses as a role is said, so a name can be chosen that fits the first time.
+  for (const word of ROLE_WORDS) assert.ok(SESSION_NAME_RULE.includes(word), word);
+  assert.match(SESSION_NAME_RULE, /claims a role or speaks for the site/);
+  assert.match(said('Admin'), /claim a role, such as admin or host, or speak for the site/);
   assert.ok(!SESSION_NAME_RULE.includes('\n'));
   // Its note on the apostrophe holds: the straight one is taken, the curly one refused.
   assert.deepEqual([normalizeSessionName("Sam's agent").ok, normalizeSessionName('Sam’s agent').reason], [true, 'characters']);
@@ -36,6 +40,14 @@ test('the names rule the tools state is the Worker’s own', () => {
   // The name the instructions suggest is one a session takes.
   assert.deepEqual(normalizeSessionName(AGENT_NAME_EXAMPLE), { ok: true, name: AGENT_NAME_EXAMPLE });
   assert.ok(SERVER_INSTRUCTIONS.includes(AGENT_NAME_EXAMPLE));
+  // One piece of advice on names, in the instructions as in the guide, and each name it offers is taken.
+  assert.ok(SERVER_INSTRUCTIONS.includes(AGENT_NAME_ADVICE));
+  for (const name of AGENT_NAME_EXAMPLES) {
+    assert.ok(AGENT_NAME_ADVICE.includes(`"${name}"`));
+    assert.deepEqual(normalizeSessionName(name), { ok: true, name });
+  }
+  // The name a hosted agent first chose is refused for the site's name, not for saying it is an agent.
+  assert.match(normalizeSessionName('Agent - Context Engine MCP').error, /“Context Engine”/);
   assert.match(SERVER_INSTRUCTIONS, /only if set_profile’s names or join_session’s name says saved: true/);
 });
 
@@ -80,7 +92,7 @@ test('a name the session refuses is sent as given and comes back with the rule',
   assert.match(results[0].error, /at most 32 characters/);
   assert.match(results[2].error, /role/);
   const one = await participant.setProfile({ displayName: 'Admin' });
-  assert.match(one.warning, /^Your name was not saved in 1 of 1 joined session that keeps names: compat-session \(Names can’t claim a role, such as admin or host\.\)\. Only/);
+  assert.match(one.warning, /^Your name was not saved in 1 of 1 joined session that keeps names: compat-session \(A name can’t include “admin”: names can’t claim a role, such as admin or host, or speak for the site\. One like "Sam" or "Sam's agent" is fine\.\)\. Only/);
 });
 
 // Two sessions that keep names, each with the Worker's own rule; the second can be made busy.

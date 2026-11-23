@@ -219,7 +219,7 @@ test('a private session’s catalog is read with the proof its invite link makes
 
 test('refusals say what to do, and never ask for a code or password by itself', async () => {
   for (const [status, error, pattern, reason] of [
-    [401, 'This session’s questions need a sign-in.', /not public \(401.*group’s invite link.*Let your AI draft your answers.*Never ask them to type a code or a password by itself/],
+    [401, 'This session’s questions need a sign-in.', /not public \(401.*group’s invite link.*Have AI draft your answers.*Never ask them to type a code or a password by itself/],
     [403, 'Private session.', /not public \(403/],
     [403, 'This session is private. Open it from your group invite link.', /Error: This session is private\. If the person has the group’s invite link/, 'private_session_invite_required'],
     [403, 'This invite link no longer opens this session.', /invite no longer opens it/, 'private_session_invite_invalid'],

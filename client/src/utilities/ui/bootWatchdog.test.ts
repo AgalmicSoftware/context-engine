@@ -10,7 +10,9 @@ const LONG_WAIT_MS = 45000;
 
 const boot = () => {
   document.body.innerHTML =
-    '<p id="ce-agent-note">For AI agents.</p><div id="root"></div><script type="module" id="entry"></script><img id="picture" />';
+    '<p id="ce-agent-note">For AI agents.</p>' +
+    '<div id="ce-boot-loading"><span>Loading…</span><progress max="1" value="0"></progress><span id="ce-boot-loading-note"></span></div>' +
+    '<div id="root"></div><script type="module" id="entry"></script><img id="picture" />';
   // The script runs as the browser would run it: once, against this document.
   new Function(source)();
   window.dispatchEvent(new Event('load'));
@@ -95,6 +97,79 @@ describe('the blank-page message', () => {
     expect(notice()).toBeNull();
   });
 
+  it('still reports a root that holds only what the app puts there before drawing, and goes when it draws', async () => {
+    boot();
+    document.getElementById('ce-agent-note')!.remove();
+    // The app's first script ran and put its empty toast host and loading line in the root; the main part of the
+    // app never arrived. That was a white page with no message.
+    const root = document.getElementById('root')!;
+    for (const tag of ['div', 'p']) {
+      const part = document.createElement(tag);
+      part.setAttribute('data-ce-boot-ignore', '');
+      root.append(part);
+    }
+    await Promise.resolve();
+    jest.advanceTimersByTime(LONG_WAIT_MS);
+    expect(notice()).not.toBeNull();
+    await draw();
+    expect(notice()).toBeNull();
+  });
+
+  it('marks the toast host, which the app puts in its root before drawing, and shows nothing else there', () => {
+    const read = (file: string) => fs.readFileSync(path.join(clientRoot, 'src', 'components', file), 'utf8');
+    expect(read('Shared/CEToaster.tsx')).toMatch(/data-testid="ce-toast-host" data-ce-boot-ignore=""/);
+    // The loading line is the page shell's, outside the root, so the app adds none of its own.
+    const app = read('App.tsx');
+    expect(app).toContain('<Suspense fallback={null}>');
+    expect(app).not.toContain('data-ce-boot-ignore');
+  });
+
+  it('never reloads the page by itself: a slow load that is still arriving is not thrown away', () => {
+    const fetched = jest.fn((_url: string, _init: RequestInit) => new Promise<Response>(() => undefined));
+    (window as unknown as { fetch: unknown }).fetch = fetched;
+    boot();
+    jest.advanceTimersByTime(LONG_WAIT_MS * 2);
+    expect(notice()).not.toBeNull();
+    expect(fetched).not.toHaveBeenCalled();
+  });
+
+  it('fills the loading bar by the size of the files that have arrived, and says when the load is slow', () => {
+    boot();
+    const entry = document.getElementById('entry') as HTMLScriptElement;
+    entry.src = 'http://localhost/assets/index-1.js';
+    entry.setAttribute('data-ce-bytes', '100');
+    const link = document.createElement('link');
+    link.href = 'http://localhost/assets/AppShell-1.js';
+    link.setAttribute('data-ce-bytes', '300');
+    document.head.append(link);
+    const entries = [
+      { name: entry.src, responseEnd: 10 },
+      { name: link.href, responseEnd: 0 },
+    ];
+    (performance as unknown as { getEntriesByType: unknown }).getEntriesByType = () => entries;
+    try {
+      const bar = document.querySelector('#ce-boot-loading progress') as HTMLProgressElement;
+      jest.advanceTimersByTime(300);
+      expect([bar.value, bar.max]).toEqual([100, 400]);
+      entries[1].responseEnd = 20;
+      jest.advanceTimersByTime(300);
+      expect(bar.value).toBe(400);
+      expect(document.getElementById('ce-boot-loading-note')!.textContent).toBe('');
+      jest.advanceTimersByTime(15000);
+      expect(document.getElementById('ce-boot-loading-note')!.textContent).toMatch(/taking longer than usual/);
+    } finally {
+      link.remove();
+      delete (performance as unknown as { getEntriesByType?: unknown }).getEntriesByType;
+    }
+  });
+
+  it('takes the loading line away once the app draws', async () => {
+    boot();
+    expect(document.getElementById('ce-boot-loading')).not.toBeNull();
+    await draw();
+    expect(document.getElementById('ce-boot-loading')).toBeNull();
+  });
+
   it("reports the app's first script failing to load at once, and no other failed file", () => {
     boot();
     document.getElementById('picture')!.dispatchEvent(new Event('error'));
@@ -125,6 +200,12 @@ describe('the blank-page message', () => {
     // The content policy allows no inline script, and the app's bundle may be what failed.
     expect(source).not.toMatch(/import |require\(/);
     expect(html).toContain('<noscript>');
+    // The loading line is in the shell itself, before the root, and hidden where no script will ever remove it.
+    expect(html).toContain(
+      '<div id="ce-boot-loading" class="ce-app-loading" role="status" style="visibility: hidden">',
+    );
+    expect(html.indexOf('id="ce-boot-loading"')).toBeLessThan(html.indexOf('<div id="root">'));
+    expect(html).toContain('<noscript><style>#ce-boot-loading { display: none; }</style></noscript>');
     expect(html).toContain('id="ce-agent-note"');
   });
 });

@@ -1,6 +1,7 @@
 // The one set of steps an AI follows to take part in a session for a person, and the words for its parts.
-// The site's copied prompts import it; llms.txt, the agent guide and the Session Worker's skill carry it in
-// marked blocks that scripts/sync-agent-flow.mjs writes and scripts/public-discovery.test.js checks.
+// The site's copied prompts and the MCP's instructions import it; llms.txt, the agent guide and the Session
+// Worker's skill carry it in marked blocks that scripts/sync-agent-flow.mjs writes and
+// scripts/public-discovery.test.js checks.
 
 import { AGENT_PROMPT_LINK_QUERY } from './agentPromptLink.mjs';
 
@@ -15,6 +16,17 @@ export const AGENT_ASK_WHICH_WAY = 'Shall I submit your answers for you, or shal
 export const AGENT_REVIEW_NEXT_STEP = 'open the link, check each draft answer, press Submit';
 
 export { AGENT_PROMPT_LINK_QUERY };
+
+/** Names an agent may give itself in a session, each one a session that keeps names takes as written. */
+export const AGENT_NAME_EXAMPLES = ["Sam's agent", 'Kestrel - Opus 5.5 - North Lab'];
+
+/**
+ * How an agent names itself in a session, the same wherever it reads it: the MCP's instructions and what
+ * joining returns import it, and the agent guide and llms.txt carry it (scripts/public-discovery.test.js).
+ */
+export const AGENT_NAME_ADVICE =
+  `A good name says you are an AI, by your model or the word "agent", and whose agent you are or where you come from, such as "${AGENT_NAME_EXAMPLES[0]}" or "${AGENT_NAME_EXAMPLES[1]}". ` +
+  "Never claim to be a person, and leave out role words such as admin or host and the site's own name, Context Engine: a session refuses a name with them.";
 
 export const AGENT_FLOW_INTRO =
   'How an AI takes part in a Context Engine session for a person. The same steps apply from the AI prompt the person copies in the session and from the session link alone.';

@@ -326,6 +326,8 @@ test('an agent makes its account’s card through the session’s AI, offers it 
   const shown = await participant.showAnalysisCard({ shown: true });
   assert.equal(shown.shown, true);
   assert.match(shown.savedAt, /^\d{4}-/);
+  // Said to stay: a shown card is saved in the session, whatever happens to this server.
+  assert.match(shown.note, /^Saved in this session and shown on your profile there.*It stays, for up to a year, until/);
   assert.deepEqual((await participant.getAnalysisCard({})).card, made.card);
   // Taken down again.
   assert.equal((await participant.showAnalysisCard({ shown: false })).shown, false);

@@ -9,16 +9,56 @@
   var AGENT_NOTE_ID = 'ce-agent-note';
   var waitedLonger = false;
   var NOTICE_ID = 'ce-boot-notice';
+  // index.html's loading line: its bar is filled here from the sizes the build wrote on the page's file links.
+  var LOADING_ID = 'ce-boot-loading';
+  var SLOW_NOTE_MS = 15000;
   var timer = 0;
+  var progressTimer = 0;
 
+  // The app puts a few things in its root before it has drawn anything to see (the empty toast host, the loading
+  // line); they carry this attribute, so a page holding only them still counts as not drawn.
   var appShown = function appShown() {
     var root = document.getElementById('root');
-    return !!root && root.childElementCount > 0;
+    if (!root) return false;
+    for (var child = root.firstElementChild; child; child = child.nextElementSibling) {
+      if (!child.hasAttribute('data-ce-boot-ignore')) return true;
+    }
+    return false;
   };
 
   var hide = function hide() {
     var notice = document.getElementById(NOTICE_ID);
     if (notice) notice.remove();
+  };
+
+  var stopLoading = function stopLoading() {
+    window.clearInterval(progressTimer);
+    var line = document.getElementById(LOADING_ID);
+    if (line) line.remove();
+  };
+
+  // How much of the app's files has arrived, by size. The browser's own record of finished downloads is read, so
+  // nothing is missed however early a file came.
+  var showProgress = function showProgress() {
+    var line = document.getElementById(LOADING_ID);
+    var bar = line && line.querySelector('progress');
+    if (!bar || !window.performance || !performance.getEntriesByType) return;
+    var arrived = {};
+    var entries = performance.getEntriesByType('resource');
+    for (var i = 0; i < entries.length; i += 1) {
+      if (entries[i].responseEnd > 0) arrived[entries[i].name] = true;
+    }
+    var files = document.querySelectorAll('[data-ce-bytes]');
+    var total = 0;
+    var done = 0;
+    for (var j = 0; j < files.length; j += 1) {
+      var bytes = Number(files[j].getAttribute('data-ce-bytes')) || 0;
+      total += bytes;
+      if (arrived[files[j].href || files[j].src]) done += bytes;
+    }
+    if (!total) return;
+    bar.max = total;
+    bar.value = done;
   };
 
   var reload = function reload() {
@@ -104,6 +144,14 @@
   // after the long wait is reported.
   window.setTimeout(show, WAIT_WHILE_LOADING_MS);
 
+  // The loading line: its bar moves as files arrive, and a slow load is told that it is slow, not broken.
+  progressTimer = window.setInterval(showProgress, 300);
+  window.setTimeout(function saySlow() {
+    var note = document.getElementById(LOADING_ID + '-note');
+    if (note && !appShown())
+      note.textContent = 'This is taking longer than usual. A slow connection or a VPN can cause this.';
+  }, SLOW_NOTE_MS);
+
   // Otherwise wait: the app draws well within this on a slow phone, and the message goes if it draws later.
   if (document.readyState === 'complete') startTimer();
   else window.addEventListener('load', startTimer);
@@ -119,6 +167,7 @@
       if (appShown()) {
         window.clearTimeout(timer);
         hide();
+        stopLoading();
       }
     }).observe(root, { childList: true });
   };

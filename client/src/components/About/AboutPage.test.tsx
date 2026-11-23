@@ -523,7 +523,7 @@ describe('AboutPage', () => {
         selectedSessionScope: 'list',
         selectedSessionSlugs: ['general'],
       } as any),
-    ).toBe('/session/rxc-ra-test-5');
+    ).toBe('/session/rxc-ra-2');
   });
 
   it('opens a demo session the site can open from a normal link', () => {

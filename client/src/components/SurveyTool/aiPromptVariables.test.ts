@@ -54,7 +54,7 @@ it('shows a stand-in in place of every value, and no key, ticket or address', ()
   expect(shown).toContain('It is only for the session <SessionName> at <SessionLink>.');
   expect(shown).toContain('never a summary:\n<QuestionsAddress>\n');
   expect(shown).toContain('Unanswered question IDs, newest first: <UnansweredQuestions>');
-  expect(shown).toContain("not the catalog's reviewUrl:\n<ReviewLink>\nGive the link twice");
+  expect(shown).toContain("not the catalog's reviewUrl:\n<ReviewLink>\nGive the link once");
   for (const secret of [key.token, ticket, 'worker.example', key.expiresAt]) expect(shown).not.toContain(secret);
   // Only the values change: put back, it is the prompt that is copied.
   const pieces = splitPromptByVariables(full, findPromptVariables(full));

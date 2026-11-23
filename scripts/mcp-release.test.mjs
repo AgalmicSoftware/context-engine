@@ -8,6 +8,7 @@ import { gzipSync } from 'node:zlib';
 import { PACKAGE, REPOSITORY, TARBALL, RECEIPT, collectInputs, inspectPackage,
   integrity, publicationDecision, selectPackageAttempt, stagePackage, validateRun, verifyArtifact } from './mcp-release-artifacts.mjs';
 import { publishVerified, readRegistry } from './publish-mcp.mjs';
+import { setMcpVersion } from './set-mcp-version.mjs';
 
 const SHA = 'a'.repeat(40);
 const manifest = { name: PACKAGE, version: '0.1.2', publishConfig: { access: 'public', registry: 'https://registry.npmjs.org/' },
@@ -262,4 +263,30 @@ test('workflow publishes only the CI artifact, defaults to dry-run and serialize
   assert.equal(workflow.match(/MCP_PACKAGE_ATTEMPT: \$\{\{ steps.run.outputs.packageAttempt \}\}/g)?.length, 2);
   assert.match(ci, /MCP_RELEASE_OUTPUT: \$\{\{ runner.temp \}\}\/mcp-release/);
   assert.match(ci, /mcp-package-\$\{\{ github.sha \}\}-\$\{\{ github.run_attempt \}\}/);
+});
+
+test('one command sets the MCP version everywhere it is stated, and nowhere else', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'ce-mcp-version-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const write = (name, text) => {
+    mkdirSync(dirname(join(root, name)), { recursive: true });
+    writeFileSync(join(root, name), text);
+  };
+  const read = (name) => readFileSync(join(root, name), 'utf8');
+  write('mcp/package.json', JSON.stringify({ name: PACKAGE, version: '0.9.3' }, null, 2));
+  // A dependency that happens to share the number keeps it.
+  write('mcp/package-lock.json', JSON.stringify({ name: PACKAGE, version: '0.9.3',
+    packages: { '': { version: '0.9.3' }, 'node_modules/other': { version: '0.9.3' } } }, null, 2));
+  write('mcp/README.md', '## Upgrading to 0.9.3\n\nNotes.\n\n## Upgrading to 0.9.0\n');
+  write('CHANGELOG.md', '## [Unreleased]\n\n### MCP 0.9.3 — ships by an npm publish\n\n### MCP 0.9.2\n');
+  // A two-digit last part, as when the MCP takes the application's version.
+  assert.deepEqual(setMcpVersion(root, '0.9.35'), ['mcp/package.json', 'mcp/package-lock.json', 'mcp/README.md', 'CHANGELOG.md']);
+  assert.equal(JSON.parse(read('mcp/package.json')).version, '0.9.35');
+  const lock = JSON.parse(read('mcp/package-lock.json'));
+  assert.deepEqual([lock.version, lock.packages[''].version, lock.packages['node_modules/other'].version], ['0.9.35', '0.9.35', '0.9.3']);
+  assert.equal(read('mcp/README.md'), '## Upgrading to 0.9.35\n\nNotes.\n\n## Upgrading to 0.9.0\n');
+  assert.equal(read('CHANGELOG.md'), '## [Unreleased]\n\n### MCP 0.9.35 — ships by an npm publish\n\n### MCP 0.9.2\n');
+  // Run again, it changes nothing; a version that is not a stable one is refused.
+  assert.deepEqual(setMcpVersion(root, '0.9.35'), []);
+  assert.throws(() => setMcpVersion(root, '0.9.36-beta.1'), /stable version/);
 });

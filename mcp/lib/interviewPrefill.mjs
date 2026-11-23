@@ -34,7 +34,7 @@ const REVIEW_LINK_PARAMS = new Set(['worker', 'mode', ...KEPT_LINK_PARAMS]);
 
 const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const PRIVATE_HINT =
-  'If the person has the group’s invite link, the one that carries its password, pass that whole link. Otherwise ask them to open the session in a browser and copy the prompt under "Let your AI draft your answers" among its interview choices, then follow it; that prompt needs you to open a web link, so if you can’t, tell them. Never ask them to type a code or a password by itself.';
+  'If the person has the group’s invite link, the one that carries its password, pass that whole link. Otherwise ask them to open the session in a browser and copy the AI prompt under "Have AI draft your answers" among its interview choices, then follow it; that prompt needs you to open a web link, so if you can’t, tell them. Never ask them to type a code or a password by itself.';
 const PRIVATE_REASONS = new Set(['private_session_invite_required', 'private_session_invite_invalid']);
 
 const sessionPageFor = (info) => `${info.appOrigin}/session/${encodeURIComponent(info.slug)}`;

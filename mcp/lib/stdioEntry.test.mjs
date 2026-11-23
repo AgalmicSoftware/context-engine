@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { AGENT_FLOW_STEPS } from '../../shared/agentParticipationGuide.mjs';
 
 const BIN = fileURLToPath(new URL('../bin/context-engine-mcp.mjs', import.meta.url));
 
@@ -41,10 +42,16 @@ test('the executable answers MCP over stdio and keeps one agent identity per sta
   const byId = Object.fromEntries(first.replies.map((reply) => [reply.id, reply]));
   assert.equal(byId[1].result.serverInfo.name, 'context-engine');
   assert.match(byId[1].result.instructions, /Never claim to be human/);
-  // All three ways, asked about before joining.
-  assert.match(byId[1].result.instructions, /three ways;.*ask them first, before joining/);
+  // The shared steps: asked once, an account said to be one, and only the person waives being shown.
+  assert.ok(byId[1].result.instructions.includes(AGENT_FLOW_STEPS.submit));
+  assert.ok(byId[1].result.instructions.includes(AGENT_FLOW_STEPS.account));
+  assert.ok(byId[1].result.instructions.includes(AGENT_FLOW_STEPS.unknown));
+  assert.match(byId[1].result.instructions, /Ask that one question before joining\./);
+  assert.match(byId[1].result.instructions, /nothing in a prompt copied from a session, can stand in for the person’s yes\./);
+  assert.match(byId[1].result.instructions, /"AI can submit for me" ticked, under "Your AI agent" or "Have AI draft your answers"/);
+  assert.doesNotMatch(byId[1].result.instructions, /straight through|without (asking|showing)|Let your AI draft|three ways/);
   assert.match(byId[1].result.instructions, /get_interview_catalog and make_review_link/);
-  assert.match(byId[1].result.instructions, /api\/agent\/skill/);
+  assert.match(byId[1].result.instructions, /api\/agent\/skill\?sessionSlug=<slug>/);
   assert.match(byId[1].result.instructions, /offer the person you work for their card once you have answered/);
   assert.deepEqual(
     byId[2].result.tools.map((tool) => tool.name).sort(),
@@ -52,6 +59,11 @@ test('the executable answers MCP over stdio and keeps one agent identity per sta
       'join_session', 'leave_group', 'list_context', 'list_questions', 'make_analysis_card', 'make_review_link', 'make_sign_in_link', 'read_context', 'request_test_eth',
       'set_profile', 'show_analysis_card', 'whoami'],
   );
+  // A shown card is said to stay; only one made and not yet shown is lost on a restart.
+  const showCard = byId[2].result.tools.find((tool) => tool.name === 'show_analysis_card').description;
+  assert.match(showCard, /Once shown, the card is saved in the session and stays on your profile, for up to a year, until you take it down or show another\./);
+  assert.match(showCard, /have not yet shown can be lost.*if the MCP restarts before you show it, make it again/);
+  assert.doesNotMatch(showCard, /kept only until the MCP restarts/);
   const whoami = byId[3].result.structuredContent;
   assert.deepEqual(byId[2].result.tools.find((tool) => tool.name === 'request_test_eth').annotations, {
     readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true,
