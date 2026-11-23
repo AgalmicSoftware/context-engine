@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.9.37] - 2026-11-23
+
+A Worker updated to this release gives a session's questions as short pages an AI can read, sign-in works in a browser that blocks the site's data, the agent guide opens on which session to work on, and a room of more than four people can record a plain transcript. MCP unchanged.
 
 ### Session Worker — needs a Worker update
 
@@ -19,6 +21,7 @@ All notable changes to this project will be documented in this file.
 - **The chosen answer stands out on Agree / Unsure / Disagree.** Once one is chosen, the others dim by 30% and the chosen one keeps its colour, with a ring inside it in its label's colour. Before, only the chosen label's bold italics showed it, which was hard to see on the bright colours, as on the interview's Review drafts window when the AI had already chosen. Only the dimmed colours darken, so every label stays readable. The session's own questions use the same buttons, so they change too.
 - **An AI reads a listed session's questions a page at a time.** `contextengine.sh/questions/<name>.md`, `/questions/<name>/<page>` and `/questions/<name>/size/<k>/<page>` pass through to the session Worker's short pages, and the guide's opening and `/llms.txt` send an AI to the index, then each page, then the link page, and to smaller pages if a page comes back shortened; each listed session's index address now comes first in `/skill.md`, `/llms.txt` and the session page's note for agents, before its JSON and Worker addresses. Only if those do not open does it fetch the whole list as JSON at `/questions/<name>`. Until a session's Worker is updated its pages do not open, so its AI uses the JSON as before.
 - **The session lists show one test session.** The site's session lists (the Session drop-down, the Tools and Groups session pickers and the Sessions directory) leave out `rxc-ra-test-5` (RA test), so beside EDDY 2026 and the Reverse Alignment salon, the agent test session is the only test session they take from `known-sessions.json`. RA test's links, `/session/rxc-ra-test-5` and `/questions/rxc-ra-test-5`, still open it, since the file keeps its entry for the films and slides that link it, and the drop-down and the pickers still show it while it is that browser's current choice. As before, a browser also lists the sessions it has opened itself, below these.
+- **Deploy helper.** It deploys the 0.9.36 Worker bundles. A Worker updated from the site gets this release's.
 
 ### Local tooling
 
