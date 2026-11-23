@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 
 ### Local tooling
 
+- **A test builds a review link from the copied prompt and opens it as the site does.** `sessionInterviewPrefillLink.test.ts` stands in for two AIs, each doing only what the prompt says: one given a summary of the question list, which has only the fingerprint, the version and the ids the prompt carries, and one that reads the list whole. Each link is read by the session page's own reader and its packet checked against the catalog; a link for another question set is refused.
 - **One command sets the MCP's version.** `node scripts/set-mcp-version.mjs <version>` writes it to `mcp/package.json`, both fields of its lock file, the README's upgrade heading and the changelog's MCP heading. The MCP takes the application's version number from its next release, so its number jumps from 0.9.2.
 
 ### MCP 0.9.35 — ships by an npm publish
