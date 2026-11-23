@@ -38,7 +38,9 @@ The checker reads it, measures built bytes directly, and follows the HTML
 entry's direct dynamic import so hashed filename changes cannot reclassify the
 application entry. It warns at 95% of a cap and fails over the checked-in cap.
 The baseline monotonicity gate independently rejects cap, exception, entry,
-vendor-prefix, or duplicate-allowlist growth.
+vendor-prefix, or duplicate-allowlist growth. The one exception: an existing
+exception's own cap may be raised, when `scripts/client-bundle-budget.json` and
+this page state the new figure. A chunk over its cap still fails the build check.
 
 ## Static Image Deduplication
 

@@ -15,6 +15,10 @@ A login file can have a password, a Submit that finds it due asks for it there, 
 - **An atlas level's title sits under "Up Level", larger.** Below a session atlas's top level, the button with the level's title now has a line of its own under "Up Level", in larger type with more room around it, so it reads as the level's heading. Before, on a phone it sat right under "Up Level", touching it, and on a wide screen beside it, where a long title could run into it and over the circles. A long title wraps within the atlas, and the circles start below it however many lines it takes.
 - **Deploy helper.** It deploys the 0.9.30 Worker bundles. A Worker updated from the site gets this release's.
 
+### Local tooling
+
+- **A raised bundle-exception cap passes the baseline check.** The baseline monotonicity check no longer fails when an existing bundle exception's own cap is raised, such as the AppShell cap from 525,000 to 530,000 bytes in this release; the budget file and `docs/bundle-budget.md` state the new figure. Every other bundle-budget loosening still fails and still cannot be approved, and a chunk over its cap still fails the build's bundle check.
+
 ## [0.9.30] - 2026-11-23
 
 A login file that is due again says to reload, its download lasts long enough for a phone to save it, and a failed Submit on the one-question pile shows its reason on screen. Site only: the Session Worker's code is unchanged and MCP stays 0.9.2. Nothing a session already stores is changed.

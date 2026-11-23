@@ -279,9 +279,36 @@ test('reports every bundle-budget cap and classification loosening', () => {
       'bundle-vendor-prefix-gain',
       'bundle-duplicate-allowlist-gain',
       'bundle-exception-selector-change',
-      'bundle-exception-cap-increase:app-shell',
       'bundle-exception-gain',
     ]);
+  });
+});
+
+test('a stated raise of an existing exception cap passes without approval', () => {
+  withTempRepo((repoDir) => {
+    writeBaselines(repoDir, { violations: [], counts: { colonAny: 0 } });
+    commitAll(repoDir, 'base baselines');
+    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
+    writeBaselines(repoDir, {
+      violations: [],
+      counts: { colonAny: 0 },
+      bundleBudget: {
+        warningRatio: 0.95,
+        entry: { sources: ['index.html'], includeDirectDynamicImports: true, maxGzipBytes: 250000 },
+        nonVendorChunk: { maxMinifiedBytes: 500000, vendorFilePrefixes: ['assets/vendor-'] },
+        exceptions: [{ id: 'app-shell', filePrefix: 'assets/AppShell-', maxMinifiedBytes: 630000 }],
+        duplicateAssets: { allowedPairs: [] },
+      },
+    });
+    commitAll(repoDir, 'raise the app-shell cap');
+    assert.deepEqual(collectBaselineMonotonicityFindings({ repoDir, baseRef: base }).bundleBudgetRegressions, []);
+    const result = spawnSync(process.execPath, [
+      SCRIPT_PATH,
+      '--repo', repoDir,
+      '--base', base,
+      '--approval', 'false',
+    ], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
   });
 });
 
