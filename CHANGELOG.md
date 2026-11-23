@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.9.36] - 2026-11-23
+
+A page that loads slowly shows its loading line from the HTML alone, the note for AI agents is ordinary page content, AI prompts wait for the question ids and review links from older question sets still open; the risk matrix keeps its labels in view and the Analyze box shows a person's saved card. No Worker or MCP change.
 
 ### Site — available when the site deploys
 
@@ -17,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - **The Report says "Analyzing cluster…" while it summarizes a cluster.** Under Opinion Clusters, each cluster said "Analyzing group..." while the AI summarized it. Elsewhere on the site a group is a membership group, so the line now uses the section's own word.
 - **The risk matrix keeps its row labels in view on a desktop too.** A matrix wider than its card scrolls sideways inside it, and on a desktop its row labels scrolled away with the squares, so a row could no longer be told from the next. They now stay at the left with the corner over them, as on a phone, in the matrix and in the grid a square opens. A phone also scrolls the grid down inside its card, keeping the column labels at the top; a desktop scrolls the page as before. A focused square draws its keyboard ring inside it, so a label beside it never hides part of the ring.
 - **The Analyze box shows the card on a person's page while an analysis is awaited or has failed.** A card saved on a page shows in the page's side column, but the Analyze box showed a card only once a new analysis arrived, and none when it failed. The saved card now shows in the box at once, on your own page with "Take it off my page" as in the side column, until an analysis brings its own card.
+- **Deploy helper.** It deploys the 0.9.35 Worker bundles. A Worker updated from the site gets this release's.
 
 ### Local tooling
 
