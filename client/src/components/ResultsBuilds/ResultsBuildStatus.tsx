@@ -2,6 +2,8 @@ import React, { useId, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faQuestionCircle, faSpinner } from '@fortawesome/free-solid-svg-icons';
 
+import AiPromptBox from '../Shared/AiPromptBox';
+import { findPromptPlaceholders } from '../Shared/aiPromptPieces';
 import CETooltip from '../Shared/CETooltip';
 import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
 import {
@@ -106,7 +108,11 @@ export default function ResultsBuildStatus({
               {sections.map(({ key, label, heading }) => (
                 <section key={key} aria-label={label}>
                   <h4>{heading}</h4>
-                  <pre>{prompts[key]}</pre>
+                  <AiPromptBox
+                    prompt={prompts[key]}
+                    variables={findPromptPlaceholders(prompts[key], { described: true })}
+                    title={null}
+                  />
                 </section>
               ))}
             </div>

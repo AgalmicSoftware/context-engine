@@ -934,6 +934,16 @@
   cursor: text;
 }
 
+// The template's placeholders, listed above it.
+.promptMeta {
+  padding: 10px 14px 0;
+  background: var(--docs-code-bg);
+  color: var(--docs-code-text);
+  font-family: var(--ce-font-mono);
+  font-size: 0.82rem;
+  line-height: 1.9;
+}
+
 .promptWindowOpen {
   border-color: var(--ce-action-primary);
 }

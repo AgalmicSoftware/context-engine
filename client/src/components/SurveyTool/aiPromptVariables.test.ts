@@ -1,5 +1,6 @@
 import { buildAgentKeyHandover } from '../../utilities/session/agentHandoff';
-import { findPromptVariables, splitPromptByVariables } from './aiPromptVariables';
+import { splitPromptByVariables } from '../Shared/aiPromptPieces';
+import { findPromptVariables } from './aiPromptVariables';
 import { buildExternalInterviewKickoff } from './sessionInterview';
 
 const key = {
@@ -21,7 +22,7 @@ const full = buildExternalInterviewKickoff({
   questionPriority: { order: 'newest', unansweredQuestionIds: ['q2', 'q1'], answeredQuestionIds: ['q0'] },
 });
 const shownText = (prompt: string) =>
-  splitPromptByVariables(prompt)
+  splitPromptByVariables(prompt, findPromptVariables(prompt))
     .map(({ text }) => text)
     .join('');
 
@@ -54,7 +55,7 @@ it('shows a stand-in in place of every value, and no key, ticket or address', ()
   expect(shown).toContain('only if reviewUrl starts with exactly <SessionLink>;');
   for (const secret of [key.token, ticket, 'worker.example', key.expiresAt]) expect(shown).not.toContain(secret);
   // Only the values change: put back, it is the prompt that is copied.
-  const pieces = splitPromptByVariables(full);
+  const pieces = splitPromptByVariables(full, findPromptVariables(full));
   const values = findPromptVariables(full);
   const rebuilt = pieces.reduce((text, piece) => text + (piece.variable ? '\u0000' : piece.text), '');
   expect(rebuilt.split('\u0000').join('').length).toBeLessThan(full.length);
@@ -73,7 +74,7 @@ it('does the same for the short prompt that hands a key over', () => {
 it('leaves a prompt with nothing personal as it is', () => {
   const plain = 'Help me take part in a Context Engine session.';
   expect(findPromptVariables(plain)).toEqual([]);
-  expect(splitPromptByVariables(plain)).toEqual([{ text: plain }]);
+  expect(splitPromptByVariables(plain, [])).toEqual([{ text: plain }]);
   // An empty list of questions is not a value to hide.
   expect(findPromptVariables('Already answered IDs, only for changes I request: []')).toEqual([]);
 });

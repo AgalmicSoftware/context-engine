@@ -35,6 +35,8 @@ it('shows the prompts only when asked', () => {
   expect(screen.getByRole('button', { name: /Hide AI prompt/ })).toHaveAttribute('aria-expanded', 'true');
   expect(screen.getByRole('region', { name: 'Planning prompt' })).toHaveTextContent('You are planning <Questions>');
   expect(screen.getByRole('region', { name: 'Mapping prompt' })).toHaveTextContent('You are mapping <Responses>');
+  // Each prompt names its placeholders, as the question generator's prompt box does.
+  expect(screen.getByRole('region', { name: 'Planning prompt' })).toHaveTextContent('Variables: <Questions>');
   // A Worker that does not summarise questions sends no prompt for it.
   expect(screen.queryByRole('region', { name: 'Question prompt' })).not.toBeInTheDocument();
 });
@@ -111,4 +113,21 @@ it("names a risk matrix build and shows its one prompt, leaving out the atlas's"
   fireEvent.click(screen.getByRole('button', { name: /Show AI prompt/ }));
   expect(screen.getByRole('region', { name: 'Building prompt' })).toHaveTextContent('You are building <Responses>');
   expect(screen.getAllByRole('region')).toHaveLength(1);
+});
+
+it('marks a placeholder the Worker describes in words, as well as a named one', () => {
+  const map = 'Branch: <Branch>\nTopic: <Topic, left out for a whole branch>\nIs 1 < 2, and 3 > 2?';
+  render(
+    <ResultsBuildStatus
+      kind="debate-atlas"
+      busy
+      nextBuild={{ model: 'm', prompts: { map } }}
+      startedAtMs={Date.now()}
+    />,
+  );
+  fireEvent.click(screen.getByRole('button', { name: /Show AI prompt/ }));
+  const region = screen.getByRole('region', { name: 'Mapping prompt' });
+  expect(region).toHaveTextContent('Variables: <Branch>, <Topic, left out for a whole branch>');
+  // A comparison in the prompt's own words is not a placeholder.
+  expect(region).not.toHaveTextContent('Variables: <Branch>, <Topic, left out for a whole branch>,');
 });

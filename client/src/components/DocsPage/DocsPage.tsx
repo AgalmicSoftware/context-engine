@@ -34,6 +34,7 @@ import {
   resolveDocsPageSessionConfig,
 } from './docsPageSessionResolution.js';
 import ContractViewer, { type ContractViewerContract } from './ContractViewer';
+import DocsPrompt from './DocsPrompt';
 import { normalizeContractKeyParam } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
 import {
@@ -435,30 +436,6 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
     }
   };
 
-  const highlightPromptVariables = (str: string): React.ReactNode => {
-    if (!str) return null;
-    const text = String(str);
-    const re = /<([A-Za-z][A-Za-z0-9_]*)>/g;
-    const parts: React.ReactNode[] = [];
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-
-    while ((match = re.exec(text)) !== null) {
-      if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
-      parts.push(
-        <span key={match.index} className={styles.promptVar}>
-          {'<'}
-          {match[1]}
-          {'>'}
-        </span>,
-      );
-      lastIndex = re.lastIndex;
-    }
-
-    if (lastIndex < text.length) parts.push(text.slice(lastIndex));
-    return parts;
-  };
-
   const renderDocsInlineCode = (str: string): React.ReactNode => {
     const text = String(str || '');
     const re = /`([^`\n]+)`/g;
@@ -677,9 +654,7 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
                 </div>
               </div>
               {isOpen ? (
-                <pre id={`prompt-${prompt.id}`} className={styles.promptBlock}>
-                  {highlightPromptVariables(prompt.content || '(Prompt unavailable)')}
-                </pre>
+                <DocsPrompt id={`prompt-${prompt.id}`} text={prompt.content || '(Prompt unavailable)'} />
               ) : null}
             </div>
           );

@@ -1,8 +1,8 @@
-// The values an AI prompt carries for one person and one session, each given a stand-in name, so the prompt
-// can be shown with `<SessionName>` where the name is and never the value itself. A key or a private link is
-// then never on screen; the copied prompt keeps every value.
+// The values the AI prompt a person copies carries for them and their session, each given a stand-in name,
+// so the prompt is shown with `<SessionName>` where the name is and never the value itself. A key or a
+// private link is then never on screen; the copied prompt keeps every value.
 
-export type PromptVariable = { name: string; value: string };
+import type { PromptVariable } from '../Shared/aiPromptPieces';
 
 const QUOTED = '"(?:[^"\\\\]|\\\\.)*"';
 
@@ -29,22 +29,4 @@ export const findPromptVariables = (prompt: string): PromptVariable[] => {
   add('UnansweredQuestions', /^Unanswered question IDs, [^:\n]*: (\[.*\])$/m.exec(prompt)?.[1]);
   add('AnsweredQuestions', /^Already answered IDs, [^:\n]*: (\[.*\])$/m.exec(prompt)?.[1]);
   return found.filter(({ value }) => value !== '[]').sort((a, b) => b.value.length - a.value.length);
-};
-
-export type PromptPiece = { text: string; variable?: string };
-
-/** The prompt cut into plain text and stand-ins, in order. */
-export const splitPromptByVariables = (prompt: string, variables = findPromptVariables(prompt)): PromptPiece[] => {
-  let pieces: PromptPiece[] = [{ text: prompt }];
-  for (const { name, value } of variables) {
-    pieces = pieces.flatMap((piece) => {
-      if (piece.variable) return [piece];
-      const parts = piece.text.split(value);
-      return parts.flatMap((text, index) => [
-        ...(index ? [{ text: `<${name}>`, variable: name }] : []),
-        ...(text ? [{ text }] : []),
-      ]);
-    });
-  }
-  return pieces;
 };

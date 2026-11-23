@@ -2,6 +2,7 @@
 import { useContext, useLayoutEffect, useRef, useState } from 'react';
 import { ReactReduxContext } from 'react-redux';
 
+import AiPromptBox from '../../Shared/AiPromptBox';
 import SessionWizardInfoTooltip from '../SessionWizardInfoTooltip';
 import useSessionWizardTooltipPreference from '../hooks/useSessionWizardTooltipPreference';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
@@ -24,18 +25,24 @@ export const SetupWithAi = ({ setupUrl }: Props) => {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState('');
   const [showPrompt, setShowPrompt] = useState(false);
-  // Set where copying was refused: the prompt, once shown, is selected to copy by hand.
+  // Set where copying was refused: the prompt is then shown as plain text, selected to copy by hand.
+  const [byHand, setByHand] = useState(false);
   const [selectPrompt, setSelectPrompt] = useState(false);
+  const [copied, setCopied] = useState(false);
   const promptRef = useRef<HTMLTextAreaElement>(null);
   const prompt = buildSessionSetupKickoff({ setupUrl });
   // Safari needs the copy to start in the tap itself, so nothing is awaited first.
-  const copy = (copied: string) => {
+  const copy = (said: string) => {
     void copyText(prompt).then((done) => {
       if (done) {
-        setStatus(copied);
+        setStatus(said);
+        // The box's own button shows its tick for a moment.
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1500);
         return;
       }
       setShowPrompt(true);
+      setByHand(true);
       setSelectPrompt(true);
       setStatus("Copying isn't allowed here, so the prompt is selected. Copy it yourself.");
     });
@@ -117,7 +124,17 @@ export const SetupWithAi = ({ setupUrl }: Props) => {
             {status}
           </p>
         ) : null}
-        {showPrompt ? (
+        {showPrompt && !byHand ? (
+          <AiPromptBox
+            id="ce-setup-ai-prompt"
+            prompt={prompt}
+            // The one value that changes: where the AI's link opens.
+            variables={[{ name: 'SetupLink', value: setupUrl }]}
+            onCopy={() => copy('Prompt copied. Paste it into ChatGPT, Claude or another AI.')}
+            copied={copied}
+          />
+        ) : null}
+        {showPrompt && byHand ? (
           <textarea
             id="ce-setup-ai-prompt"
             className={styles.textarea}

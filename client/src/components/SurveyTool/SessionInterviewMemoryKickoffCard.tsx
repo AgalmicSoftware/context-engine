@@ -3,7 +3,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faCheck, faCopy, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import AiPromptBox from './AiPromptBox';
+import AiPromptBox from '../Shared/AiPromptBox';
+import { findPromptVariables } from './aiPromptVariables';
 import { InterviewBusyLabel } from './SessionInterviewModalHeader';
 
 /** The prompt a check approved, when it differs from `kickoff`, and when to check again before its link runs out. */
@@ -190,7 +191,14 @@ export default function SessionInterviewMemoryKickoffCard({
       </div>
       {children}
       {promptShown ? (
-        <AiPromptBox id={promptId} testId={testIds.prompt} prompt={prompt} onCopy={copyPrompt} copied={promptCopied} />
+        <AiPromptBox
+          id={promptId}
+          testId={testIds.prompt}
+          prompt={prompt}
+          variables={findPromptVariables(prompt)}
+          onCopy={copyPrompt}
+          copied={promptCopied}
+        />
       ) : null}
       {/* Said to a screen reader; on screen the button turns. */}
       {holdCopy ? (

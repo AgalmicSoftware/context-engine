@@ -3888,68 +3888,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   border-radius: 0 var(--ce-radius-8) var(--ce-radius-8) 0;
 }
 
-// An AI prompt, to read: the question generator's "AI Prompt" box, with a stand-in where each value is.
-.aiPromptBox {
-  position: relative;
-  max-height: min(60vh, 28rem);
-  padding: 12px;
-  overflow: auto;
-  border: 1px solid var(--ce-card-border);
-  border-radius: var(--ce-radius-8);
-  background: var(--ce-card-bg);
-  color: var(--ce-panel-text);
-  font-family: var(--ce-font-mono);
-  font-size: 0.85rem;
-  line-height: 1.5;
-  text-align: left;
-}
-
-.aiPromptBoxHeader {
-  display: block;
-  margin: 0 44px 6px 0;
-  font-weight: 800;
-}
-
-.aiPromptBoxCopy {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  padding: 6px 8px;
-  border: 0;
-  border-radius: var(--ce-radius-6);
-  background: color-mix(in srgb, var(--ce-compat-dark) 60%, transparent);
-  color: var(--ce-color-white);
-  cursor: pointer;
-
-  &:hover {
-    background: color-mix(in srgb, var(--ce-compat-dark) 80%, transparent);
-  }
-}
-
-.aiPromptBoxCopied {
-  background: var(--ce-status-success);
-}
-
-.aiPromptBoxMeta {
-  margin-bottom: 8px;
-  opacity: 0.85;
-}
-
-.aiPromptBoxText {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.aiPromptVar {
-  display: inline-block;
-  padding: 0 6px;
-  border: 1px solid color-mix(in srgb, var(--ce-status-warning-text) 30%, transparent);
-  border-radius: var(--ce-radius-4);
-  background: color-mix(in srgb, var(--ce-status-warning-text) 10%, transparent);
-  color: var(--ce-status-warning-text);
-  font-weight: 700;
-}
-
 // A line of the card's, with its "?" beside it.
 .sessionVoicePrefillChoice {
   display: flex;

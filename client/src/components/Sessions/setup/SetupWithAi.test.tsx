@@ -67,6 +67,30 @@ describe('Set up with AI', () => {
     expect(writeText).toHaveBeenCalledTimes(2);
   });
 
+  it("shows the prompt to read with a stand-in for this page's address", () => {
+    renderOpen();
+    fireEvent.click(screen.getByRole('button', { name: 'Show prompt' }));
+    const box = document.getElementById('ce-setup-ai-prompt');
+    expect(box).toHaveTextContent('Variables: <SetupLink>');
+    expect(box).toHaveTextContent('<SetupLink>#setup=');
+    expect(box).not.toHaveTextContent(SETUP_URL);
+    // The box's own button copies the prompt itself, address included.
+    fireEvent.click(screen.getByRole('button', { name: 'Copy AI prompt' }));
+    expect(writeText).toHaveBeenCalledWith(prompt);
+  });
+
+  it('swaps the shown prompt for selectable text when its own copy button is refused', async () => {
+    writeText.mockRejectedValue(new Error('denied'));
+    renderOpen();
+    fireEvent.click(screen.getByRole('button', { name: 'Show prompt' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy AI prompt' }));
+    const field = (await screen.findByLabelText('Setup prompt')) as HTMLTextAreaElement;
+    expect(field).toHaveValue(prompt);
+    expect(document.activeElement).toBe(field);
+    expect([field.selectionStart, field.selectionEnd]).toEqual([0, prompt.length]);
+    expect(screen.queryByRole('button', { name: 'Copy AI prompt' })).not.toBeInTheDocument();
+  });
+
   it('shows the prompt to copy by hand when the clipboard is unavailable', async () => {
     writeText.mockRejectedValue(new Error('denied'));
     renderOpen();

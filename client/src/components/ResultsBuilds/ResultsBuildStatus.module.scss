@@ -48,24 +48,4 @@
     color: inherit;
     font-size: 0.9rem;
   }
-  pre {
-    max-height: 40vh;
-    margin: 0;
-    padding: 8px 10px;
-    overflow: auto;
-    border: 1px solid var(--ce-document-border);
-    border-radius: 8px;
-    background: var(--ce-document-surface);
-    color: var(--ce-document-text);
-    font-size: 0.8rem;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-}
-
-// Classic's corners are square, as Windows 95's are.
-@container ce-theme style(--ce-layout-profile: desktop-window) {
-  .prompts pre {
-    border-radius: 0;
-  }
 }
