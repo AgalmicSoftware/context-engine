@@ -24,13 +24,15 @@ const tokenMock = jest.mocked(getWorkerSessionToken);
 // The card remembers whom it asked for as long as the page is open, so each test signs in as someone new.
 let people = 0;
 let ACCOUNT = '';
-const catalog = (questionIds: string[] = []) =>
+// A session always lists something: a prompt is only given with its question ids.
+const catalog = (questionIds: string[] = ['listed']) =>
   new Response(
     JSON.stringify({
       type: 'context-engine.interview-question-catalog',
       version: 1,
       sessionSlug: 'demo',
       prefillPromptVersion: 'ce-interview-brief-v6',
+      questionSetHash: 'f'.repeat(64),
       questions: questionIds.map((id) => ({ id, prompt: `${id}?`, type: 'freeform' })),
     }),
   );

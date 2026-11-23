@@ -614,6 +614,10 @@ const readKickoffCatalog = (catalog: unknown, sessionSlug: string) => {
   return { questionSetHash, promptVersion, ids, types, binaryOptions };
 };
 
+/** Whether a catalog gives a prompt its question ids: this session's, with its fingerprint, version and plain ids. */
+export const hasKickoffQuestionIds = (catalog: unknown, sessionSlug: string): boolean =>
+  readKickoffCatalog(catalog, toTrimmedString(sessionSlug)) !== null;
+
 /**
  * The AI prompt: the one a person copies for their own AI, and the one the agent guide prints for a session
  * link alone. It is one task, to draft answers and hand back a review link, kept short: a chat app reads it

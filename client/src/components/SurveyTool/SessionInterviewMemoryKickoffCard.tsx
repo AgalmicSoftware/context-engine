@@ -40,7 +40,9 @@ const MIN_RENEW_DELAY_MS = 30 * 1000;
 
 /**
  * The AI prompt as one split button: "Copy AI prompt" on the left, and on the right a caret that opens the
- * prompt to read, in the "AI Prompt" box. The session is checked before anything can be copied.
+ * prompt to read, in the "AI Prompt" box. Until the session's questions are read, both halves are off and the
+ * button says it is loading: a prompt is only ever given with its question ids. A read that fails says so, with
+ * Retry.
  */
 export default function SessionInterviewMemoryKickoffCard({
   kickoff,
@@ -188,7 +190,7 @@ export default function SessionInterviewMemoryKickoffCard({
           data-testid={testIds.copy}
         >
           <FontAwesomeIcon icon={busy ? faSpinner : promptCopied ? faCheck : faCopy} spin={busy} />
-          {promptCopied && !busy ? 'Copied' : 'Copy AI prompt'}
+          {checking && !holdCopy ? 'Loading questions…' : promptCopied && !busy ? 'Copied' : 'Copy AI prompt'}
         </button>
         <button
           type="button"
@@ -234,8 +236,8 @@ export default function SessionInterviewMemoryKickoffCard({
           <InterviewBusyLabel
             label={
               copyWaiting
-                ? 'Checking the session. Tap Copy again when this finishes.'
-                : 'Checking session compatibility…'
+                ? 'Loading the session’s questions. Tap Copy again when this finishes.'
+                : 'Loading the session’s questions…'
             }
           />
         </div>

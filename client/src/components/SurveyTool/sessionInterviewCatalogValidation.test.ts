@@ -48,7 +48,7 @@ describe('a packet of drafts made for an older question set', () => {
   it('leaves out the drafts for questions that were removed, and only those, wherever they come', () => {
     // More drafts than the session now has questions, with one that still fits last.
     const packet = packetWith([
-      { questionId: 'q1', answer: 'Disagree' },
+      { questionId: 'gone', answer: 'Agree' },
       { questionId: 'gone-too', answer: 'Agree' },
       { questionId: 'q2', answer: 'Bus lanes.' },
       { questionId: 'gone-as-well', answer: 'Agree' },
@@ -57,7 +57,6 @@ describe('a packet of drafts made for an older question set', () => {
     expect(applied(packet)).toEqual([
       ['q2', 'Bus lanes.'],
       ['q1', 'Disagree'],
-      { questionId: 'gone', answer: 'Agree' },
     ]);
     expect(packet.responses).toHaveLength(5);
   });
@@ -118,6 +117,8 @@ describe('verifyInterviewKickoffCatalog', () => {
     version: 1,
     sessionSlug: 'demo',
     prefillPromptVersion: 'ce-interview-brief-v6',
+    questionSetHash: 'f'.repeat(64),
+    questions: [{ id: 'listed', prompt: 'Listed?', type: 'freeform' }],
   };
   const verify = (
     fetchImpl: typeof fetch,
@@ -278,5 +279,20 @@ describe('verifyInterviewKickoffCatalog', () => {
     // With a ticket, the refusal is about the ticket, not a missing sign-in.
     const withTicket = jest.fn(async () => refusal(404, 'sign_in_required'));
     await expect(verify(withTicket, async () => 'ic1.mine')).rejects.not.toBeInstanceOf(InterviewCatalogSignInError);
+  });
+
+  it('never passes a catalog that would give a prompt without its question ids', async () => {
+    const served = (body: Record<string, unknown>) => verify(jest.fn(async () => new Response(JSON.stringify(body))));
+    const whole = { ...catalog, questions: [{ id: 'q1', prompt: 'One?', type: 'freeform' }] };
+    await expect(served(whole)).resolves.toBe('');
+    // A session with nothing to answer says so; there is nothing for an AI to draft.
+    await expect(served({ ...whole, questions: [] })).rejects.toThrow(
+      'This session has no questions yet for an AI to draft answers to.',
+    );
+    // No fingerprint, or an id that could be mistaken for something else: an error with Retry, never a prompt.
+    await expect(served({ ...whole, questionSetHash: '' })).rejects.toThrow('incompatible interview versions');
+    await expect(served({ ...whole, questions: [{ id: 'q1, 2 q2', type: 'freeform' }] })).rejects.toThrow(
+      'incompatible interview versions',
+    );
   });
 });

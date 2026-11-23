@@ -1,4 +1,5 @@
 import {
+  hasKickoffQuestionIds,
   isSupportedInterviewPromptVersion,
   KICKOFF_CATALOG_VERSIONS,
   type InterviewPrefillPacket,
@@ -109,6 +110,9 @@ const listedQuestionIds = async (response: Response): Promise<Set<unknown>> => {
   }
 };
 
+const INCOMPATIBLE_CATALOG =
+  'This page and the session’s Worker use incompatible interview versions; ask the organizer to update them, then reload.';
+
 /** Reads the catalog a kickoff's AI would fetch: the catalog as this person may read it, and the ticket its
  *  address needs, or '' for none. A ticket is asked for only when the read without one leaves the person
  *  short, so a public session's address stays short and nobody is asked to sign in for it. */
@@ -193,10 +197,14 @@ export const readInterviewKickoffCatalog = async ({
     catalog.sessionSlug !== sessionSlug ||
     !KICKOFF_CATALOG_VERSIONS.includes(String(catalog.prefillPromptVersion))
   ) {
-    throw new Error(
-      'This page and the session’s Worker use incompatible interview versions; ask the organizer to update them, then reload.',
-    );
+    throw new Error(INCOMPATIBLE_CATALOG);
   }
+  // A prompt is only ever given with its question ids: an AI whose web tool returns a summary of the catalog
+  // can't make the review link without them.
+  if (!Array.isArray(catalog.questions) || !catalog.questions.length) {
+    throw new Error('This session has no questions yet for an AI to draft answers to.');
+  }
+  if (!hasKickoffQuestionIds(catalog, sessionSlug)) throw new Error(INCOMPATIBLE_CATALOG);
   return { ticket: usedTicket, catalog };
 };
 

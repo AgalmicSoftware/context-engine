@@ -28,6 +28,8 @@ const catalog = () =>
       version: 1,
       sessionSlug: 'salon',
       prefillPromptVersion: 'ce-interview-brief-v6',
+      questionSetHash: 'f'.repeat(64),
+      questions: [{ id: 'listed', prompt: 'Listed?', type: 'freeform' }],
     }),
   );
 
@@ -274,12 +276,15 @@ it('holds the copy while the key is made, so the prompt copied is the one with i
 it('copies from one split button, whose caret points down and opens the whole prompt, then up', async () => {
   renderPanel();
   const copy = await screen.findByTestId('ce-agent-handoff-copy');
-  expect(copy).toHaveAccessibleName('Copy AI prompt');
+  // Until the session's questions are read it says so and can't be pressed.
+  expect(copy).toHaveAccessibleName('Loading questions…');
+  expect(copy).toHaveAttribute('aria-disabled', 'true');
   await waitFor(() => expect(copy).toHaveAttribute('aria-disabled', 'false'));
   const caret = screen.getByRole('button', { name: 'Read the AI prompt' });
   expect(caret).toHaveAttribute('aria-expanded', 'false');
   expect(caret.querySelector('[data-icon="caret-down"]')).not.toBeNull();
   expect(screen.queryByTestId('ce-agent-handoff-prompt')).not.toBeInTheDocument();
+  expect(copy).toHaveAccessibleName('Copy AI prompt');
   fireEvent.click(caret);
   expect(caret).toHaveAccessibleName('Hide the AI prompt');
   expect(caret.querySelector('[data-icon="caret-up"]')).not.toBeNull();

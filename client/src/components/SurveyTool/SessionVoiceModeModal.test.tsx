@@ -217,6 +217,8 @@ describe('SessionVoiceModeModal', () => {
           version: 1,
           sessionSlug: 'demo',
           prefillPromptVersion: 'ce-interview-brief-v5',
+          questionSetHash: 'f'.repeat(64),
+          questions: [{ id: 'listed', prompt: 'Listed?', type: 'freeform' }],
         }),
       ),
     );
@@ -2468,7 +2470,7 @@ describe('SessionVoiceModeModal', () => {
     try {
       render(<SessionVoiceModeModal {...baseProps} />);
       expect(fetchMock).toHaveBeenCalled();
-      expect(screen.getByText('Checking session compatibility…')).toBeInTheDocument();
+      expect(screen.getByText('Loading the session’s questions…')).toBeInTheDocument();
       const copy = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
       fireEvent.click(copy);
       expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
@@ -2480,6 +2482,8 @@ describe('SessionVoiceModeModal', () => {
               version: 1,
               sessionSlug: 'demo',
               prefillPromptVersion: 'ce-interview-brief-v4',
+              questionSetHash: 'f'.repeat(64),
+              questions: [{ id: 'listed', prompt: 'Listed?', type: 'freeform' }],
             }),
           ),
         ),
@@ -2508,6 +2512,8 @@ describe('SessionVoiceModeModal', () => {
           version: 1,
           sessionSlug: 'demo',
           prefillPromptVersion: 'ce-interview-brief-v5',
+          questionSetHash: 'f'.repeat(64),
+          questions: [{ id: 'listed', prompt: 'Listed?', type: 'freeform' }],
         }),
       ),
     );
@@ -2538,9 +2544,11 @@ describe('SessionVoiceModeModal', () => {
     try {
       render(<SessionVoiceModeModal {...baseProps} />);
       await act(async () => {});
-      expect(screen.getByText('Checking session compatibility…')).toBeInTheDocument();
+      expect(screen.getByText('Loading the session’s questions…')).toBeInTheDocument();
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
-      expect(screen.getByText('Checking the session. Tap Copy again when this finishes.')).toBeInTheDocument();
+      expect(
+        screen.getByText('Loading the session’s questions. Tap Copy again when this finishes.'),
+      ).toBeInTheDocument();
       expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
     } finally {
       fetchMock.mockRestore();
@@ -2555,6 +2563,8 @@ describe('SessionVoiceModeModal', () => {
           version: 1,
           sessionSlug: 'demo',
           prefillPromptVersion: 'ce-interview-brief-v5',
+          questionSetHash: 'f'.repeat(64),
+          questions: [{ id: 'listed', prompt: 'Listed?', type: 'freeform' }],
         }),
       ),
     );
@@ -2586,6 +2596,8 @@ describe('SessionVoiceModeModal', () => {
         version: 1,
         sessionSlug: 'demo',
         prefillPromptVersion: 'ce-interview-brief-v9',
+        questionSetHash: 'f'.repeat(64),
+        questions: [{ id: 'listed', prompt: 'Listed?', type: 'freeform' }],
       }),
     } as Response);
     try {
@@ -2609,6 +2621,8 @@ describe('SessionVoiceModeModal', () => {
           version: 1,
           sessionSlug: slug,
           prefillPromptVersion: 'ce-interview-brief-v5',
+          questionSetHash: 'f'.repeat(64),
+          questions: [{ id: 'listed', prompt: 'Listed?', type: 'freeform' }],
         }),
       );
     const fetchMock = jest
@@ -2637,7 +2651,7 @@ describe('SessionVoiceModeModal', () => {
         }),
     );
     view.rerender(<SessionVoiceModeModal {...baseProps} sessionSlug="next" />);
-    expect(screen.getByText('Checking session compatibility…')).toBeInTheDocument();
+    expect(screen.getByText('Loading the session’s questions…')).toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
     expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
@@ -2655,6 +2669,8 @@ describe('SessionVoiceModeModal', () => {
         version: 1,
         sessionSlug: 'demo',
         prefillPromptVersion: 'ce-interview-brief-v4',
+        questionSetHash: 'f'.repeat(64),
+        questions: [{ id: 'listed', prompt: 'Listed?', type: 'freeform' }],
       }),
     } as Response);
     render(<SessionVoiceModeModal {...baseProps} />);
@@ -2662,8 +2678,8 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByText(/A realtime voice interviewer will cover/i)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT)).not.toBeInTheDocument();
     const copyButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
-    expect(copyButton).toHaveAccessibleName('Copy AI prompt');
-    // While the session is checked the button turns and can't be pressed.
+    // Until the session's questions are read the button says so, turns and can't be pressed.
+    expect(copyButton).toHaveAccessibleName('Loading questions…');
     expect(copyButton).toHaveAttribute('aria-disabled', 'true');
     expect(copyButton.querySelector('[data-icon="spinner"]')).toBeInTheDocument();
     const promptToggle = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE);
@@ -2680,6 +2696,13 @@ describe('SessionVoiceModeModal', () => {
     await act(async () => fireEvent.click(copyButton));
     const plainPrompt = buildExternalInterviewKickoff({
       questionPriority: { unansweredQuestionIds: ['q1'], answeredQuestionIds: [] },
+      // The session's question list, as the card read it before the button could be pressed.
+      catalog: {
+        sessionSlug: 'demo',
+        prefillPromptVersion: 'ce-interview-brief-v4',
+        questionSetHash: 'f'.repeat(64),
+        questions: [{ id: 'listed', prompt: 'Listed?', type: 'freeform' }],
+      },
       workerUrl: baseProps.workerUrl,
       sessionSlug: baseProps.sessionSlug,
       sessionUrl: `${window.location.origin}${window.location.pathname}`,
@@ -2697,9 +2720,11 @@ describe('SessionVoiceModeModal', () => {
     expect(promptToggle).toHaveAttribute('aria-controls', displayedPrompt.id);
     expect(displayedPrompt).toHaveTextContent(/^AI Prompt/);
     // Each value the prompt carries shows as a named stand-in, listed first and again in its place.
-    expect(displayedPrompt).toHaveTextContent('Variables: <QuestionsAddress>, <UnansweredQuestions>, <ReviewLink>');
+    expect(displayedPrompt).toHaveTextContent(
+      'Variables: <QuestionsAddress>, <QuestionSetHash>, <QuestionIds>, <ReviewLink>',
+    );
     expect(displayedPrompt).toHaveTextContent('never a summary: <QuestionsAddress>');
-    expect(displayedPrompt).toHaveTextContent('Unanswered question IDs, newest first: <UnansweredQuestions>');
+    expect(displayedPrompt).toHaveTextContent('Question ids: <QuestionIds>');
     expect(displayedPrompt).not.toHaveTextContent('worker.example');
     expect(displayedPrompt).toHaveTextContent('Help me draft my answers for a Context Engine session.');
     // Reading it copies nothing; its corner button copies the whole prompt, values included.
@@ -2725,6 +2750,8 @@ describe('SessionVoiceModeModal', () => {
         version: 1,
         sessionSlug: 'demo',
         prefillPromptVersion: 'ce-interview-brief-v5',
+        questionSetHash: 'f'.repeat(64),
+        questions: [{ id: 'listed', prompt: 'Listed?', type: 'freeform' }],
       }),
     } as Response);
     const priorUrl = window.location.href;
@@ -3675,10 +3702,12 @@ describe('SessionVoiceModeModal', () => {
               singleSelect: true,
             },
           ]}
+          // More drafts than the session now has questions, and the one that still fits comes last.
           prefillPacket={olderSetPacket([
-            { questionId: 'q1', answer: 'Still fits', confidence: 0.8 },
-            { questionId: 'q2', answer: 'Roads', confidence: 0.8 },
             { questionId: 'removed', answer: 'For a question that is gone', confidence: 0.8 },
+            { questionId: 'q2', answer: 'Roads', confidence: 0.8 },
+            { questionId: 'also-removed', answer: 'For another that is gone', confidence: 0.8 },
+            { questionId: 'q1', answer: 'Still fits', confidence: 0.8 },
           ])}
         />,
       );
@@ -3705,9 +3734,6 @@ describe('SessionVoiceModeModal', () => {
       mode: 'interview' as const,
       prefillPacket: olderSetPacket([
         { questionId: 'q1', answer: 'First answer', confidence: 0.8 },
-            { questionId: 'q2', answer: 'Roads', confidence: 0.8 },
-            { questionId: 'also-removed', answer: 'For another that is gone', confidence: 0.8 },
-            { questionId: 'q1', answer: 'Still fits', confidence: 0.8 },
         { questionId: 'q2', answer: 'Fresh answer', confidence: 0.8 },
       ]),
     };
@@ -4048,6 +4074,8 @@ describe('Interview cancellation and recovery', () => {
           version: 1,
           sessionSlug: 'demo',
           prefillPromptVersion: 'ce-interview-brief-v6',
+          questionSetHash: 'f'.repeat(64),
+          questions: ['q1', 'q2', 'q3'].map((id) => ({ id, prompt: `${id}?`, type: 'freeform' })),
         }),
       ),
     );
@@ -4074,8 +4102,9 @@ describe('Interview cancellation and recovery', () => {
     await waitFor(() => expect(copy).toHaveAttribute('aria-disabled', 'false'));
     fireEvent.click(copy);
     const prompt = jest.mocked(navigator.clipboard.writeText).mock.lastCall?.[0] || '';
-    expect(prompt).toContain('Unanswered question IDs, newest first: ["q3","q2"]');
-    expect(prompt).toContain('Already answered IDs, only for changes I request: ["q1"]');
+    expect(prompt).toContain(
+      'Draft in this order, by position (newest first), then any position not listed: [3,2]. I have already answered [1]: leave those out unless I ask to change them.',
+    );
     expect(prompt).not.toContain('Private prior answer');
   });
 
@@ -4095,6 +4124,8 @@ describe('Interview cancellation and recovery', () => {
           version: 1,
           sessionSlug: 'demo',
           prefillPromptVersion: 'ce-interview-brief-v6',
+          questionSetHash: 'f'.repeat(64),
+          questions: ['q1', 'q2'].map((id) => ({ id, prompt: `${id}?`, type: 'freeform' })),
         }),
       ),
     );
@@ -4115,7 +4146,7 @@ describe('Interview cancellation and recovery', () => {
     await waitFor(() => expect(copy).toHaveAttribute('aria-disabled', 'false'));
     fireEvent.click(copy);
     const prompt = jest.mocked(navigator.clipboard.writeText).mock.lastCall?.[0] || '';
-    expect(prompt).toContain('Unanswered question IDs, in the session’s order: ["q1","q2"]');
+    expect(prompt).toContain('Draft in the order of the positions.');
     expect(prompt).toContain('"promptRevision":"ce-prefill-prompt-5+arranged",');
   });
 });
