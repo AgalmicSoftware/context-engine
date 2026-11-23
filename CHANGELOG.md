@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file.
 
 - **A Build press that asks to follow its build is answered within seconds.** An atlas or risk matrix press held its request open until the build ended, up to five minutes, which a phone can cut. A press whose body has `follow: true` now waits at most 3 seconds: a build that ends by then answers with its result, as before, and one still running answers `202` with its job's id and start. Reads of builds tell those who may build how the latest build went: still running, built, or failed and why. A press without `follow`, as from an older site, is held as before, and an older site leaves the job in reads unread.
 
+### Site — available when the site deploys
+
+- **A Build press no longer waits for the build.** The site asks the Worker to answer an atlas or risk matrix press once its build starts, then follows the build as it follows a press that dropped: it reads at once, checks back every 20 seconds, opens the new build when the build's job says it built, and says why it failed in the Worker's words. A page that can't read builds, as when its sign-in has lapsed, says the build runs on. A Worker without this release's update ignores the ask and holds the press until the build ends, as before, and a press it drops is followed as before.
+
 ## [0.9.33] - 2026-11-23
 
 The Session Worker asks for short, distinct atlas branch names, stores answers sent with a person's AI key under their session, and its agent skill says what the API does; on the site, AI agents follow one set of steps wherever they start, with one "Copy AI prompt" button and an "AI can submit for me" tick. Needs a Worker update for the Worker changes. MCP stays 0.9.2. Nothing a session already stores is changed.

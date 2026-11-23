@@ -9,6 +9,7 @@ import {
 import {
   readResultsBuild,
   requestResultsBuild,
+  type ResultsBuildJob,
   type ResultsBuildResult,
   type ResultsBuildSummary,
 } from '../../domains/resultsBuilds/resultsBuildWorkerClient';
@@ -80,6 +81,18 @@ const showPage = (state: DocumentVisibilityState) =>
     document.dispatchEvent(new Event('visibilitychange'));
   });
 const dropped = { ok: false, status: 0, dropped: true, error: 'The connection dropped.' };
+// A Worker that answers a press at once, and the press's job as its reads tell it.
+const started: ResultsBuildResult<ResultsBuildSummary> = {
+  ok: true,
+  status: 202,
+  started: { jobId: 'job-a', startedAtMs: 49_000 },
+};
+const job = (state: ResultsBuildJob['state'], more: Partial<ResultsBuildJob> = {}): ResultsBuildJob => ({
+  jobId: 'job-a',
+  state,
+  startedAtMs: 49_000,
+  ...more,
+});
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -518,6 +531,108 @@ it.each([
   expect(answered).toBe(built);
   expect(result.current.dropped).toBe(false);
   expect(result.current.error).toBe(built ? '' : "The atlas build didn't finish. Press Build to try again.");
+});
+
+it('follows a build the Worker said it started until a read says its job built', async () => {
+  jest.useFakeTimers();
+  jest.setSystemTime(50_000);
+  requestBuild.mockResolvedValue(started);
+  const { result } = renderAtlas({ account: address(1) });
+  await flush();
+  read.mockClear();
+  read.mockResolvedValue({ ...shown('atlas_k2_00000002'), active: { startedAtMs: 49_000 }, job: job('running') });
+  let answered: boolean | null = null;
+  act(() => {
+    void result.current.startBuild().then((built) => (answered = built));
+  });
+  await flush();
+  // Not dropped: the build runs, timed from when the Worker started it, and is read at once.
+  expect(read).toHaveBeenCalledTimes(1);
+  expect(result.current.dropped).toBe(false);
+  expect(result.current.building).toBe(false);
+  expect(result.current.error).toBe('');
+  expect(result.current.buildStartedAtMs).toBe(49_000);
+  expect(answered).toBeNull();
+
+  // Still running at the check-back, so still followed.
+  await checkBack();
+  expect(read).toHaveBeenCalledTimes(2);
+  expect(result.current.activeSinceMs).toBe(49_000);
+  expect(answered).toBeNull();
+
+  read.mockResolvedValue({
+    ...shown('atlas_k3_00000003'),
+    job: job('done', { finishedAtMs: 500_000, ok: true, buildId: 'atlas_k3_00000003' }),
+  });
+  await checkBack();
+  expect(read).toHaveBeenCalledTimes(3);
+  expect(result.current.build?.id).toBe('atlas_k3_00000003');
+  expect(result.current.activeSinceMs).toBeNull();
+  expect(result.current.error).toBe('');
+  expect(answered).toBe(true);
+});
+
+it('says why a build the Worker said it started failed, in the words of its job', async () => {
+  requestBuild.mockResolvedValue(started);
+  const { result } = renderAtlas({ account: address(1) });
+  await waitFor(() => expect(result.current.build?.id).toBe('atlas_k2_00000002'));
+  read.mockResolvedValue({
+    ...shown('atlas_k2_00000002'),
+    job: job('done', { finishedAtMs: 80_000, ok: false, error: 'Planning the atlas failed.' }),
+  });
+  let built: boolean | null = null;
+  await act(async () => {
+    built = await result.current.startBuild();
+  });
+  expect(built).toBe(false);
+  expect(result.current.error).toBe('Planning the atlas failed.');
+  expect(result.current.activeSinceMs).toBeNull();
+  expect(result.current.build?.id).toBe('atlas_k2_00000002');
+});
+
+it.each([
+  [
+    'a newer job, and no new build, as not built',
+    job('done', { jobId: 'job-b', startedAtMs: 60_000, ok: false, error: 'Planning the atlas failed.' }),
+    'atlas_k2_00000002',
+    false,
+  ],
+  ['no job, as to a reader not told of jobs, and a new build, as built', undefined, 'atlas_k3_00000003', true],
+  // Its lease bounds the follow, as before: a job that runs on without one is stuck.
+  [
+    'its job still running without its lease, and no new build, as not built',
+    job('running'),
+    'atlas_k2_00000002',
+    false,
+  ],
+])('goes by the builds listed when a read tells of %s', async (_what, readJob, newestId, built) => {
+  requestBuild.mockResolvedValue(started);
+  const { result } = renderAtlas({ account: address(1) });
+  await waitFor(() => expect(result.current.build?.id).toBe('atlas_k2_00000002'));
+  read.mockResolvedValue({ ...shown(newestId), ...(readJob ? { job: readJob } : {}) });
+  let answered: boolean | null = null;
+  await act(async () => {
+    answered = await result.current.startBuild();
+  });
+  expect(answered).toBe(built);
+  expect(result.current.error).toBe(built ? '' : "The atlas build didn't finish. Press Build to try again.");
+});
+
+it('tells a reader whose reads are refused that the build their press started runs on', async () => {
+  requestBuild.mockResolvedValue(started);
+  const { result } = renderAtlas({ account: address(1) });
+  await waitFor(() => expect(result.current.build?.id).toBe('atlas_k2_00000002'));
+  read.mockResolvedValue({ ok: false, status: 401, error: 'Sign in again.' });
+  let built: boolean | null = null;
+  await act(async () => {
+    built = await result.current.startBuild();
+  });
+  expect(built).toBe(false);
+  expect(result.current.build).toBeNull();
+  expect(result.current.canBuild).toBe(true);
+  expect(result.current.error).toBe(
+    "The atlas build runs on, but this page can't read it. Sign in again or reload to see it once it's built.",
+  );
 });
 
 it('answers a followed press as not built when the reader changes', async () => {

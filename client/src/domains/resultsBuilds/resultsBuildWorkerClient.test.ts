@@ -42,7 +42,7 @@ it('turns refusals into a status and a reason', async () => {
   expect(refused).toEqual({ ok: false, status: 403, error: 'Not visible.' });
 });
 
-it('posts a signed build of the stored responses and returns the new atlas', async () => {
+it('posts a signed build of the stored responses, asking to follow it, and returns the atlas an older Worker built', async () => {
   const fetchImpl = respond({ ok: true, build: { id: 'atlas_k2_00000002', branches: [] } });
   const signAdminAction = jest.fn(async (_request: Record<string, unknown>) => ({
     address: '0xabc',
@@ -61,11 +61,26 @@ it('posts a signed build of the stored responses and returns the new atlas', asy
   expect(signAdminAction).toHaveBeenCalledWith(
     expect.objectContaining({
       action: 'debate-atlas/build',
-      body: { sessionSlug: 'salon', source: { kind: 'worker-canonical' } },
+      body: { sessionSlug: 'salon', source: { kind: 'worker-canonical' }, follow: true },
     }),
   );
   const [url] = fetchImpl.mock.calls[0] as unknown as [string];
   expect(url).toBe('https://worker.example/admin/debate-atlas/build');
+});
+
+it('takes a Worker that answers at once as the build started, in the job it runs as', async () => {
+  const result = await requestResultsBuild({
+    kind: 'risk-matrix',
+    chainId: 1,
+    fetchImpl: respond(
+      { ok: true, jobState: 'running', job: { jobId: 'job-a', startedAtMs: 49_000 } },
+      202,
+    ) as unknown as typeof fetch,
+    sessionSlug: 'salon',
+    signAdminAction: async () => ({ address: '0xabc', message: 'signed', signature: '0xsig' }),
+    workerUrl: 'https://worker.example',
+  });
+  expect(result).toEqual({ ok: true, status: 202, started: { jobId: 'job-a', startedAtMs: 49_000 } });
 });
 
 it.each([

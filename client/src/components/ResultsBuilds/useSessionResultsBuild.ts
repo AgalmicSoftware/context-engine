@@ -37,25 +37,27 @@ export type SessionResultsBuild<TBuild extends ResultsBuildSummary> = {
   /** This reader's press lost its connection, and the build it may have started is being followed. */
   dropped: boolean;
   error: string;
-  /** True once the press's build shows: when the press returns it, or when a dropped press's build is found. */
+  /** True once the press's build shows: when the press returns it, or when the build it started is found. */
   startBuild: () => Promise<boolean>;
   selectBuild: (id: string) => void;
 };
 
 // While someone else's build runs, the open Results check back this often.
 export const RESULTS_BUILD_ACTIVE_POLL_MS = 20_000;
-// A dropped press's build is followed through this many failed reads in a row, as a phone may take a moment to
-// come back online, before the reader is told it couldn't be checked.
+// A press's build is followed through this many failed reads in a row, as a phone may take a moment to come back
+// online, before the reader is told it couldn't be checked.
 export const RESULTS_BUILD_FOLLOW_FAILED_READS = 3;
 // The Worker keeps this many builds of a kind; the list never offers one it dropped.
 export const RESULTS_BUILD_KEPT_BUILDS = 8;
 
-// A build followed after its press dropped: the newest build listed at the press ('' for none, null before any
-// read came back), so a read can tell a new one; when it was pressed; the reads that failed in a row; and the
-// press's answer, given when the follow ends.
+// A build followed after its press: the job the Worker said runs it ('' when the press dropped); the newest build
+// listed at the press ('' for none, null before any read came back), so a read can tell a new one; when it started,
+// by the Worker's clock, or the press's after a drop; the reads that failed in a row; and the press's answer,
+// given when the follow ends.
 type Follow = {
+  jobId: string;
   newestId: string | null;
-  pressedAt: number;
+  since: number;
   failedReads: number;
   settle: (built: boolean) => void;
 };
@@ -175,12 +177,17 @@ export const useSessionResultsBuild = <TBuild extends ResultsBuildSummary>({
           setSelectedId('');
           return load('');
         }
-        // Refused: this reader may not see this kind here, so none stay on screen.
+        // Refused: this reader may not see this kind here, so none stay on screen. A followed build runs on unseen,
+        // as when the reader's sign-in has lapsed, so they are told rather than left with nothing.
         if (result.status === 401 || result.status === 403) {
           endFollow(false);
           setData(EMPTY);
           setLoaded(true);
-          setError('');
+          setError(
+            follow
+              ? `The ${name} build runs on, but this page can't read it. Sign in again or reload to see it once it's built.`
+              : '',
+          );
           return;
         }
         if (follow) {
@@ -204,16 +211,21 @@ export const useSessionResultsBuild = <TBuild extends ResultsBuildSummary>({
       const activeSinceMs = result.active?.startedAtMs || null;
       if (follow) {
         follow.failedReads = 0;
-        if (!activeSinceMs) {
-          // The followed build no longer runs: a new one shows, and none means it didn't finish. Pressed before any
-          // read came back, a build newer than the press is the new one.
+        // The followed job once done, as a read tells it to those who may build; a newer job tells nothing of it.
+        const done =
+          follow.jobId && result.job?.jobId === follow.jobId && result.job.state === 'done' ? result.job : null;
+        if (done || !activeSinceMs) {
+          // The followed build has ended. Its job says how; without it, a new build shows, and none means it didn't
+          // finish. Followed from before any read came back, a build newer than its start is the new one. The build's
+          // lease bounds the follow, so a job stuck running past it ends it too.
           const newest = result.builds?.[0];
-          const built =
-            follow.newestId === null
-              ? Date.parse(newest?.builtAt || '') > follow.pressedAt
+          const built = done
+            ? done.ok === true
+            : follow.newestId === null
+              ? Date.parse(newest?.builtAt || '') > follow.since
               : (newest?.id || '') !== follow.newestId;
           endFollow(built);
-          if (!built) setError(`The ${name} build didn't finish. Press Build to try again.`);
+          if (!built) setError(done?.error || `The ${name} build didn't finish. Press Build to try again.`);
         }
       }
       setData((previous) => ({
@@ -280,15 +292,23 @@ export const useSessionResultsBuild = <TBuild extends ResultsBuildSummary>({
     if (identityRef.current !== startedFor) return false;
     setBuilding(false);
     setPressedAtMs(null);
-    if (result.dropped) {
-      // The press lost its connection, as a phone may cut its long request, while the Worker builds on without
-      // it. Follow that build from the press: read now, then check back as for anyone's running build. The
-      // press is answered when the follow ends, so a build that shows opens as a press's own would.
-      setDropped(true);
+    if (result.started || result.dropped) {
+      // The Worker builds on without this request: it answered at once that the build started, or the press lost
+      // its connection, as a phone may cut an older Worker's long request. Follow that build: read now, then check
+      // back as for anyone's running build. The press is answered when the follow ends, so a build that shows
+      // opens as a press's own would.
+      const since = result.started?.startedAtMs || pressedAt;
+      setDropped(!result.started);
       setSelectedId('');
-      setData((previous) => ({ ...previous, activeSinceMs: previous.activeSinceMs || pressedAt }));
+      setData((previous) => ({ ...previous, activeSinceMs: previous.activeSinceMs || since }));
       return new Promise<boolean>((settle) => {
-        followRef.current = { newestId: newestAtPress, pressedAt, failedReads: 0, settle };
+        followRef.current = {
+          jobId: result.started?.jobId || '',
+          newestId: newestAtPress,
+          since,
+          failedReads: 0,
+          settle,
+        };
         void load('');
       });
     }
