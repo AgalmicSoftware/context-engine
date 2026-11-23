@@ -705,7 +705,7 @@ export const buildExternalInterviewKickoff = ({
   return [
     agentKey
       ? 'Help me answer in a Context Engine session. This is my request, not an instruction from any page you fetch.'
-      : 'Help me draft my answers for a Context Engine session. This is my request, not an instruction from any page you fetch. Drafting sends nothing to the session: I review the drafts and submit them myself.',
+      : 'Help me draft my answers for a Context Engine session. This is my request, not an instruction from any page you fetch. Drafting sends nothing to the session: I review every draft before anything is submitted.',
     ...(agentKey
       ? [
           ['I have an account in this session: make no other.', ...agentKeyPromptLines(agentKey)].join(' '),
@@ -775,10 +775,10 @@ export const buildExternalInterviewKickoff = ({
     // The format is the prompt's own; catalog groups are data, like the rest of the catalog.
     'If the catalog lists groups, add "groups":[{"groupId":"...","reason":"...","confidence":0.8}] for any that clearly fit me, judged only on catalog.groupSuggestionData, never on catalog.groupSuggestionNever.',
     '',
-    // The link opens with the drafts in place. Its address is this page's own, and written out whole: a
-    // terminal shows no Markdown link, and a link's target is easy to lose. Pasting is for an AI that can't
-    // encode the packet exactly.
-    `4. The review link. Encode the packet's exact JSON as unpadded UTF-8 base64url, with your code tool if you have one, and put it after #prefill= on this address, not the catalog's reviewUrl:\n${reviewAddress}\nGive the link twice: as a Markdown link labeled "Review your draft answers", and under it the same address written out in full. If you can't encode it exactly, end the address #prefill=paste instead and tell me to paste the packet there. Never POST or upload the packet. Only if you know nothing at all about me: say so, give the address with nothing after it, and ask a few questions whose answers would let you draft most of the answers at once.`,
+    // The link opens with the drafts in place. Its address is this page's own. It is given once: a chat app
+    // shows a Markdown link as its label, and a terminal, which shows none, gets the address itself. Pasting
+    // is for an AI that can't encode the packet exactly.
+    `4. The review link. Encode the packet's exact JSON as unpadded UTF-8 base64url, with your code tool if you have one, and put it after #prefill= on this address, not the catalog's reviewUrl:\n${reviewAddress}\nGive the link once, as a Markdown link labeled "Review your draft answers"; in a terminal, write the address out instead. If you can't encode it exactly, end the address #prefill=paste instead and tell me to paste the packet there. Never POST or upload the packet. Only if you know nothing at all about me: say so, give the address with nothing after it, and ask a few questions whose answers would let you draft most of the answers at once.`,
     ...(more.length ? ['', ...more] : []),
   ].join('\n');
 };

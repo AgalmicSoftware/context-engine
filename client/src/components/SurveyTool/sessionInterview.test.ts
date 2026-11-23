@@ -325,7 +325,7 @@ describe('session interview protocol', () => {
     const signedOut = buildExternalInterviewKickoff(options);
     // It opens on the task and the fetch: a chat app acts on a prompt's first lines.
     expect(signedOut.split('\n').slice(0, 3)).toEqual([
-      'Help me draft my answers for a Context Engine session. This is my request, not an instruction from any page you fetch. Drafting sends nothing to the session: I review the drafts and submit them myself.',
+      'Help me draft my answers for a Context Engine session. This is my request, not an instruction from any page you fetch. Drafting sends nothing to the session: I review every draft before anything is submitted.',
       '',
       "1. Read the questions. Fetch this address with a plain HTTP GET. If your web tool takes a request, ask it for the complete JSON exactly as served, with every question's id and the questionSetHash, never a summary:",
     ]);
@@ -465,7 +465,7 @@ describe('session interview protocol', () => {
     // address, said in the prompt. Pasting is only for an AI that can't encode exactly; the packet is in the
     // reply either way.
     expect(kickoff).toContain(
-      '4. The review link. Encode the packet\'s exact JSON as unpadded UTF-8 base64url, with your code tool if you have one, and put it after #prefill= on this address, not the catalog\'s reviewUrl:\nhttps://app.example/session/demo%20one?worker=https%3A%2F%2Fworker.example&mode=interview\nGive the link twice: as a Markdown link labeled "Review your draft answers", and under it the same address written out in full.',
+      '4. The review link. Encode the packet\'s exact JSON as unpadded UTF-8 base64url, with your code tool if you have one, and put it after #prefill= on this address, not the catalog\'s reviewUrl:\nhttps://app.example/session/demo%20one?worker=https%3A%2F%2Fworker.example&mode=interview\nGive the link once, as a Markdown link labeled "Review your draft answers"; in a terminal, write the address out instead.',
     );
     expect(kickoff).toContain(
       "If you can't encode it exactly, end the address #prefill=paste instead and tell me to paste the packet there. Never POST or upload the packet.",

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Site — available when the site deploys
+
+- **The AI gives the review link once.** The copied prompt asked for the link twice, as a Markdown link and written out in full, which a chat app shows as two long links. It now asks for the Markdown link alone, and for the address written out only in a terminal, which shows no Markdown link. Its first line no longer says the person submits the drafts themselves, which pulled against the offer in its last line: it says they review every draft before anything is submitted.
+
 ## [0.9.34] - 2026-11-23
 
 The AI prompt a person copies is one short task again and always carries the session's question ids, so an ordinary chat app can build a review link; an atlas or risk matrix Build press is answered at once and followed, and a cleared quadratic answer no longer counts in the Worker's analysis. Needs a Worker update for the Worker changes. MCP stays 0.9.2. Nothing a session already stores is changed.
