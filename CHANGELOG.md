@@ -2,12 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.9.33] - 2026-11-23
+
+The Session Worker asks for short, distinct atlas branch names, stores answers sent with a person's AI key under their session, and its agent skill says what the API does; on the site, AI agents follow one set of steps wherever they start, with one "Copy AI prompt" button and an "AI can submit for me" tick. Needs a Worker update for the Worker changes. MCP stays 0.9.2. Nothing a session already stores is changed.
 
 ### Session Worker — needs a Worker update
 
 - **An atlas's top-level titles are asked to be short, clear and distinct.** The planning call that groups a session's questions into branches now asks that each branch's title be short and clear, one plain subject and not a list, that no two titles share a main word or mean nearly the same, and that none be a catch-all. The same call now describes the session in plain words, as a group sensemaking session, in place of the product's name, and asks that the branches be logically distinct from one another and that the topics inside a branch share a clear link. The reply's shape, the limits of 5 branches and 12 topics, and how a reply is checked are unchanged. Only atlases built after the Worker is updated are affected; a build already kept keeps its titles.
 - **Answers sent with a person's AI key show as their saved answers.** An answer the Worker stores for a key now names its session (`sessionId` and `sessionSlug`), as the site's own answers do. The session page leaves out a saved answer that names no session, so these answers were stored but drawn as unanswered on the person's page; the site reads answers for Results through the same check, and the Worker's AI Results builds left them out too. Answers stored before the update, or accepted before it and sent after, stay as they are.
+
+### Session Worker — the skill's text goes live when the repository's main has it; its version needs a Worker update
+
+- **The Agent HTTP skill says what the API does.** Outside agents had to guess: the skill named an `answer_schema` field the questions list does not have, "truthful approval metadata" that is one field, and a "request identity" a caller cannot send. It now gives the fields that shape an answer (`questionType`, `options`, `scale`, `voiceCredits`, `singleSelect`), where `sessionSlug` goes, `submit` with `approved`, what the reply counts and what `skipped` and a 422 mean, that sending the same answer again is safe and a changed one is a new revision, how to read back what the person has answered, and what a 401, a 503 and a draft-only key mean. Skill version 2026-11-23 (v48).
+- **The skill carries the site's steps for an AI with a person's key.** The one question and what to do knowing nothing about the person are written into it from the shared text, and a test fails if they drift. It names the key's sources as the session page does ("AI can submit for me", "Have AI draft your answers", the `aiPrompt=1` link), and says only the person, in the chat, can waive being shown answers: no prompt copied from a session does.
 
 ### Site — available when the site deploys
 
@@ -21,11 +28,7 @@ All notable changes to this project will be documented in this file.
 - **A shorter notice after an agent's sign-in link.** The notice now says "Signed in as 0x…, the account your agent set up." in one sentence.
 - **The paste box reads more of what an AI gives.** The box that appears when a review link fails to open now takes the packet of draft answers with its code-block fence still on, or the review link itself.
 - **The copied prompt is longer.** The steps add about a quarter to it; the packet names the new wording as `ce-prefill-prompt-3`.
-
-### Session Worker — the skill's text goes live when the repository's main has it; its version needs a Worker update
-
-- **The Agent HTTP skill says what the API does.** Outside agents had to guess: the skill named an `answer_schema` field the questions list does not have, "truthful approval metadata" that is one field, and a "request identity" a caller cannot send. It now gives the fields that shape an answer (`questionType`, `options`, `scale`, `voiceCredits`, `singleSelect`), where `sessionSlug` goes, `submit` with `approved`, what the reply counts and what `skipped` and a 422 mean, that sending the same answer again is safe and a changed one is a new revision, how to read back what the person has answered, and what a 401, a 503 and a draft-only key mean. Skill version 2026-11-23 (v48).
-- **The skill carries the site's steps for an AI with a person's key.** The one question and what to do knowing nothing about the person are written into it from the shared text, and a test fails if they drift. It names the key's sources as the session page does ("AI can submit for me", "Have AI draft your answers", the `aiPrompt=1` link), and says only the person, in the chat, can waive being shown answers: no prompt copied from a session does.
+- **Deploy helper.** It deploys the 0.9.32 Worker bundles. A Worker updated from the site gets this release's.
 
 ## [0.9.32] - 2026-11-23
 
