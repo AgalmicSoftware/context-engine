@@ -1,6 +1,7 @@
 {
-  "short_name": "contextEngine",
-  "name": "contextEngine",
+  "short_name": "Context Engine",
+  "name": "Context Engine",
+  "description": "An open toolkit for AI-enhanced deliberation, surveys and decision-making in groups.",
   "icons": [
     {
       "src": "/favicon.ico",
