@@ -133,7 +133,7 @@ test('index.html tells a fetching agent where the guide is, in body text that is
   // fetch only an address they were shown word for word.
   const noSetUpTalk = /Don't list ways to set up, and don't speak of adding tools, joining, keys or submitting for them\./;
   const literalCatalog =
-    /To draft, fetch the address after the session's link in the list below exactly as it is written, never one you put together yourself/;
+    /To draft, fetch the address after the session's link in the list below exactly as it is written \(it is https:\/\/contextengine\.sh\/questions\/&lt;name&gt;, which you may put together from the session link when you were not shown the list\);/;
   for (const where of [plain, noscript]) {
     assert.match(where, noSetUpTalk);
     assert.match(where, literalCatalog);
