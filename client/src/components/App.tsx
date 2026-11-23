@@ -187,8 +187,9 @@ class App extends React.Component<AppProps> {
     if (readBlockedStorage().length) {
       window.setTimeout(() => {
         showToast(
-          'This browser is blocking site data for Context Engine, so your sign-in and drafts will not be kept ' +
-            'after this tab closes. Allow cookies for this site to keep them.',
+          'This browser is blocking site data for Context Engine. You can sign in and answer, but you will be ' +
+            'signed out, and answers you have not submitted will be lost, when this tab closes or reloads. ' +
+            'Allow cookies for this site to stay signed in.',
           { kind: 'info', duration: 15000 },
         );
       }, 0);

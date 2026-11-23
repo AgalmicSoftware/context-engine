@@ -1,3 +1,4 @@
+import { readBlockedStorage } from '../../storageFallback.js';
 import type { PasskeyWalletRecord, PasskeyWalletStorage } from '../types.js';
 
 const DB_NAME = 'ce_passkey_wallet_db';
@@ -117,3 +118,34 @@ export const createMemoryWalletStorage = (initialRecord: PasskeyWalletRecord | n
     },
   };
 };
+
+// A browser that blocks site data refuses this database too ("The user denied permission to access the
+// database"), and sign-in then failed outright. Where the page is already running on its stand-in for blocked
+// storage (storageFallback.ts), the record is kept in memory instead: sign-in works for the visit and is gone
+// when the tab closes or reloads. What is held is what the database would hold, and for less time: a passkey
+// record has no key in it, and a login file's key stays sealed by a key that cannot be exported. Any other
+// database failure is still an error, so an account is never dropped quietly in a browser that keeps its data.
+export const createWalletStorage = (
+  primary: PasskeyWalletStorage = indexedDbWalletStorage,
+  memory: PasskeyWalletStorage = createMemoryWalletStorage(),
+  isBlocked: () => boolean = () => readBlockedStorage().length > 0,
+): PasskeyWalletStorage => {
+  let inMemory = false;
+  const run = async <T>(op: (storage: PasskeyWalletStorage) => Promise<T>): Promise<T> => {
+    if (inMemory) return op(memory);
+    try {
+      return await op(primary);
+    } catch (error) {
+      if (!isBlocked()) throw error;
+      inMemory = true;
+      return op(memory);
+    }
+  };
+  return {
+    read: () => run((storage) => storage.read()),
+    write: (record) => run((storage) => storage.write(record)),
+    clear: () => run((storage) => storage.clear()),
+  };
+};
+
+export const walletStorage = createWalletStorage();
