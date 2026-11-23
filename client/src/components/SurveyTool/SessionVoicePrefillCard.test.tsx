@@ -387,9 +387,9 @@ describe('the AI key in a signed-in person’s prompt', () => {
     const [[url, init]] = keyRequests();
     expect(url).toBe('https://worker.example/api/agent/credentials/delegate');
     expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer session-token');
-    // The line about the key shows once the prompt holding it has been copied.
+    // While the box is ticked and the prompt holds the key, the line under the box says so, with its end time.
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE)).toHaveTextContent(
-      /^Key can answer as you until /,
+      /^The prompt holds your AI key, for this session only, until \d/,
     );
     expect(prompt).toContain(KEY_LINE);
     expect(prompt).toContain('submit them as me only after I say yes here');
@@ -638,7 +638,11 @@ describe('the AI key in a signed-in person’s prompt', () => {
     expect(setData.mock.calls[0][0]).toBe('text/plain');
     expect(setData.mock.calls[0][1]).toContain(KEY_LINE);
     expect(setData.mock.calls[0][1]).not.toContain('<AIKey>');
-    // A key that left the page by hand is said to have, as one copied by the button is.
+    // A key that left the page by hand is said to have, as one copied by the button is, once the box is unticked.
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE)).toHaveTextContent(
+      /^The prompt holds your AI key, for this session only, until /,
+    );
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL_CAN_SUBMIT));
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE)).toHaveTextContent(
       /^Key can answer as you until /,
     );
