@@ -4140,6 +4140,39 @@ describe('AppShell route render smoke', () => {
     expect(await mount({ search: '?session=profile-session', sessionConfig: hosted })).not.toHaveBeenCalled();
   });
 
+  it('loads a verified Worker session again on Back from a profile to its page', async () => {
+    const target = '0x00000000000000000000000000000000000000ab';
+    const arrive = async (sessionConfig, loaded) => {
+      const subject = createSubject({ path: `/session/${sessionConfig.slug}`, sessionConfig });
+      if (loaded) verifyWorkerRouteFixture(subject, sessionConfig);
+      subject._mounted = true;
+      subject.getDisplaySessionNetwork = jest.fn(() => null);
+      subject.initializeWorkerCanonicalCachesForGroup = jest.fn(async () => loaded);
+      // The page before was the profile, in the same session: no session in its path.
+      subject._lastDidUpdatePathRaw = `/u/${target}`;
+      await act(async () => {
+        subject.componentDidUpdate(subject.props, subject.state);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+      return subject;
+    };
+    const hosted = buildSessionConfig({
+      slug: 'profile-session',
+      corsWorkerUrl: 'https://profile-session.example.workers.dev',
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const back = await arrive(hosted, true);
+    expect(back.initializeWorkerCanonicalCachesForGroup).toHaveBeenCalledWith('profile-session');
+    // Its readiness is the loader's to restore: nothing is marked ready behind its back.
+    expect(back.state.isQuestionCacheReady).toBe(false);
+
+    // A session with no chain that the loader does not take keeps its two marks, as before.
+    const other = await arrive(buildSessionConfig({ slug: 'plain-session', __registry: undefined }), false);
+    expect(other.initializeWorkerCanonicalCachesForGroup).not.toHaveBeenCalled();
+    expect(other.state).toEqual(expect.objectContaining({ isQuestionCacheReady: true, isSurveyCacheReady: true }));
+  });
+
   it('keeps an active pure Worker user profile free of SBT scans and wallet-chain context', async () => {
     const target = '0x00000000000000000000000000000000000000ab';
     const sessionConfig = buildSessionConfig({

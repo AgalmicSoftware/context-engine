@@ -2903,7 +2903,12 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
               if (!isCacheReinitRunActive()) return;
               this.setReadinessStateIfChanged({ isSurveyCacheReady: true });
             }
-          } else {
+          } else if (
+            // A session stored on its Worker that is already verified loads again here, as on Back from a
+            // profile; any other session with no chain has only these two to mark, at once as before.
+            !claimsWorkerCanonicalAuthority(this.getCacheSessionCfg(nextActiveSlug)) ||
+            !(await this.initializeWorkerCanonicalCachesForGroup(nextActiveSlug))
+          ) {
             if (!isCacheReinitRunActive()) return;
             this.setReadinessStateIfChanged({ isQuestionCacheReady: true, isSurveyCacheReady: true });
           }
