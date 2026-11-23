@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Session Worker — needs a Worker update
 
-- **An atlas's top-level titles are asked to be short, clear and distinct.** The planning call that groups a session's questions into branches now asks that each branch's title be short and clear, one plain subject and not a list, that no two titles share a main word or mean nearly the same, and that none be a catch-all. The reply's shape, the limits of 5 branches and 12 topics, and how a reply is checked are unchanged. Only atlases built after the Worker is updated are affected; a build already kept keeps its titles.
+- **An atlas's top-level titles are asked to be short, clear and distinct.** The planning call that groups a session's questions into branches now asks that each branch's title be short and clear, one plain subject and not a list, that no two titles share a main word or mean nearly the same, and that none be a catch-all. The same call now describes the session in plain words, as a group sensemaking session, in place of the product's name, and asks that the branches be logically distinct from one another and that the topics inside a branch share a clear link. The reply's shape, the limits of 5 branches and 12 topics, and how a reply is checked are unchanged. Only atlases built after the Worker is updated are affected; a build already kept keeps its titles.
 
 ## [0.9.32] - 2026-11-23
 

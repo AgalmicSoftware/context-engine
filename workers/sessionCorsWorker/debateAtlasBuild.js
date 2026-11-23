@@ -52,8 +52,8 @@ const PLAN_RULES = Object.freeze([
   'Branch labels are the atlas\'s top-level titles, shown side by side: keep each short and clear, one plain subject and not a list. No two share a main word or mean nearly the same, and none is a catch-all such as "Other" or "General".',
 ]);
 
-export const buildDebateAtlasPlanPrompt = ({ sessionName = '', questions = [], contextText = '' } = {}) => `You are planning a debate atlas for a Context Engine session from its survey questions.
-Group the questions into 2 to ${DEBATE_ATLAS_LIMITS.branches} branches and each branch into 1 to 4 topics, at most ${DEBATE_ATLAS_LIMITS.topics} topics in all. A topic gathers questions people can disagree about along the same lines. Put each question that has responses in exactly one topic; leave out questions with none.
+export const buildDebateAtlasPlanPrompt = ({ sessionName = '', questions = [], contextText = '' } = {}) => `You are planning a debate atlas for a group sensemaking session: people answered the survey questions below so the group can see where it agrees and where it splits.
+Group the questions into 2 to ${DEBATE_ATLAS_LIMITS.branches} branches and each branch into 1 to 4 topics, at most ${DEBATE_ATLAS_LIMITS.topics} topics in all. Branches are the atlas's top level: the few big things this session is about that a curious reader would most want to open. Each is logically distinct from the others, and the topics inside one share a clear link. A topic gathers questions people can disagree about along the same lines. Put each question that has responses in exactly one topic; leave out questions with none.
 Return one JSON object with no Markdown fences and no tool calls, in this shape:
 { "title": "short atlas title", "branches": [{ "label": "2-5 word branch name", "summary": "one neutral sentence", "topics": [{ "label": "2-6 word topic name", "questionIds": ["q1"] }] }] }
 
