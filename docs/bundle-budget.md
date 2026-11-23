@@ -26,7 +26,7 @@ regenerate this block rather than maintaining parallel numbers.
 | --- | ---: | --- |
 | Application entry | 250,000 bytes gzip | `index.html` and its direct dynamic application entry |
 | Non-vendor JavaScript | 500,000 bytes minified | All other non-vendor, non-exception chunks |
-| Temporary exception: app-shell-temporary | 530,000 bytes minified | `assets/AppShell-*.js` |
+| Temporary exception: app-shell-temporary | 525,000 bytes minified | `assets/AppShell-*.js` |
 | Duplicate emitted/compatibility images | 0 pairs | 0 explicit allowlist entries |
 | Warning threshold | 95% of each byte cap | Warning only; more than 100% fails |
 <!-- END GENERATED CLIENT BUNDLE POLICY -->
@@ -73,7 +73,7 @@ it. Keep runtime and controller reductions behind real lazy boundaries; narrowly
 isolating immutable, side-effect-free fixture data is acceptable only when the
 built import graph, bundle gate, and route smoke prove the split safe.
 
-The exception is capped at 530,000 bytes minified. `scripts/client-bundle-budget.json`
+The exception is capped at 525,000 bytes minified. `scripts/client-bundle-budget.json`
 is the authority for that number.
 
 This is an accepted temporary exception for the current release line. The

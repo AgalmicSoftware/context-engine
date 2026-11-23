@@ -2,11 +2,9 @@
 // that needs a signature fails. A Submit that fails so asks, through this event, for the file to be chosen again
 // right there, and waits for the answer: `true` once the same account is signed in again, `false` when the
 // window was closed, the account changed, or nothing on the page could show it.
-import { LOGIN_FILE_DUE_TEXT } from './loginFileTexts';
+import { LOGIN_FILE_DUE_EVENT, LOGIN_FILE_DUE_TEXT } from './loginFileTexts';
 
-export { LOGIN_FILE_DUE_TEXT };
-
-export const LOGIN_FILE_DUE_EVENT = 'ce:login-file-due';
+export { LOGIN_FILE_DUE_EVENT, LOGIN_FILE_DUE_TEXT };
 
 export type LoginFileDueRequest = {
   /** Called by whoever will show the window, at once: a request nobody takes is answered `false`. */

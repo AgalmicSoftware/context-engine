@@ -12,12 +12,14 @@ import {
   buildPasskeyWalletNetwork,
   restorePasskeyLoginPassively,
   type PassivePasskeyRestoreDeps,
-} from '../Account/loginAndSettingsPasskeyActions';
+} from '../Account/passkeyLoginRestore';
 import { AccountDisplayTorus } from './AccountDisplay';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import { holdsAgentLinkAccountForPath } from 'utilities/session/agentLinkAccount';
-import { LOGIN_FILE_DUE_EVENT, type LoginFileDueRequest } from 'utilities/session/loginFileDue';
+// The event's name alone, and the request's shape: the asking itself is loaded with the Submit, not the navbar.
+import { LOGIN_FILE_DUE_EVENT } from 'utilities/session/loginFileTexts';
+import type { LoginFileDueRequest } from 'utilities/session/loginFileDue';
 import { createLogger } from 'utilities/logging.js';
 
 const accountLog = createLogger('account');
