@@ -74,14 +74,26 @@ it("keeps the Worker's address for any other catalog", () => {
   expect(fetchLine({ catalogTicket: 'ticket-1' })).toMatch(
     /^https:\/\/.*\/agent\/interview-catalog\?.*&ticket=ticket-1$/,
   );
-  expect(fetchLine({ sessionUrl: `https://contextengine.sh/session/${slug}?src=x` })).toMatch(
-    /\/agent\/interview-catalog\?/,
-  );
+  // A link that names a source or a group still gets the site's address first, which more chat AIs can
+  // open; its own catalog, which lists that group, is the second.
+  for (const query of ['src=x', 'joinGroup=g1']) {
+    const prompt = buildExternalInterviewKickoff({
+      workerUrl: worker,
+      sessionSlug: slug,
+      sessionUrl: `https://contextengine.sh/session/${slug}?${query}`,
+    });
+    const lines = prompt.split('\n');
+    const at = lines.indexOf(`https://contextengine.sh/questions/${slug}`);
+    expect(at).toBeGreaterThan(0);
+    expect(lines[at + 1]).toBe('Second address, if the first does not give you that:');
+    expect(lines[at + 2]).toMatch(
+      new RegExp(`^${worker.replace(/[.]/g, '\\.')}/agent/interview-catalog\\?.*${query.split('=')[0]}`),
+    );
+  }
   expect(fetchLine({ sessionSlug: 'not-listed', sessionUrl: 'https://contextengine.sh/session/not-listed' })).toMatch(
     /\/agent\/interview-catalog\?slug=not-listed/,
   );
   for (const fields of [
-    { sessionUrl: `https://contextengine.sh/session/${slug}?joinGroup=g1` },
     { sessionUrl: `http://localhost:3000/session/${slug}` },
     { workerUrl: 'https://ce-other.example.workers.dev' },
     { sessionSlug: 'toString', sessionUrl: 'https://contextengine.sh/session/toString' },
