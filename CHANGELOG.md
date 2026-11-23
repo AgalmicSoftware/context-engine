@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Session Worker — needs a Worker update
+
+- **A refused name says which word, and a name that works.** A name with a role word, or the site's own name, was refused with "Names can't claim a role, such as admin or host." and no word. An AI agent that called itself "Agent - Context Engine MCP" could not tell that "Context Engine" was the word, not "Agent". The refusal now reads, for example, `A name can’t include “Context Engine”: names can’t claim a role, such as admin or host, or speak for the site. One like "Sam" or "Sam's agent" is fine.` The word comes from the Worker's own list, never from what was typed. Which names are taken is unchanged: "agent" and "AI" were always allowed, and tests now say so. An older Worker gives the old sentence.
+
 ### Site — available when the site deploys
 
 - **The AI gives the review link once.** The copied prompt asked for the link twice, as a Markdown link and written out in full, which a chat app shows as two long links. It now asks for the Markdown link alone, and for the address written out only in a terminal, which shows no Markdown link. Its first line no longer says the person submits the drafts themselves, which pulled against the offer in its last line: it says they review every draft before anything is submitted.

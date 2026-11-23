@@ -17,11 +17,12 @@ const addressOf = (value) => (typeof value === 'string' ? value.trim().toLowerCa
 export const isNameHolder = (value) => ADDRESS.test(addressOf(value));
 export const sessionNameKey = (address) => PREFIX + addressOf(address);
 
-// Words that would let a name pass for someone with a role, matched as whole words.
-const ROLE_WORDS = [
+// Words that would let a name pass for someone with a role, or for the site itself, matched as whole
+// words whatever their case. "Agent" and "AI" alone are not among them: a name may say it is one.
+export const ROLE_WORDS = Object.freeze([
   'admin', 'administrator', 'moderator', 'host', 'organiser', 'organizer', 'official', 'staff', 'system',
-  'results admin', 'session agent', 'group agent', 'context engine', 'radicalxchange', 'rxc',
-];
+  'session agent', 'group agent', 'Context Engine', 'RadicalxChange', 'RxC',
+]);
 const DOMAIN = /(^|\s)(www\.|[\p{L}\p{N}-]+\.(com|org|net|io|ai|app|dev|xyz|co|me|gg|so|info|link|site|online)(\s|$))/iu;
 const REFUSALS = Object.freeze({
   empty: 'Write a name first.',
@@ -33,9 +34,10 @@ const REFUSALS = Object.freeze({
   ens: 'That looks like an ENS name; choose a name.',
   url_or_email: 'That looks like a web address; choose a name.',
   secret: 'That looks like a key or password; choose a name.',
-  role: 'Names can’t claim a role, such as admin or host.',
+  // Says which word, from the list above and never from what was typed, and a name that is taken as written.
+  role: (word) => `A name can’t include “${word}”: names can’t claim a role, such as admin or host, or speak for the site. One like "Sam" or "Sam's agent" is fine.`,
 });
-const refuse = (reason) => ({ ok: false, reason, error: REFUSALS[reason] });
+const refuse = (reason, detail) => ({ ok: false, reason, error: typeof REFUSALS[reason] === 'function' ? REFUSALS[reason](detail) : REFUSALS[reason] });
 
 // Letters drawn like Latin ones, read as those Latin letters when checking
 // for an address or a role, each case by its own shape (capital Greek Η is an
@@ -86,7 +88,8 @@ export const normalizeSessionName = (value) => {
   if (DOMAIN.test(seen)) return refuse('url_or_email');
   if (looksSecret(name)) return refuse('secret');
   const words = ` ${seen.replace(/[._'-]+/gu, ' ').replace(/\s+/gu, ' ')} `;
-  if (ROLE_WORDS.some((word) => words.includes(` ${word} `))) return refuse('role');
+  const role = ROLE_WORDS.find((word) => words.includes(` ${word.toLowerCase()} `));
+  if (role) return refuse('role', role);
   return { ok: true, name };
 };
 

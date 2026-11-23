@@ -10,7 +10,7 @@ import { dispatchAdminRequest } from './adminRequestDispatch.js';
 import { dispatchAuthenticatedSecretActionRoute } from './authenticatedSecretActionRouteDispatch.js';
 import { applySessionConfigMutation } from './sessionConfigMutation.js';
 import {
-  dispatchSessionNamesStore, isSessionNamesBackup, normalizeSessionName, readSessionNames, restoreSessionNames, setOwnSessionName,
+  dispatchSessionNamesStore, isSessionNamesBackup, normalizeSessionName, readSessionNames, restoreSessionNames, ROLE_WORDS, setOwnSessionName,
 } from './sessionNames.js';
 import { resolveTopLevelRouteSelection } from './topLevelRouteSelection.js';
 import { FEATURES } from './workerCapabilities.js';
@@ -70,6 +70,26 @@ test('a name is stored as typed, tidied, and refused with a reason when it could
   ]) assert.equal(normalizeSessionName(typed).reason, reason, String(typed));
   assert.equal(normalizeSessionName('x'.repeat(32)).ok, true);
   assert.match(normalizeSessionName('Admin').error, /role/);
+});
+
+test('a name may say it is an AI or an agent, and a refused role is named with a name that works', () => {
+  for (const name of ['Agent', 'AI agent', "Sam's agent", "Sam's AI", 'Agent - MCP', 'Kestrel - Opus 5.5 - North Lab', 'DeepSeek V4.1 Flash - CE', 'Agentic Sam']) {
+    assert.deepEqual(normalizeSessionName(name), { ok: true, name }, name);
+  }
+  // The word comes from the list, in its own spelling, never from what was typed.
+  for (const [typed, word] of [
+    ['Agent - Context Engine MCP', 'Context Engine'], ['context_engine bot', 'Context Engine'], ['The HOST', 'host'], ['AI system', 'system'],
+    ['Official AI', 'official'], ['Session agent', 'session agent'], ['Group Agent 2', 'group agent'], ['ʀxᴄ', 'RxC'], ['Ádmin', 'admin'], ['Results admin', 'admin'],
+  ]) {
+    const refused = normalizeSessionName(typed);
+    assert.equal(refused.reason, 'role', typed);
+    assert.ok(refused.error.startsWith(`A name can’t include “${word}”: `), refused.error);
+  }
+  for (const word of ROLE_WORDS) assert.ok(normalizeSessionName(word).error.includes(`“${word}”`), word);
+  // The names the refusal offers are taken as written.
+  const offered = [...normalizeSessionName('Admin').error.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(offered, ['Sam', "Sam's agent"]);
+  for (const name of offered) assert.deepEqual(normalizeSessionName(name), { ok: true, name });
 });
 
 test('a signed-in person sets and removes only their own name, within the daily limit', async () => {
