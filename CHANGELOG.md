@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Session Worker — needs a Worker update
+
+- **An atlas's top-level titles are asked to be short, clear and distinct.** The planning call that groups a session's questions into branches now asks that each branch's title be short and clear, one plain subject and not a list, that no two titles share a main word or mean nearly the same, and that none be a catch-all. The reply's shape, the limits of 5 branches and 12 topics, and how a reply is checked are unchanged. Only atlases built after the Worker is updated are affected; a build already kept keeps its titles.
+
 ## [0.9.32] - 2026-11-23
 
 "Analyze me" opens your page inside the app and Analyze starts at once, a session's answers are listed 500 a request, and Back to a Worker session's page loads it again; a cleared quadratic answer reads as blank, the Report's Active Filters row has a Filter button, and a Build press that drops no longer shows "Load failed". Site only: the Session Worker's code is unchanged and MCP stays 0.9.2. Nothing a session already stores is changed.

@@ -44,13 +44,21 @@ const unit = (value) => {
   return Number.isFinite(number) ? Math.min(1, Math.max(0, Math.round(number * 1000) / 1000)) : null;
 };
 
+// Branch labels title the atlas's top-level circles, where a reader sees them
+// side by side with nothing else: short, clear and distinct from one another.
+const PLAN_RULES = Object.freeze([
+  'Use only the question IDs listed below.',
+  'Name branches and topics after what the questions ask, in plain words.',
+  'Branch labels are the atlas\'s top-level titles, shown side by side: keep each short and clear, one plain subject and not a list. No two share a main word or mean nearly the same, and none is a catch-all such as "Other" or "General".',
+]);
+
 export const buildDebateAtlasPlanPrompt = ({ sessionName = '', questions = [], contextText = '' } = {}) => `You are planning a debate atlas for a Context Engine session from its survey questions.
 Group the questions into 2 to ${DEBATE_ATLAS_LIMITS.branches} branches and each branch into 1 to 4 topics, at most ${DEBATE_ATLAS_LIMITS.topics} topics in all. A topic gathers questions people can disagree about along the same lines. Put each question that has responses in exactly one topic; leave out questions with none.
 Return one JSON object with no Markdown fences and no tool calls, in this shape:
 { "title": "short atlas title", "branches": [{ "label": "2-5 word branch name", "summary": "one neutral sentence", "topics": [{ "label": "2-6 word topic name", "questionIds": ["q1"] }] }] }
 
 Rules:
-${[...RESULTS_BUILD_RULES, 'Use only the question IDs listed below.', 'Name branches and topics after what the questions ask, in plain words.'].map((rule) => `- ${rule}`).join('\n')}
+${[...RESULTS_BUILD_RULES, ...PLAN_RULES].map((rule) => `- ${rule}`).join('\n')}
 
 Session: ${JSON.stringify(text(sessionName, 200))}
 Questions (responses is how many answers each has):
