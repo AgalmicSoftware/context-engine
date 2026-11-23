@@ -163,6 +163,14 @@ describe('the blank-page message', () => {
     }
   });
 
+  it("takes the shell's own blocked-files sentence away as soon as it runs, since it reports failures itself", () => {
+    document.body.innerHTML =
+      '<div id="ce-boot-loading"><p id="ce-boot-blocked">This page is not loading.</p></div><div id="root"></div>';
+    new Function(source)();
+    expect(document.getElementById('ce-boot-blocked')).toBeNull();
+    expect(document.getElementById('ce-boot-loading')).not.toBeNull();
+  });
+
   it('takes the loading line away once the app draws', async () => {
     boot();
     expect(document.getElementById('ce-boot-loading')).not.toBeNull();
@@ -201,9 +209,16 @@ describe('the blank-page message', () => {
     expect(source).not.toMatch(/import |require\(/);
     expect(html).toContain('<noscript>');
     // The loading line is in the shell itself, before the root, and hidden where no script will ever remove it.
-    expect(html).toContain(
-      '<div id="ce-boot-loading" class="ce-app-loading" role="status" style="visibility: hidden">',
-    );
+    expect(html).toContain('<div id="ce-boot-loading" role="status" style="visibility: hidden">');
+    // Its style is in the shell too, not the stylesheet: a filter that replaces the site's files leaves only
+    // this HTML, and the line and its last sentence must still come up by themselves.
+    const style = (html.match(/<style>([\s\S]*?)<\/style>/) || [])[1] || '';
+    expect(style).toMatch(/#ce-boot-loading \{[^}]*animation: ce-boot-show 0s linear 1s forwards;/);
+    expect(style).toMatch(/#ce-boot-blocked \{[^}]*animation: ce-boot-show 0s linear 20s forwards;/);
+    expect(style).toMatch(/@keyframes ce-boot-show \{\s*to \{\s*visibility: visible;/);
+    expect(html).toMatch(/<p id="ce-boot-blocked" style="visibility: hidden">\s*This page is not loading\./);
+    const sheet = fs.readFileSync(path.join(clientRoot, 'src', 'assets', 'css', 'contextEngine.scss'), 'utf8');
+    expect(sheet).not.toContain('ce-boot-');
     expect(html.indexOf('id="ce-boot-loading"')).toBeLessThan(html.indexOf('<div id="root">'));
     expect(html).toContain('<noscript><style>#ce-boot-loading { display: none; }</style></noscript>');
     expect(html).toContain('id="ce-agent-note"');

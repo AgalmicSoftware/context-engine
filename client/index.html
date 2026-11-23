@@ -11,6 +11,38 @@
     <meta name="theme-color" content="#ffffff" />
     <script src="__PUBLIC_URL__/theme-bootstrap.js"></script>
     <script src="__PUBLIC_URL__/boot-watchdog.js"></script>
+    <!-- The loading line's own style, here and not in the stylesheet: a security filter that swaps this site's
+         files for its block page leaves only this HTML, and the line and its last sentence must still show. -->
+    <style>
+      #ce-boot-loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        padding: 48px 24px;
+        text-align: center;
+        font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        color: var(--ce-panel-text, CanvasText);
+        animation: ce-boot-show 0s linear 1s forwards;
+      }
+      #ce-boot-loading progress {
+        width: min(240px, 60vw);
+        accent-color: var(--ce-action-primary, Highlight);
+      }
+      #ce-boot-blocked {
+        margin: 0;
+        max-width: 34em;
+        animation: ce-boot-show 0s linear 20s forwards;
+      }
+      body:has(#root > :not([data-ce-boot-ignore])) #ce-boot-loading {
+        display: none;
+      }
+      @keyframes ce-boot-show {
+        to {
+          visibility: visible;
+        }
+      }
+    </style>
     <noscript><style>#ce-boot-loading { display: none; }</style></noscript>
     <meta
       name="description"
@@ -183,12 +215,17 @@
       second address: https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/agent/interview-catalog?slug=demo-sh&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Fdemo-sh
       <!-- /known-session-catalogs -->
     </p>
-    <!-- Shown while the app's files arrive, from a second in: hidden here, and revealed by the stylesheet's
-         animation. boot-watchdog.js fills the bar and removes this once the app has drawn. -->
-    <div id="ce-boot-loading" class="ce-app-loading" role="status" style="visibility: hidden">
+    <!-- Shown while the app's files arrive, from a second in: hidden here, and revealed by the head's style. boot-watchdog.js fills the bar and removes this once the app has drawn. -->
+    <div id="ce-boot-loading" role="status" style="visibility: hidden">
       <span>Loading…</span>
       <progress max="1" value="0" aria-label="Loading Context Engine"></progress>
       <span id="ce-boot-loading-note"></span>
+      <!-- Shown by the style above after 20 seconds where boot-watchdog.js never ran to take it away: the
+           site's scripts are being blocked or replaced. -->
+      <p id="ce-boot-blocked" style="visibility: hidden">
+        This page is not loading. A security tool, VPN filter or content blocker may be blocking this site's
+        files. Allow contextengine.sh in it, or try another browser or network, then reload.
+      </p>
     </div>
     <div id="root"></div>
     <script type="module" src="/src/viteEntry.ts"></script>
