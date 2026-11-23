@@ -67,6 +67,8 @@ export type ResultsBuildResult<TBuild extends ResultsBuildSummary> = {
   build?: TBuild;
   /** Set when the press was refused because another build is running; the next read gives its start. */
   active?: { startedAtMs: number };
+  /** The press got no response, as when a phone cuts its long request; the build it started may still run. */
+  dropped?: boolean;
 };
 
 type AdminActionSigner = (args: {
@@ -155,7 +157,9 @@ export const requestResultsBuild = async <TBuild extends ResultsBuildSummary>({
   } catch (error) {
     // The signed request throws on a refusal, keeping its status, reason and,
     // when a build is already running, when that build started.
-    const { status, reason, active } = toRecord(error);
+    const { status, reason, active, noResponse } = toRecord(error);
+    // No response is not a refusal: the Worker may have the build and go on with it.
+    if (noResponse === true) return { ok: false, status: 0, dropped: true, error: 'The connection dropped.' };
     const startedAtMs = Number(toRecord(active).startedAtMs) || now();
     return {
       ok: false,

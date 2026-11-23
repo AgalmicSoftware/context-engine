@@ -74,6 +74,29 @@ it('keeps one live region from the running build to its failure, so the failure 
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
 });
 
+it('says a dropped press builds on, with why in a (?), in the one live region until the build ends', () => {
+  const { rerender } = render(
+    <ResultsBuildStatus kind="debate-atlas" busy dropped nextBuild={null} startedAtMs={Date.now()} />,
+  );
+  const region = screen.getByRole('status');
+  expect(region).toHaveTextContent(
+    /^\s*Building the atlas · 0s\s*Connection dropped\. The build keeps running and appears here when done\.$/,
+  );
+  expect(screen.getByRole('button', { name: 'About the dropped connection' })).toBeVisible();
+  rerender(
+    <ResultsBuildStatus
+      kind="debate-atlas"
+      busy={false}
+      error="The atlas build didn't finish. Press Build to try again."
+      nextBuild={null}
+      startedAtMs={null}
+    />,
+  );
+  expect(screen.getAllByRole('status')).toEqual([region]);
+  expect(region).toHaveTextContent(/^The atlas build didn't finish\. Press Build to try again\.$/);
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
+});
+
 it("names a risk matrix build and shows its one prompt, leaving out the atlas's", () => {
   render(
     <ResultsBuildStatus

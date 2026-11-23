@@ -66,7 +66,8 @@ export const normalizeAdminWorkerFetchError = ({
   if (lowered.includes('origin not allowed')) {
     return buildAdminWorkerCorsMessage(workerBase, raw);
   }
-  if (lowered.includes('failed to fetch') || lowered.includes('networkerror')) {
+  // A request that got no response: Chrome says "Failed to fetch", Firefox "NetworkError…" and Safari "Load failed".
+  if (lowered.includes('failed to fetch') || lowered.includes('networkerror') || lowered.includes('load failed')) {
     return buildAdminWorkerCorsMessage(workerBase);
   }
   return raw || 'Failed to update worker allowOrigins.';
@@ -112,7 +113,11 @@ export const postSignedAdminWorkerRequest = async ({
         body: JSON.stringify({ ...body, ...auth }),
       });
     } catch (error) {
-      throw new Error(normalizeAdminWorkerFetchError({ error, workerBase: baseUrl }));
+      // No response came back. A caller can tell this from a refusal: a long request a phone cut may still
+      // have reached the Worker.
+      throw Object.assign(new Error(normalizeAdminWorkerFetchError({ error, workerBase: baseUrl })), {
+        noResponse: true,
+      });
     }
 
     const data = await response.json().catch(() => ({}));

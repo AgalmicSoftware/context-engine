@@ -1007,6 +1007,7 @@ export default function OnePageSessionStandardShell({
                     kind={kind}
                     className={styles.generatedResultsStatus}
                     busy={busy}
+                    dropped={results.dropped}
                     error={results.error}
                     nextBuild={results.nextBuild}
                     startedAtMs={results.buildStartedAtMs}
