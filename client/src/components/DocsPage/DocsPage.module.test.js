@@ -10,6 +10,8 @@ describe('Docs page theme readability styles', () => {
     expect(scss).toContain('--docs-titlebar-bg: var(--ce-titlebar-bg);');
     expect(scss).toContain('--docs-document-text: var(--ce-document-text);');
     expect(scss).toContain('--docs-code-text: var(--ce-overlay-text);');
+    // Code and prompts are read on the overlay surface: in the default theme the base is the text's own colour.
+    expect(scss).toContain('--docs-code-bg: var(--ce-overlay-surface);');
   });
 
   it('pairs title bars, document cards, and code readers with their matching text tokens', () => {

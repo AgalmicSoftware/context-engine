@@ -13,7 +13,8 @@
   --docs-link: var(--ce-link);
   --docs-control: var(--ce-control-face);
   --docs-control-text: var(--ce-control-text);
-  --docs-code-bg: var(--ce-overlay-base);
+  // Overlay text is made to be read on the overlay surface; on the base it can be the same colour.
+  --docs-code-bg: var(--ce-overlay-surface);
   --docs-code-text: var(--ce-overlay-text);
 
   padding: 24px;
