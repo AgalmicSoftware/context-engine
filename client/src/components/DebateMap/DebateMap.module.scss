@@ -79,7 +79,7 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     min-height: unset;
   }
 
-  // The name of the branch in view, beside "Up Level", sits on the theme's panel too. Its base colours are made
+  // The name of the branch in view, under "Up Level", sits on the theme's panel too. Its base colours are made
   // for the dark atlas page: on a light panel they came out blue-grey on grey. It takes the control colours.
   &.embeddedAtlas .debateMap .atlasViewContainer {
     .packedAtlasTitleButton,
@@ -113,16 +113,13 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
 
     &.embeddedAtlas .debateMap .atlasViewContainer {
       .packedAtlasTitleButton {
-        max-width: 100%;
-        padding: 6px 12px;
-        gap: 8px;
+        padding: 9px 16px;
+        gap: 10px;
       }
 
       .packedAtlasTitle {
-        min-width: 0;
-        font-size: 0.95rem;
+        font-size: 1.2rem;
         letter-spacing: 0;
-        overflow-wrap: break-word;
       }
 
       .packedNodeLabelOverCircles {
@@ -479,23 +476,35 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       }
     }
 
-    .packedAtlasTitleRow {
+    // "Up Level", then the level's title centred on its own line below, as the level's heading. Only the buttons
+    // take taps, so the header's empty sides leave the circles under them reachable.
+    .atlasLevelHeader {
       position: absolute;
-      top: 8px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 45;
-      width: min(70%, 720px);
-      text-align: center;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
       pointer-events: none;
+
+      > button {
+        pointer-events: auto;
+      }
+
+      > .backArrow {
+        align-self: flex-start;
+      }
     }
 
     .packedAtlasTitleButton {
-      pointer-events: auto;
       display: inline-flex;
       align-items: center;
-      gap: 10px;
-      padding: 6px 13px;
+      gap: 12px;
+      max-width: min(100%, 760px);
+      padding: 10px 20px;
       border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
       border-radius: var(--ce-radius-pill);
       background: color-mix(in srgb, var(--ce-overlay-base) 55%, transparent);
@@ -518,8 +527,10 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     }
 
     .packedAtlasTitle {
+      min-width: 0;
+      overflow-wrap: break-word;
       color: color-mix(in srgb, var(--ce-status-info-text) 96%, transparent);
-      font-size: clamp(1rem, 1.5vw, 1.35rem);
+      font-size: clamp(1.25rem, 2vw, 1.6rem);
       font-weight: 700;
       letter-spacing: 0.03em;
       line-height: 1.2;
@@ -528,15 +539,12 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     }
 
     .packedAtlasTitleIcon {
-      font-size: 0.85rem;
+      flex-shrink: 0;
+      font-size: 1rem;
       color: color-mix(in srgb, var(--ce-status-info-text) 88%, transparent);
     }
 
     .backArrow {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      z-index: 50;
       @include glass-panel;
       color: $text-main;
       padding: 10px 15px;
