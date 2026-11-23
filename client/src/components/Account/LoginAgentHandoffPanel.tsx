@@ -2,13 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faQuestionCircle, faUserCog } from '@fortawesome/free-solid-svg-icons';
-import { buildAgentKeyHandover, maskAgentKey, type AgentDelegateKey } from '../../utilities/session/agentHandoff';
+import { buildAgentKeyHandover, type AgentDelegateKey } from '../../utilities/session/agentHandoff';
 import { useAgentKey } from '../../utilities/session/useAgentKey';
 import type { KickoffAgentKey } from '../SurveyTool/sessionInterview';
 import { copyText } from '../../utilities/ui/copyText';
 import SessionInterviewMemoryKickoffCard from '../SurveyTool/SessionInterviewMemoryKickoffCard';
 import { useSessionPrefillKickoff } from '../SurveyTool/useSessionPrefillKickoff';
-import AgentPromptPreview, { PromptCaret, maskPromptTicket } from './AgentPromptPreview';
 import styles from './Account.module.scss';
 
 export type LoginAgentHandoffPanelProps = {
@@ -84,6 +83,11 @@ const Help = ({
 );
 
 const LABEL = 'Your AI agent';
+const TEST_IDS = {
+  copy: 'ce-agent-handoff-copy',
+  toggle: 'ce-agent-handoff-prompt-expand',
+  prompt: 'ce-agent-handoff-prompt',
+};
 
 // The AI prompt behind one split copy button, whose caret opens it to read.
 const PromptCopy = ({
@@ -97,9 +101,8 @@ const PromptCopy = ({
   agentKey,
   keyOnly,
   holdCopy,
-  keyShown,
-  tools,
   onCopied,
+  children,
 }: Pick<
   LoginAgentHandoffPanelProps,
   'sessionSlug' | 'sessionUrl' | 'sessionName' | 'sessionConfig' | 'context' | 'workerUrl' | 'agentHttpEnabled'
@@ -107,14 +110,13 @@ const PromptCopy = ({
   agentKey: KickoffAgentKey | null;
   /** The person came for their key: the prompt is the short one that hands it over. */
   keyOnly: boolean;
-  /** Said in place of a copy while the key is made: a copy then would give the prompt without it. */
+  /** While set, the button turns and nothing is copied: a copy then would give the prompt without the key. */
   holdCopy: string;
-  keyShown: boolean;
-  tools: React.ReactNode;
   onCopied: () => void;
+  /** The line about the key, under the button. */
+  children: React.ReactNode;
 }) => {
   const [copied, setCopied] = useState(false);
-  const [expanded, setExpanded] = useState(false);
   const copiedTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(copiedTimer.current), []);
   // The prompt just changed, so an earlier "Copied" no longer describes it.
@@ -153,43 +155,19 @@ const PromptCopy = ({
     return true;
   };
   return (
-    <div className={styles.agentHandoffKickoff}>
-      <SessionInterviewMemoryKickoffCard
-        // Another account is checked afresh, for its own ticket.
-        key={handover ? 'handover' : kickoff?.accountKey}
-        kickoff={handover || kickoff?.kickoff || ''}
-        validateKickoff={handover || !kickoff ? handoverCheck.current : kickoff.validateKickoff}
-        promptCopied={copied}
-        showAgentPrompt={false}
-        onCopyPrompt={copyPrompt}
-        onTogglePrompt={() => undefined}
-        holdCopy={holdCopy}
-        copyButton={{
-          className: styles.agentHandoffPrimary,
-          testId: 'ce-agent-handoff-copy',
-          rowClassName: styles.agentHandoffSplit,
-          addon: (
-            <PromptCaret
-              textId="ce-agent-handoff-prompt-text"
-              testId="ce-agent-handoff-prompt-expand"
-              label={LABEL}
-              expanded={expanded}
-              onToggle={() => setExpanded(!expanded)}
-            />
-          ),
-          renderPreview: (prompt) => (
-            <AgentPromptPreview
-              prompt={maskPromptTicket(keyShown ? prompt : maskAgentKey(prompt))}
-              textId="ce-agent-handoff-prompt-text"
-              testId="ce-agent-handoff-prompt"
-              label={LABEL}
-              expanded={expanded}
-              tools={tools}
-            />
-          ),
-        }}
-      />
-    </div>
+    <SessionInterviewMemoryKickoffCard
+      // Another account is checked afresh, for its own ticket.
+      key={handover ? 'handover' : kickoff?.accountKey}
+      kickoff={handover || kickoff?.kickoff || ''}
+      validateKickoff={handover || !kickoff ? handoverCheck.current : kickoff.validateKickoff}
+      promptCopied={copied}
+      onCopyPrompt={copyPrompt}
+      holdCopy={holdCopy}
+      centered={keyOnly}
+      testIds={TEST_IDS}
+    >
+      {children}
+    </SessionInterviewMemoryKickoffCard>
   );
 };
 
@@ -213,7 +191,6 @@ const LoginAgentHandoffPanel = ({
   // only an open row should ask the session anything.
   const agentKey = useAgentKey(requestKey, agentHttpEnabled && signedIn && open);
   const { promptKey } = agentKey;
-  const [keyShown, setKeyShown] = useState(false);
   // The key of the prompt last copied: the line about it shows only once that prompt has been copied.
   const [copiedKey, setCopiedKey] = useState('');
   const [copyStatus, setCopyStatus] = useState('');
@@ -231,7 +208,6 @@ const LoginAgentHandoffPanel = ({
     resetKey.current();
     setOpen(false);
     setSignOutShown(true);
-    setKeyShown(false);
     setCopyStatus('');
   }, [agentsSignedOut]);
 
@@ -240,11 +216,7 @@ const LoginAgentHandoffPanel = ({
     : '';
   return (
     <section
-      className={
-        promptRequested && signedIn
-          ? `${styles.agentHandoffPanel} ${styles.agentHandoffArrived}`
-          : styles.agentHandoffPanel
-      }
+      className={styles.agentHandoffPanel}
       aria-labelledby="ce-agent-handoff-title"
       data-testid="ce-agent-handoff-panel"
     >
@@ -291,36 +263,22 @@ const LoginAgentHandoffPanel = ({
             agentKey={promptKey}
             keyOnly={promptRequested}
             holdCopy={agentKey.making ? 'Adding your AI key…' : ''}
-            keyShown={keyShown}
             onCopied={() => {
               setCopiedKey(promptKey?.key.token || '');
               setCopyStatus('Copied the prompt.');
               setCopyCount((count) => count + 1);
             }}
-            tools={
-              promptKey ? (
-                <button
-                  type="button"
-                  className={styles.agentHandoffButton}
-                  aria-pressed={keyShown}
-                  aria-label="Show the key"
-                  onClick={() => setKeyShown(!keyShown)}
-                  data-testid="ce-agent-handoff-key-show"
-                >
-                  {keyShown ? 'Hide key' : 'Show key'}
-                </button>
-              ) : null
-            }
-          />
-        ) : null}
-        {promptKey && copiedKey === promptKey.key.token ? (
-          <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-expiry">
-            Whoever gets this prompt can answer as you here until {expiry}
-            <Help id="ce-agent-handoff-expiry-about" placement="bottom">
-              The prompt holds a key to {sessionName} only. Paste it only into your own AI: a chat app keeps what you
-              paste in its history. The key ends when your sign-in ends or when you sign agents out.
-            </Help>
-          </p>
+          >
+            {promptKey && copiedKey === promptKey.key.token ? (
+              <p className={styles.agentHandoffHint} data-testid="ce-agent-handoff-expiry">
+                Whoever gets this prompt can answer as you here until {expiry}
+                <Help id="ce-agent-handoff-expiry-about" placement="bottom">
+                  The prompt holds a key to {sessionName} only. Paste it only into your own AI: a chat app keeps what
+                  you paste in its history. The key ends when your sign-in ends or when you sign agents out.
+                </Help>
+              </p>
+            ) : null}
+          </PromptCopy>
         ) : null}
         {/* Someone who came by the link came for the key. Where it needs a fresh sign-in to the session, that
             is theirs to start: a link alone never raises a signing prompt. */}

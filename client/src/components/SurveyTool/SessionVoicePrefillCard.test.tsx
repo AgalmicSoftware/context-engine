@@ -197,18 +197,18 @@ it('keeps the prompt to copy by hand through a renewal, with the renewed link, w
     await act(async () => {});
     await copy();
     const field = await screen.findByRole<HTMLTextAreaElement>('textbox', {
-      name: 'Memory augmentation prompt to copy',
+      name: 'AI prompt to copy',
     });
     expect(field.value).toContain('&ticket=ic1.first');
     expect(document.activeElement).toBe(field);
-    const elsewhere = screen.getByRole('button', { name: 'Prompt' });
+    const elsewhere = screen.getByRole('button', { name: 'Read the AI prompt' });
     elsewhere.focus();
     await act(async () => {
       jest.advanceTimersByTime(60 * 1000);
     });
     await act(async () => {});
     expect(ticketMock).toHaveBeenCalledTimes(2);
-    expect(screen.getByRole('textbox', { name: 'Memory augmentation prompt to copy' })).toBe(field);
+    expect(screen.getByRole('textbox', { name: 'AI prompt to copy' })).toBe(field);
     expect(field.value).toContain('&ticket=ic1.second');
     expect(document.activeElement).toBe(elsewhere);
   } finally {
@@ -227,14 +227,14 @@ it('hides the prompt to copy by hand when its renewal check fails', async () => 
     renderCard();
     await act(async () => {});
     await copy();
-    expect(await screen.findByRole('textbox', { name: 'Memory augmentation prompt to copy' })).toBeInTheDocument();
+    expect(await screen.findByRole('textbox', { name: 'AI prompt to copy' })).toBeInTheDocument();
     fetchMock.mockImplementation(async () => signInRequired());
     await act(async () => {
       jest.advanceTimersByTime(60 * 1000);
     });
     await act(async () => {});
     expect(screen.getByText(/Could not check this session’s Worker/)).toBeInTheDocument();
-    expect(screen.queryByRole('textbox', { name: 'Memory augmentation prompt to copy' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'AI prompt to copy' })).toBeNull();
   } finally {
     jest.useRealTimers();
   }
@@ -358,7 +358,8 @@ describe('the AI key in a signed-in person’s prompt', () => {
     // The card's own view of the prompt hides the key.
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE));
     const shown = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT);
-    expect(shown).toHaveTextContent('The key is ceagt_••••••••;');
+    expect(shown).toHaveTextContent('The key is <AIKey>;');
+    expect(shown).toHaveTextContent('until <KeyEnds>.');
     expect(shown).not.toHaveTextContent(KEY);
   });
 

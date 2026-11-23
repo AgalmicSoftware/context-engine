@@ -43,9 +43,9 @@ try {
       return route.continue();
     });
     await page.goto(`${base}/order-probe`);
-    const copy = page.getByRole('button', { name: 'Copy memory augmentation prompt' });
+    const copy = page.getByRole('button', { name: 'Copy AI prompt' });
     await copy.waitFor();
-    await page.waitForFunction(() => document.querySelector('[aria-label="Copy memory augmentation prompt"]').getAttribute('aria-disabled') === 'false');
+    await page.waitForFunction(() => document.querySelector('[data-testid="ce-session-interview-copy-agent-prompt"]').getAttribute('aria-disabled') === 'false');
     await copy.click();
     const prompt = await page.evaluate(() => navigator.clipboard.readText());
     assert(prompt.includes('Unanswered question IDs, newest first: ["room-newest","room-first"]'));

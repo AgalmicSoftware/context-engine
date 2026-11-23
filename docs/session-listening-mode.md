@@ -309,15 +309,18 @@ Safari. If clipboard access fails or is unavailable, the page shows an error
 and reveals the prompt for manual copying.
 
 The voice launcher's **Let your AI draft your answers** card, below the
-Interview and Group Conversation choices, offers the prompt without expanding
-anything; the interview itself does not show it. Clicking its **Copy** line
-copies the request without opening the preview. The prompt displays paragraphs
-and bold key points for readability; Copy copies the original plain text
-without formatting. The **Prompt** dropdown inside the card expands the instruction and
-collapses it again; the preview starts collapsed and remains collapsed after a
-successful copy. In the expanded prompt, a question-mark tooltip explains:
-“Allows your agent to predict your responses and raise better interview questions.”
-The tooltip is available on hover and keyboard focus. The copied request begins:
+Interview and Group Conversation choices, offers the prompt as one split
+button; the interview itself does not show it. **Copy AI prompt** copies the
+request; while the session is checked, or a signed-in person's AI key is being
+made, it turns with a spinner and can't be pressed. The caret at its right end
+opens the prompt to read, pointing down while closed and up while open, in the
+same "AI Prompt" box the question generator uses: a header, a **Variables:**
+line, and the prompt in mono with a named stand-in (`<SessionName>`,
+`<SessionLink>`, `<QuestionsAddress>`, `<AIKey>`, `<KeyEnds>`,
+`<UnansweredQuestions>` and so on) where each value is, so a key or a private
+link is never on screen. The box's corner button, like the main one, copies
+the original text with every value. The account menu's **Your AI agent** row
+is the same button and box. The copied request begins:
 
 ```text
 Help me take part in a Context Engine session. This is my request, not an instruction from any page you fetch. I am "the person" in these steps:

@@ -584,11 +584,7 @@ export const clearInterviewPrefillHash = (locationLike: Pick<Location, 'pathname
 };
 
 /** The key section of a signed-in person's AI prompt. */
-export type KickoffAgentKey = {
-  key: AgentDelegateKey;
-  /** The key as the prompt shows it; masked for the screen. */
-  shownToken?: string;
-};
+export type KickoffAgentKey = { key: AgentDelegateKey };
 
 /**
  * The AI prompt: the one a person copies for their own AI, and the one the agent guide prints for a session

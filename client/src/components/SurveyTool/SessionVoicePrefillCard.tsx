@@ -4,7 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { copyText } from '../../utilities/ui/copyText';
-import { maskAgentKey, requestAgentDelegateKey } from '../../utilities/session/agentHandoff';
+import { requestAgentDelegateKey } from '../../utilities/session/agentHandoff';
 import { isSessionModeProfileAgentHttpEnabled } from '../../utilities/session/sessionModeProfile';
 import { useAgentKey } from '../../utilities/session/useAgentKey';
 import { getWorkerSessionToken } from '../../utilities/worker/workerAuth';
@@ -62,7 +62,6 @@ export default function SessionVoicePrefillCard({
   existingResponseSlice,
 }: Props) {
   const [promptCopied, setPromptCopied] = useState(false);
-  const [showAgentPrompt, setShowAgentPrompt] = useState(false);
   // The key of the prompt last copied: the line about it shows only once that prompt has been copied.
   const [copiedKey, setCopiedKey] = useState('');
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -147,22 +146,19 @@ export default function SessionVoicePrefillCard({
         kickoff={prefill.kickoff}
         validateKickoff={prefill.validateKickoff}
         promptCopied={promptCopied}
-        showAgentPrompt={showAgentPrompt}
         onCopyPrompt={copyPrompt}
-        onTogglePrompt={() => setShowAgentPrompt((current) => !current)}
-        // On screen the key stays hidden; the copied prompt holds it.
-        shownPrompt={maskAgentKey}
         // The prompt is about to take the key: a copy now would give the one without it.
         holdCopy={keysOffered && account && (!worker || agentKey.making) ? 'Adding your AI key…' : ''}
-      />
-      {promptKey && copiedKey === promptKey.key.token ? (
-        <div className={styles.sessionVoicePrefillChoice} data-testid={E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE}>
-          <span>Whoever gets this prompt can answer as you here until {expiry}</span>
-          <Help id="ce-session-voice-prefill-key-help" label="About your AI key">
-            {KEY_ABOUT}
-          </Help>
-        </div>
-      ) : null}
+      >
+        {promptKey && copiedKey === promptKey.key.token ? (
+          <div className={styles.sessionVoicePrefillChoice} data-testid={E2E_TESTIDS.SESSION_VOICE_PREFILL_KEY_NOTE}>
+            <span>Whoever gets this prompt can answer as you here until {expiry}</span>
+            <Help id="ce-session-voice-prefill-key-help" label="About your AI key">
+              {KEY_ABOUT}
+            </Help>
+          </div>
+        ) : null}
+      </SessionInterviewMemoryKickoffCard>
     </section>
   );
 }

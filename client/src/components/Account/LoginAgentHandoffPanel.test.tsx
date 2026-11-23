@@ -133,7 +133,7 @@ it('signed in, gives one prompt to copy with the AI key already in it, and one l
   expect(prompt).toContain(`sessionUrl=${encodeURIComponent(sessionUrl)}`);
 });
 
-it('hides the key on screen until Show key, and the ticket always', async () => {
+it('shows the prompt with stand-ins where its key and private link are, never the values', async () => {
   ticketMock.mockResolvedValue({ ticket: 'ic1.mine', expiresAtMs: Date.now() + 60 * 60 * 1000 });
   // A private session lists its questions only with a ticket.
   fetchMock.mockImplementation(async (input) =>
@@ -145,20 +145,19 @@ it('hides the key on screen until Show key, and the ticket always', async () => 
   const prompt = await copyPrompt();
   expect(prompt).toContain('&ticket=ic1.mine');
   expect(prompt).toContain('The link is private to me');
-  const expand = screen.getByTestId('ce-agent-handoff-prompt-expand');
-  expect(expand).toHaveAccessibleName('Show prompt: Your AI agent');
-  expect(expand).toHaveAttribute('aria-controls', 'ce-agent-handoff-prompt-text');
-  fireEvent.click(expand);
+  expect(prompt).toContain(KEY_LINE);
+  const caret = screen.getByTestId('ce-agent-handoff-prompt-expand');
+  expect(caret).toHaveAccessibleName('Read the AI prompt');
+  fireEvent.click(caret);
   const shown = screen.getByTestId('ce-agent-handoff-prompt');
-  expect(shown).toHaveTextContent('The key is ceagt_••••••••;');
+  expect(caret).toHaveAttribute('aria-controls', shown.id);
+  expect(shown).toHaveTextContent('The key is <AIKey>;');
+  expect(shown).toHaveTextContent('To draft, fetch this URL with a plain HTTP GET: <QuestionsAddress>');
+  expect(shown).toHaveTextContent('It is only for the session <SessionName> at <SessionLink>.');
   expect(shown).not.toHaveTextContent('ceagt_secret');
-  expect(shown).toHaveTextContent('&ticket=••••••••');
   expect(shown).not.toHaveTextContent('ic1.mine');
-  const show = screen.getByRole('button', { name: 'Show the key' });
-  expect(show).toHaveAttribute('aria-pressed', 'false');
-  fireEvent.click(show);
-  expect(screen.getByTestId('ce-agent-handoff-prompt')).toHaveTextContent(KEY_LINE);
-  expect(screen.getByTestId('ce-agent-handoff-prompt')).not.toHaveTextContent('ic1.mine');
+  // Nothing on screen reveals the key: the copy is the only place it is.
+  expect(screen.queryByRole('button', { name: 'Show the key' })).not.toBeInTheDocument();
 });
 
 it("leaves the ticket out of a signed-in person's prompt on a public session", async () => {
@@ -221,26 +220,30 @@ it('holds the copy while the key is made, so the prompt copied is the one with i
   renderPanel({ requestKey: jest.fn(() => new Promise<typeof key>((done) => (resolve = done))) });
   expect(await screen.findByText('Adding your AI key…')).toBeInTheDocument();
   const copy = await screen.findByTestId('ce-agent-handoff-copy');
+  // Unclickable, with a spinner, until the key is in the prompt.
   expect(copy).toHaveAttribute('aria-disabled', 'true');
+  expect(copy.querySelector('[data-icon="spinner"]')).not.toBeNull();
   await act(async () => fireEvent.click(copy));
   expect(writeText).not.toHaveBeenCalled();
   await act(async () => resolve(key));
   expect(await copyPrompt()).toContain(KEY_LINE);
 });
 
-it('copies from one split Copy prompt button, whose caret opens the whole prompt to read', async () => {
+it('copies from one split button, whose caret points down and opens the whole prompt, then up', async () => {
   renderPanel();
   const copy = await screen.findByTestId('ce-agent-handoff-copy');
   expect(copy).toHaveAccessibleName('Copy AI prompt');
-  // The caret waits for the checked prompt, as Copy prompt does.
-  expect(screen.queryByRole('button', { name: 'Show prompt: Your AI agent' })).not.toBeInTheDocument();
   await waitFor(() => expect(copy).toHaveAttribute('aria-disabled', 'false'));
-  const show = screen.getByRole('button', { name: 'Show prompt: Your AI agent' });
-  expect(screen.getByTestId('ce-agent-handoff-prompt')).not.toBeVisible();
-  expect(show.querySelector('[data-icon="caret-right"]')).not.toBeNull();
-  fireEvent.click(show);
-  expect(show.querySelector('[data-icon="caret-down"]')).not.toBeNull();
-  expect(screen.getByTestId('ce-agent-handoff-prompt')).toBeVisible();
+  const caret = screen.getByRole('button', { name: 'Read the AI prompt' });
+  expect(caret).toHaveAttribute('aria-expanded', 'false');
+  expect(caret.querySelector('[data-icon="caret-down"]')).not.toBeNull();
+  expect(screen.queryByTestId('ce-agent-handoff-prompt')).not.toBeInTheDocument();
+  fireEvent.click(caret);
+  expect(caret).toHaveAccessibleName('Hide the AI prompt');
+  expect(caret.querySelector('[data-icon="caret-up"]')).not.toBeNull();
+  expect(screen.getByTestId('ce-agent-handoff-prompt')).toHaveTextContent(/^AI Prompt/);
+  // No second way in: the caret is the only control that opens the prompt.
+  expect(screen.queryByRole('button', { name: /Expand|Show prompt|Read prompt/ })).not.toBeInTheDocument();
 });
 
 it('gives a refused copy its own field with the whole prompt, key included, not the prompt twice', async () => {
@@ -250,10 +253,10 @@ it('gives a refused copy its own field with the whole prompt, key included, not 
   renderPanel();
   const button = await screen.findByTestId('ce-agent-handoff-copy');
   await waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'false'));
-  fireEvent.click(screen.getByRole('button', { name: 'Show prompt: Your AI agent' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Read the AI prompt' }));
   expect(screen.getByTestId('ce-agent-handoff-prompt')).toBeVisible();
   await act(async () => fireEvent.click(button));
-  const field = await screen.findByRole('textbox', { name: 'Memory augmentation prompt to copy' });
+  const field = await screen.findByRole('textbox', { name: 'AI prompt to copy' });
   expect(field).toHaveValue(String(writeText.mock.calls.at(-1)?.[0]));
   expect((field as HTMLTextAreaElement).value).toContain(KEY_LINE);
   expect(screen.queryByTestId('ce-agent-handoff-prompt')).not.toBeInTheDocument();
@@ -301,54 +304,6 @@ it('treats a malformed page path as off the session page, without failing', asyn
   } finally {
     window.history.pushState({}, '', '/');
   }
-});
-
-it('enlarges an open prompt to read, and Minimize or Escape makes it small before the dialog closes', async () => {
-  // Stands in for the dialog, which closes on Escape.
-  const closeDialog = jest.fn();
-  render(
-    <div onKeyUp={(event) => event.key === 'Escape' && closeDialog()}>
-      <LoginAgentHandoffPanel
-        agentHttpEnabled
-        sessionUrl={sessionUrl}
-        sessionName="Salon"
-        sessionSlug="salon"
-        workerUrl={workerUrl}
-        requestKey={jest.fn(async () => key)}
-      />
-    </div>,
-  );
-  const toggle = screen.getByRole('button', { name: 'Your AI agent' });
-  fireEvent.click(toggle);
-  fireEvent.click(await screen.findByRole('button', { name: 'Show prompt: Your AI agent' }));
-  const box = screen.getByTestId('ce-agent-handoff-prompt-box');
-  expect(box).not.toHaveClass('agentHandoffPromptLarge');
-
-  fireEvent.click(screen.getByRole('button', { name: 'Expand prompt: Your AI agent' }));
-  expect(box).toHaveClass('agentHandoffPromptLarge');
-  const minimize = screen.getByRole('button', { name: 'Minimize prompt: Your AI agent' });
-  expect(minimize).toHaveTextContent('Minimize');
-  // Still the text to read and select, whole.
-  expect(screen.getByTestId('ce-agent-handoff-prompt')).toHaveTextContent('Help me take part in a Context Engine');
-
-  fireEvent.click(minimize);
-  expect(box).not.toHaveClass('agentHandoffPromptLarge');
-
-  fireEvent.click(screen.getByRole('button', { name: 'Expand prompt: Your AI agent' }));
-  fireEvent.keyUp(minimize, { key: 'Escape' });
-  expect(box).not.toHaveClass('agentHandoffPromptLarge');
-  expect(closeDialog).not.toHaveBeenCalled();
-  // Small again, the next Escape is the dialog's.
-  fireEvent.keyUp(minimize, { key: 'Escape' });
-  expect(closeDialog).toHaveBeenCalledTimes(1);
-
-  // Focus moving out of it, as by Tab to the rows it covers, makes it small.
-  fireEvent.click(screen.getByRole('button', { name: 'Expand prompt: Your AI agent' }));
-  expect(box).toHaveClass('agentHandoffPromptLarge');
-  act(() => screen.getByRole('button', { name: 'Minimize prompt: Your AI agent' }).focus());
-  expect(box).toHaveClass('agentHandoffPromptLarge');
-  act(() => toggle.focus());
-  expect(box).not.toHaveClass('agentHandoffPromptLarge');
 });
 
 it('holds Sign Agents Out under the prompt; after it, drops the dead key and closes, keeping its message', async () => {
@@ -418,7 +373,6 @@ describe('opened by a link for the AI prompt', () => {
     expect(screen.getByRole('button', { name: 'Your AI agent' })).toHaveAttribute('aria-expanded', 'true');
     expect(await copyPrompt()).not.toContain('ceagt_');
     expect(requestKey).not.toHaveBeenCalled();
-    expect(screen.getByTestId('ce-agent-handoff-panel')).not.toHaveClass('agentHandoffArrived');
   });
 
   it('signed in, copies a short prompt that hands over the key, with the button in the middle', async () => {
@@ -426,7 +380,8 @@ describe('opened by a link for the AI prompt', () => {
     renderClosedPanel({ promptRequested: true, requestKey });
     const prompt = await copyPrompt();
     expect(requestKey).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId('ce-agent-handoff-panel')).toHaveClass('agentHandoffArrived');
+    // The button sits in the middle of the row.
+    expect(screen.getByTestId('ce-agent-handoff-copy').parentElement).toHaveClass('aiPromptCopyCentered');
     // The AI that sent the person here has the steps and the questions already: this is the key and its rules.
     expect(prompt).toBe(buildAgentKeyHandover({ key, sessionName: 'Salon', sessionUrl }));
     expect(prompt).toContain(`Here is my AI key for the Context Engine session "Salon" (${sessionUrl}).`);
@@ -435,8 +390,9 @@ describe('opened by a link for the AI prompt', () => {
     expect(prompt).not.toContain('interview-catalog');
     expect(prompt.length).toBeLessThan(1400);
     // On screen the key is hidden, as in the long prompt.
-    fireEvent.click(screen.getByRole('button', { name: 'Show prompt: Your AI agent' }));
-    expect(screen.getByTestId('ce-agent-handoff-prompt')).toHaveTextContent('The key is ceagt_••••••••;');
+    fireEvent.click(screen.getByRole('button', { name: 'Read the AI prompt' }));
+    expect(screen.getByTestId('ce-agent-handoff-prompt')).toHaveTextContent('The key is <AIKey>;');
+    expect(screen.getByTestId('ce-agent-handoff-prompt')).not.toHaveTextContent('ceagt_secret');
   });
 
   it('raises no signing prompt by itself where the key needs a fresh sign-in: the person adds the key', async () => {

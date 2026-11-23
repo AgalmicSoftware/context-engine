@@ -3807,21 +3807,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     font-weight: 800;
     line-height: 1.25;
   }
-
-  // The copy button form, which a caller styles: its messages sit under the button.
-  .sessionAgentKickoffButtonForm {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-width: 0;
-  }
-
-  .sessionAgentKickoff {
-    padding: 0;
-    border: 0;
-    background: none;
-    box-shadow: none;
-  }
 }
 
 // The "?" follows the heading's last word, even when it wraps, and keeps its
@@ -3840,7 +3825,132 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// A tick or a disclosure of the card's, with its "?" beside it.
+// "Copy AI prompt" as one split button: copy on the left, a caret on the right that opens the prompt to read.
+.aiPromptCopyForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.aiPromptCopy {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  min-width: 0;
+}
+
+// For a person sent here to copy: the button in the middle, at a modest width.
+.aiPromptCopyCentered {
+  align-self: center;
+  width: min(100%, 22rem);
+}
+
+.aiPromptCopyMain,
+.aiPromptCopyCaret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 8px 16px;
+  border: 0;
+  background: var(--ce-action-accent);
+  color: var(--ce-action-accent-text);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--ce-action-accent-hover, var(--ce-action-accent));
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: -4px;
+  }
+
+  &[aria-disabled='true'] {
+    cursor: progress;
+    opacity: 0.75;
+  }
+}
+
+.aiPromptCopyMain {
+  flex: 1 1 auto;
+  border-radius: var(--ce-radius-8) 0 0 var(--ce-radius-8);
+}
+
+.aiPromptCopyCaret {
+  flex: none;
+  width: 52px;
+  border-radius: 0 var(--ce-radius-8) var(--ce-radius-8) 0;
+}
+
+// An AI prompt, to read: the question generator's "AI Prompt" box, with a stand-in where each value is.
+.aiPromptBox {
+  position: relative;
+  max-height: min(60vh, 28rem);
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-card-bg);
+  color: var(--ce-panel-text);
+  font-family: var(--ce-font-mono);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.aiPromptBoxHeader {
+  display: block;
+  margin: 0 44px 6px 0;
+  font-weight: 800;
+}
+
+.aiPromptBoxCopy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--ce-radius-6);
+  background: color-mix(in srgb, var(--ce-compat-dark) 60%, transparent);
+  color: var(--ce-color-white);
+  cursor: pointer;
+
+  &:hover {
+    background: color-mix(in srgb, var(--ce-compat-dark) 80%, transparent);
+  }
+}
+
+.aiPromptBoxCopied {
+  background: var(--ce-status-success);
+}
+
+.aiPromptBoxMeta {
+  margin-bottom: 8px;
+  opacity: 0.85;
+}
+
+.aiPromptBoxText {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.aiPromptVar {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--ce-status-warning-text) 30%, transparent);
+  border-radius: var(--ce-radius-4);
+  background: color-mix(in srgb, var(--ce-status-warning-text) 10%, transparent);
+  color: var(--ce-status-warning-text);
+  font-weight: 700;
+}
+
+// A line of the card's, with its "?" beside it.
 .sessionVoicePrefillChoice {
   display: flex;
   align-items: center;
@@ -4454,195 +4564,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   overflow-wrap: anywhere;
 }
 
-.sessionAgentKickoff {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--ce-card-border);
-  border-radius: var(--ce-radius-8);
-  background: var(--ce-card-bg);
-  color: var(--ce-panel-text);
-  box-shadow: var(--ce-card-shadow);
-}
-
-.sessionAgentKickoffRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-
-.sessionAgentKickoffCopyTarget {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  flex: 1 1 260px;
-  min-width: min(100%, 260px);
-  min-height: 48px;
-  padding: 6px 0;
-  border: 0;
-  border-radius: 0;
-  outline: none;
-  background: transparent;
-  color: var(--ce-panel-text);
-  font-family: var(--ce-font-body);
-  cursor: copy;
-
-  &:hover .sessionAgentKickoffCopyBadge,
-  &:focus-visible .sessionAgentKickoffCopyBadge {
-    border-color: var(--ce-status-info-text);
-    background: color-mix(in srgb, var(--ce-status-info-text) 18%, transparent);
-    color: var(--ce-status-info-text);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--ce-status-info-text);
-    outline-offset: 4px;
-  }
-}
-
-.sessionAgentKickoffTitle {
-  min-width: 0;
-  color: var(--ce-panel-text);
-  font-size: 0.85rem;
-  font-weight: 700;
-  line-height: 1.35;
-  text-align: left;
-}
-
-.sessionAgentKickoffCopyBadge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  vertical-align: middle;
-  margin-block: 3px;
-  margin-inline-end: 6px;
-  gap: 6px;
-  min-height: 30px;
-  padding: 5px 9px;
-  border: 1px solid var(--ce-status-info-text);
-  border-radius: var(--ce-radius-pill);
-  color: var(--ce-status-info-text);
-  font-size: 0.78rem;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.sessionAgentKickoffActions {
-  display: flex;
-  align-items: center;
-  align-self: flex-end;
-  justify-content: flex-end;
-  flex: 0 1 auto;
-  flex-wrap: wrap;
-  gap: 8px;
-  min-width: 0;
-  margin-inline-start: auto;
-
-  .sessionInterviewHeaderButton {
-    color: var(--ce-panel-text) !important;
-  }
-}
-
-.sessionAgentKickoffToggle {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  width: fit-content;
-  max-width: 100%;
-  padding: 3px 2px;
-  border: 0;
-  border-radius: var(--ce-radius-4);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-weight: 700;
-  text-align: left;
-  cursor: pointer;
-  opacity: 0.5;
-  transition:
-    color 150ms ease,
-    opacity 150ms ease;
-
-  &:hover,
-  &:focus-visible {
-    color: var(--ce-panel-text);
-    opacity: 1;
-    outline: 2px solid var(--ce-focus-ring);
-    outline-offset: 3px;
-  }
-
-  &[aria-expanded='true'] {
-    opacity: 1;
-  }
-}
-
-.sessionAgentKickoffCaret {
-  flex: 0 0 auto;
-  transition: transform 150ms ease;
-}
-
-.sessionAgentKickoffCaretExpanded {
-  transform: rotate(180deg);
-}
-
-.sessionAgentKickoffPromptHelpRow {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 8px;
-}
-
-.sessionAgentKickoffPrompt {
-  display: block;
-  padding-top: 12px;
-  border-top: 1px solid var(--ce-card-border);
-  color: var(--ce-panel-text);
-  font-family: var(--ce-font-body);
-  font-size: 0.9rem;
-  line-height: 1.6;
-  white-space: pre-line;
-  overflow-wrap: anywhere;
-
-  a {
-    color: var(--ce-action-accent);
-    overflow-wrap: anywhere;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-
-  p {
-    margin: 0 0 1em;
-  }
-
-  p:last-child {
-    margin-bottom: 0;
-  }
-
-  .sessionInterviewPromptCodeBlock {
-    max-width: 100%;
-    margin: 0 0 1em;
-    padding: 12px 14px;
-    border: 1px solid var(--ce-card-border);
-    border-radius: var(--ce-radius-8);
-    background: var(--ce-surface-sunken);
-    color: var(--ce-panel-text);
-    font-family: var(--ce-font-mono);
-    font-size: 0.78rem;
-    line-height: 1.45;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-
-  .sessionInterviewPromptCodeBlock code {
-    font-family: inherit;
-    color: inherit;
-    white-space: inherit;
-  }
-}
-
 .sessionAgentKickoffManualCopy {
   display: block;
   width: 100%;
@@ -4657,15 +4578,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   font-size: 16px;
   line-height: 1.4;
   resize: vertical;
-}
-
-.sessionAgentKickoffCopied {
-  border-color: var(--ce-status-info-text);
-
-  .sessionAgentKickoffCopyBadge {
-    border-color: var(--ce-status-info-text);
-    color: var(--ce-status-info-text);
-  }
 }
 
 .sessionInterviewReview {
@@ -5066,14 +4978,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 }
 
 @media (max-width: 480px) {
-  .sessionAgentKickoffRow {
-    grid-template-columns: 1fr;
-  }
-
-  .sessionAgentKickoffActions {
-    justify-content: flex-end;
-  }
-
   .sessionInterviewDraft {
     padding: 12px 42px 12px 12px;
   }
@@ -7459,11 +7363,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
-  .sessionAgentKickoffToggle {
-    color: var(--ce-panel-text);
-    opacity: 1;
-  }
-
   .sessionInterviewStatusPill {
     color: var(--ce-response-agree-text) !important;
     background: var(--ce-response-agree-bg) !important;

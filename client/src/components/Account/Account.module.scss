@@ -2695,39 +2695,6 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   font-weight: 700;
 }
 
-// The box's one main action: full width and tall enough to tap.
-.agentHandoffPrimary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 48px;
-  padding: 8px 16px;
-  border: 0;
-  border-radius: var(--ce-radius-8);
-  background: var(--ce-action-accent);
-  color: var(--ce-action-accent-text);
-  font-size: 1rem;
-  font-weight: 700;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--ce-action-accent-hover, var(--ce-action-accent));
-  }
-
-  &:focus-visible {
-    outline: 2px solid currentColor;
-    outline-offset: -4px;
-  }
-
-  &:disabled,
-  &[aria-disabled='true'] {
-    cursor: progress;
-    opacity: 0.75;
-  }
-}
-
 .agentHandoffToggle {
   display: inline-flex;
   align-items: center;
@@ -2774,58 +2741,10 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// Opened by a link for its prompt: the Copy prompt button takes the middle.
-.agentHandoffArrived .agentHandoffSplit {
-  justify-self: center;
-  width: min(100%, 22rem);
-}
-
 // A "?" here reads as a mark, not a button, so hovering it draws no square behind it.
 .agentHandoffHelp:hover {
   background: transparent !important;
   opacity: 0.75;
-}
-
-// "Copy prompt" and its caret as one split button: the caret opens the whole prompt to read.
-.agentHandoffSplit {
-  display: flex;
-  flex: 1 1 auto;
-  align-items: stretch;
-  gap: 2px;
-  min-width: 0;
-
-  > .agentHandoffPrimary:first-child {
-    flex: 1 1 auto;
-    width: auto;
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-  }
-}
-
-.agentHandoffSplit > .agentHandoffPrimary.agentHandoffCaret {
-  flex: none;
-  width: 52px;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-}
-
-// Bootstrap colours code pink; commands here read as the panel's text.
-.agentHandoffCommand {
-  display: block;
-  margin: 8px 0 0;
-  padding: 8px 10px;
-  border: 1px solid var(--ce-settings-border);
-  border-radius: var(--ce-radius-6);
-  background: var(--ce-settings-field-bg);
-  color: inherit;
-  font-size: 0.9rem;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-
-  // Its display: block would otherwise outweigh the hidden attribute.
-  &[hidden] {
-    display: none;
-  }
 }
 
 // "Sign Agents Out" and its message, under both options.
@@ -2840,58 +2759,6 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   &:empty,
   &[hidden] {
     display: none;
-  }
-}
-
-// An option's prompt, to read: a small box under it, or large over the account panel.
-.agentHandoffPromptBox {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-
-  &[hidden] {
-    display: none;
-  }
-
-  .agentHandoffCommand {
-    max-height: 9rem;
-    margin: 0;
-    overflow: auto;
-  }
-}
-
-.agentHandoffPromptTools {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-
-  .agentHandoffButton {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 36px;
-  }
-}
-
-// Over the whole account panel, scrolling inside, until Minimize or Escape.
-.agentHandoffPromptLarge {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  padding: 16px;
-  border: 1px solid var(--ce-settings-border);
-  border-radius: var(--ce-radius-8);
-  // The panel colour over the surface: some themes' panel colour is a tint, and the rows must not show through.
-  background: linear-gradient(var(--ce-settings-panel-bg), var(--ce-settings-panel-bg)), var(--ce-surface);
-  color: var(--ce-settings-text);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--ce-overlay-base) 35%, transparent);
-
-  .agentHandoffCommand {
-    flex: 1 1 auto;
-    max-height: none;
-    font-size: 1rem;
   }
 }
 

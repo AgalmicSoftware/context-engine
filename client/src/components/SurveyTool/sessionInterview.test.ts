@@ -367,9 +367,7 @@ describe('session interview protocol', () => {
     expect(withKey).toContain(AGENT_ASK_WHICH_WAY);
     expect(withKey).toContain('submit them as me only after I say yes here');
     expect(withKey).toContain("If you can't send such requests, leave the key unused and draft.");
-    // The screen's copy hides the key; the rest of the prompt is the same as without one.
-    const masked = buildExternalInterviewKickoff({ ...options, agentKey: { key, shownToken: 'ceagt_hidden' } });
-    expect(masked).not.toContain(key.token);
+    // Apart from those lines, the prompt is the same as without a key.
     const [, withKeyRest] = withKey.split('\nThe Context Engine tools');
     const [, plainRest] = buildExternalInterviewKickoff(options).split('\nThe Context Engine tools');
     expect(withKeyRest).toBe(plainRest);

@@ -55,10 +55,6 @@ export const agentKeyFailureMessage = (error: unknown): string => {
 // A key is `ceagt_` and base64url characters, so a reply with any other text in its place is refused.
 const AGENT_KEY_RE = /^ceagt_[A-Za-z0-9_-]{16,}$/;
 
-export const MASKED_AGENT_KEY = 'ceagt_••••••••';
-/** The prompt as the screen shows it, with any AI key hidden; the copied prompt keeps it. */
-export const maskAgentKey = (prompt: string): string => prompt.replace(/ceagt_[A-Za-z0-9_-]+/g, MASKED_AGENT_KEY);
-
 /** Why a key was not made, in the page's words. */
 export const agentKeyErrorMessage = (error: unknown): string => {
   const { reason, status } = error instanceof AgentDelegateKeyError ? error : { reason: '', status: 0 };
@@ -72,17 +68,11 @@ export const agentKeyErrorMessage = (error: unknown): string => {
 // The AI prompt's lines for a signed-in person: it carries their AI key, which lives only as long as their
 // sign-in and works only in this session, and tells the AI never to repeat it. The AI still asks them whether
 // they want a draft or a submission, as the prompt's steps say, and shows its answers before it submits.
-// `shownToken` lets the screen show the prompt with the key masked. An AI that can't send requests with its
-// own headers leaves the key unused and drafts.
-export const agentKeyPromptLines = ({
-  key,
-  shownToken = key.token,
-}: {
-  key: AgentDelegateKey;
-  shownToken?: string;
-}): string[] => [
+// An AI that can't send requests with its own headers leaves the key unused and drafts. On screen the key
+// shows as a stand-in (AiPromptBox); only the copied prompt holds it.
+export const agentKeyPromptLines = ({ key }: { key: AgentDelegateKey }): string[] => [
   'This prompt holds my AI key, so you can submit as me, in this session and no other.',
-  `The key is ${shownToken}; it works only for the session with slug "${key.sessionSlug}", at ${key.workerUrl}, until ${key.expiresAt}.`,
+  `The key is ${key.token}; it works only for the session with slug "${key.sessionSlug}", at ${key.workerUrl}, until ${key.expiresAt}.`,
   'I give it to you here on purpose, in place of the CE_AGENT_TOKEN variable the skill mentions, as it is short-lived.',
   'Send it only as the header "Authorization: Bearer <key>" to that address. Never repeat or print it, and never put it in files, URLs or later messages.',
   `Follow ${key.workerUrl}/api/agent/skill.`,
@@ -99,16 +89,14 @@ export const buildAgentKeyHandover = ({
   key,
   sessionName,
   sessionUrl,
-  shownToken,
 }: {
   key: AgentDelegateKey;
   sessionName: string;
   sessionUrl: string;
-  shownToken?: string;
 }): string =>
   [
     `Here is my AI key for the Context Engine session ${JSON.stringify(sessionName || key.sessionSlug)} (${sessionUrl}). I have an account there: make no other.`,
-    ...agentKeyPromptLines({ key, shownToken }),
+    ...agentKeyPromptLines({ key }),
   ].join(' ');
 
 export const requestAgentDelegateKey = async ({

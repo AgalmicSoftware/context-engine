@@ -7,7 +7,6 @@ import {
   agentKeyFailureMessage,
   agentKeyPromptLines,
   buildAgentKeyHandover,
-  maskAgentKey,
   requestAgentDelegateKey,
 } from './agentHandoff';
 import { noteAiPromptRequest, requestsAiPrompt, takeAiPromptRequest, withoutAiPromptRequest } from './aiPromptLink';
@@ -32,12 +31,6 @@ describe('the AI prompt’s key lines', () => {
     expect(lines).toContain('This prompt holds my AI key, so you can submit as me, in this session and no other.');
     // An AI that can't use the key drafts, as the prompt's steps say.
     expect(lines).toContain("If you can't send such requests, leave the key unused and draft.");
-    // The screen shows it masked.
-    const shown = agentKeyPromptLines({ key, shownToken: 'ceagt_••••' }).join(' ');
-    expect(shown).not.toContain(key.token);
-    expect(shown).toContain('The key is ceagt_••••;');
-    expect(maskAgentKey(lines)).not.toContain(key.token);
-    expect(maskAgentKey(lines)).toContain('The key is ceagt_••••••••;');
   });
 
   it('have the AI show its answers and submit only on the person’s yes', () => {
@@ -66,11 +59,8 @@ it('hands the key over in a short prompt for an AI that sent the person to sign 
       ...agentKeyPromptLines({ key }),
     ].join(' '),
   );
-  // Without a title, the slug names the session; the screen's copy hides the key.
+  // Without a title, the slug names the session.
   expect(buildAgentKeyHandover({ key, sessionName: '', sessionUrl })).toContain('session "salon" (');
-  expect(buildAgentKeyHandover({ key, sessionName: 'Salon', sessionUrl, shownToken: 'ceagt_••••' })).not.toContain(
-    key.token,
-  );
 });
 
 describe('requestAgentDelegateKey', () => {
