@@ -2899,16 +2899,19 @@ describe('Polis mixed answer report filtering', () => {
         onFilterChange={onFilterChange}
       />,
     );
-    const filter = screen.getByRole('button', { name: 'Filter' });
-    // One row: the Active Filters label, the filters, then the button, which stays out of the PDF like the
-    // Report's other controls.
+    // The button takes the Active Filters label's place, so its name says what the row shows.
+    const filter = screen.getByRole('button', { name: 'Filter: none active' });
+    // One row: the button, its (?), then the filters. The button stays out of the PDF, like the Report's other
+    // controls, and the label it replaces, with its colon, is kept for the PDF and print only.
     const row = filter.closest('.statsItem');
     expect(row).toHaveClass('activeFiltersItem');
-    expect(row.firstElementChild).toHaveTextContent(/^Active Filters/);
+    expect(row.firstElementChild).toContainElement(filter);
+    expect(filter.parentElement).toHaveClass('pdfIgnore');
+    expect(within(row).getByText('Active Filters')).toHaveClass('replacedLabel');
+    expect(within(row).getByText(':')).toHaveClass('replacedLabel');
     const value = row.querySelector('.statValue');
     expect(value).toHaveTextContent('None');
-    expect(value.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(filter.parentElement).toHaveClass('pdfIgnore');
+    expect(filter.compareDocumentPosition(value) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(filter).toHaveAttribute('aria-expanded', 'false');
 
     fireEvent.click(filter);
@@ -2939,7 +2942,10 @@ describe('Polis mixed answer report filtering', () => {
     };
     render(<LiveReport />);
     const value = () =>
-      screen.getByRole('button', { name: 'Filter' }).closest('.statsItem').querySelector('.statValue');
+      screen
+        .getByRole('button', { name: /^Filter: / })
+        .closest('.statsItem')
+        .querySelector('.statValue');
     // Summary and Statistics' question count.
     const questions = () =>
       value()
@@ -2949,35 +2955,61 @@ describe('Polis mixed answer report filtering', () => {
     const unfiltered = questions();
     expect(Number(unfiltered)).toBeGreaterThan(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Filter: none active' }));
     const panel = await screen.findByTestId('report-filter-panel');
     fireEvent.click(within(panel).getByRole('button', { name: 'Pick housing' }));
     // No reload and no other page: the row lists the new filter, the Report narrows to it, and the panel stays.
     await waitFor(() => expect(value()).toHaveTextContent('Tags: #housing'));
+    expect(screen.getByRole('button', { name: 'Filter: 1 active' })).toHaveAttribute('aria-expanded', 'true');
     expect(questions()).toBe('1');
     expect(screen.getByText('Other tag')).toBeInTheDocument();
     expect(screen.queryByText('Tagged rating')).not.toBeInTheDocument();
     expect(screen.getByTestId('report-filter-panel')).toBe(panel);
   });
 
-  it('shows no Filter button where the Report cannot change the filter', () => {
+  it('shows no Filter button where the Report cannot change the filter, and keeps the Active Filters label', () => {
     render(<PolisReport {...baseReportProps} questionResponses={responses} filterState={{}} />);
     expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Filter/ })).not.toBeInTheDocument();
+    const label = screen.getByText('Active Filters');
+    expect(label).not.toHaveClass('replacedLabel');
+    const row = label.closest('.statsItem');
+    expect(within(row).getByText(':')).not.toHaveClass('replacedLabel');
+    // The label, its PDF footnote mark, then the filters.
+    expect(row).toHaveTextContent(/^Active Filters\S*:\s*None$/);
+  });
+
+  it('names the Filter button for how many filters the row lists, a line each', () => {
+    render(
+      <PolisReport
+        {...baseReportProps}
+        questionResponses={responses}
+        filterState={{ selectedTags: ['housing', 'other'], questionTypes: ['rating'] }}
+        onFilterChange={jest.fn()}
+      />,
+    );
+    const value = screen
+      .getByRole('button', { name: 'Filter: 2 active' })
+      .closest('.statsItem')
+      .querySelector('.statValue');
+    expect(value).toHaveTextContent('Types: rating');
+    expect(value).toHaveTextContent('Tags: #housing, #other');
   });
 
   it('keeps Summary and Statistics and an open panel in place when a filter leaves nothing to show', async () => {
     const props = { ...baseReportProps, questionResponses: responses, onFilterChange: jest.fn() };
     const { rerender } = render(<PolisReport {...props} filterState={{}} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Filter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Filter: none active' }));
     const panel = await screen.findByTestId('report-filter-panel');
     const pick = within(panel).getByRole('button', { name: 'Pick housing' });
     pick.focus();
 
     rerender(<PolisReport {...props} filterState={{ selectedTags: ['missing'] }} />);
     expect(screen.getByText('No readable responses match the current filters.')).toBeInTheDocument();
-    // The Filter button stays beside Active Filters, and the panel is the same one, with the person's place in it.
-    expect(screen.getByRole('button', { name: 'Filter' }).closest('.statsItem')).toHaveTextContent(/^Active Filters/);
+    // The Filter button stays in the Active Filters row, and the panel is the same one, with the person's place in it.
+    expect(screen.getByRole('button', { name: 'Filter: 1 active' }).closest('.statsItem')).toHaveTextContent(
+      'Tags: #missing',
+    );
     expect(screen.getByTestId('report-filter-panel')).toBe(panel);
     expect(pick).toHaveFocus();
     expect(screen.getByTestId('ce-polis-all-questions')).not.toBeVisible();
@@ -3005,7 +3037,11 @@ describe('Polis mixed answer report filtering', () => {
       />,
     );
     expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Filter/ })).not.toBeInTheDocument();
+    // With no button, the label stays where it was.
+    const label = screen.getByText('Active Filters');
+    expect(label).not.toHaveClass('replacedLabel');
+    expect(label.closest('.statsItem')).toHaveTextContent('None (Demo Data Active)');
   });
 
   it('leaves the Filter button out of the PDF’s footnote for Active Filters, as the PDF leaves it out', () => {
