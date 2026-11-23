@@ -308,9 +308,13 @@ stays first.
 - The file stays loaded for 6 hours from the moment it is chosen, across reloads;
   use of the page does not extend that. In that time the key rests in the
   wallet's IndexedDB record (`keyMode: 'login-file'`), encrypted with AES-GCM
-  under a non-extractable WebCrypto key kept in the same record. Page scripts
-  cannot read it as text. It is no guard against a script running in the site's
-  origin while it lasts, nor against a copy of the browser's profile.
+  under a non-extractable WebCrypto key kept in the same record. That keeps the
+  key out of anything that reads storage as text, and no more. A script running
+  in the site's origin while the file is loaded can ask the browser to open the
+  sealed key, because the sealing key sits beside it, and so take the account's
+  key for good. With a passkey account such a script can only ask for signatures
+  while the wallet is unlocked. A copy of the browser's profile holds the key
+  too.
 - After 6 hours, and on Disconnect, the key is wiped from the record: by a timer
   on an open page, and otherwise at the next page load or signature. What is left
   names the account and holds no key, so another tab on that account is told

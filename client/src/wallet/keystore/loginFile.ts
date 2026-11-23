@@ -63,10 +63,12 @@ export const readLoginFileKey = (text: string): { privateKey: HexString; address
   }
 };
 
-// Between uploads the key rests in the browser's database, encrypted under a key the browser will not hand to
-// page scripts as text (non-extractable), and it is wiped once `expiresAt` passes. That keeps the key and the 12
-// words out of anything that reads storage as text. It is no guard against a script running in this origin, which
-// could ask for signatures while the wallet is unlocked anyway, nor against a copy of the browser's profile.
+// Between uploads the key rests in the browser's database, encrypted under a key the browser will not export
+// (non-extractable), and it is wiped once `expiresAt` passes. That keeps the key and the 12 words out of anything
+// that reads storage as text. It is no guard against a script running in this origin: the sealing key sits
+// beside the sealed key, so such a script can ask the browser to open it and take the account's key for good,
+// where with a passkey it could only ask for signatures while the wallet is unlocked. Nor is it a guard against
+// a copy of the browser's profile.
 export const sealLoginFileKey = async ({
   privateKey,
   address,
