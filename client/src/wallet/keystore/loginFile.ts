@@ -20,7 +20,9 @@ export class LoginFileUnreadableError extends Error {
 
 export class LoginFileExpiredError extends Error {
   constructor() {
-    super('Your login file is needed again. Open Log in and choose your login file.');
+    // A page that was open when the hours ran out still shows the account, and that window has no file to
+    // choose. A reload shows signed out, keeps the tab's unsent answers, and offers the file.
+    super('Your login file is needed again. Reload the page, then log in with your file. Unsent answers are kept.');
     this.name = 'LoginFileExpiredError';
   }
 }

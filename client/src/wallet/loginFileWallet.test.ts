@@ -217,6 +217,10 @@ describe('signing in with a login file', () => {
     clock.now += 60_000;
     expect(client.isUnlocked()).toBe(false);
     await expect(client.signMessage('too late', PHRASE_ADDRESS)).rejects.toThrow(LoginFileExpiredError);
+    // The page still shows the account, and that window has no file to choose: the message says what works.
+    await expect(client.signMessage('too late', PHRASE_ADDRESS)).rejects.toThrow(
+      'Your login file is needed again. Reload the page, then log in with your file. Unsent answers are kept.',
+    );
     await expect(client.sendTransaction({ from: PHRASE_ADDRESS, to: PHRASE_ADDRESS })).rejects.toThrow(
       LoginFileExpiredError,
     );

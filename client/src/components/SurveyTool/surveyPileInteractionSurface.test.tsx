@@ -662,6 +662,31 @@ it('announces a draft storage failure without hiding the submit error', () => {
   expect(screen.getByRole('alert')).toHaveTextContent('The response was not submitted.');
 });
 
+it('brings the submit error into view when it appears or changes, since it starts below a phone\u2019s screen', () => {
+  const scrolled: Array<{ text: string; options: unknown }> = [];
+  const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
+  HTMLElement.prototype.scrollIntoView = function scrollIntoView(this: HTMLElement, options?: unknown) {
+    scrolled.push({ text: this.textContent || '', options });
+  };
+  try {
+    const withError = (submissionError: string) =>
+      renderPileInteractionSurface({ ...buildBaseProps(), submissionError });
+    const { rerender } = render(withError(''));
+    expect(scrolled).toEqual([]);
+    rerender(withError('The response was not submitted.'));
+    expect(scrolled).toEqual([{ text: 'The response was not submitted.', options: { block: 'nearest' } }]);
+    // The same message again does not move the page; a new one does.
+    rerender(withError('The response was not submitted.'));
+    expect(scrolled).toHaveLength(1);
+    rerender(withError('Your login file is needed again.'));
+    expect(scrolled).toHaveLength(2);
+    expect(scrolled[1].text).toBe('Your login file is needed again.');
+  } finally {
+    if (original) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', original);
+    else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+  }
+});
+
 it('explains protected question storage when signed out without replacing genuine public errors', () => {
   const config = { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'role_gate' } } };
   expect(requiresQuestionStorageLogin(config, false)).toBe(true);

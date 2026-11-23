@@ -320,6 +320,12 @@ stays first.
   names the account and holds no key, so another tab on that account is told
   "Your login file is needed again." rather than asked for a passkey. A browser
   that never opens the site again keeps the sealed key until it does.
+- A page left open past the 6 hours still shows the account until it is
+  reloaded, and its account window has no file to choose. The message therefore
+  says what to do: "Reload the page, then log in with your file. Unsent answers
+  are kept." A reload shows signed out and keeps that tab's unsent answers, which
+  return once the same file signs in. Disconnect would discard them, and asks
+  first.
 - A passkey Login or Create replaces a login file's record, and the reverse. An
   `encrypted-private-key` wallet's record is never written over. A file that is
   not a login file leaves the signed-in account as it was.
