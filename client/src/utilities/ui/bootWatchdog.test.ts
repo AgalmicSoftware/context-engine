@@ -216,7 +216,10 @@ describe('the blank-page message', () => {
     expect(style).toMatch(/#ce-boot-loading \{[^}]*animation: ce-boot-show 0s linear 1s forwards;/);
     expect(style).toMatch(/#ce-boot-blocked \{[^}]*animation: ce-boot-show 0s linear 20s forwards;/);
     expect(style).toMatch(/@keyframes ce-boot-show \{\s*to \{\s*visibility: visible;/);
-    expect(html).toMatch(/<p id="ce-boot-blocked" style="visibility: hidden">\s*This page is not loading\./);
+    // The sentence is written by the style, so a script-less AI reader of the page's text is not told it failed.
+    expect(html).toContain('<p id="ce-boot-blocked" style="visibility: hidden"></p>');
+    expect(style).toMatch(/#ce-boot-blocked::after \{\s*content: "This page is not loading\. A security tool/);
+    expect(html.split('</head>')[1]).not.toContain('This page is not loading');
     const sheet = fs.readFileSync(path.join(clientRoot, 'src', 'assets', 'css', 'contextEngine.scss'), 'utf8');
     expect(sheet).not.toContain('ce-boot-');
     expect(html.indexOf('id="ce-boot-loading"')).toBeLessThan(html.indexOf('<div id="root">'));
