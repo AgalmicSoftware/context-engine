@@ -428,6 +428,8 @@ describe('drafts generated while publishing', () => {
     const leaving = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
     subject.handleDraftBeforeUnload(leaving);
     expect(leaving.defaultPrevented).toBe(true);
+    // A link that would swap the page inside the app is told the same.
+    expect(subject.holdsUnsavedDrafts()).toBe(true);
     published.resolve({ receipt: { status: 1 }, uploadedQuestions: [{ questionId: 'q1' }, { questionId: 'q2' }] });
     await operation;
 
@@ -439,6 +441,7 @@ describe('drafts generated while publishing', () => {
     const settled = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
     subject.handleDraftBeforeUnload(settled);
     expect(settled.defaultPrevented).toBe(false);
+    expect(subject.holdsUnsavedDrafts()).toBe(false);
   });
 
   it('adds a held batch after a failed submit', async () => {

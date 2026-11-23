@@ -4,6 +4,7 @@ import { ANALYZE_LINK_SETTLE_MS, AnalyzeLinkArrival, AnalyzeMeButton } from './U
 import { openAnalyzeLink, takeAnalyzeLinkArrival } from './userPageAnalyzeLink';
 
 jest.mock('./userPageAnalyzeLink', () => ({
+  ANALYZE_LINK_EVENT: 'ce:analyze-link',
   openAnalyzeLink: jest.fn(),
   takeAnalyzeLinkArrival: jest.fn(),
 }));
@@ -25,6 +26,19 @@ describe('Analyze me button and arrival', () => {
     render(<AnalyzeMeButton href="/u/0xaa?session=demo-one&analyze=1" />);
     fireEvent.click(screen.getByRole('button', { name: 'Analyze me' }));
     expect(openAnalyzeLink).toHaveBeenCalledWith('/u/0xaa?session=demo-one&analyze=1');
+  });
+
+  it('closes the dialog only where my page opened inside the app', () => {
+    const onOpened = jest.fn();
+    render(<AnalyzeMeButton href="/u/0xaa?analyze=1" onOpened={onOpened} />);
+    for (const outcome of ['new-tab', 'same-tab', 'none']) {
+      (openAnalyzeLink as jest.Mock).mockReturnValue(outcome);
+      fireEvent.click(screen.getByRole('button', { name: 'Analyze me' }));
+    }
+    expect(onOpened).not.toHaveBeenCalled();
+    (openAnalyzeLink as jest.Mock).mockReturnValue('in-app');
+    fireEvent.click(screen.getByRole('button', { name: 'Analyze me' }));
+    expect(onOpened).toHaveBeenCalledTimes(1);
   });
 
   it("shows the site's AI wand, not a search icon", () => {
@@ -57,6 +71,34 @@ describe('Analyze me button and arrival', () => {
     rerender(<AnalyzeLinkArrival ready onStart={later} />);
     act(() => void jest.advanceTimersByTime(60_000));
     expect(later).toHaveBeenCalledTimes(1);
+    expect(take).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts again from a press made while the page is on screen', () => {
+    take.mockReturnValue(0);
+    const onStart = jest.fn();
+    render(<AnalyzeLinkArrival ready onStart={onStart} />);
+    act(() => void jest.advanceTimersByTime(ANALYZE_LINK_SETTLE_MS));
+    expect(onStart).not.toHaveBeenCalled();
+
+    for (const starts of [1, 2]) {
+      take.mockReturnValue(Date.now() + 60_000);
+      act(() => void window.dispatchEvent(new Event('ce:analyze-link')));
+      act(() => void jest.advanceTimersByTime(ANALYZE_LINK_SETTLE_MS));
+      expect(onStart).toHaveBeenCalledTimes(starts);
+    }
+    expect(take).toHaveBeenCalledTimes(3);
+  });
+
+  it('leaves the note to the page that opens, where the press replaces this one', () => {
+    take.mockReturnValue(0);
+    const { unmount } = render(<AnalyzeLinkArrival ready onStart={jest.fn()} />);
+    expect(take).toHaveBeenCalledTimes(1);
+    // The press and the page swap land in one update, as they do in the app.
+    act(() => {
+      window.dispatchEvent(new Event('ce:analyze-link'));
+      unmount();
+    });
     expect(take).toHaveBeenCalledTimes(1);
   });
 

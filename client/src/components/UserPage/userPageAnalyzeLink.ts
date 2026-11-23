@@ -1,3 +1,4 @@
+import { pageHeld } from '../../utilities/ui/leaveGuards';
 import { withWorkerHintForSession } from '../../utilities/ui/currentWorkerHint';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 
@@ -5,11 +6,13 @@ import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 // analysis, and the picture card where the session has it. Analyze is paid for by the session, so only the press
 // itself may start it: the press leaves a one-use note in this browser and the link carries a marker, and the
 // page starts only where it finds both. A reload, a copied or shared link, or the Back button finds no note and
-// starts nothing.
+// starts nothing. The page opens inside the app, so what the app has loaded stays loaded.
 
 export const ANALYZE_LINK_PARAM = 'analyze';
 export const ANALYZE_LINK_NOTE_KEY = 'ce:analyzeLink';
 export const ANALYZE_LINK_NOTE_MS = 120_000;
+// Tells a profile page that is already on screen that the press has just put the marker on the address.
+export const ANALYZE_LINK_EVENT = 'ce:analyze-link';
 
 type AnalyzeLinkPage = {
   props: { viewAddress?: unknown };
@@ -86,11 +89,20 @@ export const countUnsentAnswers = (account: string, store?: Storage): number => 
   }
 };
 
-/** The press: leaves the note, then opens my page here, or in a new tab where this one holds unsent answers. */
+// A session's own page, whatever follows its name in the address.
+const SESSION_PAGE = /\/session\/[^/?#]+/;
+
+/**
+ * The press: leaves the note, then opens my page inside the app, or only marks the address where my page in this
+ * session is already open. Only a page that has this session loaded is swapped that way: the session's own page,
+ * or a profile in it. From anywhere else the site navigates for real, which loads the session. Where this tab holds
+ * unsent answers, a recording or an unsaved draft, the page is left alone and mine opens in a new tab; where the
+ * browser refuses the tab, by a real navigation, which asks before anything is lost.
+ */
 export const openAnalyzeLink = (
   href: string,
-  { now = Date.now(), win = window }: { now?: number; win?: Window } = {},
-): 'same-tab' | 'new-tab' | 'none' => {
+  { now = Date.now(), win = window, held = pageHeld() }: { now?: number; win?: Window; held?: boolean } = {},
+): 'in-app' | 'same-tab' | 'new-tab' | 'none' => {
   const url = new URL(href, win.location.href);
   const target = readAnalyzeLinkTarget(url);
   if (!target) return 'none';
@@ -100,9 +112,30 @@ export const openAnalyzeLink = (
   } catch {
     // Without the note the page still opens; Analyze is then pressed there by hand.
   }
-  if (hasUnsentAnswers(target.account, win.sessionStorage) && win.open(url.href)) return 'new-tab';
-  win.location.assign(url.href);
-  return 'same-tab';
+  const leave = (): 'same-tab' => {
+    win.location.assign(url.href);
+    return 'same-tab';
+  };
+  if (held || hasUnsentAnswers(target.account, win.sessionStorage)) return win.open(url.href) ? 'new-tab' : leave();
+  if (url.origin !== win.location.origin) return leave();
+  try {
+    const here = readAnalyzeLinkTarget(win.location);
+    const inSession = here ? here.sessionSlug === target.sessionSlug : SESSION_PAGE.test(win.location.pathname);
+    if (!target.sessionSlug || !inSession) return leave();
+    if (here?.account === target.account) {
+      // Already on my page: the address keeps what it has (an open tab, say) and gains the marker.
+      const params = new URLSearchParams(win.location.search);
+      params.set(ANALYZE_LINK_PARAM, '1');
+      win.history.replaceState(win.history.state, '', `${win.location.pathname}?${params}${win.location.hash}`);
+    } else {
+      win.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
+      win.scrollTo(0, 0);
+    }
+  } catch {
+    return leave();
+  }
+  win.dispatchEvent(new win.Event(ANALYZE_LINK_EVENT));
+  return 'in-app';
 };
 
 /**

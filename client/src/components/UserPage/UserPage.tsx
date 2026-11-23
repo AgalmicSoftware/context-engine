@@ -3746,6 +3746,7 @@ class UserPage extends Component<any, any> {
           compareButtonDisplayState={compareButtonDisplayState}
           copyIconDisplayState={copyIconDisplayState}
           analyzeLinkHref={buildAnalyzeLinkHref(this, !!minimized && isOwner)}
+          onAnalyzeLinkOpened={this.props.onAnalyzeLinkOpened}
           explorerUrl={explorerUrl}
           headerActionVisibility={headerActionVisibility}
           headerBookmarkClassName={headerBookmarkClassName}

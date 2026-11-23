@@ -1,4 +1,5 @@
 import {
+  ANALYZE_LINK_EVENT,
   ANALYZE_LINK_NOTE_KEY,
   ANALYZE_LINK_NOTE_MS,
   buildAnalyzeLinkHref,
@@ -27,11 +28,19 @@ const memoryStore = (entries: Record<string, string> = {}): Storage => {
 };
 
 const fakeWindow = (href: string, { session = memoryStore(), local = memoryStore(), opens = true } = {}) => {
-  const url = new URL(href, 'https://site.example.test/s/demo-one');
+  const url = new URL(href, 'https://site.example.test/session/demo-one');
   const win = {
-    location: { href: url.href, pathname: url.pathname, search: url.search, hash: url.hash, assign: jest.fn() },
+    location: {
+      href: url.href,
+      origin: url.origin,
+      pathname: url.pathname,
+      search: url.search,
+      hash: url.hash,
+      assign: jest.fn(),
+    },
     history: {
       state: { kept: true },
+      pushState: jest.fn(),
       replaceState: jest.fn((_state: unknown, _title: string, next: string) => {
         const moved = new URL(next, url.href);
         win.location.pathname = moved.pathname;
@@ -41,6 +50,9 @@ const fakeWindow = (href: string, { session = memoryStore(), local = memoryStore
     localStorage: local,
     sessionStorage: session,
     open: jest.fn((_url?: string) => (opens ? {} : null)),
+    scrollTo: jest.fn(),
+    dispatchEvent: jest.fn(),
+    Event,
   };
   return win;
 };
@@ -130,31 +142,97 @@ describe('Analyze me, from the account dialog', () => {
     expect(window.sessionStorage.length).toBeGreaterThanOrEqual(0);
   });
 
-  it('opens my page in this tab, and in a new one where answers are unsent', () => {
-    const plain = fakeWindow('/s/demo-one');
-    expect(openAnalyzeLink(HREF, { now: 1000, win: asWindow(plain) })).toBe('same-tab');
-    expect(plain.location.assign).toHaveBeenCalledWith(`https://site.example.test${HREF}`);
+  it('opens my page inside the app, leaving the note and telling an open page', () => {
+    const plain = fakeWindow('/session/demo-one');
+    expect(openAnalyzeLink(HREF, { now: 1000, win: asWindow(plain), held: false })).toBe('in-app');
+    expect(plain.history.pushState).toHaveBeenCalledWith({}, '', HREF);
+    expect(plain.scrollTo).toHaveBeenCalledWith(0, 0);
+    expect(plain.location.assign).not.toHaveBeenCalled();
     expect(plain.open).not.toHaveBeenCalled();
+    expect(plain.dispatchEvent.mock.calls.map(([event]) => event.type)).toEqual([ANALYZE_LINK_EVENT]);
     expect(JSON.parse(plain.localStorage.getItem(ANALYZE_LINK_NOTE_KEY) || '')).toEqual({
       account: ME,
       sessionSlug: 'demo-one',
       at: 1000,
     });
 
-    const unsent = { [`dg:surveyDraft:demo-one:worker:${ME}:questions`]: '{"answers":{"q1":{"value":"x"}}}' };
-    const busy = fakeWindow('/s/demo-one', { session: memoryStore(unsent) });
-    expect(openAnalyzeLink(HREF, { win: asWindow(busy) })).toBe('new-tab');
+    const nowhere = fakeWindow('/session/demo-one');
+    expect(openAnalyzeLink('/s/demo-one', { win: asWindow(nowhere), held: false })).toBe('none');
+    expect(nowhere.localStorage.getItem(ANALYZE_LINK_NOTE_KEY)).toBeNull();
+    expect(nowhere.history.pushState).not.toHaveBeenCalled();
+  });
+
+  it('only marks the address where my page in this session is already open', () => {
+    const mine = fakeWindow(`/u/${ME.toUpperCase()}?session=demo-one&tab=answers#top`);
+    expect(openAnalyzeLink(HREF, { win: asWindow(mine), held: false })).toBe('in-app');
+    expect(mine.history.replaceState).toHaveBeenCalledWith(
+      { kept: true },
+      '',
+      `/u/${ME.toUpperCase()}?session=demo-one&tab=answers&analyze=1#top`,
+    );
+    expect(mine.history.pushState).not.toHaveBeenCalled();
+    expect(mine.scrollTo).not.toHaveBeenCalled();
+    expect(mine.dispatchEvent).toHaveBeenCalledTimes(1);
+
+    // Someone else's page in this session is replaced.
+    const other = fakeWindow('/u/0xbb?session=demo-one');
+    expect(openAnalyzeLink(HREF, { win: asWindow(other), held: false })).toBe('in-app');
+    expect(other.history.pushState).toHaveBeenCalledWith({}, '', HREF);
+  });
+
+  it.each([
+    [
+      'unsent answers',
+      { [`dg:surveyDraft:demo-one:worker:${ME}:questions`]: '{"answers":{"q1":{"value":"x"}}}' },
+      false,
+    ],
+    ['a recording or an unsaved draft', {}, true],
+  ])('leaves a page that holds %s alone: a new tab, or a real navigation', (_what, stored, held) => {
+    const busy = fakeWindow('/session/demo-one', { session: memoryStore(stored) });
+    expect(openAnalyzeLink(HREF, { win: asWindow(busy), held })).toBe('new-tab');
     expect(busy.open).toHaveBeenCalledWith(`https://site.example.test${HREF}`);
     expect(busy.location.assign).not.toHaveBeenCalled();
+    expect(busy.history.pushState).not.toHaveBeenCalled();
+    expect(busy.dispatchEvent).not.toHaveBeenCalled();
 
-    // A blocked new tab falls back to this one: unsent answers are kept per tab and come back.
-    const blocked = fakeWindow('/s/demo-one', { session: memoryStore(unsent), opens: false });
-    expect(openAnalyzeLink(HREF, { win: asWindow(blocked) })).toBe('same-tab');
-    expect(blocked.location.assign).toHaveBeenCalled();
+    // A blocked new tab falls back to leaving this one, which asks first where a recording would be lost;
+    // unsent answers are kept per tab and come back.
+    const blocked = fakeWindow('/session/demo-one', { session: memoryStore(stored), opens: false });
+    expect(openAnalyzeLink(HREF, { win: asWindow(blocked), held })).toBe('same-tab');
+    expect(blocked.location.assign).toHaveBeenCalledWith(`https://site.example.test${HREF}`);
+    expect(blocked.history.pushState).not.toHaveBeenCalled();
+  });
 
-    const nowhere = fakeWindow('/s/demo-one');
-    expect(openAnalyzeLink('/s/demo-one', { win: asWindow(nowhere) })).toBe('none');
-    expect(nowhere.localStorage.getItem(ANALYZE_LINK_NOTE_KEY)).toBeNull();
+  it('navigates for real from a page that does not hold the session', () => {
+    for (const elsewhere of ['/about', '/admin?session=demo-one', '/', `/u/${ME}`, '/u/0xbb?session=demo-two']) {
+      const cold = fakeWindow(elsewhere);
+      expect(openAnalyzeLink(HREF, { win: asWindow(cold), held: false })).toBe('same-tab');
+      expect(cold.location.assign).toHaveBeenCalledWith(`https://site.example.test${HREF}`);
+      expect(cold.history.pushState).not.toHaveBeenCalled();
+      expect(cold.history.replaceState).not.toHaveBeenCalled();
+    }
+    // A link with no session names nothing that is loaded.
+    const sessionless = fakeWindow('/session/demo-one');
+    expect(openAnalyzeLink(`/u/${ME}?analyze=1`, { win: asWindow(sessionless), held: false })).toBe('same-tab');
+    // The session's page under a longer address is still its page.
+    const deeper = fakeWindow('/base/session/demo-one/results?worker=w1');
+    expect(openAnalyzeLink(HREF, { win: asWindow(deeper), held: false })).toBe('in-app');
+  });
+
+  it('leaves by a real navigation where the page cannot be swapped inside the app', () => {
+    const stuck = fakeWindow('/session/demo-one');
+    stuck.history.pushState.mockImplementation(() => {
+      throw new DOMException('refused', 'SecurityError');
+    });
+    expect(openAnalyzeLink(HREF, { win: asWindow(stuck), held: false })).toBe('same-tab');
+    expect(stuck.location.assign).toHaveBeenCalledWith(`https://site.example.test${HREF}`);
+    expect(stuck.dispatchEvent).not.toHaveBeenCalled();
+
+    const abroad = fakeWindow('/session/demo-one');
+    expect(openAnalyzeLink(`https://other.example.test${HREF}`, { win: asWindow(abroad), held: false })).toBe(
+      'same-tab',
+    );
+    expect(abroad.history.pushState).not.toHaveBeenCalled();
   });
 
   describe('arrival', () => {

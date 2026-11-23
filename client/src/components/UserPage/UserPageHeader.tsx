@@ -77,6 +77,7 @@ type UserPageHeaderProps = {
   analyzeButtonDisplayState: UserPageAnalyzeButtonDisplayState;
   /** Whether my answers have finished loading, for an Analyze that "Analyze me" starts on arrival. */
   analyzeLinkReady?: boolean;
+  onAnalyzeLinkOpened?: () => void;
   avatarDisplayState: UserPageAvatarDisplayState;
   bookmarkButtonDisplayState: UserPageBookmarkButtonDisplayState;
   bookmarksHref: string;
@@ -121,6 +122,7 @@ const UserPageHeader = ({
   usernameSavedTo = 'device',
   analyzeButtonDisplayState,
   analyzeLinkReady = false,
+  onAnalyzeLinkOpened,
   avatarDisplayState,
   bookmarkButtonDisplayState,
   bookmarksHref,
@@ -376,7 +378,7 @@ const UserPageHeader = ({
       {/* The account dialog's list: this page's two actions, then the dialog's own rows. */}
       {minimized && (
         <AccountMenu>
-          {analyzeLinkHref ? <AnalyzeMeButton href={analyzeLinkHref} /> : null}
+          {analyzeLinkHref ? <AnalyzeMeButton href={analyzeLinkHref} onOpened={onAnalyzeLinkOpened} /> : null}
           {showUsernameButton && (
             <AccountMenuRow
               icon={faUser}
