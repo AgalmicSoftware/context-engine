@@ -479,4 +479,23 @@ describe('surveyToolViewState', () => {
     });
     expect(inactive).toEqual({});
   });
+
+  it('keeps a Worker group choice, so every view sharing the filter gets it', () => {
+    const workerGroupFilter = {
+      sessionId: '0x' + '1'.repeat(64),
+      sessionSlug: 'filter-fixture',
+      workerUrl: 'https://worker.example.test',
+      creatorInclude: [],
+      creatorExclude: [],
+      responderInclude: [{ groupId: 'workshop', label: 'Workshop' }],
+      responderExclude: [],
+    };
+    const normalized = normalizeSurveyToolFilterState({ workerGroupFilter });
+    expect(normalized.workerGroupFilter).toEqual(workerGroupFilter);
+    expect(isSurveyToolFilterStateActive(normalized)).toBe(true);
+    // A choice with no groups left in it is no filter.
+    expect(
+      normalizeSurveyToolFilterState({ workerGroupFilter: { ...workerGroupFilter, responderInclude: [] } }),
+    ).toEqual({});
+  });
 });

@@ -1040,6 +1040,10 @@ export default function OnePageSessionStandardShell({
                       questionResponses={aggregatorData}
                       disclaimersActive={disclaimersActive}
                       filterState={filterState}
+                      onFilterChange={onFilterChange}
+                      isSBTCacheReady={isSBTCacheReady}
+                      sbtCacheRevision={sbtCacheRevision}
+                      ensureLightSbtUniverse={ensureLightSbtUniverse}
                       sessionName={sessionName}
                       sessionHeader={sessionHeader}
                       sessionInfo={sessionInfo}

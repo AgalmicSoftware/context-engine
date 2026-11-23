@@ -1,4 +1,5 @@
 import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
+import { hasWorkerGroupSelection } from '../../domains/worker/workerGroupResultsFilter';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -36,6 +37,7 @@ type CanonicalSurveyToolFilterState = {
   aiCombine: boolean;
   selectedTags: unknown[];
   responseStatus: CanonicalResponseStatus;
+  workerGroupFilter?: UnknownRecord;
 };
 
 type LockAudienceDisplayStateArgs = {
@@ -235,6 +237,10 @@ const buildCanonicalSurveyToolFilterState = (rawFilterState: unknown): Canonical
     aiCombine,
     selectedTags,
     responseStatus,
+    // A Worker group choice, kept so it reaches every view that shares this filter, the Report included.
+    ...(hasWorkerGroupSelection(state.workerGroupFilter)
+      ? { workerGroupFilter: { ...(state.workerGroupFilter as UnknownRecord) } }
+      : {}),
   };
 };
 

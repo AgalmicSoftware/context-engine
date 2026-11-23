@@ -171,6 +171,31 @@
   margin-left: 20px;
 }
 
+// Active Filters: the label, the filters and the Filter button share one row, and wrap only when they don't fit.
+.activeFiltersItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  // 6px, not 8px: with no filter on, the row then fits a 375px-wide phone.
+  gap: 4px 6px;
+  // Alone in its row, it needs no space after it, and a phone needs every pixel to keep it on one line.
+  margin-right: 0;
+
+  .statLabel {
+    margin-right: 0;
+  }
+
+  .filterList {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 12px;
+  }
+
+  .filterList > div {
+    margin-left: 0;
+  }
+}
+
 .graphSection {
   display: flex;
   flex-wrap: wrap;
