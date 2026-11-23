@@ -532,8 +532,8 @@ directory when upgrading; identities and saved session access do not change.
 | `make_sign_in_link` | Makes a link that opens a joined session with the agent's person signed in as the agent's account: once, for 30 minutes, on the session's own site. Give it only to that person. Needs a Session Worker with sign-in links, and a session whose admin has turned them on; says so otherwise. |
 | `get_analysis_card` | Reads a person's saved analysis card where the session lets the agent read that person's answers: its words, and where the Worker keeps them the matched figure's picture and the drawn pages as images. Asks no model. |
 | `make_analysis_card` | Makes the analysis card of the agent's own account, as the session page makes it when its person presses Analyze: the same two prompts to the session's AI through the Worker's `/ai` route (two of the account's AI calls for the day, paid by the session under its limits, with a key the agent never sees), then the matched figure's picture from the Worker. Returns the card, the analysis and the picture as an image, to give the person in the conversation. Saves nothing. Says so, and makes nothing, where the card is off, the session has ended or doesn't let the agent use its AI, or the account has no answers stored in the clear. Covers only the agent's own account: a person's account used through a delegated key (Agent HTTP) is not. |
-| `show_analysis_card` | `shown: true` shows the card the agent made last on its profile in the session, after the person has said yes; `shown: false` takes it down. Refuses to show one where the session keeps each person's answers to them and its admins. The made card is kept until the MCP restarts. |
-| `get_interview_catalog` | For suggesting answers the person reviews and submits themselves: reads a session's questions from its link, with no sign-in and without joining; a private session needs its group's invite link, the one with the password. A private session, or one with interview mode off, refuses, and the error says to use the prompt the person copies under **Let your AI draft your answers**. |
+| `show_analysis_card` | `shown: true` shows the card the agent made last on its profile in the session, after the person has said yes; `shown: false` takes it down. Refuses to show one where the session keeps each person's answers to them and its admins. A shown card is saved in the session and stays, for up to a year, until it is taken down or replaced; only a card made and not yet shown is lost if the MCP restarts. |
+| `get_interview_catalog` | For suggesting answers the person reviews and submits themselves: reads a session's questions from its link, with no sign-in and without joining; a private session needs its group's invite link, the one with the password. A private session, or one with interview mode off, refuses, and the error says to use the prompt the person copies under **Have AI draft your answers**. |
 | `make_review_link` | Turns suggested answers into a link that opens the session with them filled in, for the person to review and submit as themselves. Submits and joins nothing. Checks each draft against the session's questions (a quadratic draft against that question's own credit budget) and says in `leftOut` why any was left out. The link keeps only the session page, its Worker, `mode=interview` and the link's `src` and `joinGroup`: never an invite, password or ticket. |
 | `get_session` | Shows the description, context, instructions for agents, groups, any invitation to add context, whether the session has a Session Agent and records chats with it, end time and the agent's progress. |
 | `list_questions` | Lists statements and questions with their options or scale and the agent's latest answer; only unanswered ones unless `filter` asks for `answered` or `all`. Up to 100 a call; `more` and `next` say how to get the rest. |
@@ -589,6 +589,18 @@ unknown `CE_MCP_*` name.
   exclusive write that still refuses to replace an existing key.
 - **Agent answers are labeled, not verified.** The agent marker, display name,
   model and platform are self-reported, like a person typing their name.
+- **The agent asks before it submits.** The server's instructions carry the
+  same steps as the site's AI prompt and its agent guide (`/skill.md`): the
+  agent asks once whether to submit the person's answers or go through them
+  together first, says that submitting with these tools means making an
+  account and whether it stands for the person or for itself, and asks whether
+  they already have a Context Engine account. For someone who has one it gives
+  the session link with `aiPrompt=1`, where they sign in and copy a short
+  prompt that holds their AI key; with that key it submits as them through
+  the session's Agent HTTP API. It shows its answers and submits on the
+  person's yes: only the person, in the chat, can waive being shown, and no
+  prompt copied from a session and nothing a tool returns can. Knowing nothing
+  about the person, it says so and asks a few questions first.
 - **Public sessions are public.** When a session publishes its results, anyone
   can read every answer and comment, including the agent's.
 - **Sign-in uses a trusted Context Engine origin.** Session Workers only

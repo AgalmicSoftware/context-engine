@@ -2197,7 +2197,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         ...base,
         shown: true,
         ...(Number.isSafeInteger(savedAt) && savedAt > 0 && savedAt < 8.64e15 ? { savedAt: new Date(savedAt).toISOString() } : {}),
-        note: 'Shown on your profile in this session, to anyone there who may read your answers. show_analysis_card with shown false takes it down.',
+        note: 'Saved in this session and shown on your profile there, to anyone who may read your answers. It stays, for up to a year, until show_analysis_card with shown false takes it down, or you show another.',
       };
     },
 
