@@ -257,7 +257,16 @@ test('client static headers cache only existing versioned media and leave assets
     '/media/product-film/v1/context-engine-film-720p.mp4',
     '/media/product-film/v1/context-engine-og-1200x630.png',
   ];
-  assert.deepEqual(Object.keys(rules), ['/*', '/skill.md', '/agent-guide.md', ...mediaPaths]);
+  assert.deepEqual(Object.keys(rules), [
+    '/*',
+    '/skill.md',
+    '/agent-guide.md',
+    '/.well-known/security.txt',
+    ...mediaPaths,
+  ]);
+  // security.txt is served as plain text and, like the guides, never cached for a year.
+  assert.equal(rules['/.well-known/security.txt']['Content-Type'], 'text/plain; charset=utf-8');
+  assert.equal(rules['/.well-known/security.txt']['Cache-Control'], undefined);
   for (const mediaPath of mediaPaths) {
     assert.ok(existsSync(resolve(rootDir, 'client/public', mediaPath.slice(1))));
     assert.equal(rules[mediaPath]['Cache-Control'], 'public, max-age=31536000, immutable');
