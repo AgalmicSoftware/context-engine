@@ -5,7 +5,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Provider, connect } from 'react-redux';
 import { applyMiddleware, combineReducers, createStore } from 'redux';
 import thunk from 'redux-thunk';
-import ConnectedCommunityTab, { CommunityTab } from './CommunityTab';
+import ConnectedCommunityTab, { CommunityTab, WORKER_LISTING_COUNTS_WAIT_MS } from './CommunityTab';
 import { LoginAndSettingsModal } from '../Account/LoginAndSettingsModal';
 import sessionStateReducer from '../../reducers/sessionStateReducer';
 import { updateGlobalSessionSelection } from '../../actions/sessionStateActions';
@@ -35,7 +35,7 @@ import {
   resolveWorkerCanonicalCacheIdentity,
   withWorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
-import { WORKER_GROUP_COUNT_WAIT_MS } from './communityWorkerGroupStats';
+import { WORKER_GROUP_COUNT_TIMEOUT_MS, WORKER_GROUP_COUNT_WAIT_MS } from './communityWorkerGroupStats';
 
 // The Stats tiles count a Worker-hosted session from its listings. Tests name what each session's listings hold;
 // a session not named here lists nothing.
@@ -704,6 +704,76 @@ describe('CommunityTab helpers', () => {
     await expect(instance.checkIfInitialLoadDone()).resolves.toBe(false);
   });
 
+  it('does not wait in ALL for a chain session this browser holds nothing for', async () => {
+    const instance = new CommunityTab({ activeSessionSlug: 'picked' });
+    const worker = (slug) => ({
+      slug,
+      isWorkerCanonical: true,
+      workerCanonicalIdentity: null,
+      workerGroupsStatus: 'idle',
+      sessionConfig: { slug, corsWorkerUrl: `https://${slug}.example.workers.dev` },
+      questionsCache: {},
+      surveysCache: {},
+    });
+    instance._iterScopeCaches = jest.fn(() => [
+      worker('picked'),
+      { slug: '', netKey: '11155420', surveysCache: {}, questionsCache: {}, sbtCache: {} },
+      worker('other'),
+    ]);
+    const blockSpy = jest.spyOn(contractScripts, 'getRelevantBlockWindowForFilter').mockResolvedValue({ toBlock: 10 });
+    // Until each Worker session's listing is read, the view is still loading.
+    await expect(instance.checkIfInitialLoadDone()).resolves.toBe(false);
+    for (const slug of ['picked', 'other']) {
+      instance._workerListingCounts.set(instance._workerListingKey(worker(slug)), {
+        counts: { questions: 1, surveys: 0, responders: [] },
+        failed: false,
+        loading: false,
+        at: Date.now(),
+      });
+    }
+    await expect(instance.checkIfInitialLoadDone()).resolves.toBe(true);
+    expect(blockSpy).not.toHaveBeenCalled();
+  });
+
+  it('checks readiness for a new selection, not trusting the flag of the one before', async () => {
+    const instance = attachMutableSetState(new CommunityTab({ activeSessionSlug: 'picked' }));
+    instance.state = { ...instance.state, initialLoadDone: true, initialLoadSelectionKey: 'the one before' };
+    expect(instance._computeFallbackPollDelayMs()).toBe(15000);
+    jest.spyOn(instance, '_iterScopeCaches').mockReturnValue([]);
+    jest.spyOn(instance, '_buildCommunityBeeswarmPoints').mockReturnValue([]);
+    const check = jest.spyOn(instance, 'checkIfInitialLoadDone').mockResolvedValue(false);
+    const poll = jest.spyOn(instance, '_scheduleNextStatsPoll').mockImplementation(() => {});
+    // The first cycle of the new selection checks at once.
+    await instance._runStatsRefreshCycle();
+    expect(check).toHaveBeenCalledTimes(1);
+    // The next, moments later, is put off by the short wait between checks: run when it may be, not at the next poll.
+    await instance._runStatsRefreshCycle();
+    expect(check).toHaveBeenCalledTimes(1);
+    expect(poll).toHaveBeenCalledTimes(1);
+    expect(poll.mock.calls[0][0]).toBeGreaterThan(0);
+    expect(poll.mock.calls[0][0]).toBeLessThanOrEqual(2000);
+    check.mockResolvedValue(true);
+    await instance._runStatsRefreshCycle({ force: true });
+    expect(check).toHaveBeenCalledTimes(2);
+    expect(instance.state.initialLoadDone).toBe(true);
+    expect(instance._computeFallbackPollDelayMs()).toBe(60000);
+  });
+
+  it('still waits in ALL for the chain session whose page is open', async () => {
+    const instance = new CommunityTab({ activeSessionSlug: 'here' });
+    instance._iterScopeCaches = jest.fn(() =>
+      ['here', 'elsewhere'].map((slug) => ({
+        slug,
+        netKey: '84532',
+        surveysCache: {},
+        questionsCache: {},
+        sbtCache: {},
+      })),
+    );
+    jest.spyOn(contractScripts, 'getRelevantBlockWindowForFilter').mockResolvedValue({ toBlock: 10 });
+    await expect(instance.checkIfInitialLoadDone()).resolves.toBe(false);
+  });
+
   it('keeps multi-session readiness false when any latest block is unavailable', async () => {
     const instance = new CommunityTab({ activeSessionSlug: 'edge' });
     instance._iterScopeCaches = jest.fn(() =>
@@ -1148,6 +1218,128 @@ describe('CommunityTab helpers', () => {
     await instance._runStatsRefreshCycle({ force: true });
     await settleListingCounts(instance);
     expect(collectNodeText(tile('questions'))).toBe('5+Questions');
+  });
+
+  it('settles a Worker session never opened here: its groups show as unread and nothing waits on them', async () => {
+    const selection = { primarySessionSlug: 'unopened', selectedSessionScope: 'active', selectedSessionSlugs: [] };
+    const instance = attachMutableSetState(new CommunityTab({ globalSessionSelection: selection }));
+    const tile = (label) =>
+      collectTreeNodes(instance.render(), (node) => node.props?.['data-testid'] === `ce-community-stat-${label}`)[0];
+    mockListingCounts.unopened = {
+      questions: 4,
+      surveys: 0,
+      responders: ['0x0000000000000000000000000000000000000001'],
+    };
+    // No Worker identity on this device, so no group count is ever started for it.
+    jest.spyOn(instance, '_iterScopeCaches').mockReturnValue([
+      {
+        slug: 'unopened',
+        isWorkerCanonical: true,
+        workerCanonicalIdentity: null,
+        sessionConfig: { slug: 'unopened', corsWorkerUrl: 'https://unopened.example.workers.dev' },
+        workerGroupsStatus: 'idle',
+        questionsCache: {},
+        surveysCache: {},
+      },
+    ]);
+    jest.spyOn(instance, '_buildCommunityBeeswarmPoints').mockReturnValue([]);
+    await instance._runStatsRefreshCycle({ force: true });
+    await settleListingCounts(instance);
+    expect(collectNodeText(tile('questions'))).toBe('4Questions');
+    expect(collectNodeText(tile('groups'))).toMatch(/^–/);
+    expect(tile('groups').props['aria-busy']).toBe(false);
+    await expect(instance.checkIfInitialLoadDone()).resolves.toBe(true);
+    expect(instance.state.initialLoadDone).toBe(true);
+  });
+
+  it('leaves a Worker whose listing does not answer in time out of the sum, and adds it when it answers', async () => {
+    const selection = { primarySessionSlug: 'one', selectedSessionScope: 'active', selectedSessionSlugs: [] };
+    const instance = attachMutableSetState(new CommunityTab({ globalSessionSelection: selection }));
+    const tile = (label) =>
+      collectTreeNodes(instance.render(), (node) => node.props?.['data-testid'] === `ce-community-stat-${label}`)[0];
+    const entry = (slug) => ({
+      slug,
+      isWorkerCanonical: true,
+      sessionConfig: { slug, corsWorkerUrl: `https://${slug}.example.workers.dev` },
+      workerGroupsStatus: 'ready',
+      questionsCache: {},
+      surveysCache: {},
+    });
+    mockListingCounts.one = { questions: 5, surveys: 0, responders: [] };
+    let answerSlow;
+    const { loadWorkerListingCounts } = jest.requireMock('./communityWorkerListingCounts');
+    loadWorkerListingCounts.mockClear();
+    loadWorkerListingCounts.mockImplementation(async ({ sessionSlug }) =>
+      sessionSlug === 'slow' ? new Promise((resolve) => (answerSlow = resolve)) : mockListingCounts[sessionSlug],
+    );
+    jest.spyOn(instance, '_iterScopeCaches').mockReturnValue([entry('one'), entry('slow')]);
+    jest.spyOn(instance, '_queueCacheDrivenRefresh').mockImplementation(() => {});
+    jest.spyOn(instance, '_buildCommunityBeeswarmPoints').mockReturnValue([]);
+    jest.spyOn(instance, 'checkIfInitialLoadDone').mockResolvedValue(false);
+    jest.useFakeTimers();
+    try {
+      await instance._runStatsRefreshCycle({ force: true });
+      await settleListingCounts(instance);
+      expect(tile('questions').props['aria-busy']).toBe(true);
+
+      await jest.advanceTimersByTimeAsync(WORKER_LISTING_COUNTS_WAIT_MS);
+      await instance._runStatsRefreshCycle({ force: true });
+      expect(collectNodeText(tile('questions'))).toBe('5+Questions');
+      expect(tile('questions').props['aria-busy']).toBe(false);
+
+      answerSlow({ questions: 2, surveys: 0, responders: [] });
+      await settleListingCounts(instance);
+      expect(collectNodeText(tile('questions'))).toBe('7Questions');
+      // Kept for the visit: no second read of either.
+      await instance._runStatsRefreshCycle({ force: true });
+      expect(loadWorkerListingCounts).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+      loadWorkerListingCounts.mockReset();
+      loadWorkerListingCounts.mockImplementation(async ({ sessionSlug }) => {
+        const counts = mockListingCounts[sessionSlug];
+        if (counts instanceof Error) throw counts;
+        return counts || { questions: 0, surveys: 0, responders: [] };
+      });
+    }
+  });
+
+  it('marks a Worker group count with no answer in time as unread, until the answer comes', async () => {
+    let answer;
+    jest
+      .spyOn(workerAuth, 'getWorkerSessionToken')
+      .mockImplementation(() => new Promise((resolve) => (answer = resolve)));
+    const instance = new CommunityTab({
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: WORKER_SESSION_CONFIG,
+      account: '0x00000000000000000000000000000000000000aa',
+    });
+    jest.spyOn(instance, '_queueCacheDrivenRefresh').mockImplementation(() => {});
+    const status = () => instance._buildScopeEntriesFromSlugs(['demo-sh'])[0].workerGroupsStatus;
+    jest.useFakeTimers();
+    try {
+      const hydrated = instance._hydrateWorkerGroupCounts(instance._buildScopeEntriesFromSlugs(['demo-sh']));
+      await jest.advanceTimersByTimeAsync(WORKER_GROUP_COUNT_WAIT_MS);
+      await hydrated;
+      expect(status()).toBe('loading');
+      await jest.advanceTimersByTimeAsync(WORKER_GROUP_COUNT_TIMEOUT_MS);
+      expect(status()).toBe('error');
+      // The Worker answers late: no token, so the public groups are counted after all, and Stats is refreshed.
+      const refreshes = instance._queueCacheDrivenRefresh.mock.calls.length;
+      answer('');
+      await jest.advanceTimersByTimeAsync(0);
+      expect(status()).toBe('ready');
+      expect(instance._queueCacheDrivenRefresh.mock.calls.length).toBe(refreshes + 1);
+
+      // Counted again later: while that runs, the tile keeps what was counted rather than a spinner.
+      jest.spyOn(workerAuth, 'getWorkerSessionToken').mockImplementation(() => new Promise(() => {}));
+      await jest.advanceTimersByTimeAsync(60_000);
+      void instance._hydrateWorkerGroupCounts(instance._buildScopeEntriesFromSlugs(['demo-sh']));
+      await jest.advanceTimersByTimeAsync(WORKER_GROUP_COUNT_WAIT_MS);
+      expect(status()).toBe('ready');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('does not mistake an empty identity-bound Worker cache for completed metadata hydration', async () => {

@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Site — available when the site deploys
 
 - **The interview's "?" says who processes it.** It now ends "Processed by OpenAI; future versions will use open-source models." The voice always runs on OpenAI, and the session's AI provider drafts the answers, so a session set to Anthropic reads "Processed by OpenAI and Anthropic". The "?" sits in the interview's header, so it can be read before starting.
+- **The Stats panel settles on every session choice.** Signed out on the home page, Groups and the header kept spinning on any single session, and Surveys and the header on ALL, because the panel waited for group counts and question details of sessions never opened in this browser, and in ALL for the general chain session, none of which ever come. Those now count as settled: Users, Questions and Surveys come from each session's listings, and Groups shows "–" where no session in view could be counted. A session whose listing or group count gets no answer within 15 seconds is left out of the sum (shown with a plus) instead of holding every tile, and is added if it answers later. After quick switching, the panel no longer waits up to a minute on the previous choice's poll.
 
 ## [0.9.37] - 2026-11-23
 
