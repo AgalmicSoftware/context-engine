@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Site — available when the site deploys
+
+- **The interview's "?" says who processes it.** It now ends "Processed by OpenAI; future versions will use open-source models." The voice always runs on OpenAI, and the session's AI provider drafts the answers, so a session set to Anthropic reads "Processed by OpenAI and Anthropic". The "?" sits in the interview's header, so it can be read before starting.
+
 ## [0.9.37] - 2026-11-23
 
 A Worker updated to this release gives a session's questions as short pages an AI can read, sign-in works in a browser that blocks the site's data, the agent guide opens on which session to work on, and a room of more than four people can record a plain transcript. MCP unchanged.

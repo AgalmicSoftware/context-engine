@@ -15,6 +15,8 @@ import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInt
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
 import { useSessionInterviewGroupRecommendations } from './useSessionInterviewGroupRecommendations';
 import { loadDraftingGroupChoices } from './sessionInterviewGroupRecommendations';
+import { getEffectiveAiConfig } from '../../utilities/ai/aiSettings';
+import { buildAiConfigRequest } from '../../utilities/ai/aiClientRequestOptions';
 
 const mockGroupArea = jest.fn();
 const mockGroupAreaMounts = jest.fn();
@@ -512,7 +514,9 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByText(/Speak with an AI interviewer/)).not.toBeInTheDocument();
     fireEvent.focus(help);
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Stopping prepares drafts for your review');
-    expect(screen.getByRole('tooltip')).toHaveTextContent('You can answer in the language you prefer.');
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      /You can answer in the language you prefer\. Processed by OpenAI; future versions will use open-source models\.$/,
+    );
     fireEvent.blur(help);
     // Beside it, flags that screen readers name by language, not country.
     const languages = within(screen.getByRole('list', { name: 'Some languages you can answer in' }));
@@ -537,6 +541,38 @@ describe('SessionVoiceModeModal', () => {
     );
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Start voice interview');
   });
+
+  // A whole Worker session config, the only supplied config the AI settings read, with its slug or without one
+  // (the drafting call fills it in from the session's). The provider sits on each model, as the session settings
+  // save it; the fast model stays on OpenAI, so only the drafting (thinking) model can name Anthropic.
+  const { slug: _slug, ...workerConfigWithoutSlug } = buildAllowedSuggestionSessionConfig();
+  it.each([
+    ['with its own slug', buildAllowedSuggestionSessionConfig()],
+    ['without one', workerConfigWithoutSlug],
+  ])(
+    "names the drafting call's AI provider beside OpenAI before the interview starts, config %s",
+    async (_, config) => {
+      const models = {
+        fast: { provider: 'openai', model: 'gpt-6.1-terra' },
+        thinking: { provider: 'anthropic', model: 'claude-opus-5-5' },
+      };
+      const sessionConfig = { ...config, ai: { models } };
+      render(<SessionVoiceModeModal {...baseProps} mode="interview" sessionConfig={sessionConfig} />);
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toBeInTheDocument();
+      fireEvent.focus(screen.getByRole('button', { name: 'About Interview' }));
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(
+        /Processed by OpenAI and Anthropic; future versions will use open-source models\.$/,
+      );
+      // The drafting call's own reading of the same props (its options as mapInterviewEvidenceToResponses sends them).
+      const drafting = await getEffectiveAiConfig(
+        buildAiConfigRequest(
+          { sessionSlug: baseProps.sessionSlug, sessionConfig, preferLocal: false },
+          { thinking: true },
+        ),
+      );
+      expect(drafting.provider).toBe('anthropic');
+    },
+  );
 
   it('says the questions are loading until the pile settles, and no questions only after', () => {
     const { rerender } = render(
