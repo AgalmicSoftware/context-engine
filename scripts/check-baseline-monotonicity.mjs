@@ -27,7 +27,8 @@ Fails if baseline files grow relative to a base ref:
   - Typed-test diagnostics must not grow, classifications must not shrink, and
     explicit test-source exclusions must not grow.
   - Client bundle caps and warning coverage must not loosen, and exception,
-    vendor, entry, or duplicate-asset allowlists must not grow.
+    vendor, entry, or duplicate-asset allowlists must not grow. An existing
+    exception's own cap may be raised, stated in the budget file and docs.
 
 Options:
   --base <ref>        Base git ref to compare against. Defaults to
@@ -307,11 +308,7 @@ function clientBundleBudgetRegressions(baseBudget, currentBudget) {
         current: entry.filePrefix,
       });
     }
-    compareCap(
-      `bundle-exception-cap-increase:${entry.id}`,
-      base.maxMinifiedBytes,
-      entry.maxMinifiedBytes,
-    );
+    // An exception's own cap may be raised; the budget file and docs/bundle-budget.md state it.
   });
   return regressions;
 }

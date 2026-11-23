@@ -290,7 +290,11 @@ phone to login", the login file, "Copy this link to paste your responses on a
 different device." In a browser without passkeys, the link to another browser
 stays first.
 
-- The file (`context-engine-login-<6 hex>.json`) holds a standard 12-word
+- The file is named as a passkey is, with the device's date and time, for
+  example `ContextEngine-Login-November23-2026-1003PM.json` (letters, digits and
+  hyphens only; no part of the account). The name is for finding it again: a
+  login file signs in under any name, the earlier
+  `context-engine-login-<6 hex>.json` among them. It holds a standard 12-word
   recovery phrase; the account is that phrase's first Ethereum address
   (`m/44'/60'/0'/0/0`). It is made in the browser and sent nowhere. Whoever holds
   the file holds the account, and a lost file cannot be replaced. It has no
@@ -321,11 +325,60 @@ stays first.
   "Your login file is needed again." rather than asked for a passkey. A browser
   that never opens the site again keeps the sealed key until it does.
 - A page left open past the 6 hours still shows the account until it is
-  reloaded, and its account window has no file to choose. The message therefore
-  says what to do: "Reload the page, then log in with your file. Unsent answers
-  are kept." A reload shows signed out and keeps that tab's unsent answers, which
-  return once the same file signs in. Disconnect would discard them, and asks
-  first.
+  reloaded. When a Submit of answers meets that, a window opens at once ("LOGIN
+  FILE": "Your unsent answers are kept.", **Login with file**, Close), and the
+  Submit waits behind it. The same file, chosen there, signs the account back in
+  with no reload, and that Submit then starts again and goes ahead, as one
+  Submit with one outcome; a file with a password is asked for it in the same
+  window. A file for another account is refused ("That file is for another
+  account.") before anything is locked or written, so the page's account is
+  never switched.
+  - Closing the window, signing out, or moving to another session while it is
+    open sends nothing. The Submit then fails as before, with its line under the
+    Submit bar: "Your login file is needed again. Reload the page, then log in
+    with your file. Unsent answers are kept." A reload shows signed out and keeps
+    that tab's unsent answers, which return once the same file signs in.
+    Disconnect would discard them, and asks first.
+  - The window is asked for once per Submit, by `askForLoginFile` in
+    `utilities/session/loginFileDue.ts`, and shown by the navbar's account
+    section. Every Submit of answers goes through it: the pile, All questions,
+    a survey, the one-question page and the interview's Submit, and the read of
+    saved answers that comes before a pile Submit. Anything else that needs a
+    signature past the 6 hours (joining a group, for one) fails with the same
+    message and no window.
+- **A password, if asked for.** "Add a password", under "Create login file",
+  takes a password, and the file made then (version 2) holds its 12 words
+  encrypted: PBKDF2-SHA256 with 600,000 iterations and a random 16-byte salt
+  stretches the password into an AES-GCM-256 key, used with a random 12-byte IV.
+  The password is taken as UTF-8 after Unicode NFKC normalisation; the cipher's
+  input is the phrase as UTF-8, with no additional data; `salt`, `iv` and
+  `ciphertext` (which ends with the 16-byte tag) are base64url without padding.
+  The file records the method and its numbers (`encryptedRecoveryPhrase`: `kdf`,
+  `iterations`, `salt`, `cipher`, `iv`, `ciphertext`), so they can be raised later
+  and older files still open; a count below 100,000 or above 5,000,000, or any
+  other method, is refused as not a login file. Stretching takes about a tenth of
+  a second on a fast laptop (measured in Chromium and WebKit) and is expected to
+  take up to about a second on a phone (not measured).
+  - Choosing such a file asks for its password before anything is tried: one box,
+    in place of the other choices, with Back. A wrong password says "Wrong
+    password, or the file is damaged." and leaves the box there to try again; the
+    cipher cannot tell a wrong password from a protected part that was changed. A
+    file that opens to another account than the one it names is refused.
+  - The password is used to open the file and kept nowhere: not in storage, not
+    in the wallet's record, not in the page's markup while it is typed, and it is
+    sent nowhere. It cannot be recovered. A
+    forgotten password leaves the file of no use, which the window says in view.
+  - There is one password box with a "Show" tick, and no second "confirm" box.
+    Creating never signs in, so the first sign-in with the new file is the check:
+    a mistyped password fails there, while the account is still empty and another
+    file can be made.
+  - After the file is opened, everything is as without a password: the same
+    account on every device, and the key sealed in the browser for its 6 hours,
+    during which the password is not asked for again. Files without a password,
+    and the 12 words alone, work as before.
+  - A password protects the file at rest. It does not protect a signed-in
+    browser, and a short or guessable password can be tried offline by anyone who
+    has the file, at the cost of the stretching per guess.
 - The page cannot tell whether a browser saved the file. The notice says where
   to look ("Check your downloads for …"), and its (?) says what to do if no file
   was saved: built-in browsers of other apps often drop downloads.

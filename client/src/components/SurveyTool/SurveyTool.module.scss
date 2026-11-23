@@ -7053,24 +7053,30 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   color: color-mix(in srgb, var(--ce-text-inverse) 80%, transparent);
 }
 
-// The X shares the label's row; the slider below keeps the full width.
+// The X sits on the slider's line, just past the track's end, however wide the row is.
+// Columns: slider, X, then the rest of the row; the label above spans all three.
 .convictionSliderWithClear {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  column-gap: 4px;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: end;
 
   > * {
     grid-column: 1 / -1;
   }
 
-  > .importanceText {
+  > .convictionSlider {
     grid-column: 1;
+    grid-row: 2;
   }
 
   > .convictionClearButton {
     grid-column: 2;
-    grid-row: 1;
+    grid-row: 2;
+    // Clear of the slider's 15px touch overhang, so a drag to the far end never meets the X.
+    margin-left: 18px;
+    // Centred on the track, whose centre sits 11px above the row's end: its 5px bottom margin
+    // plus half its 12px height.
+    margin-bottom: -11px;
   }
 
   .convictionToggleStack {
@@ -7082,13 +7088,10 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 36px;
-  min-height: 36px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
   font-size: 1rem;
-  // Above the slider's enlarged touch area.
-  position: relative;
-  z-index: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {

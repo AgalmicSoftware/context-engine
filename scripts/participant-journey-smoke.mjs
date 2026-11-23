@@ -5,7 +5,7 @@ import {
   PHONES, THEMES, WORKER_ORIGIN,
   assertNoHiddenFaults, assertNoSidewaysScroll, assertReachable, assertReadableText,
   chooseTheme, createJourneySession, createPasskey, loginFileFixture, maxAtOnce, openLoginDialog, openPersonContext, outage, passkeyFixture, settled,
-  signInWithLoginFile,
+  signInWithLoginFile, withFilePassword,
 } from './lib/session-journey-harness.mjs';
 
 // A participant's whole visit on a phone, in the built client against the real Session Worker code:
@@ -29,7 +29,8 @@ const engineNames = (process.env.JOURNEY_ENGINES || 'webkit,chromium').split(','
 for (const name of engineNames) assert.ok(engines[name], `Unknown browser engine: ${name}`);
 await mkdir(outputDir, { recursive: true });
 const startedAt = performance.now();
-// JOURNEY_LOGIN=file: the visit's person has no passkey and signs in with a login file, both times.
+// JOURNEY_LOGIN=file: the visit's person has no passkey and signs in with a login file, both times: first with
+// the plain file, then, after signing out, with the same file under a password.
 const withLoginFile = process.env.JOURNEY_LOGIN === 'file';
 
 const TOTAL = 40;
@@ -322,7 +323,8 @@ const runJourney = async (engineName, phoneName) => {
     assert.equal(await firstAnswer(), false, 'A signed-out page shows no saved answer');
     await page.getByTestId('ce-account-login-button').click();
     if (withLoginFile) {
-      await signInWithLoginFile(page, person);
+      // The same words under a password: a wrong password is refused, the right one opens the same account.
+      await signInWithLoginFile(page, await withFilePassword(person));
     } else {
       await page.getByTestId('ce-passkey-wallet-sign-in').click();
       await page.getByTestId('ce-wallet-display').waitFor().catch(() => assert.fail('Signing in with the passkey did not sign the person in'));

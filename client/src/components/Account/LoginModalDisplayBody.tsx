@@ -17,8 +17,12 @@ import styles from './Account.module.scss';
 import { AccountMenu, AccountMenuRow } from './AccountMenu';
 import { countUnsentAnswers } from 'components/UserPage/userPageAnalyzeLink';
 const AgentAccountAccessPanel = React.lazy(() => import('./AgentAccountAccessPanel'));
-import LoginFileAccess, { LoginFilePairLine, OrLine } from './LoginFileAccess';
+import LoginFileAccess, { LoginFilePairLine, OrLine, type ChosenLoginFile } from './LoginFileAccess';
 import {
+  LOGIN_FILE_NOT_MADE_TEXT,
+  LOGIN_FILE_PASSWORD_NEEDED_TEXT,
+  LOGIN_FILE_PASSWORD_WRONG_TEXT,
+  LOGIN_FILE_UNREADABLE_TEXT,
   PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE,
   PASSKEYS_UNAVAILABLE_MESSAGE,
   type PasskeyWalletActionMode,
@@ -54,8 +58,15 @@ const CopyPageLink = () => {
 // Sign-in errors that mean the passkey itself cannot be made or used in this browser, so trying again here will
 // not help: no passkeys at all, no PRF, or a create or unlock the device or browser refused. A prompt that was
 // closed or timed out, and the errors that point at the other button, are left out: those are fixed here.
-const FIXED_HERE =
-  /prompt closed or timed out|try the passkey again|Use Login\.|Sign in, or delete it first|not a Context Engine login file/;
+const FIXED_HERE = /prompt closed or timed out|try the passkey again|Use Login\.|Sign in, or delete it first/;
+// A status about a login file itself, by its exact words: not a passkey's problem, and never one to hide.
+const LOGIN_FILE_STATUSES = [
+  LOGIN_FILE_UNREADABLE_TEXT,
+  LOGIN_FILE_PASSWORD_NEEDED_TEXT,
+  LOGIN_FILE_PASSWORD_WRONG_TEXT,
+  LOGIN_FILE_NOT_MADE_TEXT,
+].flatMap((text) => [`Login failed: ${text}`, `Create failed: ${text}`]);
+const isLoginFileStatus = (message: string): boolean => LOGIN_FILE_STATUSES.includes(message);
 // Any sign-in that failed in the log-in window, whatever the cause: the status then offers a login file.
 export const isLoginIssue = (message: string): boolean =>
   message === PASSKEYS_UNAVAILABLE_MESSAGE ||
@@ -63,7 +74,8 @@ export const isLoginIssue = (message: string): boolean =>
   /^No passkey wallet is saved/.test(message);
 
 export const isPasskeyProblem = (message: string): boolean =>
-  message === PASSKEYS_UNAVAILABLE_MESSAGE || (/^(Create|Login) failed: /.test(message) && !FIXED_HERE.test(message));
+  message === PASSKEYS_UNAVAILABLE_MESSAGE ||
+  (/^(Create|Login) failed: /.test(message) && !FIXED_HERE.test(message) && !isLoginFileStatus(message));
 
 const COPY_ANSWERS_HELP =
   'Copies a link that holds your unsaved answers, so you can finish in a browser where sign-in works. ' +
@@ -221,10 +233,12 @@ type LoginModalDisplayBodyProps = {
   handlePasskeyWalletCreate: () => void;
   handlePasskeyWalletCreateOnAnotherDevice: () => void;
   handlePasskeyWalletSignIn: () => void;
-  handleLoginFileSignIn: (text: string) => void;
-  handleLoginFileCreate: () => void;
+  handleLoginFileChosen: (file: ChosenLoginFile) => void;
+  handleLoginFilePassword: (password: string) => void;
+  handleLoginFileCreate: (password?: string) => void | Promise<void>;
   handleLoginFileBack: () => void;
   loginFileSavedName: string;
+  loginFileProtectedName: string;
   loginComplete: boolean;
   loginInProgress: boolean;
   network: unknown;
@@ -267,10 +281,12 @@ const LoginModalDisplayBody = ({
   handlePasskeyWalletCreate,
   handlePasskeyWalletCreateOnAnotherDevice,
   handlePasskeyWalletSignIn,
-  handleLoginFileSignIn,
+  handleLoginFileChosen,
+  handleLoginFilePassword,
   handleLoginFileCreate,
   handleLoginFileBack,
   loginFileSavedName,
+  loginFileProtectedName,
   loginComplete,
   loginInProgress,
   network,
@@ -293,15 +309,16 @@ const LoginModalDisplayBody = ({
   // After any sign-in that failed, the status is also the list of other ways in: it offers a login file, so
   // "Other options" is not shown beside it. A message about a login file itself stays in view on its own.
   const loginIssue = passkeyWalletStatusTone === 'error' && isLoginIssue(passkeyWalletStatusMessage);
-  const aboutLoginFile = /login file/i.test(passkeyWalletStatusMessage);
-  // Once a login file was saved from there, the notice about it stands in place of that status and its other
-  // ways out; Back brings them back.
-  const noticeReplacesStatus = loginIssue && !aboutLoginFile && !!loginFileSavedName;
-  const offersLoginFile = loginIssue && !loginFileSavedName;
+  const aboutLoginFile = isLoginFileStatus(passkeyWalletStatusMessage);
+  // Once a login file was saved from there, or one with a password was chosen, the box about it stands in place
+  // of that status and its other ways out; Back brings them back.
+  const loginFileBox = !!loginFileSavedName || !!loginFileProtectedName;
+  const noticeReplacesStatus = loginIssue && !aboutLoginFile && loginFileBox;
+  const offersLoginFile = loginIssue && !loginFileBox;
   const copiesAnswers =
     passkeyWalletStatusTone === 'error' && isPasskeyProblem(passkeyWalletStatusMessage) && countUnsavedAnswers() > 0;
   const loginFileLine = (withOr: boolean, last: boolean) => (
-    <LoginFilePairLine onCreate={handleLoginFileCreate} onSignIn={handleLoginFileSignIn} withOr={withOr} last={last} />
+    <LoginFilePairLine onCreate={handleLoginFileCreate} onChoose={handleLoginFileChosen} withOr={withOr} last={last} />
   );
   if (!loginComplete && !loginInProgress) {
     return (
@@ -358,6 +375,7 @@ const LoginModalDisplayBody = ({
                 passkeyWalletStatusTone === 'error' ? styles.passkeyWalletStatusError : ''
               }`}
               role="status"
+              id="ce-passkey-wallet-status"
               data-testid="ce-passkey-wallet-status"
             >
               {passkeyWalletStatusMessage}
@@ -412,8 +430,15 @@ const LoginModalDisplayBody = ({
           {offersLoginFile ? null : (
             <LoginFileAccess
               onCreate={handleLoginFileCreate}
-              onSignIn={handleLoginFileSignIn}
+              onChoose={handleLoginFileChosen}
               savedName={loginFileSavedName}
+              protectedName={loginFileProtectedName}
+              onPassword={handleLoginFilePassword}
+              passwordRefusedBy={
+                passkeyWalletStatusMessage === `Login failed: ${LOGIN_FILE_PASSWORD_WRONG_TEXT}`
+                  ? 'ce-passkey-wallet-status'
+                  : ''
+              }
               onBack={handleLoginFileBack}
             />
           )}

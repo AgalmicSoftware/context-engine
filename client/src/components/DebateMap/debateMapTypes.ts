@@ -286,7 +286,11 @@ export interface DebateMapProps {
 export interface AtlasChromeProps {
   atlasRoot: DebateNode | null;
   handleBack: (event?: React.SyntheticEvent) => void;
+  /** Holds "Up Level" and the level's title; the packed atlas measures it to start its circles below. */
+  headerRef?: React.Ref<HTMLDivElement>;
   onNodeClick: (node: DebateNode) => void;
+  /** The level's title, under "Up Level"; it opens the level's own window. */
+  title?: string;
   readOnly?: boolean;
   showActiveDebates: boolean;
   setShowActiveDebates: React.Dispatch<React.SetStateAction<boolean>>;

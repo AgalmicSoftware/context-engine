@@ -1,3 +1,4 @@
+import { LOGIN_FILE_DUE_EVENT, type LoginFileDueRequest } from '../../utilities/session/loginFileDue';
 import { createSurveyQuestionsSubmitRuntime } from './surveyQuestionsSubmitRuntime';
 import { ethers } from 'ethers';
 import { webcrypto } from 'crypto';
@@ -237,6 +238,105 @@ describe('surveyQuestionsSubmitRuntime', () => {
     // Dropped, an answer changed just before the Submit returned and still unsent would be lost on reload.
     expect(persistDraftSafely).toHaveBeenCalledTimes(pending ? 1 : 0);
     if (timer) clearTimeout(timer);
+  });
+
+  describe('a Submit that finds the login file due again', () => {
+    const due =
+      'Your login file is needed again. Reload the page, then log in with your file. Unsent answers are kept.';
+    // Stands in for the window: takes each request, and answers it as the test says.
+    const withWindow = async (answer: boolean | null, run: (asked: LoginFileDueRequest[]) => Promise<void>) => {
+      const asked: LoginFileDueRequest[] = [];
+      const listen = (event: Event) => {
+        const request = (event as CustomEvent<LoginFileDueRequest>).detail;
+        if (answer === null) return;
+        request.take();
+        asked.push(request);
+        // After the Submit has gone to wait, as a person's choice comes.
+        setTimeout(() => request.answer(answer), 0);
+      };
+      window.addEventListener(LOGIN_FILE_DUE_EVENT, listen);
+      try {
+        await run(asked);
+      } finally {
+        window.removeEventListener(LOGIN_FILE_DUE_EVENT, listen);
+      }
+    };
+
+    it('waits for the file, then goes ahead as one Submit with one outcome', async () => {
+      await withWindow(true, async (asked) => {
+        const context = createContext();
+        context.submitSurveyResponse.mockRejectedValueOnce(new Error(due));
+        const runtime = createSurveyQuestionsSubmitRuntime(context);
+        // The caller sees the Submit succeed: no failure in between for it to undo anything on.
+        await expect(runtime.encryptAndUpload()).resolves.toEqual({ status: 'submitted' });
+        expect(asked).toHaveLength(1);
+        expect(context.submitSurveyResponse).toHaveBeenCalledTimes(2);
+        expect(context.runSurveyQuestionsSubmitFailureController).not.toHaveBeenCalled();
+        expect(context.inst._submitGuard).toBeFalsy();
+      });
+    });
+
+    it('fails with its line under the bar when the window is closed', async () => {
+      await withWindow(false, async (asked) => {
+        const context = createContext();
+        context.submitSurveyResponse.mockRejectedValueOnce(new Error(due));
+        const runtime = createSurveyQuestionsSubmitRuntime(context);
+        await expect(runtime.encryptAndUpload()).resolves.toEqual({ status: 'failed', message: due });
+        expect(asked).toHaveLength(1);
+        expect(context.submitSurveyResponse).toHaveBeenCalledTimes(1);
+        expect(context.runSurveyQuestionsSubmitFailureController).toHaveBeenCalledWith(
+          expect.objectContaining({ error: expect.objectContaining({ message: due }) }),
+        );
+      });
+    });
+
+    it('fails the same way where nothing on the page can show the window', async () => {
+      await withWindow(null, async () => {
+        const context = createContext();
+        context.submitSurveyResponse.mockRejectedValueOnce(new Error(due));
+        await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+          status: 'failed',
+          message: due,
+        });
+        expect(context.submitSurveyResponse).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('asks once per Submit: still due after the file, it fails rather than ask again', async () => {
+      await withWindow(true, async (asked) => {
+        const context = createContext();
+        context.submitSurveyResponse.mockRejectedValue(new Error(due));
+        await expect(createSurveyQuestionsSubmitRuntime(context).encryptAndUpload()).resolves.toEqual({
+          status: 'failed',
+          message: due,
+        });
+        expect(asked).toHaveLength(1);
+        expect(context.submitSurveyResponse).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    it('sends nothing when the page moved to another session while the window was open', async () => {
+      await withWindow(true, async () => {
+        const context = createContext();
+        context.submitSurveyResponse.mockImplementationOnce(async () => {
+          // The person left for another session before choosing the file.
+          context.inst._getEffectiveDraftSlug.mockReturnValue('different-session');
+          throw new Error(due);
+        });
+        const result = await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+        expect(result.status).toBe('stale');
+        expect(context.submitSurveyResponse).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('asks for nothing on any other failure', async () => {
+      await withWindow(true, async (asked) => {
+        const context = createContext();
+        context.submitSurveyResponse.mockRejectedValueOnce(new Error('Upload failed.'));
+        await createSurveyQuestionsSubmitRuntime(context).encryptAndUpload();
+        expect(asked).toHaveLength(0);
+      });
+    });
   });
 
   it('starts a new operation when the account or session changes after a failed attempt', async () => {

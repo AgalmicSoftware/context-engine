@@ -898,6 +898,44 @@ describe('DebateMap', () => {
     expect(onNodeClick).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'parent-node' }));
   });
 
+  it('puts the level title under Up Level and starts the circles below them both', () => {
+    // A header 300px tall, as a long title wrapped over several lines draws it; nothing else has a size here.
+    const header = (element: HTMLElement) => element.classList.contains('atlasLevelHeader');
+    const offsetTop = jest.spyOn(HTMLElement.prototype, 'offsetTop', 'get').mockImplementation(function offsetTopOf(
+      this: HTMLElement,
+    ) {
+      return header(this) ? 20 : 0;
+    });
+    const offsetHeight = jest
+      .spyOn(HTMLElement.prototype, 'offsetHeight', 'get')
+      .mockImplementation(function offsetHeightOf(this: HTMLElement) {
+        return header(this) ? 300 : 0;
+      });
+    try {
+      render(
+        <AtlasViewComponent
+          data={[{ id: 'parent-node', name: 'Parent Node', children: [{ id: 'child-node', name: 'Child Node' }] }]}
+          onNodeClick={jest.fn()}
+          atlasLayoutMode="packed"
+        />,
+      );
+      fireEvent.click(getAtlasNodeElementById('parent-node', 'packed') as HTMLElement);
+
+      const upLevel = screen.getByRole('button', { name: /up level/i });
+      const title = screen.getByTestId(E2E_TESTIDS.ATLAS_TITLE_ACTION);
+      expect(upLevel.parentElement).toHaveClass('atlasLevelHeader');
+      expect(title.parentElement).toBe(upLevel.parentElement);
+      expect(upLevel.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+      const child = getAtlasNodeElementById('child-node', 'packed') as HTMLElement;
+      const radius = parseFloat((child.querySelector('.packedNodeDot') as HTMLElement).style.height) / 2;
+      expect(parseFloat(child.style.top) - radius).toBeGreaterThanOrEqual(320);
+    } finally {
+      offsetTop.mockRestore();
+      offsetHeight.mockRestore();
+    }
+  });
+
   it('opens a session subtopic in one click, over its question circles, and only zooms into what is above it', () => {
     const onNodeClick = jest.fn();
     const question = (id: string) => ({ id, name: `Question ${id}`, isQuestion: true, questions: [{ id }] });

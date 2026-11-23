@@ -21,7 +21,9 @@ const renderBody = (props: Partial<Props>) => {
         handleLogout: jest.fn(),
         handlePasskeyWalletCreate: jest.fn(),
         handlePasskeyWalletCreateOnAnotherDevice: jest.fn(),
-        handleLoginFileSignIn: jest.fn(),
+        handleLoginFileChosen: jest.fn(),
+        handleLoginFilePassword: jest.fn(),
+        loginFileProtectedName: '',
         handleLoginFileCreate: jest.fn(),
         handleLoginFileBack: jest.fn(),
         loginFileSavedName: '',
@@ -117,7 +119,7 @@ describe('Copy my answers after a failed sign-in', () => {
     // After the login file's line and an "or", its button leads its sentence.
     expect(line.querySelector('button')).toBe(button);
     expect(screen.getByTestId('ce-passkey-login-file')).toHaveTextContent(
-      /^Create login file or Login with file ?to login without a passkey$/,
+      /^Create login file or Login with file ?to login without a passkeyAdd a password/,
     );
     expect(line).toHaveTextContent(
       /^orCopy this link and open it on your phone to recover and submit responses\.(?: |$)/,
@@ -218,7 +220,7 @@ describe('Copy my answers after a failed sign-in', () => {
     renderBody({ passkeyWalletStatusMessage: closed, passkeyWalletStatusTone: 'error' });
     const status = screen.getByTestId('ce-passkey-wallet-status');
     expect(status).toHaveTextContent(
-      /^Login failed: Passkey prompt closed or timed out\. Try again\.Create login file or Login with file ?to login without a passkey\.$/,
+      /^Login failed: Passkey prompt closed or timed out\. Try again\.Create login file or Login with file ?to login without a passkey\.Add a password/,
     );
     expect(screen.queryByRole('button', { name: 'Scan QR with phone' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Other options' })).not.toBeInTheDocument();
@@ -232,8 +234,8 @@ describe('Copy my answers after a failed sign-in', () => {
     expect(
       within(screen.getByTestId('ce-passkey-wallet-status'))
         .getAllByRole('button')
-        .map((button) => button.textContent?.trim()),
-    ).toEqual(['Copy link', 'Create login file', 'Login with file']);
+        .map((button) => button.textContent?.trim() || button.getAttribute('aria-label')),
+    ).toEqual(['Copy link', 'Create login file', 'Login with file', "About a login file's password"]);
   });
 
   it('shows "Other options" where no sign-in failed, and for a status that is not a failed sign-in', () => {
@@ -265,9 +267,14 @@ describe('Copy my answers after a failed sign-in', () => {
         'No passkey wallet is saved in this browser for this app. Use Create to make one under this RP ID.',
         'Signed out here, but the saved wallet could not be disconnected.',
         'Login failed: That is not a Context Engine login file.',
+        'Login failed: Wrong password, or the file is damaged.',
+        'Login failed: This login file has a password. Enter it to log in.',
+        'Create failed: The login file could not be made.',
         '',
       ].map(isPasskeyProblem),
-    ).toEqual(Array(8).fill(false));
+    ).toEqual(Array(11).fill(false));
+    // Only those exact words: a passkey's own error that happens to speak of a password still counts.
+    expect(isPasskeyProblem('Login failed: The device asked for a password and was refused.')).toBe(true);
 
     sessionStorage.setItem(
       'dg:surveyDraft:meadow-forum:84532:anon:all',

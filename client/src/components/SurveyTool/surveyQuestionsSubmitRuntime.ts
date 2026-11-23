@@ -1,3 +1,4 @@
+import { askForLoginFile, isLoginFileDueError } from '../../utilities/session/loginFileDue';
 import { buildSavedInterviewConsent, isWithheldConsent } from './sessionInterviewConsent';
 import { loadSessionInterviewSavedAnswers } from './sessionInterviewSavedAnswers';
 import { planDraftTextSync, resendPendingDraftTextDeletes, syncDraftText } from './sessionInterviewDraftText';
@@ -438,7 +439,11 @@ export const createSurveyQuestionsSubmitRuntime = (
     return oversize;
   };
 
-  const encryptAndUpload = async (overrideChangedQids: Set<string> | null = null) => {
+  const encryptAndUpload = async (
+    overrideChangedQids: Set<string> | null = null,
+    // Set on the one run that follows a login file being chosen again, so that it is asked for once per Submit.
+    afterLoginFile = false,
+  ): Promise<SurveyQuestionsLegacyValue> => {
     let submitContext: SurveyQuestionsLegacyValue = null;
     let heldBackNotice = '';
     try {
@@ -938,6 +943,21 @@ export const createSurveyQuestionsSubmitRuntime = (
         heldBackNotice && !String(error?.message || '').includes(heldBackNotice)
           ? new Error([error?.message, heldBackNotice].filter(Boolean).join(' '))
           : error;
+      // A login file whose time ran out: the page asks for it again in a window of its own, and this Submit waits
+      // there. Once the file has signed the account back in, the same Submit starts again from the top, so its
+      // caller sees one outcome. If the window is closed, or the page has moved on meanwhile, it fails like every
+      // other failure, and the line under the bar says what to do.
+      if (!afterLoginFile && isLoginFileDueError(error) && (await askForLoginFile())) {
+        if (submitContext && !isSubmitContextCurrent(submitContext)) {
+          handleStaleSubmitContext(submitContext);
+          return { status: 'stale', message: 'Submission context changed before failure handling completed.' };
+        }
+        if (inst._isMounted !== false) {
+          inst._submitGuard = false;
+          finishSubmitAttempt(submitContext?.submitAttemptId);
+          return encryptAndUpload(overrideChangedQids, true);
+        }
+      }
       runSurveyQuestionsSubmitFailureController({
         error: reportedError,
         submittedSinceLastEdit: stateRef.current.submittedSinceLastEdit,

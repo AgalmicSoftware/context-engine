@@ -658,17 +658,36 @@ const useAtlasNavigationState = (
 const AtlasChrome = ({
   atlasRoot,
   handleBack,
+  headerRef,
   onNodeClick,
   readOnly = false,
   showActiveDebates,
   setShowActiveDebates,
+  title = '',
   topNodes,
 }: AtlasChromeProps) => (
   <>
+    {/* "Up Level", then the level's title on a line of its own, so neither covers the other at any width. */}
     {atlasRoot && (
-      <button type="button" className={styles.backArrow} onClick={handleBack}>
-        <FontAwesomeIcon icon={faArrowLeft} /> Up Level
-      </button>
+      <div ref={headerRef} className={styles.atlasLevelHeader}>
+        <button type="button" className={styles.backArrow} onClick={handleBack}>
+          <FontAwesomeIcon icon={faArrowLeft} /> Up Level
+        </button>
+        {title && (
+          <button
+            type="button"
+            className={styles.packedAtlasTitleButton}
+            data-testid={E2E_TESTIDS.ATLAS_TITLE_ACTION}
+            data-ce-node-id={atlasRoot.id || ''}
+            aria-label={`Open ${title}`}
+            title={`Open ${title}`}
+            onClick={() => onNodeClick(atlasRoot)}
+          >
+            <span className={styles.packedAtlasTitle}>{title}</span>
+            <FontAwesomeIcon icon={faExternalLinkAlt} className={styles.packedAtlasTitleIcon} />
+          </button>
+        )}
+      </div>
     )}
 
     {!atlasRoot && !readOnly && (
@@ -980,9 +999,21 @@ const PackedAtlasView = ({
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [hoveredGroupId, setHoveredGroupId] = useState('');
   const isMobile = dimensions.w < 768;
-  const compactHeader = dimensions.w < 480;
   const packedTitle = atlasRoot ? String(atlasRoot?.name || '').trim() : '';
   const isTopLevelPackedView = !atlasRoot;
+  // The circles start below the header ("Up Level" and the level's title), however many lines the title takes.
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  const [headerBottom, setHeaderBottom] = useState(0);
+  useLayoutEffect(() => {
+    const header = headerRef.current;
+    if (!header) return undefined;
+    const measure = () => setHeaderBottom(header.offsetTop + header.offsetHeight);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, [atlasRoot]);
 
   const layout = useMemo(() => {
     const centerNode = atlasRoot
@@ -994,10 +1025,9 @@ const PackedAtlasView = ({
         }
       : getAtlasCenterNode(atlasRoot, data, rootLabel);
     const inset = isMobile ? 12 : 18;
-    // On a narrow phone the branch's name has its own row under "Up Level": beside it, a long name had room for
-    // a few letters a line.
-    const headerHeight = atlasRoot ? (compactHeader ? 142 : isMobile ? 34 : 28) : 0;
-    const desiredTopGutter = atlasRoot ? (isMobile ? 10 : 8) : isMobile ? 14 : 18;
+    // The header as drawn; before it is drawn, and in tests, where nothing is, an estimate of one with a short title.
+    const headerHeight = atlasRoot ? Math.max((headerBottom || 120) - inset, 0) : 0;
+    const desiredTopGutter = atlasRoot || isMobile ? 14 : 18;
     const packLayout = d3Pack()
       .size([Math.max(dimensions.w - inset * 2, 1), Math.max(dimensions.h - inset * 2 - headerHeight, 1)])
       .padding(isMobile ? 4 : 8);
@@ -1044,7 +1074,7 @@ const PackedAtlasView = ({
       });
 
     return { nodes };
-  }, [atlasRoot, compactHeader, data, dimensions.h, dimensions.w, isMobile, readOnly, rootLabel]);
+  }, [atlasRoot, data, dimensions.h, dimensions.w, headerBottom, isMobile, readOnly, rootLabel]);
   const layoutNodeMap = useMemo(
     () => new Map(layout.nodes.map((node) => [String(node.id || '').trim(), node])),
     [layout.nodes],
@@ -1070,34 +1100,14 @@ const PackedAtlasView = ({
       <AtlasChrome
         atlasRoot={atlasRoot}
         handleBack={handleBack}
+        headerRef={headerRef}
         onNodeClick={onNodeClick}
         readOnly={readOnly}
         showActiveDebates={showActiveDebates}
         setShowActiveDebates={setShowActiveDebates}
+        title={packedTitle}
         topNodes={topNodes}
       />
-
-      {packedTitle && (
-        <div
-          className={styles.packedAtlasTitleRow}
-          style={compactHeader ? { top: 68, left: 8, right: 8, width: 'auto', transform: 'none' } : undefined}
-        >
-          <button
-            type="button"
-            className={styles.packedAtlasTitleButton}
-            data-testid={E2E_TESTIDS.ATLAS_TITLE_ACTION}
-            data-ce-node-id={atlasRoot?.id || ''}
-            aria-label={`Open ${packedTitle}`}
-            title={`Open ${packedTitle}`}
-            onClick={() => {
-              if (atlasRoot) onNodeClick(atlasRoot);
-            }}
-          >
-            <span className={styles.packedAtlasTitle}>{packedTitle}</span>
-            <FontAwesomeIcon icon={faExternalLinkAlt} className={styles.packedAtlasTitleIcon} />
-          </button>
-        </div>
-      )}
 
       {layout.nodes.map((node) => {
         const diameter = Math.max((Number(node.r) || 0) * 2, 0);

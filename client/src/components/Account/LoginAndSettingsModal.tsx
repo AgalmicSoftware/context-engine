@@ -52,7 +52,7 @@ import contractScripts, {
 } from '../../utilities/web3/chainGateway.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import * as passkeyWallet from '../../wallet/passkeyWallet.js';
-import { saveLoginFile } from './LoginFileAccess';
+import { saveLoginFile, type ChosenLoginFile } from './LoginFileAccess';
 import {
   getSessionAiSettings,
   getLocalAiSettings,
@@ -129,7 +129,11 @@ import {
   resolveValidatedWorkerCanonicalLoginConfig,
   type LoginDisplaySessionConfig,
 } from './loginAndSettingsAgentTokenActions';
-import { createLoginPasskeyActions, restorePasskeyLoginPassively } from './loginAndSettingsPasskeyActions';
+import {
+  LOGIN_FILE_NOT_MADE_TEXT,
+  createLoginPasskeyActions,
+  restorePasskeyLoginPassively,
+} from './loginAndSettingsPasskeyActions';
 import type { LoginPasskeyNetwork, PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
 
 const LoginSettingsAiConfigContent = React.lazy(() => import('./LoginSettingsAiConfigContent'));
@@ -183,6 +187,8 @@ interface LoginAndSettingsModalState {
   passkeyWalletStatusHelp: string;
   // The name of the login file this window last saved to the person's downloads.
   loginFileSavedName: string;
+  // A chosen login file that has a password, kept while its password is asked for. Never stored anywhere else.
+  loginFileProtected: ChosenLoginFile | null;
   passkeyMode: PasskeyWalletActionMode;
   autoRequestTestnetFundsEnabled: boolean;
   autoSendTriggered: boolean;
@@ -345,6 +351,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       passkeyWalletStatusTone: '',
       passkeyWalletStatusHelp: '',
       loginFileSavedName: '',
+      loginFileProtected: null,
       passkeyMode: '',
       autoRequestTestnetFundsEnabled: DEFAULT_AUTO_REQUEST_TESTNET_FUNDS,
       autoSendTriggered: false,
@@ -412,7 +419,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       this.setStateIfMounted({ ...patch, passkeyWalletStatusHelp: '' });
     },
     startAction: () => this.startPurposefulPasskeyWalletAction(),
-    updateLoginInfo: (payload) => this.props.updateLoginInfo(payload),
+    updateLoginInfo: (payload) => {
+      // Signed in, by a file or a passkey: a file that was waiting for its password, and the notice of a saved
+      // one, are let go, so neither is shown to whoever signs out here later.
+      if (payload.loginComplete) this.setStateIfMounted({ loginFileProtected: null, loginFileSavedName: '' });
+      this.props.updateLoginInfo(payload);
+    },
   });
   syncPasskeyWalletChain = this._passkeyActions.syncPasskeyWalletChain;
   getPasskeyWalletNetwork = this._passkeyActions.getPasskeyWalletNetwork;
@@ -421,12 +433,38 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   handlePasskeyWalletSignIn = this._passkeyActions.handlePasskeyWalletSignIn;
   handleLoginFileSignIn = this._passkeyActions.handleLoginFileSignIn;
   // Makes a login file and saves it to the person's downloads. It signs no one in: choosing the file does.
-  handleLoginFileCreate = () => {
-    const file = passkeyWallet.createLoginFile();
-    saveLoginFile(file);
-    this.setStateIfMounted({ loginFileSavedName: file.name });
+  // Without a password nothing is awaited before the save, so the download stays inside the tap.
+  handleLoginFileCreate = async (password?: string) => {
+    try {
+      // A password that was asked for is always used: an empty one is refused, never dropped.
+      const file =
+        password === undefined
+          ? passkeyWallet.createLoginFile()
+          : await passkeyWallet.createProtectedLoginFile(password);
+      saveLoginFile(file);
+      this.setStateIfMounted({ loginFileSavedName: file.name });
+    } catch (error) {
+      accountLog.error('Login file create error:', error);
+      this.setStateIfMounted({
+        passkeyWalletStatusMessage: `Create failed: ${LOGIN_FILE_NOT_MADE_TEXT}`,
+        passkeyWalletStatusTone: 'error',
+        passkeyWalletStatusHelp: '',
+      });
+    }
   };
-  handleLoginFileBack = () => this.setStateIfMounted({ loginFileSavedName: '' });
+  // A chosen file signs in at once, unless it has a password: then the window asks for it first.
+  handleLoginFileChosen = (file: ChosenLoginFile) => {
+    if (passkeyWallet.isLoginFileProtected(file.text)) this.setStateIfMounted({ loginFileProtected: file });
+    else void this.handleLoginFileSignIn(file.text);
+  };
+  // The file stays chosen through a wrong password, so that it can be tried again.
+  handleLoginFilePassword = async (password: string) => {
+    const file = this.state.loginFileProtected;
+    if (!file) return;
+    await this.handleLoginFileSignIn(file.text, password);
+  };
+  handleLoginFileBack = () =>
+    this.setStateIfMounted(this.state.loginFileProtected ? { loginFileProtected: null } : { loginFileSavedName: '' });
   _finalizePasskeyWalletLogin = this._passkeyActions._finalizePasskeyWalletLogin;
   _agentTokenActions = createLoginAgentActions({
     changeAccount: (payload) => this.props.changeAccount(payload),
@@ -879,7 +917,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     this._passkeyWalletActionId += 1;
     this._passkeyWalletRestoreReqId += 1;
     this._purposefulPasskeyActionId = null;
-    this.setStateIfMounted({ agentTokenInput: '', agentTokenStatus: '', agentTokenError: '' });
+    this.setStateIfMounted({
+      agentTokenInput: '',
+      agentTokenStatus: '',
+      agentTokenError: '',
+      loginFileProtected: null,
+      loginFileSavedName: '',
+    });
     this.props.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
     this.props.changeAccount({});
   };
@@ -2591,10 +2635,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       handlePasskeyWalletCreate: this.handlePasskeyWalletCreate,
       handlePasskeyWalletCreateOnAnotherDevice: this.handlePasskeyWalletCreateOnAnotherDevice,
       handlePasskeyWalletSignIn: this.handlePasskeyWalletSignIn,
-      handleLoginFileSignIn: this.handleLoginFileSignIn,
+      handleLoginFileChosen: this.handleLoginFileChosen,
+      handleLoginFilePassword: this.handleLoginFilePassword,
       handleLoginFileCreate: this.handleLoginFileCreate,
       handleLoginFileBack: this.handleLoginFileBack,
       loginFileSavedName: this.state.loginFileSavedName,
+      loginFileProtectedName: this.state.loginFileProtected?.name || '',
       loginComplete: this.props.loginComplete,
       loginInProgress: this.props.loginInProgress,
       network: this.props.network,

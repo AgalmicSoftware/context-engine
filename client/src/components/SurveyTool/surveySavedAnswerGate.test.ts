@@ -42,3 +42,19 @@ it('ends at once, as stale, when its caller stops it', async () => {
   caller.abort();
   await expect(outcome).resolves.toEqual({ status: 'stale' });
 });
+
+it('says in the wallet’s own words when the login file is due again, and keeps its usual words for any other failure', async () => {
+  const due = 'Your login file is needed again. Reload the page, then log in with your file. Unsent answers are kept.';
+  const read = jest.spyOn(savedAnswers, 'loadSessionInterviewSavedAnswers');
+  read.mockRejectedValueOnce(new Error(due));
+  // The Submit knows the failure by these words, and asks for the file.
+  await expect(readOwnAnswersBeforeUpload(engine(), () => ['q1'], new AbortController().signal)).resolves.toEqual({
+    status: 'failed',
+    message: due,
+  });
+  read.mockRejectedValueOnce(new Error('offline'));
+  await expect(readOwnAnswersBeforeUpload(engine(), () => ['q1'], new AbortController().signal)).resolves.toEqual({
+    status: 'failed',
+    message: 'Could not load your saved answers. Try Submit again to retry.',
+  });
+});
