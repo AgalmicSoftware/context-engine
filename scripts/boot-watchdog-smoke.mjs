@@ -12,6 +12,8 @@ const engineNames = (process.env.SMOKE_ENGINES || 'chromium,webkit').split(',').
 const WAIT_MS = 12000;
 // And the longer wait it gives once the app's first script has run.
 const LONG_WAIT_MS = 45000;
+// When the loading line says the load is slow.
+const SLOW_NOTE_MS = 15000;
 const PAGE = '/about';
 const notice = (page) => page.locator('#ce-boot-notice');
 // Drawn means something in the root besides what the app puts there before drawing (its empty toast host and its
@@ -23,9 +25,14 @@ const isEntry = (url) => /\/assets\/index-[^/]+\.js$/.test(url.pathname);
 const isAppScript = (url) => /\/assets\/[^/]+\.js$/.test(url.pathname) && !isEntry(url);
 const isMainPart = (url) => /\/assets\/AppShell-[^/]+\.js$/.test(url.pathname);
 
-const open = async (browser, { colorScheme = 'light', routes = async () => {} } = {}) => {
+// The watchdog reloads the page by itself once before showing its message. Most cases are about the message, so
+// they start with that one try already used; `autoRetry` leaves it to happen.
+const open = async (browser, { colorScheme = 'light', routes = async () => {}, autoRetry = false } = {}) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 664 }, colorScheme });
   const page = await context.newPage();
+  if (!autoRetry) {
+    await page.addInitScript(() => window.sessionStorage.setItem('ce:bootAutoRetryAt', String(Date.now())));
+  }
   await page.route(
     (url) => url.origin !== new URL(base).origin,
     (route) => route.abort(),
@@ -174,16 +181,24 @@ for (const name of engineNames) {
 
     // 6. The first script ran, but the main part of the app never arrives (a stalled connection). The app has
     // already put its toast host in the root; that alone once kept the message away and left a white page. Now
-    // the loading line shows, and the message comes after the long wait.
+    // the loading line shows with its bar part filled, the page reloads by itself once after the long wait, and
+    // the message comes when that fails too.
     {
-      const { context, page } = await open(browser, { routes: (p) => p.route(isMainPart, () => {}) });
+      const { context, page } = await open(browser, { autoRetry: true, routes: (p) => p.route(isMainPart, () => {}) });
+      let loads = 0;
+      page.on('domcontentloaded', () => (loads += 1));
       await page.goto(`${base}${PAGE}`, { waitUntil: 'commit' });
-      const loading = page.locator('.ce-app-loading');
+      const loading = page.locator('#ce-boot-loading');
       await loading.waitFor({ timeout: 20000 });
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(2500);
       assert.equal(await loading.isVisible(), true, `${name}: the loading line shows while the main part is missing`);
+      const bar = await loading.locator('progress').evaluate((el) => el.value / el.max);
+      assert(bar > 0.2 && bar < 1, `${name}: the bar shows part of the app has arrived (${bar.toFixed(2)})`);
       assert.equal(await notice(page).count(), 0, `${name}: no message before the long wait`);
-      await notice(page).waitFor({ timeout: LONG_WAIT_MS });
+      await page.waitForTimeout(SLOW_NOTE_MS);
+      assert.match(await loading.innerText(), /taking longer than usual/, `${name}: a slow load is told it is slow`);
+      await notice(page).waitFor({ timeout: 2 * LONG_WAIT_MS });
+      assert.equal(loads, 2, `${name}: the page reloaded by itself once before the message (${loads} loads)`);
       await assertNotice(page, `${name}, main part stalled`);
       await context.close();
     }
@@ -194,7 +209,7 @@ for (const name of engineNames) {
       await page.addInitScript(() => {
         window.__loadingSeen = false;
         const check = () => {
-          const line = document.querySelector('.ce-app-loading');
+          const line = document.getElementById('ce-boot-loading');
           if (line && getComputedStyle(line).visibility === 'visible') window.__loadingSeen = true;
         };
         new MutationObserver(check).observe(document, { childList: true, subtree: true });

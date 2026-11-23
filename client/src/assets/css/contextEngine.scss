@@ -7762,16 +7762,29 @@ a[data-toggle='collapse'][aria-expanded='true'] .caret,
   top: 12px;
 }
 
-// App.tsx's loading line while the main part of the app arrives: hidden for the first second, so a normal load
-// never flashes it. Hidden by its own style, not by the animation: WebKit paints a frame before an animation starts.
+// index.html's loading line while the app's files arrive: hidden for the first second, so a normal load never
+// flashes it. Hidden by its own style, not by the animation: WebKit paints a frame before an animation starts.
 .ce-app-loading {
-  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
   padding: 48px 24px;
   text-align: center;
   font-size: 16px;
   color: var(--ce-panel-text, CanvasText);
   visibility: hidden;
   animation: ce-app-loading-in 0s linear 1s forwards;
+
+  progress {
+    width: min(240px, 60vw);
+    accent-color: var(--ce-action-primary, Highlight);
+  }
+}
+
+// boot-watchdog.js removes the line once the app has drawn; this covers a browser where that script did not run.
+body:has(#root > :not([data-ce-boot-ignore])) #ce-boot-loading {
+  display: none;
 }
 
 @keyframes ce-app-loading-in {

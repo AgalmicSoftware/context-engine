@@ -8,9 +8,15 @@ const source = fs.readFileSync(path.join(clientRoot, 'public', 'boot-watchdog.js
 const WAIT_MS = 12000;
 const LONG_WAIT_MS = 45000;
 
-const boot = () => {
+const RETRY_KEY = 'ce:bootAutoRetryAt';
+const boot = ({ retriedAlready = true } = {}) => {
   document.body.innerHTML =
-    '<p id="ce-agent-note">For AI agents.</p><div id="root"></div><script type="module" id="entry"></script><img id="picture" />';
+    '<p id="ce-agent-note">For AI agents.</p>' +
+    '<div id="ce-boot-loading"><span>Loading…</span><progress max="1" value="0"></progress><span id="ce-boot-loading-note"></span></div>' +
+    '<div id="root"></div><script type="module" id="entry"></script><img id="picture" />';
+  // Most tests are about the message, which comes once the one automatic retry has been used.
+  if (retriedAlready) window.sessionStorage.setItem(RETRY_KEY, String(Date.now()));
+  else window.sessionStorage.removeItem(RETRY_KEY);
   // The script runs as the browser would run it: once, against this document.
   new Function(source)();
   window.dispatchEvent(new Event('load'));
@@ -29,6 +35,26 @@ describe('the blank-page message', () => {
   afterEach(() => {
     jest.useRealTimers();
     document.body.innerHTML = '';
+  });
+
+  // First in the file: every boot() below leaves its listeners on the window, and a second copy of the script
+  // answering the same load event would see the first copy's retry as already used.
+  it('reloads by itself the first time the wait runs out, and shows the message the next time', () => {
+    const fetched = jest.fn((_url: string, _init: RequestInit) => new Promise<Response>(() => undefined));
+    (window as unknown as { fetch: unknown }).fetch = fetched;
+    boot({ retriedAlready: false });
+    jest.advanceTimersByTime(WAIT_MS);
+    // A fresh copy of the page is asked for, as Reload does; no message yet.
+    expect(fetched).toHaveBeenCalledTimes(1);
+    expect(notice()).toBeNull();
+    expect(document.getElementById('ce-boot-loading-note')!.textContent).toBe('Trying again…');
+    expect(Number(window.sessionStorage.getItem(RETRY_KEY))).toBeGreaterThan(0);
+
+    // The reloaded page, in the same tab, fails the same way: the message, and no second reload.
+    boot({ retriedAlready: true });
+    jest.advanceTimersByTime(WAIT_MS);
+    expect(fetched).toHaveBeenCalledTimes(1);
+    expect(notice()).not.toBeNull();
   });
 
   it('shows a message and a Reload button when nothing was drawn some seconds after the page loaded', () => {
@@ -57,6 +83,7 @@ describe('the blank-page message', () => {
 
   it('reports a page whose load never finishes, after the long wait', () => {
     document.body.innerHTML = '<p id="ce-agent-note">For AI agents.</p><div id="root"></div>';
+    window.sessionStorage.setItem(RETRY_KEY, String(Date.now()));
     // Still loading, and no load event ever comes: a part of the page never arrived.
     const state = jest.spyOn(document, 'readyState', 'get').mockReturnValue('loading');
     try {
@@ -113,13 +140,70 @@ describe('the blank-page message', () => {
     expect(notice()).toBeNull();
   });
 
-  it('marks what the app puts in its root before drawing, and nothing that is the app itself', () => {
+  it('marks the toast host, which the app puts in its root before drawing, and shows nothing else there', () => {
     const read = (file: string) => fs.readFileSync(path.join(clientRoot, 'src', 'components', file), 'utf8');
     expect(read('Shared/CEToaster.tsx')).toMatch(/data-testid="ce-toast-host" data-ce-boot-ignore=""/);
+    // The loading line is the page shell's, outside the root, so the app adds none of its own.
     const app = read('App.tsx');
-    expect(app).toMatch(/<p className="ce-app-loading" role="status" data-ce-boot-ignore="">/);
-    expect(app).toContain('<Suspense fallback={<AppLoading />}>');
-    expect(app.match(/data-ce-boot-ignore/g)).toHaveLength(1);
+    expect(app).toContain('<Suspense fallback={null}>');
+    expect(app).not.toContain('data-ce-boot-ignore');
+  });
+
+  it('does not reload by itself where the browser keeps nothing for the tab, or for a blocked first script', () => {
+    const fetched = jest.fn((_url: string, _init: RequestInit) => new Promise<Response>(() => undefined));
+    (window as unknown as { fetch: unknown }).fetch = fetched;
+    const blocked = jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('Access is denied for this document.', 'SecurityError');
+    });
+    try {
+      boot({ retriedAlready: false });
+      jest.advanceTimersByTime(WAIT_MS);
+      expect(notice()).not.toBeNull();
+    } finally {
+      blocked.mockRestore();
+    }
+    document.body.innerHTML = '';
+    boot({ retriedAlready: false });
+    document.getElementById('entry')!.dispatchEvent(new Event('error'));
+    expect(notice()).not.toBeNull();
+    expect(fetched).not.toHaveBeenCalled();
+  });
+
+  it('fills the loading bar by the size of the files that have arrived, and says when the load is slow', () => {
+    boot();
+    const entry = document.getElementById('entry') as HTMLScriptElement;
+    entry.src = 'http://localhost/assets/index-1.js';
+    entry.setAttribute('data-ce-bytes', '100');
+    const link = document.createElement('link');
+    link.href = 'http://localhost/assets/AppShell-1.js';
+    link.setAttribute('data-ce-bytes', '300');
+    document.head.append(link);
+    const entries = [
+      { name: entry.src, responseEnd: 10 },
+      { name: link.href, responseEnd: 0 },
+    ];
+    (performance as unknown as { getEntriesByType: unknown }).getEntriesByType = () => entries;
+    try {
+      const bar = document.querySelector('#ce-boot-loading progress') as HTMLProgressElement;
+      jest.advanceTimersByTime(300);
+      expect([bar.value, bar.max]).toEqual([100, 400]);
+      entries[1].responseEnd = 20;
+      jest.advanceTimersByTime(300);
+      expect(bar.value).toBe(400);
+      expect(document.getElementById('ce-boot-loading-note')!.textContent).toBe('');
+      jest.advanceTimersByTime(15000);
+      expect(document.getElementById('ce-boot-loading-note')!.textContent).toMatch(/taking longer than usual/);
+    } finally {
+      link.remove();
+      delete (performance as unknown as { getEntriesByType?: unknown }).getEntriesByType;
+    }
+  });
+
+  it('takes the loading line away once the app draws', async () => {
+    boot();
+    expect(document.getElementById('ce-boot-loading')).not.toBeNull();
+    await draw();
+    expect(document.getElementById('ce-boot-loading')).toBeNull();
   });
 
   it("reports the app's first script failing to load at once, and no other failed file", () => {
@@ -152,6 +236,10 @@ describe('the blank-page message', () => {
     // The content policy allows no inline script, and the app's bundle may be what failed.
     expect(source).not.toMatch(/import |require\(/);
     expect(html).toContain('<noscript>');
+    // The loading line is in the shell itself, before the root, and hidden where no script will ever remove it.
+    expect(html.indexOf('id="ce-boot-loading"')).toBeGreaterThan(0);
+    expect(html.indexOf('id="ce-boot-loading"')).toBeLessThan(html.indexOf('<div id="root">'));
+    expect(html).toContain('<noscript><style>#ce-boot-loading { display: none; }</style></noscript>');
     expect(html).toContain('id="ce-agent-note"');
   });
 });

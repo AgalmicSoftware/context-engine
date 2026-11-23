@@ -6,6 +6,7 @@ import { defineConfig, loadEnv, transformWithEsbuild } from 'vite';
 import { createBundleReportPlugin } from './scripts/bundle-report.mjs';
 import { isDocumentExportModule, lazyDocumentBuildPlugin } from './scripts/lazy-document-build.mjs';
 import { writePostSocialPreviewHtml, writeStaticPageSocialPreviewHtml } from './scripts/post-social-preview.mjs';
+import { startupPreloadPlugin } from './scripts/startup-preload.mjs';
 import { transformGroupPasswordDerivationCommonJs } from './scripts/source-commonjs-compatibility.mjs';
 import { normalizeThemeIdForHtml } from './scripts/theme-registry-core.mjs';
 
@@ -639,6 +640,7 @@ export default defineConfig(({ mode }) => {
       publicRewritesPlugin(),
       publicAssetsCompatibilityPlugin(),
       immutableAssetHeadersPlugin(),
+      startupPreloadPlugin(),
       postsAssetsCompatibilityPlugin(),
       knownSessionsFilePlugin(),
       staticPageSocialPreviewPlugin(),
