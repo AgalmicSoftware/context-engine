@@ -11,6 +11,15 @@ import { t } from '../../utilities/ui/terminology.js';
 import { NOTHING_TO_ANALYZE_TITLE } from './userPageLoadingStateHelpers';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
+// The Analyze button is drawn by the "Analyze me" arrival, which tells it whether a press is waiting to start.
+const analyzeButtonOf = (tree) => {
+  const arrival = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'AnalyzeLinkArrival')[0];
+  const button = arrival.props.children(false, () => {});
+  expect(button.type).toBe('button');
+  expect(treeHasText(button, 'Analyze')).toBe(true);
+  return button;
+};
+
 describe('UserPage cache refresh render and SBT fallbacks', () => {
   setupUserPageCacheRefreshTestLifecycle();
 
@@ -39,10 +48,7 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
       };
 
       const tree = instance.render();
-      const analyzeButton = collectTreeNodes(
-        tree,
-        (node) => node?.type === 'button' && treeHasText(node, 'Analyze'),
-      )[0];
+      const analyzeButton = analyzeButtonOf(tree);
       const compareButton = collectTreeNodes(
         tree,
         (node) => node?.type === 'button' && treeHasText(node, 'Compare'),
@@ -95,10 +101,7 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
       };
 
       const tree = instance.render();
-      const analyzeButton = collectTreeNodes(
-        tree,
-        (node) => node?.type === 'button' && treeHasText(node, 'Analyze'),
-      )[0];
+      const analyzeButton = analyzeButtonOf(tree);
       const compareButton = collectTreeNodes(
         tree,
         (node) => node?.type === 'button' && treeHasText(node, 'Compare'),
