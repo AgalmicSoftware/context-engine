@@ -22,7 +22,9 @@ first script removes; the static summary and file-not-found pages link the
 guide, and `/agents`, `/agents.md` and `/agent-guide` redirect to it.
 The guide opens with one set of steps, written once in
 `shared/agentParticipationGuide.mjs` and carried word for word by the guide,
-`/llms.txt` and the AI prompt a person copies in a session; the agent note on
+`/llms.txt` and the Session Worker's skill; the AI
+prompt a person copies in a session is kept to the drafting task, with the one
+question and the guide's address in its last line; the agent note on
 every page points to the guide (`scripts/sync-agent-flow.mjs` writes the files; a test fails when
 they drift). The steps start from what the agent can do. It can **submit as
 the person** when it has their AI key and can send web requests; it can

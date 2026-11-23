@@ -81,6 +81,36 @@ beforeEach(() => {
 afterEach(() => fetchMock.mockRestore());
 
 // The address a chat AI's fetch tool takes must stay short, so a ticket goes in only where it is needed.
+it('always carries the session’s question ids in the copied prompt, as the session lists them, whatever this page has loaded', async () => {
+  const whole = {
+    type: 'context-engine.interview-question-catalog',
+    version: 1,
+    sessionSlug: 'demo',
+    reviewUrl: 'https://app.example/session/demo?mode=interview',
+    questionSetHash: 'c'.repeat(64),
+    prefillPromptVersion: 'ce-interview-brief-v6',
+    questions: [
+      { id: 'q1', prompt: 'Parks need more money.', type: 'binary', options: ['Agree', 'Disagree'] },
+      { id: 'q2', prompt: 'Why?', type: 'freeform' },
+    ],
+  };
+  fetchMock.mockImplementation(async () => new Response(JSON.stringify(whole)));
+  // The page's own question pool is still empty, as before its questions load.
+  renderCard('', []);
+  const prompt = await copy();
+  expect(prompt).toContain('\nQuestion ids: 1 q1 binary, 2 q2 freeform\n');
+  expect(prompt).toContain(
+    `questionSetHash "${'c'.repeat(64)}", prefillPromptVersion "ce-interview-brief-v6", 2 questions.`,
+  );
+  // An empty list would read as nothing left to answer.
+  expect(prompt).not.toMatch(/: \[\]/);
+  // Opened to read, the ids and the fingerprint are stand-ins.
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE));
+  const box = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT);
+  expect(box).toHaveTextContent('Question ids: <QuestionIds>');
+  expect(box).toHaveTextContent('questionSetHash <QuestionSetHash>');
+});
+
 it('gives a signed-in person on a public session a short address with no ticket, asking nothing', async () => {
   fetchMock.mockImplementation(async () => catalog(['q1', 'q2']));
   renderCard(ACCOUNT, POOL);
@@ -406,7 +436,7 @@ describe('the AI key in a signed-in person’s prompt', () => {
   it('signed out, gives a prompt without a key and nothing to tick', async () => {
     serve();
     renderAgentCard('');
-    expect(await copy()).toContain('\nThis prompt holds no AI key.\n');
+    expect(await copy()).toContain('\nThis prompt holds no AI key. If you have Context Engine tools');
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     expect(keyRequests()).toHaveLength(0);
     expect(tokenMock).not.toHaveBeenCalled();

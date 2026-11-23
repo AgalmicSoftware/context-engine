@@ -3,7 +3,7 @@ import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
 import { orderInterviewQuestionPool, buildInterviewQuestionPriority } from './sessionInterviewQuestionOrder';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { buildExternalInterviewKickoff, normalizeInterviewQuestions, type KickoffAgentKey } from './sessionInterview';
-import { InterviewCatalogSignInError, verifyInterviewKickoffCatalog } from './sessionInterviewCatalogValidation';
+import { InterviewCatalogSignInError, readInterviewKickoffCatalog } from './sessionInterviewCatalogValidation';
 import { getInterviewCatalogTicket, INTERVIEW_CATALOG_TICKET_RENEW_MS } from './interviewCatalogTicket';
 import { buildInterviewReturnSessionUrl } from './sessionInterviewReturnUrl';
 import type { ValidatedKickoff } from './SessionInterviewMemoryKickoffCard';
@@ -92,13 +92,17 @@ export const useSessionPrefillKickoff = ({
   const questionPriority = questionPool
     ? buildInterviewQuestionPriority(questions, existingResponseSlice, questionOrder)
     : undefined;
-  const buildKickoff = (catalogTicket = '') =>
+  // Once the session's catalog has been read, as this person may read it, the prompt carries its fingerprint
+  // and its questions' ids in its own order. They come from the session, not from what this page happens to
+  // have loaded, so the list is never empty for a session that has questions.
+  const buildKickoff = (catalogTicket = '', catalog?: Record<string, unknown>) =>
     buildExternalInterviewKickoff({
       workerUrl: activeWorkerUrl,
       sessionSlug,
       sessionUrl,
       questionPriority,
       catalogTicket,
+      catalog,
       sessionName,
       hasAccount: Boolean(account),
       agentKeysOffered,
@@ -137,14 +141,14 @@ export const useSessionPrefillKickoff = ({
         }
       : undefined;
     try {
-      const catalogTicket = await verifyInterviewKickoffCatalog({
+      const { ticket: catalogTicket, catalog } = await readInterviewKickoffCatalog({
         workerUrl: activeWorkerUrl,
         sessionSlug,
         sessionUrl,
         ticket,
         questionIds: questions.map((question) => question.id),
       });
-      return { prompt: buildKickoff(catalogTicket), renewAtMs: catalogTicket ? renewAtMs : 0 };
+      return { prompt: buildKickoff(catalogTicket, catalog), renewAtMs: catalogTicket ? renewAtMs : 0 };
     } catch (error) {
       if (error instanceof InterviewCatalogSignInError && ticketFailed) {
         throw new Error('This session’s questions need a sign-in. Press Retry to sign in, then copy the prompt.');

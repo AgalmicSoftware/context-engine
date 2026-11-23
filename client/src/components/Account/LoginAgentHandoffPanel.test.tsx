@@ -193,7 +193,7 @@ it('shows the prompt with stand-ins where its key and private link are, never th
   const shown = screen.getByTestId('ce-agent-handoff-prompt');
   expect(caret).toHaveAttribute('aria-controls', shown.id);
   expect(shown).toHaveTextContent('The key is <AIKey>;');
-  expect(shown).toHaveTextContent('To draft, fetch this URL with a plain HTTP GET: <QuestionsAddress>');
+  expect(shown).toHaveTextContent('never a summary: <QuestionsAddress>');
   expect(shown).toHaveTextContent('It is only for the session <SessionName> at <SessionLink>.');
   expect(shown).not.toHaveTextContent('ceagt_secret');
   expect(shown).not.toHaveTextContent('ic1.mine');
@@ -233,7 +233,7 @@ it('asks for no key while the session has Agent HTTP off, or while signed out', 
   view.unmount();
   renderPanel({ context: {}, requestKey });
   const signedOut = await copyPrompt();
-  expect(signedOut).toContain('\nThis prompt holds no AI key.\n');
+  expect(signedOut).toContain('\nThis prompt holds no AI key. If you have Context Engine tools');
   expect(requestKey).not.toHaveBeenCalled();
   expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
 });

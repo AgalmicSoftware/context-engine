@@ -239,7 +239,7 @@ test('index.html tells a fetching agent where the guide is, in body text people 
 
 // One set of steps, written once (shared/agentParticipationGuide.mjs), reaches an agent whichever file it reads.
 // The pages' own HTML carries none of them, only where the guide is.
-test('llms.txt, the guide and the Worker skill carry the same steps as the copied prompt', async () => {
+test('llms.txt, the guide and the Worker skill carry the same steps, written once', async () => {
   const { expectedAgentFlowFiles } = await import('./sync-agent-flow.mjs');
   const { AGENT_ASK_WHICH_WAY, AGENT_FLOW_INTRO, AGENT_FLOW_STEPS, AGENT_PROMPT_LINK_QUERY, AGENT_REVIEW_NEXT_STEP, agentFlowLines } =
     await import('../shared/agentParticipationGuide.mjs');
@@ -249,11 +249,12 @@ test('llms.txt, the guide and the Worker skill carry the same steps as the copie
   for (const { file, actual, expected } of files) {
     assert.equal(actual, expected, `${file} differs from the shared steps: run node scripts/sync-agent-flow.mjs`);
   }
-  // Every step, whole, in each place: once in llms.txt, and in the guide both as its own steps and inside
-  // the prompt it prints. The page's HTML names the guide for them and repeats none.
+  // Every step, whole, once in each place. The prompt a person copies is kept short: it holds the one question
+  // and names the guide, and the guide's printed copy of it repeats no step. The page's HTML names the guide
+  // for them and repeats none.
   const steps = agentFlowLines();
   assert.equal(steps.length, 5);
-  for (const [text, count] of [[llmsTxt, 1], [skillMd, 2]]) {
+  for (const [text, count] of [[llmsTxt, 1], [skillMd, 1]]) {
     for (const line of steps) assert.equal(text.split(line).length - 1, count);
     assert.ok(text.includes(AGENT_FLOW_INTRO));
   }

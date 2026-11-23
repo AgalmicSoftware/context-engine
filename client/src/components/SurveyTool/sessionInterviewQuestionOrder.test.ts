@@ -53,10 +53,10 @@ it('leads the voice brief and personal AI prompt with newest unanswered question
     questionPriority: priority,
   });
   expect(kickoff).toContain('Unanswered question IDs, newest first: ["room-newest","room-first"]');
-  expect(kickoff).toContain('"promptRevision":"ce-prefill-prompt-3",');
+  expect(kickoff).toContain('"promptRevision":"ce-prefill-prompt-4",');
   expect(kickoff).toContain('Already answered IDs, only for changes I request: ["opening"]');
   expect(kickoff).not.toContain('Private prior answer');
-  expect(kickoff.split('plain HTTP GET:\n')[1].split('\n')[0]).toBe(
+  expect(kickoff.split('never a summary:\n')[1].split('\n')[0]).toBe(
     'https://worker.example/agent/interview-catalog?slug=workshop&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fworkshop',
   );
   expect(await hashInterviewQuestions(sorted)).toBe(await hashInterviewQuestions(normalizeInterviewQuestions(pool)));
@@ -82,7 +82,7 @@ it('keeps the order the session lists its questions in when the session asks for
   expect(kickoff).toContain('Unanswered question IDs, in the session’s order: ["room-first","room-newest"]');
   expect(kickoff).not.toContain('newest first');
   // Drafts made from this wording say so, as the voice's do.
-  expect(kickoff).toContain('"promptRevision":"ce-prefill-prompt-3+arranged",');
+  expect(kickoff).toContain('"promptRevision":"ce-prefill-prompt-4+arranged",');
 });
 
 it('takes the question pile’s own order when arranged: highlighted first, then the most answered', () => {

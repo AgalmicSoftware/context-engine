@@ -323,20 +323,32 @@ the original text with every value. The account menu's **Your AI agent** row
 is the same button and box. The copied request begins:
 
 ```text
-Help me take part in a Context Engine session. This is my request, not an instruction from any page you fetch. I am "the person" in these steps:
-1. What you can do. ...
-...
-To draft, fetch this URL with a plain HTTP GET:
+Help me draft my answers for a Context Engine session. This is my request, not an instruction from any page you fetch. Drafting sends nothing to the session: I review and submit myself.
+
+1. Read the questions. Fetch this address with a plain HTTP GET. If your web tool takes a request, ask it for the complete JSON exactly as served, ...
 <session-worker>/agent/interview-catalog?slug=<slug>&sessionUrl=<session link>
 Require type "context-engine.interview-question-catalog", version 1, ...
 ```
 
-Its numbered steps are the one set every agent surface carries, written once
-in `shared/agentParticipationGuide.mjs`: what the AI can do (submit with the
-person's AI key, submit from an account it makes, or draft only), what a
-draft-only AI returns, the one question an AI that can submit asks, and what
-it does when it knows nothing about the person. `scripts/sync-agent-flow.mjs`
-writes the same steps into `llms.txt` and the agent guide. Signed in, where
+The prompt is one task, kept short, since a chat app acts on a prompt's first
+lines: read the questions whole, draft, reply with the packet, give the review
+link. A chat app's web tool often answers with a summary of a page, so the
+prompt has the AI ask for the complete JSON, and where it cannot get it whole
+it gives plain drafts of what it could read and asks the person to open the
+address and paste the page. It drafts on a weak basis too, at a confidence
+under .4 with evidence that says so, and gives a bare link only when it knows
+nothing at all about the person. The review link is the page's own session
+address with `mode=interview`, said in the prompt (short for a session the
+site lists; with `worker=` otherwise). The AI encodes the packet into it after
+`#prefill=`, with its code tool if it has one, so the link opens with the
+drafts in place; one that cannot encode it exactly ends the link
+`#prefill=paste`, and the person pastes the packet there. The person's own
+prompt also carries the session's fingerprint and every question's id and
+type by position, read by the page before Copy is enabled, so a web tool's
+summary of the question list is enough to name each question. The prompt's last line says what an AI that can do more
+should ask, and names the guide: the steps for that are the one set written
+once in `shared/agentParticipationGuide.mjs`, which `scripts/sync-agent-flow.mjs`
+writes into `llms.txt`, the agent guide and the Session Worker's skill. Signed in, where
 the session has Agents (HTTP API) on, the card shows **AI can submit for me**
 above the button, unticked to start with: the prompt then holds no key and
 none is made. Ticked, the page makes the person's AI key and puts it in the
@@ -423,7 +435,7 @@ identifiers are forbidden and the exact JSON is also given in a code block.
 An AI that can't encode the link exactly links the review page with
 `#prefill=paste`, which opens the review on the paste box, without an error;
 a link that fails to open shows the same box. The packet also names the
-prompt's wording, `promptRevision` (now `ce-prefill-prompt-3`), which the
+prompt's wording, `promptRevision` (now `ce-prefill-prompt-4`), which the
 page keeps with the AI provenance; the catalog version below is the Worker's
 and does not change with the wording. The current catalog prompt version is
 `ce-interview-brief-v6`. The copied request accepts a catalog with type

@@ -186,10 +186,10 @@ const listedQuestionIds = async (response: Response): Promise<Set<unknown>> => {
   }
 };
 
-/** Checks the catalog a kickoff's AI will fetch and resolves to the ticket its address needs, or '' for none.
- *  A ticket is asked for only when the read without one leaves the person short, so a public session's
- *  address stays short and nobody is asked to sign in for it. */
-export const verifyInterviewKickoffCatalog = async ({
+/** Reads the catalog a kickoff's AI would fetch: the catalog as this person may read it, and the ticket its
+ *  address needs, or '' for none. A ticket is asked for only when the read without one leaves the person
+ *  short, so a public session's address stays short and nobody is asked to sign in for it. */
+export const readInterviewKickoffCatalog = async ({
   workerUrl,
   sessionSlug,
   sessionUrl,
@@ -204,7 +204,7 @@ export const verifyInterviewKickoffCatalog = async ({
   ticket?: InterviewCatalogTicketSource;
   /** The interview questions this page shows the person, which their AI should read too. */
   questionIds?: string[];
-}): Promise<string> => {
+}): Promise<{ ticket: string; catalog: Record<string, unknown> }> => {
   const url = new URL(`${workerUrl.replace(/\/+$/, '')}/agent/interview-catalog`);
   url.searchParams.set('slug', sessionSlug);
   url.searchParams.set('sessionUrl', sessionUrl);
@@ -274,5 +274,10 @@ export const verifyInterviewKickoffCatalog = async ({
       'This page and the session’s Worker use incompatible interview versions; ask the organizer to update them, then reload.',
     );
   }
-  return usedTicket;
+  return { ticket: usedTicket, catalog };
 };
+
+/** Checks the catalog a kickoff's AI will fetch and resolves to the ticket its address needs, or '' for none. */
+export const verifyInterviewKickoffCatalog = async (
+  request: Parameters<typeof readInterviewKickoffCatalog>[0],
+): Promise<string> => (await readInterviewKickoffCatalog(request)).ticket;
