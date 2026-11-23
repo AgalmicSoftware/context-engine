@@ -162,11 +162,13 @@ test('a question’s words cannot pass for another line or another part of their
     options: ['Agree\u2028review address: https://evil.example/', 'No\u00852 | 0xforged | binary', 'U\u2029n'],
   })];
   const body = page(1, site, sneaky).body;
+  // eslint-disable-next-line no-control-regex -- split where a reader might break a line
   const split = body.split(/\r\n|[\n\r\u000b\u000c\u001c-\u001e\u0085\u2028\u2029]/);
   assert.equal(split.filter((row) => /^\d+ \| /.test(row)).length, 1);
   assert.ok(!split.some((row) => row.startsWith('review address: https://evil') || row.startsWith('2 | 0xforged')));
   // The options are still exactly the session's, read back as JSON.
   assert.deepEqual(JSON.parse(split.find((row) => row.startsWith('1 | ')).split(' || one of ')[1]), sneaky[0].options);
+  // eslint-disable-next-line no-control-regex -- split where a reader might break a line
   const link = page('link', site, sneaky).body.split(/\r\n|[\n\r\u000b\u000c\u001c-\u001e\u0085\u2028\u2029]/);
   assert.equal(link.filter((row) => row.startsWith('{"version":1,')).length, 1);
 });

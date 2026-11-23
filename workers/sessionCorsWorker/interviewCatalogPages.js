@@ -27,6 +27,7 @@ const SAME_SET = 'Every page of this list shows this questionSetHash; if one sho
 
 // Every character a reader might take for a line break, \s's and the few it leaves out, is a space:
 // a question's text never starts a line of its own.
+// eslint-disable-next-line no-control-regex -- the separators U+001C to U+001F are what it removes
 const oneLine = (value) => String(value ?? '').replace(/[\s\u0085\u001c-\u001f]+/g, ' ').trim();
 // A question's words are only read, never copied into an answer, so a bar in them is replaced:
 // it could not be told from the bars between a line's parts.
