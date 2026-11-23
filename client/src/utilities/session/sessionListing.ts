@@ -5,7 +5,7 @@ import { KNOWN_SESSIONS } from './knownSessionsFile';
 // works as before. "General" (the empty slug: content in no session) shows
 // only while it is the current choice.
 
-// Sessions left off the lists for now: automated test runs and older demos.
+// Sessions left off the lists for now: automated test runs, older demos and earlier trials.
 export const UNLISTED_SESSION_PATTERNS: readonly RegExp[] = Object.freeze([
   /^cloudflare-/, // Worker setup test runs
   /^e2e-/, // end-to-end test runs
@@ -14,7 +14,9 @@ export const UNLISTED_SESSION_PATTERNS: readonly RegExp[] = Object.freeze([
   /^ce-mod-/, // session-setup test runs
   /^demo-(?:1|sh|interview)$/, // older demos
   /^(?:telegram|dweb)-demo(?:-\d+)?$/, // older channel demos
-  /^rxc-(?:ra-)?test$/, // the two retired trial sessions (RETIRED_SESSION_SLUGS below)
+  // Earlier trials: the two retired ones (RETIRED_SESSION_SLUGS below) and the RA test session, which films and
+  // slides still link, so known-sessions.json keeps it and those links open.
+  /^rxc-(?:test|ra-test(?:-5)?)$/,
 ]);
 
 // Trial sessions taken off the lists by name: the first salon trial, whose title reads like the real salon's, and

@@ -26,7 +26,7 @@ const TEST_RUN_SLUGS = [
   'dweb-demo',
 ];
 
-const LISTED = ['eddy26', 'rxc-ra-2', 'rxc-ra-test-5', 'rxc-ra-agent-test-1'];
+const LISTED = ['eddy26', 'rxc-ra-2', 'rxc-ra-agent-test-1'];
 
 describe('session listing', () => {
   it('leaves test runs and older demos off, and keeps sessions people take part in', () => {
@@ -41,15 +41,16 @@ describe('session listing', () => {
     expect(LISTED.map((slug) => sessionListLabel(slug, names[slug] || 'Reverse Alignment'))).toEqual([
       'EDDY 2026 - Bridging theory and practice (eddy26)',
       'Reverse Alignment Salon (rxc-ra-2)',
-      'RA test (rxc-ra-test-5)',
       'RA agent test (rxc-ra-agent-test-1)',
     ]);
+    // Off the lists, but labelled by its title while it is someone's current choice.
+    expect(sessionListLabel('rxc-ra-test-5', 'Reverse Alignment')).toBe('RA test (rxc-ra-test-5)');
     expect(sessionListLabel('town-hall', 'Town Hall')).toBe('Town Hall (town-hall)');
     expect(sessionListLabel('town-hall')).toBe('town-hall');
     expect(sessionListLabel('')).toBe('General');
   });
 
-  it('orders EDDY, the salon, the test sessions, then everything else by name', () => {
+  it('orders EDDY, the salon, the agent test session, then everything else by name', () => {
     const options = buildSessionListOptions({
       slugs: ['zeta', 'rxc-ra-agent-test-1', '', ...TEST_RUN_SLUGS, 'rxc-ra-test-5', 'alpha', 'rxc-ra-2', 'eddy26'],
       nameOf: (slug) => (slug === 'zeta' ? 'Aardvark' : ''),
@@ -62,7 +63,6 @@ describe('session listing', () => {
     expect(RETIRED_SESSION_SLUGS.some(isListedSession)).toBe(false);
     expect(
       [
-        'rxc-ra-test-5',
         'rxc-ra-test-6',
         'rxc-ra-2',
         'rxc-ra-agent-test-1',
@@ -81,6 +81,25 @@ describe('session listing', () => {
     expect(
       buildSessionListOptions({ slugs: ['rxc-ra-test', 'rxc-ra-2'], keep: ['rxc-ra-test'] }).map(({ slug }) => slug),
     ).toEqual(['rxc-ra-2', 'rxc-ra-test']);
+  });
+
+  it('lists one test session, the agent one, and still opens the RA test session from its links', () => {
+    // EDDY, the salon and the agent test session; the demo and the RA test session are off every list.
+    expect(buildSessionListOptions({ slugs: Object.keys(KNOWN_SESSIONS) }).map(({ slug }) => slug)).toEqual(LISTED);
+    expect(isListedSession('rxc-ra-test-5')).toBe(false);
+    // Not retired: a browser that remembers it keeps it, and the lists show it while it is the current choice.
+    expect(RETIRED_SESSION_SLUGS).not.toContain('rxc-ra-test-5');
+    expect(
+      buildSessionListOptions({ slugs: ['rxc-ra-test-5', 'rxc-ra-2'], keep: ['rxc-ra-test-5'] }).map(
+        ({ slug }) => slug,
+      ),
+    ).toEqual(['rxc-ra-2', 'rxc-ra-test-5']);
+    // Films and slides link it, so known-sessions.json keeps it and its normal link opens.
+    expect(KNOWN_SESSION_CONFIGS['rxc-ra-test-5']).toMatchObject({
+      sessionId: KNOWN_SESSIONS['rxc-ra-test-5'].sessionId,
+      corsWorkerUrl: 'https://ce-rxc-ra-test-5.agalmic.workers.dev',
+      workerCanonicalCleanRoute: true,
+    });
   });
 
   it('keeps the current choice, even General or a session left off', () => {
