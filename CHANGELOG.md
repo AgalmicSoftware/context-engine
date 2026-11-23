@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Site — available when the site deploys
+
+- **The agent guide opens on which session to work on and where its questions are.** An AI sent a picture of a flyer that showed a session's address and said "Follow contextengine.sh/skill.md to draft my answers for this session" found the session but not its questions: a chat app's reader gave it a summary of the guide, which kept the names of the listed sessions and dropped their question addresses. `/skill.md` now begins, before anything else: the session is the one the person gave you, an address in their message, in the link that led you here, or in a picture, flyer, screenshot or QR caption (read the picture's text); with none, ask for the link in one line, and never pick from a list or the home page. For a session the site lists, its questions are at `https://contextengine.sh/questions/<name>`; an app that won't open an address it put together shows it to the person to send back, and any other session or a link with `worker=`, `src=` or `joinGroup=` goes to the section that handles it. With nothing known of the person's views, the AI says so in one line and goes through the questions with them in the chat first. Without the question ids, which a summary of the list does not carry, it gives plain-text drafts with the session link and says it could not make the review link. `/llms.txt` opens the same way. The shared steps, the Worker's skill and the MCP are unchanged.
+
 ## [0.9.36] - 2026-11-23
 
 A page that loads slowly shows its loading line from the HTML alone, the note for AI agents is ordinary page content, AI prompts wait for the question ids and review links from older question sets still open; the risk matrix keeps its labels in view and the Analyze box shows a person's saved card. No Worker or MCP change.

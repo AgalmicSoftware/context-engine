@@ -139,11 +139,32 @@ test('index.html tells a fetching agent where the guide is, in body text that is
     assert.match(where, literalCatalog);
   }
   assert.match(llmsTxt.replace(/\s+/g, ' '), noSetUpTalk);
-  assert.match(llmsTxt.replace(/\s+/g, ' '), /To draft: fetch the address after the session's link in the list below exactly as it is written, never one you put together yourself/);
-  assert.match(guide, /the URL to fetch is the address after its link there: fetch that address exactly as it is written there, never one you put together yourself/);
+  assert.match(llmsTxt.replace(/\s+/g, ' '), /To draft: fetch the address after the session's link in the list below exactly as it is written \(it is `https:\/\/contextengine\.sh\/questions\/<name>`, which you may put together from the session link when you were not shown the list\)/);
+  assert.match(guide, /the URL to fetch is the address after its link there: fetch that address exactly\s+as it is written there, and the second address there only if that one does\s+not open\. It is `https:\/\/contextengine\.sh\/questions\/<slug>`, which you may\s+put together from the session link when you were not shown the list/);
   assert.match(guide, /This site passes that address through to the catalog the request below builds for the plain session link, and stores nothing\./);
-  // With nothing to go on it says so, then asks a few questions that could seed most of the drafts at once.
-  assert.match(guide, /Draft only where you have a real basis, and tell them plainly which questions you had no basis for\. If you know nothing relevant, say so, then give the shortest read of the session's topics and ask a few questions whose answers would let you draft most of the answers at once\./);
+  // With nothing to go on it says so in one line, then goes through the questions with the person or asks a
+  // few that could seed most of the drafts at once; it still ends in the review link.
+  assert.match(guide, /Draft only where you have a real basis, and tell them plainly which questions you had no basis for\. If you know nothing relevant, say so in one line, then give the shortest read of the session's topics and offer to go through the questions with them in the chat, or ask a few questions whose answers would let you draft most of the answers at once\. Either way it ends in the review link\./);
+  // The guide opens on which session to work on and where its questions are: a reader that keeps only a
+  // page's first lines, or a summary of it, still has both. The session comes from what the person gave,
+  // a picture's text included, never from a list.
+  const opening = skillMd.slice(0, skillMd.indexOf('A Context Engine session asks'));
+  assert.ok(opening.length < 1800, 'the guide opens short');
+  assert.match(opening, /^---\n[^]*?---\n\n# [^\n]+\n\n\*\*Start here\.\*\* The session is the one the person gave you: a `contextengine\.sh\/session\/<name>` address in their message, in the link or page that led you here, or in a picture, flyer, screenshot or QR caption they sent\. Read a picture's text for it\. If you find none, ask for the session link in one line\. Never pick a session from a list or from the site's home page\.\n/);
+  assert.match(opening, /\n\nFor a session this site lists, its questions are at `https:\/\/contextengine\.sh\/questions\/<name>`, the same `<name>` in lower case with nothing from `\?` or `#` on: fetch that address, asking for the complete JSON with every question's id and the questionSetHash\./);
+  // Any other session, and a link that carries more than its name, is sent to the section that handles it.
+  assert.match(opening, /If it gives no questions, or the link has `worker=`, `src=` or `joinGroup=`, see "Draft answers for the person to review" below\./);
+  // It never promises a review link it cannot make: without the ids it says so.
+  assert.match(opening, /If you could not get the ids, give your drafts as plain text with the session link, and say plainly that you could not make the review link\./);
+  assert.match(opening, /If you know nothing of their views, say so in one line and go through the questions with them in the chat first\./);
+  assert.ok(opening.indexOf('Start here') < skillMd.indexOf('## Sessions listed on this site'));
+  // Every listed session's questions are at the address the opening gives, so one put together from it opens.
+  const listedSlugs = Object.keys(JSON.parse(fs.readFileSync(path.join(repoRoot, 'known-sessions.json'), 'utf8')));
+  assert.ok(listedSlugs.length > 0);
+  for (const slug of listedSlugs) {
+    assert.ok(skillMd.includes(`https://contextengine.sh/questions/${slug}\n`), slug);
+  }
+  assert.match(llmsTxt, /- Start here: the session is the one the person gave you, a `contextengine\.sh\/session\/<name>` address/);
   for (const where of [plain, guide, llmsTxt]) assert.doesNotMatch(where, /state their views first/);
   assert.match(guide, /A chat app's own sandbox, which reaches few sites or none, doesn't count: take case 4\./);
   assert.match(guide, /Build the URL yourself only when the session isn't listed there, or the link has `src=` or `joinGroup=`\./);
