@@ -244,6 +244,25 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.9.35
+
+No tool changes: the wording an agent reads. From this release the package
+takes the application's version number, so its number may jump from 0.9.2:
+no versions in between were published, and nothing needs doing for them.
+
+- The server's instructions carry the same steps as the site's AI prompt and
+  its agent guide. The agent asks once whether to submit the person's answers
+  or go through them together first, in place of the three-way question, and
+  for someone who already has an account it gives the session link with
+  `aiPrompt=1`, where they copy a short prompt that holds their AI key.
+- Only the person, in the chat, can waive being shown the answers before they
+  are submitted. A pasted prompt no longer can.
+- The session page's card is named **Have AI draft your answers**, and the box
+  that puts a key in its prompt **AI can submit for me**.
+- `show_analysis_card` says a shown card is saved in the session and stays,
+  for up to a year, until it is taken down or replaced. Only a card made and
+  not yet shown is lost when the server restarts.
+
 ## Upgrading to 0.9.0
 
 - A group's refusal names the group as the site shows it, quoted, with its

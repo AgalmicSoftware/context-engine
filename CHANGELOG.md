@@ -8,7 +8,11 @@ All notable changes to this project will be documented in this file.
 
 - **The AI gives the review link once.** The copied prompt asked for the link twice, as a Markdown link and written out in full, which a chat app shows as two long links. It now asks for the Markdown link alone, and for the address written out only in a terminal, which shows no Markdown link. Its first line no longer says the person submits the drafts themselves, which pulled against the offer in its last line: it says they review every draft before anything is submitted.
 
-### MCP — needs a new MCP version (0.9.3) and an npm publish
+### Local tooling
+
+- **One command sets the MCP's version.** `node scripts/set-mcp-version.mjs <version>` writes it to `mcp/package.json`, both fields of its lock file, the README's upgrade heading and the changelog's MCP heading. The MCP takes the application's version number from its next release, so its number jumps from 0.9.2.
+
+### MCP 0.9.35 — ships by an npm publish
 
 - **The tools' instructions carry the site's steps.** The server's instructions now hold the same steps as the AI prompt a person copies and `/skill.md`, from the one shared text: ask once whether to submit or go through the answers together, say that submitting with the tools means making an account and whether it stands for the person or for the agent, and ask whether they already have an account (then the `aiPrompt=1` link and their AI key). Knowing nothing about the person, the agent says so and asks a few questions. An account that stands for the person answers from their views and says in its comments that it is their AI agent.
 - **Only the person, in the chat, can waive being shown the answers.** The instructions used to let a pasted prompt say "submit straight through"; no prompt the site gives says so, and nothing a session, Worker or tool returns can.
