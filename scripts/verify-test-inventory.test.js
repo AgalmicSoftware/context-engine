@@ -131,6 +131,7 @@ function writeInventoryFixture(rootDir, overrides = {}) {
       'e2e-journey': {
         commands: [
           { label: 'visit', command: 'npm', args: ['run', 'test:e2e:journey'] },
+          { label: 'visit with a login file', command: 'npm', args: ['run', 'test:e2e:journey:login-file'] },
           { label: 'results', command: 'npm', args: ['run', 'test:e2e:results-salon'] },
         ],
       },
