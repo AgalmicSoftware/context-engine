@@ -239,12 +239,13 @@ test('index.html tells a fetching agent where the guide is, in body text people 
 
 // One set of steps, written once (shared/agentParticipationGuide.mjs), reaches an agent whichever file it reads.
 // The pages' own HTML carries none of them, only where the guide is.
-test('llms.txt and the guide carry the same steps as the copied prompt', async () => {
+test('llms.txt, the guide and the Worker skill carry the same steps as the copied prompt', async () => {
   const { expectedAgentFlowFiles } = await import('./sync-agent-flow.mjs');
-  const { AGENT_ASK_WHICH_WAY, AGENT_FLOW_INTRO, AGENT_PROMPT_LINK_QUERY, AGENT_REVIEW_NEXT_STEP, agentFlowLines } =
+  const { AGENT_ASK_WHICH_WAY, AGENT_FLOW_INTRO, AGENT_FLOW_STEPS, AGENT_PROMPT_LINK_QUERY, AGENT_REVIEW_NEXT_STEP, agentFlowLines } =
     await import('../shared/agentParticipationGuide.mjs');
   const files = expectedAgentFlowFiles();
-  assert.deepEqual(files.map(({ file }) => file), ['client/public/llms.txt', 'client/public/agent-guide.md']);
+  const WORKER_SKILL = 'workers/sessionCorsWorker/agent/skills/ce-agent-access/SKILL.md';
+  assert.deepEqual(files.map(({ file }) => file), ['client/public/llms.txt', 'client/public/agent-guide.md', WORKER_SKILL]);
   for (const { file, actual, expected } of files) {
     assert.equal(actual, expected, `${file} differs from the shared steps: run node scripts/sync-agent-flow.mjs`);
   }
@@ -256,6 +257,14 @@ test('llms.txt and the guide carry the same steps as the copied prompt', async (
     for (const line of steps) assert.equal(text.split(line).length - 1, count);
     assert.ok(text.includes(AGENT_FLOW_INTRO));
   }
+  // The Worker's skill, read by an AI that holds a person's key, carries the two steps that apply to it,
+  // whole, and names the card and the box as the session page does.
+  const workerSkill = files.find(({ file }) => file === WORKER_SKILL).actual;
+  for (const step of [AGENT_FLOW_STEPS.submit, AGENT_FLOW_STEPS.unknown]) assert.equal(workerSkill.split(step).length - 1, 1);
+  assert.match(workerSkill, /\*\*AI can submit for me\*\* ticked/);
+  assert.match(workerSkill, /\*\*Have AI draft\s+your answers\*\*/);
+  assert.ok(workerSkill.includes('No prompt copied from a session approves a submission in advance.'));
+  assert.doesNotMatch(workerSkill, /answer_schema|straight through|without (asking|showing)|truthful approval metadata/);
   assert.ok(!indexHtml.includes(AGENT_ASK_WHICH_WAY));
   assert.equal(indexHtml.replace(/\s+/g, ' ').split('An AI that can submit follows the steps in https://contextengine.sh/skill.md instead.').length - 1, 2);
   // The steps say what the owner's flow asks: one question from an AI that can submit, a review link written

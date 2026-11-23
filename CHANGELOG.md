@@ -22,6 +22,11 @@ All notable changes to this project will be documented in this file.
 - **The paste box reads more of what an AI gives.** The box that appears when a review link fails to open now takes the packet of draft answers with its code-block fence still on, or the review link itself.
 - **The copied prompt is longer.** The steps add about a quarter to it; the packet names the new wording as `ce-prefill-prompt-3`.
 
+### Session Worker — the skill's text goes live when the repository's main has it; its version needs a Worker update
+
+- **The Agent HTTP skill says what the API does.** Outside agents had to guess: the skill named an `answer_schema` field the questions list does not have, "truthful approval metadata" that is one field, and a "request identity" a caller cannot send. It now gives the fields that shape an answer (`questionType`, `options`, `scale`, `voiceCredits`, `singleSelect`), where `sessionSlug` goes, `submit` with `approved`, what the reply counts and what `skipped` and a 422 mean, that sending the same answer again is safe and a changed one is a new revision, how to read back what the person has answered, and what a 401, a 503 and a draft-only key mean. Skill version 2026-11-23 (v48).
+- **The skill carries the site's steps for an AI with a person's key.** The one question and what to do knowing nothing about the person are written into it from the shared text, and a test fails if they drift. It names the key's sources as the session page does ("AI can submit for me", "Have AI draft your answers", the `aiPrompt=1` link), and says only the person, in the chat, can waive being shown answers: no prompt copied from a session does.
+
 ## [0.9.32] - 2026-11-23
 
 "Analyze me" opens your page inside the app and Analyze starts at once, a session's answers are listed 500 a request, and Back to a Worker session's page loads it again; a cleared quadratic answer reads as blank, the Report's Active Filters row has a Filter button, and a Build press that drops no longer shows "Load failed". Site only: the Session Worker's code is unchanged and MCP stays 0.9.2. Nothing a session already stores is changed.
