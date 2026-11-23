@@ -194,10 +194,25 @@ const readViewerRefusal = async ({ kind, env, config, slug, address, scopes, hea
   return null;
 };
 
+// How the kind's latest job went, as builders see it: running, or done with its build or its failure.
+const builderJob = (kind, job) => ({
+  jobId: job.jobId,
+  state: job.state,
+  startedAtMs: job.startedAtMs,
+  ...(job.state === 'done' ? {
+    finishedAtMs: job.finishedAtMs,
+    ok: job.outcome?.ok === true,
+    ...(job.outcome?.ok === true
+      ? { buildId: job.outcome.buildId }
+      : { error: job.outcome?.error || `The ${kind.name} build failed.` }),
+  } : {}),
+});
+
 // Viewers see builds under the rule AI Views follow; anyone who may build one
 // sees them on any session, signed in. The admin-hat check reads the chain, so
 // it runs only for a signed-in reader the viewer rule refuses. Builders also
-// get `describeNextBuild(config)`, the model and prompts a build would use.
+// get `describeNextBuild(config)`, the model and prompts a build would use, and
+// the latest job, so a site following its press can tell a failed build.
 export const dispatchResultsBuildRead = async ({
   kindName, describeNextBuild, request, env, config, slug, address, scopes, headers, deps = {},
 } = {}) => {
@@ -219,9 +234,10 @@ export const dispatchResultsBuildRead = async ({
   if (!result.ok) {
     return deps.json({ ok: false, error: result.body?.error || `${kind.plural} are unavailable; retry.` }, result.status || 503, responseHeaders);
   }
+  const { job, ...stored } = result.body || {};
   return deps.json({
-    ...result.body,
+    ...stored,
     canBuild: builder,
-    ...(builder ? { nextBuild: describeNextBuild(config) } : {}),
+    ...(builder ? { nextBuild: describeNextBuild(config), ...(job?.jobId ? { job: builderJob(kind, job) } : {}) } : {}),
   }, 200, responseHeaders);
 };

@@ -681,12 +681,20 @@ Admin test panel:
   as a job in the session's coordinator, not in the request that pressed for
   it, so a page that drops, reloads or closes loses nothing. One job of each
   kind runs at a time; a press while one runs joins it and pays for nothing
-  more. The press waits while the page is connected (5 minutes for a build, 9
-  for AI Views) and answers with the result. After that the atlas and risk
-  matrix answer `409` with the running build's `reason` and `active`, and AI
-  Views answers `202`, as for a build someone else started; the page's own
-  checks, or a reload on any device, find the result when it lands. A build
-  that fails says why and frees the next press at once. A running job writes a
+  more. An atlas or risk matrix press whose body has `follow: true`, as the
+  site sends, waits at most 3 seconds: a build that ends by then answers with
+  its result, and one still running answers `202` with `jobState: "running"`
+  and `job` (`jobId`, `startedAtMs`), which the site follows by reading
+  builds. Without `follow`, as from an older site, the press waits while the
+  page is connected (5 minutes for a build, 9 for AI Views) and answers with
+  the result. After that the atlas and risk matrix answer `409` with the
+  running build's `reason` and `active`, and AI Views answers `202`, as for a
+  build someone else started; the page's own checks, or a reload on any
+  device, find the result when it lands. Reads of builds give builders `job`,
+  the kind's latest job: `jobId`, `state` (`running` or `done`),
+  `startedAtMs` and, once done, `finishedAtMs`, `ok` and its `buildId` or
+  `error`, so a followed build that fails says why. A build that fails says
+  why and frees the next press at once. A running job writes a
   heartbeat every 15 seconds. If the heartbeat goes a minute stale (the
   coordinator restarted), the next alarm, read of builds, AI Views status or
   press runs the job again; a job cut off twice ends with "The build stopped

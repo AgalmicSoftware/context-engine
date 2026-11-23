@@ -47,7 +47,8 @@ const chunkBuild = (build) => {
 
 const listedBuild = ({ chunkCount, ...entry }) => entry;
 
-export const dispatchResultsBuildStore = async (coordinator, kindName, operation, payload = {}) => {
+// A read also carries `job`, the kind's latest job as the coordinator read it, which the Worker shows builders.
+export const dispatchResultsBuildStore = async (coordinator, kindName, operation, payload = {}, { job = null } = {}) => {
   const kind = Object.hasOwn(RESULTS_BUILD_KINDS, kindName) ? RESULTS_BUILD_KINDS[kindName] : null;
   if (!kind) return json({ error: 'Not found.' }, 404);
   const storage = coordinator.state.storage;
@@ -147,6 +148,7 @@ export const dispatchResultsBuildStore = async (coordinator, kindName, operation
       active: isFresh(index.active, nowMs) ? { startedAtMs: index.active.startedAtMs } : null,
       builds: index.builds.map(listedBuild),
       build,
+      ...(job ? { job } : {}),
     });
   }
   return json({ error: 'Not found.' }, 404);

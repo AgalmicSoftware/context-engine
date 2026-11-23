@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { RESULTS_BUILD_WAIT_MS, pressResultsAnalysis, pressResultsBuild } from './resultsJobPress.js';
+import { RESULTS_BUILD_FOLLOW_WAIT_MS, RESULTS_BUILD_WAIT_MS, pressResultsAnalysis, pressResultsBuild } from './resultsJobPress.js';
 import { readResultsJob, startResultsJob } from './resultsJobs.js';
 
 // The coordinator's job routes over an in-memory coordinator, with runners the test controls.
@@ -64,6 +64,23 @@ test('a press whose wait is over says the build is still running, as the site ex
   assert.equal(result.reason, 'debate_atlas_build_running');
   assert.equal(result.active.startedAtMs, 1_000_000);
   assert.ok(jobs.clock.ms >= 1_000_000 + RESULTS_BUILD_WAIT_MS);
+});
+
+test('a press that follows the build is answered within seconds, with 202 and its job while it runs', async () => {
+  const jobs = createJobs({ 'debate-atlas': { run: () => new Promise(() => {}) } });
+  const result = await pressResultsBuild({ kindName: 'debate-atlas', config: {}, body: { follow: true }, deps: buildDeps(jobs) });
+  assert.match(result.job?.jobId, /^[0-9a-f]{16}$/);
+  assert.deepEqual(result, { ok: true, status: 202, jobState: 'running', job: { jobId: result.job.jobId, startedAtMs: 1_000_000 } });
+  const waitedMs = jobs.clock.ms - 1_000_000;
+  assert.ok(waitedMs >= RESULTS_BUILD_FOLLOW_WAIT_MS && waitedMs < RESULTS_BUILD_FOLLOW_WAIT_MS + 3000, `waited ${waitedMs}ms`);
+});
+
+test('a press that follows still gets the build, or why it failed, when the job ends within its wait', async () => {
+  const built = createJobs({ 'debate-atlas': { run: async () => ({ ok: true, status: 200, buildId: BUILD.id }) } });
+  const press = (kindName, jobs) => pressResultsBuild({ kindName, config: {}, body: { follow: true }, deps: buildDeps(jobs) });
+  assert.deepEqual(await press('debate-atlas', built), { ok: true, status: 200, build: BUILD });
+  const failing = createJobs({ 'risk-matrix': { run: async () => ({ ok: false, status: 422, error: 'Too few answers to build from.' }) } });
+  assert.deepEqual(await press('risk-matrix', failing), { ok: false, status: 422, error: 'Too few answers to build from.' });
 });
 
 test('a press the build would refuse starts no job', async () => {

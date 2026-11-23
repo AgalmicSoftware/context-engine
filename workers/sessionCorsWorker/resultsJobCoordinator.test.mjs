@@ -68,6 +68,21 @@ test('the coordinator’s job routes take the atlas lease once, and a second pre
   assert.equal((await post('results-job/nonsense', { kind: 'debate-atlas' })).status, 404);
 });
 
+test('a read of builds tells how the latest job went: running, then done with its failure', async () => {
+  const runner = createRunner();
+  const { post } = createCoordinator({ runners: { 'risk-matrix': runner } });
+  assert.equal((await post('risk-matrix/read', {})).body.job, undefined, 'no job yet');
+  const started = await post('results-job/start', { kind: 'risk-matrix', input: { builder: BUILDER } });
+  await settle();
+  const running = (await post('risk-matrix/read', {})).body.job;
+  assert.deepEqual([running.jobId, running.state], [started.body.job.jobId, 'running']);
+  runner.runs[0].finish({ ok: false, status: 422, error: 'Too few answers to build from.' });
+  await settle();
+  const done = (await post('risk-matrix/read', {})).body.job;
+  assert.deepEqual([done.jobId, done.state, done.outcome.ok, done.outcome.error], [running.jobId, 'done', false, 'Too few answers to build from.']);
+  assert.equal('input' in done, false, 'never its input');
+});
+
 test('a press while another kind’s lease is held is refused as the store refuses it', async () => {
   const runner = createRunner();
   const { post } = createCoordinator({ runners: { 'risk-matrix': runner } });

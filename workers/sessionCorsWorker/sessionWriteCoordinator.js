@@ -3654,9 +3654,9 @@ export class SessionWriteCoordinator {
     }
     const resultsBuild = url.pathname.match(/^\/session-config\/(debate-atlas|risk-matrix)\/([a-z]+)$/);
     if (resultsBuild) {
-      // A page reading builds wakes a job no one is running.
-      if (resultsBuild[2] === 'read') await readResultsJob(this, resultsBuild[1], this.resultsJobRunners);
-      return dispatchResultsBuildStore(this, resultsBuild[1], resultsBuild[2], payload || {});
+      // A page reading builds wakes a job no one is running, and is told how the latest one went.
+      const job = resultsBuild[2] === 'read' ? await readResultsJob(this, resultsBuild[1], this.resultsJobRunners) : null;
+      return dispatchResultsBuildStore(this, resultsBuild[1], resultsBuild[2], payload || {}, { job });
     }
     const resultsJob = url.pathname.match(/^\/session-config\/results-job\/([a-z]+)$/);
     if (resultsJob) return this.executeResultsJob(resultsJob[1], payload || {});

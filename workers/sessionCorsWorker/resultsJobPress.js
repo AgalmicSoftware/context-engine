@@ -2,6 +2,7 @@
 // job in the session's coordinator (resultsJobs.js), or joins the one running,
 // and answers when the job finishes while the page is still waiting. If the
 // page drops, the job carries on and keeps its build; the next read finds it.
+// A site that follows an atlas or risk matrix build itself is not kept waiting.
 import { readKeptResultsAnalysisDraft } from './resultsAnalysisGeneration.js';
 import { resultsBuildRefusal, resultsBuildReserveFailure } from './resultsBuild.js';
 import { RESULTS_BUILD_KINDS } from './resultsBuildStore.js';
@@ -11,6 +12,8 @@ import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 // A build's own deadline is 4 minutes, and an AI Views call's 8.
 export const RESULTS_BUILD_WAIT_MS = 5 * 60 * 1000;
 export const RESULTS_ANALYSIS_WAIT_MS = 9 * 60 * 1000;
+// A site that follows the build is answered within seconds, long enough to say why a build failed at once.
+export const RESULTS_BUILD_FOLLOW_WAIT_MS = 3 * 1000;
 
 const trim = (value) => (typeof value === 'string' ? value.trim() : '');
 const lower = (value) => trim(value).toLowerCase();
@@ -27,17 +30,25 @@ const waitFor = ({ env, slug, kind, input, waitMs, deps }) => awaitResultsJob({
   ...(deps?.wait ? { wait: deps.wait } : {}),
 });
 
-/** An atlas or risk matrix press: the build, its failure, or that it is still being built. */
+/**
+ * An atlas or risk matrix press: the build, its failure, or that it is still being built. A site that follows the
+ * build itself sends `follow: true` and gets 202 and the job while it runs, which reads then report to builders.
+ * Older sites send no `follow` and are held while it builds, as before.
+ */
 export const pressResultsBuild = async ({ env, slug, kindName, config, body = {}, builderAddress, deps = {} } = {}) => {
   const kind = RESULTS_BUILD_KINDS[kindName];
   const refusal = resultsBuildRefusal(kindName, config, body);
   if (refusal) return refusal;
+  const follows = body?.follow === true;
   const waited = await waitFor({
-    env, slug, kind: kindName, deps, waitMs: RESULTS_BUILD_WAIT_MS,
+    env, slug, kind: kindName, deps, waitMs: follows ? RESULTS_BUILD_FOLLOW_WAIT_MS : RESULTS_BUILD_WAIT_MS,
     input: { builder: lower(builderAddress), body: { source: { kind: 'worker-canonical' } } },
   });
   if (!waited.ok) return resultsBuildReserveFailure(kindName, waited);
   const { job } = waited;
+  if (job?.state !== 'done' && follows) {
+    return { ok: true, status: 202, jobState: 'running', job: { jobId: job?.jobId, startedAtMs: job?.startedAtMs } };
+  }
   if (job?.state !== 'done') {
     // The site shows the running build and checks back for it, as for anyone else's.
     return {
