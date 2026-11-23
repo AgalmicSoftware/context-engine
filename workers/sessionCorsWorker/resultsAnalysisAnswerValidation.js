@@ -35,7 +35,10 @@ export const formatValidAnalysisAnswer = (raw, question) => {
       return unique.length <= limit ? unique : null;
     }
     case 'quadratic':
-      return validateQuadraticAllocation(value, question) ? null : formatQuadraticAllocation(value, question.options);
+      if (validateQuadraticAllocation(value, question)) return null;
+      // Every vote at 0, which clearing a quadratic answer leaves, is no answer, as the site reads it: like a cleared
+      // choice, it is kept only for a comment.
+      return value.every((vote) => vote === 0) ? '' : formatQuadraticAllocation(value, question.options);
     case 'freeform':
     case 'text':
       return scalarText(value) || null;

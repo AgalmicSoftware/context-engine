@@ -778,7 +778,12 @@ Admin test panel:
   budget, which reach the model with option labels. This applies to canonical
   input and admin snapshots alike; admin snapshots keep answers to older types,
   such as polls, as text. Invalid answers are excluded even when accompanied by
-  a comment; genuinely unanswered comment-only rows remain supported. This does
+  a comment; genuinely unanswered comment-only rows remain supported. A valid
+  quadratic allocation with every vote at 0, which clearing a quadratic answer
+  leaves, is unanswered, as the site reads it: the allocation counts for
+  nothing and reaches no model, so its row is left out unless it has a
+  comment, and then counts as a comment-only response. Atlas and risk matrix
+  builds and the Session Agent's member answers read the same rows. This does
   not change opaque storage admission or the historical admin-snapshot format.
 - Normalized analysis snapshots keep multiple-choice answers as arrays of exact
   option labels, including single-select answers. Breakdown counts those selections
