@@ -417,10 +417,12 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     '';
   const gapWarning =
     failedCount > 0 ? "Some audio couldn't be transcribed. Retry transcription or download the audio below." : '';
-  // Only labelled parts can say how many voices they hold, so this needs speaker labels on.
+  // Only labelled parts can say how many voices they hold, so this needs speaker labels on. It is about the
+  // recording in progress, so it goes on Stop and never shows for an uploaded file.
+  const isRecordingNow = recorder.isRecording || recorder.isPaused;
   const oneVoiceParts = useMemo(
-    () => (panelMode === 'recordGroup' ? oneVoicePartsInARow(recorder.segments) : 0),
-    [panelMode, recorder.segments],
+    () => (panelMode === 'recordGroup' && isRecordingNow ? oneVoicePartsInARow(recorder.segments) : 0),
+    [panelMode, isRecordingNow, recorder.segments],
   );
   const oneVoiceWarning =
     oneVoiceParts < ONE_VOICE_PARTS_BEFORE_WARNING

@@ -2038,12 +2038,12 @@ it('warns when the latest finished parts each hold one voice, and never touches 
   const startRecording = jest.fn();
   const stopRecording = jest.fn();
   const pauseRecording = jest.fn();
-  const show = (segments: unknown[], speakerAudio = false) => {
+  const show = (segments: unknown[], speakerAudio = false, isRecording = true) => {
     window.localStorage.setItem('ce:record-speaker-audio:v1', String(speakerAudio));
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
       buildRecorder({
-        status: 'recording',
-        isRecording: true,
+        status: isRecording ? 'recording' : 'idle',
+        isRecording,
         transcript: 'Talk.',
         segments,
         startRecording,
@@ -2080,6 +2080,10 @@ it('warns when the latest finished parts each hold one voice, and never touches 
     view.unmount();
     // Parts without speaker labels say nothing about voices.
     view = show([0, 1, 2].map((index) => ({ ...part(index, []), text: 'Plain words.' })));
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_RECORDING_ONE_VOICE)).not.toBeInTheDocument();
+    view.unmount();
+    // Once stopped, or for an uploaded file, the same parts say nothing: there is no recording to change.
+    view = show([part(0, ['Speaker A']), part(1, ['Speaker A'])], false, false);
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_RECORDING_ONE_VOICE)).not.toBeInTheDocument();
     view.unmount();
     expect(startRecording).not.toHaveBeenCalled();
