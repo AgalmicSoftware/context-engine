@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { contextCardsOn, participantsMayAddContext } from '@ce-shared/sessionContextSources.mjs';
 import { buildSessionContextPrompt } from '@ce-shared/sessionContextText.mjs';
+import { canonicalizeSessionSlug } from '../session/sessionSlug';
 import { getUsableSessionWorkerUrl } from '../session/sessionWorkerAvailability';
 import { resolveWorkerCanonicalSessionIdHex } from '../session/sessionWorkerDiscovery';
 import { isConfiguredAdmin } from '../storage/storageClient';
@@ -26,6 +27,15 @@ export const supportsContextSources = (sessionConfig: unknown): boolean =>
 const sessionHasEnded = (sessionConfig: unknown): boolean => {
   const endsAt = Date.parse(String((sessionConfig as { sessionEndsAt?: unknown } | null)?.sessionEndsAt ?? ''));
   return Number.isFinite(endsAt) && endsAt <= Date.now();
+};
+
+const CONTEXT_SOURCES_CHANGED_EVENT = 'ce:context-sources-changed';
+
+/** Has this session's context lists read again: a source was added or replaced elsewhere on the page. */
+export const announceContextSourcesChanged = (sessionSlug: string): void => {
+  window.dispatchEvent(
+    new CustomEvent(CONTEXT_SOURCES_CHANGED_EVENT, { detail: canonicalizeSessionSlug(sessionSlug) }),
+  );
 };
 
 type Input = { sessionSlug: string; sessionConfig: unknown; account?: unknown; enabled?: boolean };
@@ -105,6 +115,16 @@ export function useSessionContextSources({
     };
   }, [active, identity, sessionSlug, account, isAdmin, revision]);
   const reload = useCallback(() => setRevision((value) => value + 1), []);
+  // A source added from elsewhere, as a Group Conversation's transcript, shows here without a page reload.
+  useEffect(() => {
+    if (!active) return undefined;
+    const slug = canonicalizeSessionSlug(sessionSlug);
+    const hear = (event: Event) => {
+      if ((event as CustomEvent<unknown>).detail === slug) reload();
+    };
+    window.addEventListener(CONTEXT_SOURCES_CHANGED_EVENT, hear);
+    return () => window.removeEventListener(CONTEXT_SOURCES_CHANGED_EVENT, hear);
+  }, [active, sessionSlug, reload]);
   // A token or a new membership can open files the last list couldn't show.
   useEffect(() => {
     if (!active || isAdmin) return undefined;

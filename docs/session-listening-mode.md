@@ -603,7 +603,9 @@ or some of its groups, starting with the group the page's link joined. Submittin
 transcript as a text file through the same path as any
 [context file](session-context-sources.md), after the questions, so the person has
 signed in by then. A later submit with more of the same conversation, or a new choice
-of who can read it, replaces that file; another conversation keeps its own. A failure
+of who can read it, replaces that file; another conversation keeps its own. Once it is
+in, the session page's context list reads itself again, so the file shows there without a
+page reload. A failure
 says so beside **Try again**, and closing waits for an upload under way. The box only
 shows when the Worker takes participants' files (`participant_context_v1`) and the
 session allows them, or for an admin.

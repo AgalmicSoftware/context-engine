@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Site — available when the site deploys
 
 - **Group Conversation drafts pick one or pick any.** Each multiple-choice question it drafts is now pick one where its options exclude one another and pick any where several can apply, and its card says which, as other choice questions do. Before, every one was pick any.
+- **An added transcript shows in the session's context at once.** After Group Conversation adds its transcript to context, the session page's context list, and the context the session's AI reads, now include it without a page reload.
 - **A passkey sign-in can no longer get stuck on its spinner.** After Create, the passkey step that follows could wait with nothing on screen, and closing the dialog left every later Submit on the spinner. The spinner now has **Cancel**, and closing the dialog on it does the same: the step stops, nothing more is saved, and the dialog says to choose **Login** and pick the passkey just made. A sign-in cancelled from outside the dialog also ends its spinner.
 
 ## [0.9.40] - 2026-11-24

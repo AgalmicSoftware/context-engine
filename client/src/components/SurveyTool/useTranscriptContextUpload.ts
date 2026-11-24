@@ -10,7 +10,10 @@ import {
   type ContextFileAccess,
 } from '../../utilities/docLibrary/contextSources';
 import { useContextGroups } from '../../utilities/docLibrary/useContextGroups';
-import { supportsContextSources } from '../../utilities/docLibrary/useSessionContextSources';
+import {
+  announceContextSourcesChanged,
+  supportsContextSources,
+} from '../../utilities/docLibrary/useSessionContextSources';
 import { isConfiguredAdmin } from '../../utilities/storage/storageClient';
 import { contextAccessKey } from '../Sessions/setup/ContextAccessPicker';
 
@@ -107,6 +110,7 @@ export function useTranscriptContextUpload({ sessionSlug, sessionConfig, context
               replaced = false;
             });
           }
+          announceContextSourcesChanged(target.sessionSlug);
           setStatus(
             replaced
               ? 'Transcript added to context.'
