@@ -1,4 +1,5 @@
 import { AI_MODEL_NOT_ALLOWED } from './aiRequestPolicy.js';
+import { answerAiCall } from './aiKeepAlive.js';
 import { DEFAULT_AI_MODEL, DEFAULT_ANTHROPIC_MODEL } from '../../shared/aiDefaults.mjs';
 import { dispatchWorkerCapabilities } from './workerCapabilities.js';
 import { isModelAllowed } from './aiRequestNormalization.js';
@@ -264,13 +265,13 @@ export const dispatchAnonymousRoute = async ({
     ? {}
     : ((await deps?.getSessionSecrets?.(slug)) || {});
   if (provider === 'anthropic') {
-    return deps?.proxyAnthropic?.({ payload, secrets, config, baseHeaders: headers });
+    return answerAiCall(payload, () => deps?.proxyAnthropic?.({ payload, secrets, config, baseHeaders: headers }), headers);
   }
   if (provider === 'openai') {
-    return deps?.proxyOpenAI?.({ payload, secrets, config, baseHeaders: headers });
+    return answerAiCall(payload, () => deps?.proxyOpenAI?.({ payload, secrets, config, baseHeaders: headers }), headers);
   }
   if (provider === 'openrouter') {
-    return deps?.proxyOpenRouter?.({ payload, secrets, config, baseHeaders: headers });
+    return answerAiCall(payload, () => deps?.proxyOpenRouter?.({ payload, secrets, config, baseHeaders: headers }), headers);
   }
 
   return deps?.json?.({ error: `Unsupported provider: ${provider}` }, 400, headers);

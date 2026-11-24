@@ -1,4 +1,5 @@
 import { AI_MODEL_NOT_ALLOWED } from './aiRequestPolicy.js';
+import { answerAiCall } from './aiKeepAlive.js';
 import { reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, withCoordinatedFaucetWalletTurn } from './sessionWriteCoordinator.js';
 import { DEFAULT_AI_MODEL, DEFAULT_ANTHROPIC_MODEL } from '../../shared/aiDefaults.mjs';
 import { isModelAllowed } from './aiRequestNormalization.js';
@@ -243,40 +244,40 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
     if (provider === 'anthropic') {
       return {
         handled: true,
-        response: await deps?.proxyAnthropic?.({
+        response: await answerAiCall(body, () => deps?.proxyAnthropic?.({
           payload: body,
           config,
           secrets: secretContext.secrets,
           baseHeaders: headers,
-        }),
+        }), headers),
       };
     }
     if (provider === 'openai') {
       return {
         handled: true,
-        response: await deps?.proxyOpenAI?.({
+        response: await answerAiCall(body, () => deps?.proxyOpenAI?.({
           payload: body,
           config,
           secrets: secretContext.secrets,
           baseHeaders: headers,
-        }),
+        }), headers),
       };
     }
     if (provider === 'openrouter') {
       return {
         handled: true,
-        response: await deps?.proxyOpenRouter?.({
+        response: await answerAiCall(body, () => deps?.proxyOpenRouter?.({
           payload: body,
           config,
           secrets: secretContext.secrets,
           baseHeaders: headers,
-        }),
+        }), headers),
       };
     }
     if (provider === 'custom') {
       return {
         handled: true,
-        response: await deps?.proxyCustomRPC?.({
+        response: await answerAiCall(body, () => deps?.proxyCustomRPC?.({
           payload: body,
           config,
           secrets: secretContext.secrets,
@@ -285,7 +286,7 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
             address,
             scopes,
           },
-        }),
+        }), headers),
       };
     }
 

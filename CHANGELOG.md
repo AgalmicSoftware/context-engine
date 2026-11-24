@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Session Worker — needs a Worker update
+
+- **A long AI reply is no longer cut as idle on a phone.** The full "Analyze user" reply can take a minute or more, and the Worker sent nothing until it was done, so a phone's browser could drop the silent connection and show "Unable to reach the AI service" after the first read had arrived. When the site asks for it, the Worker now answers at once and sends a space every 10 seconds until the reply is ready; a failure from the AI provider then comes in the reply's body with its status, and refusals before the provider (sign-in, limits) keep their own status. The site asks on every AI request; an older Worker ignores the request and answers as before, and the MCP and other callers are unchanged. A locked screen still ends the request. A reply lost while it was being read is no longer sent again, since it had reached the provider.
+
 ## [0.9.42] - 2026-11-25
 
 Results' report folds each question to one line and lists participants by when they first answered, and Atlas lists positions most widely held first. Session Agent answers keep their lists and line breaks; Group Conversation's recording options sit above Record, with a note when the last two parts each held one voice; rating answers say their number once; and no empty band stays above the question after a submit. Site only: the Session Worker's code is unchanged and MCP stays 0.9.35.

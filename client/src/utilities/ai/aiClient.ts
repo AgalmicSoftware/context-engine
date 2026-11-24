@@ -195,6 +195,17 @@ export const analyzePhotoForQuestionGeneration = async (file: PhotoUploadFile, o
  *   POST { action:'ai', provider, model, temperature?, max_tokens?, messages:[{role, content}] }
  * And respond with: { completion: "<text>" }
  */
+// The reply's body. A connection lost while it is read had already reached the Worker, which has passed the request
+// on to the provider: the error keeps the browser's words, which say what the person sees, but is no longer the
+// browser's own TypeError, so it is never taken for a request that did not arrive and sent again.
+const readAiWorkerReply = async (response: Response): Promise<unknown> => {
+  try {
+    return await response.json();
+  } catch (error) {
+    throw error instanceof TypeError ? new Error(error.message) : error;
+  }
+};
+
 const callAICompletion = async (prompt: unknown, opts: unknown = {}) => {
   try {
     const thinkingRequested = readAiOptionThinking(opts);
@@ -250,7 +261,9 @@ const callAICompletion = async (prompt: unknown, opts: unknown = {}) => {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
+        // The Worker answers at once and keeps the connection busy until the reply is ready, so a long reply is not
+        // cut as idle on the way. An older Worker ignores this and answers as before.
+        body: JSON.stringify({ ...asRecord(requestBody), keepAlive: true }),
       },
       {
         sessionSlug,
@@ -264,9 +277,11 @@ const callAICompletion = async (prompt: unknown, opts: unknown = {}) => {
       },
     );
 
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data?.error || 'AI request failed');
+    const data = await readAiWorkerReply(response);
+    const failure = asRecord(data).error;
+    // With the connection kept busy the status is sent before the outcome is known, so a failure comes in a 200.
+    if (!response.ok || failure) {
+      throw new Error(String(failure || 'AI request failed'));
     }
 
     const reportedModel = asRecord(asRecord(data).raw).model ?? asRecord(data).model;

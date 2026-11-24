@@ -113,6 +113,38 @@ describe('aiClient worker auth options', () => {
     expect(fetchWorkerWithAuth.mock.calls[1]).toEqual(fetchWorkerWithAuth.mock.calls[0]);
   });
 
+  it('asks the Worker to keep the connection busy, and fails with an error a 200 reply ends with', async () => {
+    getEffectiveAiConfig.mockResolvedValue({ provider: 'openai', model: 'gpt-6.1-sol', apiKeySource: 'session' });
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
+    fetchWorkerWithAuth.mockResolvedValue({
+      ok: true,
+      json: async () => ({ error: 'Incorrect API key provided.', status: 401 }),
+    });
+
+    await expect(analyzeUserOpinions({}, { sessionSlug: 'session-a', throwOnError: true })).rejects.toThrow(
+      'Incorrect API key provided.',
+    );
+    expect(JSON.parse(fetchWorkerWithAuth.mock.calls[0][1].body).keepAlive).toBe(true);
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not send again a reply lost while it was being read, which had reached the Worker', async () => {
+    getEffectiveAiConfig.mockResolvedValue({ provider: 'openai', model: 'gpt-6.1-sol', apiKeySource: 'session' });
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
+    fetchWorkerWithAuth.mockResolvedValue({
+      ok: true,
+      json: async () => {
+        throw new TypeError('Load failed');
+      },
+    });
+
+    const failure = analyzeUserOpinions({}, { sessionSlug: 'session-a', throwOnError: true });
+    // The browser's words stay, so the person sees the same "Unable to reach the AI service" notice.
+    await expect(failure).rejects.toThrow('Load failed');
+    await expect(failure).rejects.not.toBeInstanceOf(TypeError);
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+  });
+
   it('writes the picture card in a second request, after the analysis and without holding it up', async () => {
     getEffectiveAiConfig.mockResolvedValue({ provider: 'openai', model: 'gpt-4o-mini', apiKeySource: 'worker' });
     getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
