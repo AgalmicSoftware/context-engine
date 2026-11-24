@@ -307,6 +307,12 @@ test('sending an add again after a lost reply or a failed store counts it once',
 
 test('copies of one add sent at once store it once', async () => {
   const h = harness();
+  // Storing takes a moment, as on Cloudflare, so the copies arrive while the first is stored.
+  const publish = h.deps.executeCoordinatedStoragePublication;
+  h.deps.executeCoordinatedStoragePublication = async (args) => {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    return publish(args);
+  };
   const note = (i) => h.uploadFile({ address: PARTICIPANT, name: `note-${i}.md`, type: 'text/markdown', bytes: new TextEncoder().encode(`Note ${i}`) });
   const statuses = (await Promise.all(Array.from({ length: 5 }, () => note(0)))).map((response) => response.status);
   assert.deepEqual(statuses.sort(), [200, 503, 503, 503, 503]);

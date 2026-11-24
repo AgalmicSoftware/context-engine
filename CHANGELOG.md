@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.39] - 2026-11-24
+
+A Worker updated to this release no longer answers `503` to requests that share a settings read with a request that ended first, so sign-in, lists and names keep working after a reload or a quiet spell. No site change beyond the Deploy helper; no MCP change.
+
+### Session Worker — needs a Worker update
+
+- **A cancelled request no longer fails the requests waiting on its settings read.** Requests arriving together in one Worker instance share one read of the session's settings, and AI Views viewers one read of the draft. They did so by awaiting the promise of the request that started the read; when that request ended before they saw the answer, Cloudflare's runtime rejected them ("This promise was created by a request that has since ended, so it can never settle") and the Worker answered `503` (`500` from `/capabilities`). A request ends first when its caller hangs up (a reload, a closed tab), and also without one: after a quiet spell a slow first read gathers many waiters, and the first request may answer and end before they all see it. A cancelled read also stayed in place, so later requests in that instance failed the same way, signed in or not, until it was recycled: lists, sign-in nonces and names failed, and the page showed "Cache initialization error" even after a reload. The site does not retry that reply. A waiting request now checks for the shared read's answer on its own timer and never awaits another request's promise; if that read has not answered within a second, the next request reads again. Those waiting are no longer tied to the first request at all; a cancelled read costs them up to a second, and no request after that. A burst still sends the coordinator one read, and those waiting still get its answer, including the busy reply the site sends again.
+
+### Site — available when the site deploys
+
+- **Deploy helper.** It deploys the 0.9.38 Worker bundles. A Worker updated from the site gets this release's.
+
 ## [0.9.38] - 2026-11-24
 
 The interview's Submit fills its button, Agree / Unsure / Disagree keep their own colours and one font, multiple choice lists one option per line, a room of more than four letters its speakers part by part and new questions from a recording are easy to find; the report lists choices most chosen first, the interview says who processes it, the Stats panel settles, the Analyze box drops its Text view and the footer credits Agalmic Software. No Worker or MCP change.

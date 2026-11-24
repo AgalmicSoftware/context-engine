@@ -30234,7 +30234,7 @@ var init_sessionConfigSecretsStore = __esm({
 });
 
 // workers/sessionCorsWorker/sessionConfigAuthority.js
-var SESSION_CONFIG_COORDINATION_ERROR, SUPERSEDED_AUTHORITY_ERROR, assertExpectedSessionAuthority, SESSION_CONFIG_CACHE_MS, SHARED_READ_JOIN_MS, STALLED, createReadShare, deepFreeze, configReads, resultsAnalysisStatusReads, sessionKey, shareResultsAnalysisStatusRead, forgetResultsAnalysisStatus, forgetSessionConfig, KEEPS_CONFIG, KEEPS_CONFIG_PREFIXES, keepsConfig, callSessionConfigCoordinator, lastFailureLogAt, heldFailureLogs, logCoordinatorFailure, callCoordinator, readCurrentSessionConfig, executeCoordinatedStorageVisibilityMutation, executeCoordinatedStoragePublication, executeCoordinatedContextSourceOperation;
+var SESSION_CONFIG_COORDINATION_ERROR, SUPERSEDED_AUTHORITY_ERROR, assertExpectedSessionAuthority, SESSION_CONFIG_CACHE_MS, SHARED_READ_WAIT_MS, SHARED_READ_POLL_MS, createReadShare, deepFreeze, configReads, resultsAnalysisStatusReads, sessionKey, shareResultsAnalysisStatusRead, forgetResultsAnalysisStatus, forgetSessionConfig, KEEPS_CONFIG, KEEPS_CONFIG_PREFIXES, keepsConfig, callSessionConfigCoordinator, lastFailureLogAt, heldFailureLogs, logCoordinatorFailure, callCoordinator, readCurrentSessionConfig, executeCoordinatedStorageVisibilityMutation, executeCoordinatedStoragePublication, executeCoordinatedContextSourceOperation;
 var init_sessionConfigAuthority = __esm({
   "workers/sessionCorsWorker/sessionConfigAuthority.js"() {
     init_sessionCoordinatorBusy();
@@ -30250,64 +30250,50 @@ var init_sessionConfigAuthority = __esm({
       }
     };
     SESSION_CONFIG_CACHE_MS = 1e3;
-    SHARED_READ_JOIN_MS = 1e4;
-    STALLED = Symbol("stalled");
+    SHARED_READ_WAIT_MS = 1e3;
+    SHARED_READ_POLL_MS = 10;
     createReadShare = (copy4) => {
       const reads = /* @__PURE__ */ new WeakMap();
       const stateFor = (binding, slug) => {
         let slugs = reads.get(binding);
         if (!slugs) reads.set(binding, slugs = /* @__PURE__ */ new Map());
         let state2 = slugs.get(slug);
-        if (!state2) slugs.set(slug, state2 = { generation: 0, cached: null, inFlight: null });
+        if (!state2) slugs.set(slug, state2 = { started: 0, forgotten: 0, cached: null, pending: null });
         return state2;
       };
       const stamp = (result, readStartedAt) => {
         if (result && typeof result === "object" && !Object.isFrozen(result)) Object.defineProperty(result, "readStartedAt", { value: readStartedAt });
         return result;
       };
-      const share = (state2, read) => {
-        const joined = state2.inFlight;
-        if (!joined) {
-          const generation = state2.generation;
-          const startedAt = Date.now();
-          const pending = read().then((result) => {
-            if (result?.ok && state2.generation === generation) {
-              state2.cached = { result, startedAt, expiresAt: Date.now() + SESSION_CONFIG_CACHE_MS };
-            }
-            return result;
-          }).finally(() => {
-            if (state2.inFlight === pending) state2.inFlight = null;
-          });
-          state2.inFlight = pending;
-          state2.inFlightStartedAt = startedAt;
-          return pending.then((result) => stamp(copy4(result), startedAt));
-        }
-        const joinedStartedAt = state2.inFlightStartedAt;
-        let timer;
-        const stalled = new Promise((resolve) => {
-          timer = setTimeout(resolve, SHARED_READ_JOIN_MS, STALLED);
-        });
-        return Promise.race([joined, stalled]).finally(() => clearTimeout(timer)).then((result) => {
-          if (result !== STALLED) return stamp(copy4(result), joinedStartedAt);
-          if (state2.inFlight === joined) {
-            state2.inFlight = null;
-            state2.generation += 1;
-          }
-          return share(state2, read);
-        });
-      };
       return {
-        read: ({ binding, slug, cache, read }) => {
+        read: async ({ binding, slug, cache, read }) => {
           const state2 = stateFor(binding, slug);
-          if (cache && state2.cached && Date.now() < state2.cached.expiresAt) return Promise.resolve(stamp(copy4(state2.cached.result), state2.cached.startedAt));
-          return share(state2, read);
+          for (; ; ) {
+            if (cache && state2.cached && Date.now() < state2.cached.expiresAt) return stamp(copy4(state2.cached.result), state2.cached.startedAt);
+            const waited = state2.pending;
+            if (!waited || Date.now() - waited.startedAt >= SHARED_READ_WAIT_MS) break;
+            await new Promise((resolve) => setTimeout(resolve, SHARED_READ_POLL_MS));
+            if (waited.answered && waited.order > state2.forgotten) return stamp(copy4(waited.result), waited.startedAt);
+          }
+          const mine = { order: state2.started += 1, startedAt: Date.now(), answered: false, result: void 0 };
+          state2.pending = mine;
+          try {
+            mine.result = await read();
+            mine.answered = true;
+          } finally {
+            if (state2.pending === mine) state2.pending = null;
+          }
+          if (mine.result?.ok && mine.order > state2.forgotten && mine.order > (state2.cached?.order ?? 0)) {
+            state2.cached = { result: mine.result, order: mine.order, startedAt: mine.startedAt, expiresAt: Date.now() + SESSION_CONFIG_CACHE_MS };
+          }
+          return stamp(copy4(mine.result), mine.startedAt);
         },
         forget: (binding, slug) => {
           const state2 = reads.get(binding)?.get(slug);
           if (!state2) return;
-          state2.generation += 1;
+          state2.forgotten = state2.started;
           state2.cached = null;
-          state2.inFlight = null;
+          state2.pending = null;
         }
       };
     };
@@ -108627,7 +108613,7 @@ var FEATURES = Object.freeze([
   "worker_groups"
 ]);
 var WORKERS_AI_FEATURE = "workers_ai_v1";
-var workerRelease = () => "0.9.38" ? "0.9.38" : null;
+var workerRelease = () => "0.9.39" ? "0.9.39" : null;
 var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 = {} }) => {
   const deployed = FEATURES.filter((feature) => feature !== WORKER_GROUP_READ_CODE_FEATURE || workerGroupCodeReadsOn(env));
   const body = {
