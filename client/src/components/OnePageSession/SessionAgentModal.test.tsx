@@ -381,6 +381,12 @@ describe('SessionAgentModal', () => {
     expect(dialog.getByText('The Session Agent isn’t open to you in this session.')).toBeInTheDocument();
     expect(dialog.queryByLabelText('Your question')).not.toBeInTheDocument();
     expect(dialog.queryByRole('switch')).not.toBeInTheDocument();
+    // Someone who came by the title's robot may not have seen the Context section.
+    expect(
+      dialog.getByText(
+        'Whether the Session Agent may use your answers and files, and your address on them, is set in the Context section.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('says when the session has ended or its AI is off, with no question box and no switches', async () => {
@@ -503,6 +509,9 @@ describe('SessionAgentModal', () => {
 
   it('gives someone signed in without an address no address to store', async () => {
     const { dialog } = await renderModal({ ...member, recording: true, unattributed: null });
+    expect(
+      dialog.getByText('Whether the Session Agent may use your answers and files is set in the Context section.'),
+    ).toBeInTheDocument();
     expect(dialog.getByRole('checkbox', { name: 'Store this chat' })).toBeChecked();
     expect(dialog.queryByRole('radio')).not.toBeInTheDocument();
     ask.mockResolvedValueOnce({ ...reply('An answer.'), stored: true });
@@ -518,6 +527,8 @@ describe('SessionAgentModal', () => {
     expect(await dialog.findByText('Not signed in, you get General answers.')).toBeInTheDocument();
     expect(readStatus).toHaveBeenCalledWith({ ...OPTIONS, account: '' });
     expect(dialog.queryByRole('switch')).not.toBeInTheDocument();
+    // They have no answers or files here of their own to set anything for.
+    expect(dialog.queryByText(/is set in the Context section/)).not.toBeInTheDocument();
     // How it works stays a link away without the switches' "?".
     expect(dialog.getByRole('link', { name: 'How the Session Agent works' })).toHaveAttribute(
       'href',

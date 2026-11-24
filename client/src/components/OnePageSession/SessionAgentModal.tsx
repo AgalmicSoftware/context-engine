@@ -441,6 +441,14 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
       </ModalHeader>
       <ModalBody className={styles.body} data-testid="ce-session-agent">
         {body}
+        {/* Their switches aren't here, and someone who came by the title's robot may not have seen them. */}
+        {status?.on && !status.signedOut ? (
+          <p className={styles.hint}>
+            {status.unattributed === null
+              ? 'Whether the Session Agent may use your answers and files is set in the Context section.'
+              : 'Whether the Session Agent may use your answers and files, and your address on them, is set in the Context section.'}
+          </p>
+        ) : null}
       </ModalBody>
     </Modal>
   );

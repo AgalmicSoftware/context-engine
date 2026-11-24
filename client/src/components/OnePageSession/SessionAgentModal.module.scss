@@ -171,9 +171,11 @@
     color: var(--ce-action-accent-text);
   }
 
-  // Filled while it waits for a question too, so it always reads as the dialog's action. Themes draw a
-  // button's border, so the fill is what sets it apart.
+  // Themes draw a button's border, so the fill is what sets it apart. Waiting for a question it takes the
+  // disabled fill with the dialog's own text, dimmed but readable: some themes' disabled text is too faint.
   &:disabled {
+    background: var(--ce-control-disabled-bg);
+    color: var(--ce-panel-text);
     cursor: not-allowed;
   }
 }
