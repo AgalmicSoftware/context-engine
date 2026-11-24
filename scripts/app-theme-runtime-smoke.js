@@ -660,11 +660,12 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
             width: rect.width,
           };
         }),
+        // The link holds the words and the icon, so the icon is measured on its own.
         github: await footerGithubLink.evaluate((element) => {
-          const style = window.getComputedStyle(element);
           const rect = element.getBoundingClientRect();
+          const icon = element.querySelector('svg');
           return {
-            fontSize: Number.parseFloat(style.fontSize),
+            iconHeight: icon ? icon.getBoundingClientRect().height : 0,
             height: rect.height,
             width: rect.width,
           };
@@ -2088,11 +2089,12 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
             width: rect.width,
           };
         }),
+        // The link holds the words and the icon, so the icon is measured on its own.
         github: await footerGithubLink.evaluate((element) => {
-          const style = window.getComputedStyle(element);
           const rect = element.getBoundingClientRect();
+          const icon = element.querySelector('svg');
           return {
-            fontSize: Number.parseFloat(style.fontSize),
+            iconHeight: icon ? icon.getBoundingClientRect().height : 0,
             height: rect.height,
             width: rect.width,
           };
@@ -2920,7 +2922,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       'Context Engine footer attribution wording should remain visible',
     );
     assert.ok(
-      classicFooterBrandState.github.fontSize > currentFooterBrandState.github.fontSize,
+      classicFooterBrandState.github.iconHeight > currentFooterBrandState.github.iconHeight,
       'Classic 95 footer GitHub icon should be larger than the Context Engine icon',
     );
   }
