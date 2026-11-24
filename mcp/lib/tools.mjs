@@ -1,6 +1,7 @@
 // MCP tool definitions for an agent taking part in Context Engine sessions.
 import { failedToolResult } from './mcpServer.mjs';
 import { AGENT_FLOW_STEPS, AGENT_NAME_ADVICE, AGENT_REVIEW_NEXT_STEP } from '../../shared/agentParticipationGuide.mjs';
+import { SESSION_AGENT_LIMITS } from '../../shared/sessionAgent.mjs';
 import { CONTEXT_SOURCE_LIMITS } from '../../shared/sessionContextSources.mjs';
 import { CONTEXT_LIST_MAX, CONTEXT_READ_CHARS } from './contextLibrary.mjs';
 import { AGENT_NAME_EXAMPLE, SESSION_NAME_RULE } from './sessionNameRule.mjs';
@@ -428,7 +429,7 @@ export const buildTools = (participant) => [
     name: 'ask_session_agent',
     title: 'Ask the session’s agent',
     description:
-      'Ask the session’s own Session Agent one question about the session, when it has one and its admins let you ask. It answers from the session’s context, results and, for some askers, members’ answers, naming no one, in at most 150 words. Chats with a session’s agent can be recorded when the session’s recording setting is on: get_session shows this session’s setting as sessionAgent.recording. While it is on, this call stores your question and the answer for the session’s organisers, who may export them, unless you pass store false; your address is stored only if you pass attribution "address". While it is off, nothing is kept. Returns the answer, how much it drew on, and whether the chat was stored: stored says so, and chat says it in a sentence to pass on with the answer.',
+      `Ask the session’s own Session Agent one question about the session, when it has one and its admins let you ask. It answers from the session’s context, results and, for some askers, members’ answers, naming no one, in at most ${SESSION_AGENT_LIMITS.answerWords.toLocaleString('en-US')} words. Chats with a session’s agent can be recorded when the session’s recording setting is on: get_session shows this session’s setting as sessionAgent.recording. While it is on, this call stores your question and the answer for the session’s organisers, who may export them, unless you pass store false; your address is stored only if you pass attribution "address". While it is off, nothing is kept. Returns the answer, how much it drew on, and whether the chat was stored: stored says so, and chat says it in a sentence to pass on with the answer.`,
     inputSchema: {
       type: 'object',
       properties: {

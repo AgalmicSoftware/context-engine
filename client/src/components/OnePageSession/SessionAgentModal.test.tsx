@@ -342,7 +342,7 @@ describe('SessionAgentModal', () => {
     expect(dialog.getByText('Preview')).toBeInTheDocument();
     expect(readStatus).toHaveBeenCalledWith(OPTIONS);
     expect(dialog.getByText('You get General answers.')).toBeInTheDocument();
-    expect(dialog.getByText('Answers are at most 150 words. Questions and answers aren’t kept.')).toBeInTheDocument();
+    expect(dialog.getByText('Answers are at most 3,000 words. Questions and answers aren’t kept.')).toBeInTheDocument();
     expect(dialog.getByLabelText('Your question')).toHaveAttribute('maxLength', '500');
   });
 

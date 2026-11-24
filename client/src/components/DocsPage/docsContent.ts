@@ -1,3 +1,4 @@
+import { SESSION_AGENT_LIMITS } from '@ce-shared/sessionAgent.mjs';
 import { t } from '../../utilities/ui/terminology.js';
 
 export type QuickstartLink = Readonly<{
@@ -207,7 +208,7 @@ export const SESSION_AGENT_TOPICS: readonly SessionAgentTopic[] = Object.freeze(
         'An AI that answers questions about one session from that session’s own material, using the AI the session is set up with. It is a preview, off until an admin turns it on under AI, and only sessions on a Session Worker have one.',
       points: [
         'While it is on, a robot shows by the session’s title, and anyone signed in can open it from the session’s Context.',
-        'It takes one question at a time and answers in at most 150 words.',
+        `It takes one question at a time and answers in at most ${SESSION_AGENT_LIMITS.answerWords.toLocaleString('en-US')} words.`,
       ],
       link: { href: SESSION_AGENT_DOC_PATH, label: 'Full Session Agent docs' },
     },

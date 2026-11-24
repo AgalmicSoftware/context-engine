@@ -3437,7 +3437,7 @@ Signed login/bootstrap requests:
     with a model from `shared/workersAiModels.mjs`; every other AI task keeps
     the session's provider, and `/ai` refuses `workers-ai` as an unsupported
     provider. The call goes through the Worker's `AI` binding, never `fetch`,
-    with the Session Agent's 3,000-token ceiling sent in the field the model
+    with the Session Agent's 16,000-token ceiling sent in the field the model
     takes, so a model's own default never applies. Only the answer is read,
     never a reasoning model's thinking. No request key pays for it, a session
     needs no stored AI key for it, and a question counts toward the person's

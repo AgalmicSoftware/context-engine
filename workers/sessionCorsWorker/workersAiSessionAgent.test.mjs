@@ -9,9 +9,11 @@ import { proxyWorkersAi } from './aiProviderExecution.js';
 import { isModelAllowed } from './aiRequestNormalization.js';
 import { inferAiProviderFromModel } from '../../shared/aiModelFamily.mjs';
 import { DEFAULT_WORKERS_AI_MODEL } from '../../shared/workersAiModels.mjs';
+import { SESSION_AGENT_LIMITS } from '../../shared/sessionAgent.mjs';
 import { buildSiweMessage, installSessionCoordinatorBinding, makeJsonRequest } from '../../tests/helpers/sessionCorsWorkerTestUtils.mjs';
 
 const GLM = '@cf/zai-org/glm-5.3';
+const REPLY_TOKENS = SESSION_AGENT_LIMITS.answerTokens;
 const AGENT_ON_CLOUDFLARE = Object.freeze({
   mode: 'openai',
   models: { fast: 'gpt-4o-mini', thinking: 'gpt-5', 'session-agent': { model: GLM, provider: 'workers-ai' } },
@@ -46,12 +48,12 @@ test('only the Session Agent may use it, and every call sets the Session Agentâ€
   assert.deepEqual(await proxy({ env: { AI: ai }, payload: { ...ASK, max_tokens: 99_999, apiKey: 'synthetic-byo-key' } }),
     { status: 200, body: { completion: 'Synthetic open-model answer' } });
   // GLM 5.3 thinks at `max` unless told, so every call asks for `low`.
-  assert.deepEqual(ai.calls[0], { model: GLM, inputs: { messages: ASK.messages, max_completion_tokens: 3000, reasoning_effort: 'low' } });
+  assert.deepEqual(ai.calls[0], { model: GLM, inputs: { messages: ASK.messages, max_completion_tokens: REPLY_TOKENS, reasoning_effort: 'low' } });
   // No limit asked: the ceiling is still sent, never the model's own default;
   // and a session set to think harder doesn't change it.
   const harder = { ...AGENT_ON_CLOUDFLARE, reasoningEffort: 'high' };
   await proxyWorkersAi({ env: { AI: ai }, config: { ai: harder }, baseHeaders: {}, payload: { ...ASK, reasoning_effort: 'medium' } });
-  assert.deepEqual([ai.calls[1].inputs.max_completion_tokens, ai.calls[1].inputs.reasoning_effort], [3000, 'low']);
+  assert.deepEqual([ai.calls[1].inputs.max_completion_tokens, ai.calls[1].inputs.reasoning_effort], [REPLY_TOKENS, 'low']);
 });
 
 test('a model the session didnâ€™t set, or one off the list, is refused', async (t) => {
@@ -161,7 +163,7 @@ test('the Session Agent answers on Workers AI while every other AI task stays on
   const asked = await f.request('/session-agent/ask', { question: 'What do people want?' });
   assert.equal(asked.status, 200, await asked.clone().text());
   assert.equal((await asked.json()).answer, 'Synthetic open-model answer');
-  assert.deepEqual(f.ai.calls.map(({ model, inputs }) => [model, inputs.max_completion_tokens]), [[GLM, 3000]]);
+  assert.deepEqual(f.ai.calls.map(({ model, inputs }) => [model, inputs.max_completion_tokens]), [[GLM, REPLY_TOKENS]]);
   assert.equal(f.outbound.length, 0);
   // A summary, signed in or not, goes to OpenAI as before.
   for (const authenticated of [true, false]) {
