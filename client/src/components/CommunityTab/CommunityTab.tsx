@@ -255,6 +255,7 @@ export class CommunityTab extends Component<any, any> {
     this._statsRefreshQueuedForce = false;
     this._statsRefreshQueuedLoading = false;
     this._lastInitialLoadCheckMs = 0;
+    this._initialLoadCheck = null;
     this._cacheUpdateRefreshQueuedForce = false;
     this._cacheUpdateUnsubscribe = null;
     this._statsCacheRefreshCoalescer = null;
@@ -1738,12 +1739,22 @@ export class CommunityTab extends Component<any, any> {
       const waitMs = this._lastInitialLoadCheckMs + checkIntervalMs - now;
       // A check put off here is run when it may be, rather than at the next poll, which can be a minute away.
       if (waitMs > 0) this._scheduleNextStatsPoll(waitMs);
-      else {
+      else if (this._initialLoadCheck?.selectionKey !== selectionKey) {
+        // Not awaited. For chain sessions the check reads each one's latest block in turn, with retries, which
+        // can take minutes; a refresh waiting on it held every later refresh of this choice, and the counts that
+        // came in meanwhile stayed on spinners. One check at a time per choice; a newer choice starts its own.
         this._lastInitialLoadCheckMs = now;
-        const loadDone = await this.checkIfInitialLoadDone();
-        if (loadDone && isCurrent()) {
-          this.setState(() => (isCurrent() ? { initialLoadDone: true } : null));
-        }
+        const checking = { selectionKey };
+        this._initialLoadCheck = checking;
+        const stillThisChoice = () => !this._isUnmounted && selectionKey === this._statsSelectionKey();
+        void this.checkIfInitialLoadDone()
+          .catch(() => false)
+          .then((loadDone) => {
+            if (this._initialLoadCheck === checking) this._initialLoadCheck = null;
+            if (loadDone && stillThisChoice()) {
+              this.setState(() => (stillThisChoice() ? { initialLoadDone: true } : null));
+            }
+          });
       }
     }
 
