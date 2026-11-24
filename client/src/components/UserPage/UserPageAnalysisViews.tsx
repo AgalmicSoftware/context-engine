@@ -33,31 +33,11 @@ export type UserPageAnalysisViewsProps = {
   onAnalysisCardShownChange?: (shown: boolean) => void;
 };
 
-type View = 'text' | 'breakdown' | 'card';
+type View = 'breakdown' | 'card';
 const VIEW_LABELS: ReadonlyArray<[View, string]> = [
-  ['text', 'Text'],
   ['breakdown', 'Breakdown'],
   ['card', 'Card'],
 ];
-// The Text view says what the Breakdown says, so its button is there only for those who ask for it under Options.
-// The choice is kept in this browser; where storage is shut it is kept here, for this visit.
-const TEXT_VIEW_KEY = 'ce-analysis-text-view';
-let textViewThisVisit = false;
-const readTextView = (): boolean => {
-  try {
-    return window.localStorage.getItem(TEXT_VIEW_KEY) === '1';
-  } catch {
-    return textViewThisVisit;
-  }
-};
-const keepTextView = (shown: boolean): void => {
-  try {
-    if (shown) window.localStorage.setItem(TEXT_VIEW_KEY, '1');
-    else window.localStorage.removeItem(TEXT_VIEW_KEY);
-  } catch {
-    textViewThisVisit = shown;
-  }
-};
 
 const BREAKDOWN_LINES: ReadonlyArray<[keyof UserAnalysisBreakdown, string]> = [
   ['holds', 'Holds most strongly'],
@@ -65,27 +45,18 @@ const BREAKDOWN_LINES: ReadonlyArray<[keyof UserAnalysisBreakdown, string]> = [
   ['unsure', 'Least sure about'],
 ];
 
-// The historical figure and why, written as the analysis writes it: a tinted box in the Text view, a panel in
-// the Breakdown.
-const HistoricalAlignment = ({
-  figure,
-  panel = false,
-  reasoning,
-}: {
-  figure: React.ReactNode;
-  panel?: boolean;
-  reasoning: React.ReactNode;
-}) =>
+// The historical figure and why, written as the analysis writes it, in a panel of the Breakdown.
+const HistoricalAlignment = ({ figure, reasoning }: { figure: React.ReactNode; reasoning: React.ReactNode }) =>
   figure || reasoning ? (
-    <div className={panel ? viewStyles.panel : styles.historicalAlignment}>
-      {panel ? <h5 className={viewStyles.label}>Historical Alignment</h5> : <h4>Historical Alignment</h4>}
-      {figure ? <p className={panel ? viewStyles.figure : undefined}>{figure}</p> : null}
-      {reasoning ? <p className={panel ? undefined : styles.placeholderNote}>{reasoning}</p> : null}
+    <div className={viewStyles.panel}>
+      <h5 className={viewStyles.label}>Historical Alignment</h5>
+      {figure ? <p className={viewStyles.figure}>{figure}</p> : null}
+      {reasoning ? <p>{reasoning}</p> : null}
     </div>
   ) : null;
 
 /**
- * One analysis, three ways to read it. The picture card is the third view, there only where the session makes
+ * One analysis, two ways to read it. The picture card is the second view, there only where the session makes
  * one: on my own page it shows nowhere else, and its "Show this card on my page" box sits with it.
  */
 const UserPageAnalysisViews = ({
@@ -105,11 +76,9 @@ const UserPageAnalysisViews = ({
 }: UserPageAnalysisViewsProps): React.ReactElement => {
   const hasCard = !!(analysisCard || analysisCardPending);
   const [chosen, setChosen] = useState<View>('breakdown');
-  const [textView, setTextView] = useState(readTextView);
-  // A card that is taken away (the session turned it off), or a Text view put away under Options, leaves the
-  // Breakdown, not an empty view.
-  const view = (chosen === 'card' && !hasCard) || (chosen === 'text' && !textView) ? 'breakdown' : chosen;
-  const views = VIEW_LABELS.filter(([id]) => (id !== 'card' || hasCard) && (id !== 'text' || textView));
+  // A card that is taken away (the session turned it off) leaves the Breakdown, not an empty view.
+  const view = chosen === 'card' && !hasCard ? 'breakdown' : chosen;
+  const views = VIEW_LABELS.filter(([id]) => id !== 'card' || hasCard);
   const lines = BREAKDOWN_LINES.filter(([key]) => analysisBreakdown?.[key]);
   return (
     <>
@@ -128,15 +97,6 @@ const UserPageAnalysisViews = ({
           ))}
         </div>
       ) : null}
-
-      {view === 'text' && (
-        <>
-          {analysisName ? <h4 className={viewStyles.name}>{analysisName}</h4> : null}
-          <p className={styles.placeholderNote}>{aiAnalysis}</p>
-          {analysisDetails ? <p className={styles.analysisDetails}>{analysisDetails}</p> : null}
-          <HistoricalAlignment figure={analysisHistoricalFigure} reasoning={analysisHistoricalReasoning} />
-        </>
-      )}
 
       {view === 'breakdown' && (
         <>
@@ -162,7 +122,7 @@ const UserPageAnalysisViews = ({
                 <blockquote className={viewStyles.quote}>“{analysisBreakdown.ownWords}”</blockquote>
               </figure>
             ) : null}
-            <HistoricalAlignment panel figure={analysisHistoricalFigure} reasoning={analysisHistoricalReasoning} />
+            <HistoricalAlignment figure={analysisHistoricalFigure} reasoning={analysisHistoricalReasoning} />
           </div>
         </>
       )}
@@ -223,22 +183,6 @@ const UserPageAnalysisViews = ({
         {analysisGeneration?.model || 'not recorded'}
         {analysisGeneration?.provider ? ` (${analysisGeneration.provider})` : ''}
       </p>
-      <details className={viewStyles.options}>
-        <summary>Options</summary>
-        <label>
-          <input
-            type="checkbox"
-            checked={textView}
-            onChange={(event) => {
-              setTextView(event.target.checked);
-              keepTextView(event.target.checked);
-              // Put away, it is forgotten as the view shown: ticked again, the Breakdown stays.
-              if (!event.target.checked && chosen === 'text') setChosen('breakdown');
-            }}
-          />{' '}
-          Show the Text view
-        </label>
-      </details>
     </>
   );
 };
