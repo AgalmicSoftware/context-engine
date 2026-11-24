@@ -378,6 +378,7 @@ export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngin
   engine._lastLoadAndSortResultSignature = '';
   engine._lastInitializeResponseSig = '';
   engine._lastNotifiedPileSubmitRailVisible = null;
+  engine._pileSubmittedCheckShown = false;
 
   // Refs for auto-scrolling to newly opened sections
   engine.createSectionRef = React.createRef();
@@ -540,6 +541,7 @@ const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEn
     handleFilter: bindPileEngineMethod(engine, handleFilter),
     getIsPileSubmitRailVisible: bindPileEngineMethod(engine, getIsPileSubmitRailVisible),
     notifyPileSubmitRailVisibility: bindPileEngineMethod(engine, notifyPileSubmitRailVisibility),
+    handlePileSubmittedCheckShown: bindPileEngineMethod(engine, handlePileSubmittedCheckShown),
     renderPileResponseInput: bindPileEngineMethod(engine, renderPileResponseInput),
     renderPileSliderSection: bindPileEngineMethod(engine, renderPileSliderSection),
     renderPileAdditionalInput: bindPileEngineMethod(engine, renderPileAdditionalInput),
@@ -3057,14 +3059,16 @@ const handleFilter = (engine: PileViewModeEngine, filteredQsOrCombined: any, new
   });
 };
 
+// The page lifts the title over the card while Submit, or the green "Submitted" after it, is in the band between
+// them. Once "Submitted" hides, the band holds nothing, so the title comes back down; the card does not move.
 const getIsPileSubmitRailVisible = (engine: PileViewModeEngine) => {
   const pendingStats = engine.getPendingStatsSnapshot?.() || { total: 0 };
-  return !!(
-    engine.state.isSubmitting ||
-    Number(pendingStats.total || 0) > 0 ||
-    engine.state.submittedSinceLastEdit ||
-    engine.state.submissionComplete
-  );
+  return !!(engine.state.isSubmitting || Number(pendingStats.total || 0) > 0 || engine._pileSubmittedCheckShown);
+};
+
+const handlePileSubmittedCheckShown = (engine: PileViewModeEngine, shown: boolean) => {
+  engine._pileSubmittedCheckShown = shown;
+  engine.notifyPileSubmitRailVisibility();
 };
 
 const notifyPileSubmitRailVisibility = (engine: PileViewModeEngine) => {
@@ -3877,6 +3881,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             activePromptMasked,
             finalSubmitText,
             showClearPendingButton,
+            onSubmittedCheckShown: engine.handlePileSubmittedCheckShown,
             handleRevertPendingChanges: () => {
               engine.handleRevertPendingChanges();
               // Clear discards the answers the interview left unsaved, so their notice ends with them.

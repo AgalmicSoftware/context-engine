@@ -13,7 +13,7 @@ type Engine = { setState: (patch: Record<string, unknown>) => void };
 const check = () => screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR);
 
 // The real pile view, signed in on a session's page, just after a submit.
-const submitted = (): Engine => {
+const submitted = (extra: Record<string, unknown> = {}): Engine => {
   let engine: Engine | null = null;
   const strategy = createPileViewRuntimeStrategy() as { render: (engine: never) => unknown };
   const renderPile = strategy.render;
@@ -39,6 +39,7 @@ const submitted = (): Engine => {
     onFilterChange: jest.fn(),
     runtimeStrategy: strategy,
     questionPool: [{ id: 'q1', type: 'freeform', prompt: 'What matters?' }],
+    ...extra,
   } as never);
   act(() => engine!.setState({ submittedSinceLastEdit: true }));
   return engine!;
@@ -66,6 +67,22 @@ it('shows the check for ten seconds after each submit', () => {
   expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toBeNull();
   act(() => engine.setState({ submittedSinceLastEdit: true }));
   expect(check()).not.toHaveClass('pileSubmitDoneGone');
+});
+
+// The page lifts its title to make room above the card while the band holds Submit or the check (see
+// OnePageSessionStandardShell): once the check hides, the band is empty and the title comes back down.
+it('holds the band above the card only while the check shows', () => {
+  jest.useFakeTimers();
+  const bandHeld = jest.fn();
+  const engine = submitted({ onPileSubmitRailVisibilityChange: bandHeld });
+  expect(bandHeld).toHaveBeenLastCalledWith(true);
+  act(() => {
+    jest.advanceTimersByTime(10_000);
+  });
+  expect(bandHeld).toHaveBeenLastCalledWith(false);
+  act(() => engine.setState({ submittedSinceLastEdit: false }));
+  act(() => engine.setState({ submittedSinceLastEdit: true }));
+  expect(bandHeld).toHaveBeenLastCalledWith(true);
 });
 
 it('hands focus to the question card when the check hides', () => {

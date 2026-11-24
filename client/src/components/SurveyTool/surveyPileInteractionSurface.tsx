@@ -98,6 +98,8 @@ type PileFooterControlsProps = {
   handleRevertPendingChanges: VoidHandler;
   /** The end card has its own Submit, so Submit and Clear here step aside, keeping their place. */
   endOfSetShown?: boolean;
+  /** Hears whether the green "Submitted" is showing (see PileSubmittedCheck). */
+  onSubmittedCheckShown?: (shown: boolean) => void;
 };
 
 type PileDeckWindowProps = {
@@ -174,6 +176,7 @@ export type PileInteractionSurfaceProps = {
   finalSubmitText: string;
   showClearPendingButton: boolean;
   handleRevertPendingChanges: VoidHandler;
+  onSubmittedCheckShown?: (shown: boolean) => void;
   navCounterVisible: boolean;
   nextIsPrimary?: boolean;
   nextNudge?: boolean;
@@ -395,10 +398,23 @@ const renderPileActionControls = ({
 // place so nothing below it moves. It only reports the submit; it is no link.
 const SUBMITTED_CHECK_MS = 10_000;
 
-/** What Submit becomes after a submit. */
-export const PileSubmittedCheck = (): React.ReactElement => {
+/**
+ * What Submit becomes after a submit. `onShown` hears true while it shows and false once it hides or goes, so the
+ * page holds the band above the card for it only while there is something in it.
+ */
+export const PileSubmittedCheck = ({ onShown }: { onShown?: (shown: boolean) => void } = {}): React.ReactElement => {
   const [gone, setGone] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
+  // The page hands a new copy of its handler on every render; each copy does the same, so the first one serves.
+  const onShownRef = React.useRef(onShown);
+  onShownRef.current = onShown;
+  // Before the page's own update reads it, so the band is held from the check's first frame.
+  React.useLayoutEffect(() => {
+    if (gone) return undefined;
+    const report = onShownRef.current;
+    report?.(true);
+    return () => report?.(false);
+  }, [gone]);
   React.useEffect(() => {
     // Submit, which may have had focus, is gone: keep focus here rather than on the page.
     if (!document.activeElement || document.activeElement === document.body)
@@ -442,6 +458,7 @@ const renderPileFooterControls = ({
   showClearPendingButton,
   handleRevertPendingChanges,
   endOfSetShown = false,
+  onSubmittedCheckShown,
 }: PileFooterControlsProps): React.ReactElement => {
   return (
     <div className={buildPileFooterClassName(styles, pileTopRailVisible)}>
@@ -450,7 +467,7 @@ const renderPileFooterControls = ({
         {showSuccessBadge ? 'Your answers are submitted.' : ''}
       </span>
       {showSuccessBadge ? (
-        <PileSubmittedCheck />
+        <PileSubmittedCheck onShown={onSubmittedCheckShown} />
       ) : showSubmitButton ? (
         <>
           <Button
@@ -738,6 +755,7 @@ export const renderPileInteractionSurface = ({
   finalSubmitText,
   showClearPendingButton,
   handleRevertPendingChanges,
+  onSubmittedCheckShown,
   navCounterVisible,
   nextIsPrimary,
   nextNudge,
@@ -840,6 +858,7 @@ export const renderPileInteractionSurface = ({
         showClearPendingButton,
         handleRevertPendingChanges,
         endOfSetShown: !!endOfSetCard,
+        onSubmittedCheckShown,
       })}
       {renderPileNavControls({
         pileQuestions,

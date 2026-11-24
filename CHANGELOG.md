@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Site — available when the site deploys
 
+- **No empty band above the question after a submit.** On a wide screen the session's title moves up to make room for Submit above the question card, and the green **Submitted** that replaces it hides after ten seconds; the title used to stay up over the empty space. It now comes back down once nothing shows there. The card itself does not move, and phones are unchanged.
 - **Session Agent answers keep their lists.** An answer's "- " bullets, numbered steps, short headings and bold now show as such in the dialog and in admins' list of stored chats, instead of one block of text. HTML in an answer still shows as text, and no image, link or chart is drawn or fetched from it; stored chats keep the text as it came.
 - **Group recordings ask where the others are.** Before a new Group Conversation recording, Record asks whether the others are in the room or on a call through this device; the answer sets "Recording voices coming from this device" (on a call: on, with "Use speakers, not headphones") and starts recording in the same tap. While recording, a note says when the last two finished parts each held only one voice, and points at that option and at headphones; it never stops or changes the recording, and needs speaker labels.
 - **Rating answers say their number once.** An answer card shows "8/10" without the bare "0" and "10" beside it; worded scale ends, and a lowest point other than 0, still show.
