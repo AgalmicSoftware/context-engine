@@ -376,6 +376,7 @@ export default function PolisReport({
   const [participantsGraphOpen, setParticipantsGraphOpen] = useState<boolean>(true);
   const allQuestionsBodyId = useId();
   const [allQuestionsOpen, setAllQuestionsOpen] = useState<boolean>(true);
+  const [openAnswerQuestions, setOpenAnswerQuestions] = useState<ReadonlySet<string>>(() => new Set());
   const [answerSectionsOpen, setAnswerSectionsOpen] = useState<AnswerSectionsOpen>({
     binary: true,
     freeform: true,
@@ -760,6 +761,7 @@ export default function PolisReport({
    ***************************************************************/
   function handleCollapseAll() {
     setAnswerSectionsOpen({});
+    setOpenAnswerQuestions(new Set());
     setBeeswarmOpen(false);
     setParticipantsGraphOpen(false);
     setAllQuestionsOpen(false);
@@ -775,6 +777,7 @@ export default function PolisReport({
 
   function handleExpandAll() {
     setAnswerSectionsOpen({ binary: true, freeform: true, rating: true, multichoice: true, quadratic: true });
+    setOpenAnswerQuestions(new Set((reportData?.answers || []).map((question) => question.id)));
     setBeeswarmOpen(true);
     setParticipantsGraphOpen(true);
     setAllQuestionsOpen(true);
@@ -3147,6 +3150,8 @@ export default function PolisReport({
                   pdfMode={isPdfModeActive}
                   openSections={answerSectionsOpen}
                   onToggleSection={(type) => setAnswerSectionsOpen((prev) => ({ ...prev, [type]: !prev[type] }))}
+                  openQuestions={openAnswerQuestions}
+                  onOpenQuestionsChange={setOpenAnswerQuestions}
                   renderBinaryQuestions={ratingMatrix?.length ? buildQuestionList : undefined}
                   binaryQuestionCount={rankedBinaryQuestions.length}
                 />

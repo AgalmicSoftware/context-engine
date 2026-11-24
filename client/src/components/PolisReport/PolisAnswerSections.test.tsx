@@ -253,6 +253,24 @@ it('names every option tied for most chosen, and says when none was', () => {
   expect(mostChosenLine(none)).toBe('No option chosen');
 });
 
+it('puts each question back as the reader left it after the export', async () => {
+  const { rerender } = render(<PolisAnswerSections questions={questions} openSections={{ rating: true }} />);
+  const section = screen.getByTestId('ce-polis-answers-rating');
+  fireEvent.click(within(section).getByRole('button', { name: 'View more (1)' }));
+  const folds = () => [...section.querySelectorAll('details')].map((details) => details.open);
+  fireEvent.click(section.querySelector('summary') as HTMLElement);
+  // The browser says a details element opened or closed on a later task.
+  const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  await settle();
+  expect(folds()).toEqual([true, false]);
+  rerender(<PolisAnswerSections questions={questions} openSections={{ rating: true }} pdfMode />);
+  await settle();
+  expect(folds()).toEqual([true, true]);
+  rerender(<PolisAnswerSections questions={questions} openSections={{ rating: true }} />);
+  await settle();
+  expect(folds()).toEqual([true, false]);
+});
+
 it('shows every question open in the export', () => {
   render(<PolisAnswerSections questions={questions} pdfMode />);
   const folds = [...screen.getByTestId('ce-polis-answer-sections').querySelectorAll('details')];

@@ -203,6 +203,8 @@ export default function PolisAnswerSections({
   pdfMode = false,
   openSections,
   onToggleSection,
+  openQuestions: shownOpenQuestions,
+  onOpenQuestionsChange,
   renderBinaryQuestions,
   binaryQuestionCount = 0,
 }: {
@@ -210,6 +212,8 @@ export default function PolisAnswerSections({
   pdfMode?: boolean;
   openSections?: AnswerSectionsOpen;
   onToggleSection?: (type: AnswerSectionType) => void;
+  openQuestions?: ReadonlySet<string>;
+  onOpenQuestionsChange?: React.Dispatch<React.SetStateAction<ReadonlySet<string>>>;
   renderBinaryQuestions?: (heading: React.ReactNode, limit?: number) => React.ReactNode;
   binaryQuestionCount?: number;
 }) {
@@ -217,9 +221,10 @@ export default function PolisAnswerSections({
   const [localOpen, setLocalOpen] = useState<AnswerSectionsOpen>({});
   const [expanded, setExpanded] = useState<AnswerSectionsOpen>({});
   // Questions opened from their folded line, by id; the export shows every one open.
-  const [openQuestions, setOpenQuestions] = useState<ReadonlySet<string>>(() => new Set());
+  const [localOpenQuestions, setLocalOpenQuestions] = useState<ReadonlySet<string>>(() => new Set());
+  const openQuestions = shownOpenQuestions || localOpenQuestions;
   const setQuestionsOpen = (ids: string[], isOpen: boolean) =>
-    setOpenQuestions((prev) => {
+    (onOpenQuestionsChange || setLocalOpenQuestions)((prev) => {
       if (ids.every((questionId) => prev.has(questionId) === isOpen)) return prev;
       const next = new Set(prev);
       ids.forEach((questionId) => (isOpen ? next.add(questionId) : next.delete(questionId)));
@@ -288,7 +293,10 @@ export default function PolisAnswerSections({
                           <details
                             className={styles.questionFold}
                             open={pdfMode || openQuestions.has(question.id)}
-                            onToggle={(event) => setQuestionsOpen([question.id], event.currentTarget.open)}
+                            // The export's opening is not the reader's, so the folds come back after it.
+                            onToggle={(event) => {
+                              if (!pdfMode) setQuestionsOpen([question.id], event.currentTarget.open);
+                            }}
                           >
                             <summary>
                               {heading}

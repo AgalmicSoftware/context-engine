@@ -1951,7 +1951,7 @@ describe('PolisReport demo data defaults', () => {
     });
   });
 
-  it('includes the participants list and answer sections in the global collapse and expand controls', async () => {
+  it('includes the participants list, answer sections and folded questions in the global collapse and expand controls', async () => {
     const demoDataset = getPolisDemoDatasetForSlug('demo');
     const participant = Array.isArray(demoDataset?.participantsVotes)
       ? demoDataset.participantsVotes.find((entry) => entry?.xid || entry?.participant)
@@ -2000,6 +2000,16 @@ describe('PolisReport demo data defaults', () => {
     ['Binary', 'Freeform', 'Ratings', 'Multiple choice', 'Quadratic allocation'].forEach((name) => {
       expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'true');
     });
+    const folds = (within) => [...within.querySelectorAll('details')].map((details) => details.open);
+    const sections = () => screen.getByTestId('ce-polis-answer-sections');
+    expect(folds(sections()).length).toBeGreaterThan(1);
+    expect(folds(sections()).every(Boolean)).toBe(true);
+
+    // Collapse All folds them again: All Questions opened by hand shows its questions folded.
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse All' }));
+    fireEvent.click(screen.getByRole('button', { name: 'All Questions' }));
+    expect(folds(sections()).length).toBeGreaterThan(1);
+    expect(folds(sections()).some(Boolean)).toBe(false);
   });
 
   describe('people outside the analysis', () => {
