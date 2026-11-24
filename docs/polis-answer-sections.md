@@ -87,14 +87,20 @@ Multiple-choice percentages use respondents as the denominator, so a question
 allowing several choices can exceed 100% across its options. Its options are listed
 most chosen first, with options chosen as often kept in the question's order, and
 the PDF export follows that order; the question's own option order, its answers and
-the data exports are unchanged. On the page each multiple-choice question starts folded
-to one line: its prompt, Pick one or Pick any, how many answered, and the option chosen
-most with its count (every option tied for it, with "each"). Its line opens and closes
-it, by click or by Enter or Space once it has focus; the PDF export shows each open.
+the data exports are unchanged.
 Quadratic bars show
 positive and negative vote totals on a common scale, with a separate signed net;
 credit costs are omitted. Canonical option labels and custom budgets are used to
 validate allocations.
+
+On the page each Freeform, Ratings, Multiple choice and Quadratic allocation question
+starts folded to one line: its prompt (with Pick one or Pick any), how many answered, and
+its answer in short: the opening of its first written answer, the average rating, the
+option chosen most with its count, or the option with the highest net (every option tied
+for it, with "each"). Its line opens and closes it, by click or by Enter or Space once it
+has focus; with more than one question showing, Open all and Fold all do the same for the
+section. The PDF export shows every question open. Binary statements are not folded: each
+is already its prompt and one line of counts.
 
 Binary counts read Agree, Unsure, Disagree to match the bar order, including
 tooltips and comparison cards. Response bars share the pile's green/yellow/red palette. Settings → Theme →
