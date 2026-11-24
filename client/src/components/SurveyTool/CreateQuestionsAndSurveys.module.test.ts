@@ -70,4 +70,15 @@ describe('CreateQuestionsAndSurveys.module.scss interview suggestion review guar
       /\.interviewQuestionPreview\s*{\s*min-width: 0;\s*margin: 0;\s*padding: 0;\s*border: 0;\s*isolation: isolate;/,
     );
   });
+
+  // Choice options stack one per line everywhere, so a draft with a long list would push the drafts after it
+  // far down; its preview scrolls instead.
+  it('scrolls a long choice list inside a draft preview', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'CreateQuestionsAndSurveys.module.scss'), 'utf8');
+    const preview = scss.slice(scss.indexOf('.interviewQuestionPreview {'));
+
+    expect(preview).toMatch(
+      /^\.interviewQuestionPreview \{[^]*?\n {2}:global\(\[id\*='multiChoice'\]\[role='group'\]\) \{\s*max-height: 42vh;\s*overflow-y: auto;/,
+    );
+  });
 });

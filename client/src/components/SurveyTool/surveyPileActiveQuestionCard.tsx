@@ -9,17 +9,23 @@ import { usePileHalfRowCut } from './pileHalfRowCut';
 const PILE_LIST_ROW_SELECTOR = `.${styles.checkboxOptionText}`;
 
 /**
- * The card's answer area. Where it scrolls (a phone's choice list), its last visible option is always cut through,
- * and the quadratic card's chevrons show in the footer while options are out of view above or below. Their place
+ * An answer area that scrolls up and down. Where it scrolls, its last visible option is always cut through, and the
+ * up and down chevrons show in the card's footer slot while options are out of view above or below. Their place
  * stays in the footer while none shows, so the footer, and the room it leaves the list, never changes with them.
  */
-const PileAnswerArea = ({ children }: { children: React.ReactNode }): React.ReactElement => {
+export const ScrollingAnswerArea = ({
+  className,
+  children,
+}: {
+  className: string;
+  children: React.ReactNode;
+}): React.ReactElement => {
   const ref = React.useRef<HTMLDivElement>(null);
-  const id = `pile-answers-${React.useId().replace(/:/g, '')}`;
+  const id = `answers-${React.useId().replace(/:/g, '')}`;
   const cue = usePileHalfRowCut(ref, PILE_LIST_ROW_SELECTOR);
   return (
     <>
-      <div className={styles.pileCardMainContent} ref={ref} id={id}>
+      <div className={className} ref={ref} id={id}>
         {children}
       </div>
       {cue !== 'off' && (
@@ -77,9 +83,9 @@ export const renderPileCardShell = ({
       <CardBody className={styles.pileCardBody}>
         <PileQuestionPrompt>{promptHeader}</PileQuestionPrompt>
 
-        <PileAnswerArea>
+        <ScrollingAnswerArea className={styles.pileCardMainContent}>
           <div className={questionContainerClass}>{questionComponent}</div>
-        </PileAnswerArea>
+        </ScrollingAnswerArea>
 
         {footerSection}
       </CardBody>

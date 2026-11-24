@@ -1,3 +1,5 @@
+@use 'scss/choiceListScroll' as choiceListScroll;
+
 .draftCard {
   position: relative;
   display: grid;
@@ -590,4 +592,14 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+// A choice list is the pile's: one option per line, and a long one scrolls inside the card, ending partway through
+// an option, with the up and down chevrons in the card's footer.
+.choiceList {
+  @include choiceListScroll.choice-list-scroll;
+
+  max-height: 42vh;
+  // Room for each option's focus ring, which reaches 5px outside it.
+  padding: 5px 5px 28px;
 }

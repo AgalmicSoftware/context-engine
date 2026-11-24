@@ -52,7 +52,7 @@ it('gives every phone question card one height that leaves the controls row in v
   expect(heightsOf('.pileCardInner')).toContain('var(--pile-phone-card-height, 380px)');
   // Choices scroll from the top: centring pushed the first ones out of reach.
   expect(css).toMatch(
-    /\.pileCardInner \.pileCardMainContent:has\(\.multichoiceQuestionContainer\)\s*\{[^}]*?justify-content: flex-start;/,
+    /\.pileCardInner \.pileCardMainContent:has\(#multiChoice\)\s*\{[^}]*?justify-content: flex-start;/,
   );
 });
 
@@ -277,8 +277,32 @@ it('fades a phone choice list where more options are', () => {
 
 // The options spread apart by what usePileHalfRowCut measures, so a long list fills its room and still ends
 // partway through an option; a fixed gap left a blank band under it.
-it('lets a phone choice list spread its options to fill the card', () => {
+it('lets a choice list spread its options to fill the card', () => {
   expect(css).toMatch(
-    /\.pileCardInner \.multichoiceQuestionContainer #multiChoice\s*\{[^}]*flex-direction: column;[^}]*gap: calc\(8px \+ var\(--pile-list-row-spread, 0px\)\);/,
+    /^#multiChoice\s*\{[^}]*flex-direction: column;[^}]*gap: calc\(8px \+ var\(--pile-list-row-spread, 0px\)\);/m,
+  );
+});
+
+// Choice options ran sideways in a strip on a computer and stacked on a phone. They stack one per line at every
+// width, in an answer area that scrolls up and down and takes the room the prompt leaves, never room from it.
+it('lists choice options one per line at every width, scrolling up and down only', () => {
+  // A rule at the top level of the stylesheet, which holds at every width.
+  const everywhere = (selector: string) =>
+    css.match(new RegExp(`^${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm'))?.[1] || '';
+  expect(everywhere('.pileCardInner .pileCardMainContent:has(#multiChoice)')).toMatch(
+    /overflow-x: hidden;[\s\S]*overflow-y: auto;[\s\S]*flex: 1 1 0;\s*min-height: 0;/,
+  );
+  expect(everywhere('#multiChoice')).toMatch(/flex-direction: column;\s*flex-wrap: nowrap;\s*align-items: stretch;/);
+  expect(everywhere('#multiChoice .checkboxOptionText')).toMatch(/width: 100%;\s*max-width: 100%;/);
+  // Nothing in a choice list scrolls or snaps sideways, or wraps its options into columns.
+  const choiceRules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(([selectors]) =>
+    /multichoiceQuestionContainer|#multiChoice/.test(selectors),
+  );
+  expect(choiceRules.length).toBeGreaterThan(5);
+  choiceRules.forEach(([selectors, body]) =>
+    expect([selectors.trim(), body]).toEqual([
+      selectors.trim(),
+      expect.not.stringMatching(/overflow-x: (auto|scroll)|scroll-snap-type: x|flex-wrap: wrap|grid-auto-flow: column/),
+    ]),
   );
 });

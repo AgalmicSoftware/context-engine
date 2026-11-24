@@ -1,6 +1,7 @@
 @use 'scss/finalSubmitCta' as finalSubmitCta;
 @use 'scss/groupImagePlaceholder' as groupImagePlaceholder;
 @use 'scss/answerChoiceType' as answerChoiceType;
+@use 'scss/choiceListScroll' as choiceListScroll;
 
 /* NEW - Color variables for dropdown items */
 $questions-item-bg: var(--ce-color-success-soft); // Light green
@@ -171,13 +172,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   margin-right: 10px;
 }
 
+// Choice options stack one per line at every width, each as wide as the list: never in a row that wraps or runs
+// sideways. Where the list may be long, its answer area scrolls (choice-list-scroll).
 #multiChoice {
   display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  // Not center: an overflowing list would push its first options above the scroll top, out of reach.
+  justify-content: flex-start;
+  // usePileHalfRowCut spreads the options to fill a scrolling list's room, so it still ends partway through one.
+  gap: calc(8px + var(--pile-list-row-spread, 0px));
   margin: 0;
   padding: 0;
   width: 100%;
@@ -185,29 +190,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 #multiChoice .checkboxOptionText {
+  width: 100%;
+  max-width: 100%;
   margin: 0;
-  max-width: min(420px, 90%);
-}
-
-// Mobile: options should be full-width and scroll within the card.
-@media (max-width: 480px) {
-  #multiChoice {
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: stretch;
-    // Not center: an overflowing list would push its first options above the scroll top, out of reach.
-    justify-content: flex-start;
-    max-height: 42vh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  #multiChoice .checkboxOptionText {
-    width: 100%;
-    max-width: 100%;
-    justify-content: center;
-    text-align: center;
-  }
+  justify-content: center;
+  text-align: center;
 }
 
 // How much of an option beside the chosen one shows: its own colours, faded by 30%, with nothing mixed in.
@@ -6800,52 +6787,12 @@ $session-interview-submit-height: 48px;
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: flex-start;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 4px 0 12px;
-  scroll-padding-inline: 4px;
-  scroll-snap-type: x proximity;
-  scrollbar-width: auto;
-  scrollbar-color: var(--ce-action-accent) color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
-  -webkit-overflow-scrolling: touch;
-
-  &::-webkit-scrollbar {
-    height: 10px;
-  }
-
-  &::-webkit-scrollbar-track {
-    border-radius: var(--ce-radius-pill);
-    background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
-  }
-
-  &::-webkit-scrollbar-thumb {
-    border: 2px solid transparent;
-    border-radius: var(--ce-radius-pill);
-    background: var(--ce-action-accent);
-    background-clip: padding-box;
-  }
 }
 
 .multichoiceQuestionContainer #multiChoice {
   font-size: 1rem;
-  // The space the pill above leaves, so the wrapped columns are not clipped at the bottom.
-  flex: 1 1 0;
-  flex-direction: column;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  align-content: flex-start;
-  align-items: flex-start;
-  gap: 14px 18px;
-  height: auto;
-  min-height: 0;
-  // Leave room for the next wrapped column to peek into view as a scroll cue.
-  width: 70%;
-  max-width: 70%;
-  max-height: none;
-  padding: 2px 28px 4px 2px;
-  overflow: visible;
 }
 
 .multichoiceQuestionContainer #multiChoice .checkboxOptionText {
@@ -6855,7 +6802,6 @@ $session-interview-submit-height: 48px;
   padding: 14px 18px;
   font-size: 1rem !important;
   line-height: 1.35;
-  align-self: flex-start;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -6863,7 +6809,6 @@ $session-interview-submit-height: 48px;
   border-radius: var(--ce-radius-10);
   background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
   box-shadow: 0 4px 12px color-mix(in srgb, var(--ce-overlay-base) 18%, transparent);
-  scroll-snap-align: start;
   transition:
     background-color 0.16s ease,
     border-color 0.16s ease,
@@ -7835,7 +7780,7 @@ $session-interview-submit-height: 48px;
     flex-basis: 104px;
   }
 
-  .pileCardMainContent:has(.multichoiceQuestionContainer) {
+  .pileCardMainContent:has(#multiChoice) {
     flex-basis: 176px;
   }
 
@@ -7904,32 +7849,6 @@ $session-interview-submit-height: 48px;
       padding: 6px 4px;
       font-size: 1rem;
       line-height: 1.25;
-    }
-
-    .pileCardInner .multichoiceQuestionContainer {
-      padding: 0 0 6px;
-    }
-
-    .pileCardInner .multichoiceQuestionContainer #multiChoice {
-      display: grid;
-      grid-auto-flow: column;
-      grid-template-rows: repeat(2, minmax(0, 1fr));
-      grid-auto-columns: 72%;
-      gap: 8px;
-      width: 100%;
-      max-width: 100%;
-      min-height: 0;
-      margin: 0;
-      padding: 2px;
-    }
-
-    .pileCardInner .multichoiceQuestionContainer #multiChoice .checkboxOptionText {
-      height: 100%;
-      min-height: 44px;
-      margin: 0;
-      padding: 4px 10px;
-      align-self: stretch;
-      overflow-y: auto;
     }
 
     @container ce-theme style(--ce-layout-profile: desktop-window) {
@@ -8087,7 +8006,7 @@ $session-interview-submit-height: 48px;
     min-height: 0;
   }
 
-  .pileCardInner .pileCardBody:has(.multichoiceQuestionContainer, .quadraticQuestionContainer) {
+  .pileCardInner .pileCardBody:has(#multiChoice, .quadraticQuestionContainer) {
     .pileCardHeader {
       flex: 0 1 auto;
       max-height: 40%;
@@ -8138,78 +8057,53 @@ $session-interview-submit-height: 48px;
       }
     }
   }
+}
 
-  // Choice options stack one per line and scroll up and down inside the answer area, never sideways, from the top
-  // (centring would push the first ones out of reach). When more are below, the area fills its room and ends partway
-  // through an option (usePileHalfRowCut), and that edge fades a little; once scrolled, the top edge does too. The
-  // padding, and keyboard scrolling, keep the last option clear at the end.
-  .pileCardInner .pileCardMainContent:has(.multichoiceQuestionContainer) {
-    --pile-list-fade-top: black;
-    --pile-list-fade-bottom: black;
-
-    justify-content: flex-start;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior-y: contain;
-    padding-bottom: 28px;
-    scroll-padding-bottom: 28px;
-    -webkit-mask-image: linear-gradient(
-      to bottom,
-      var(--pile-list-fade-top),
-      black 20px,
-      black calc(100% - 20px),
-      var(--pile-list-fade-bottom)
-    );
-    mask-image: linear-gradient(
-      to bottom,
-      var(--pile-list-fade-top),
-      black 20px,
-      black calc(100% - 20px),
-      var(--pile-list-fade-bottom)
-    );
-
-    &[data-list-cue='start'],
-    &[data-list-cue='middle'] {
-      --pile-list-fade-bottom: color-mix(in srgb, black 35%, transparent);
-    }
-
-    &[data-list-cue='middle'],
-    &[data-list-cue='end'] {
-      --pile-list-fade-top: color-mix(in srgb, black 35%, transparent);
-    }
-  }
-
-  .pileCardInner .multichoiceQuestionContainer {
-    flex: 0 0 auto;
-    height: auto;
-    overflow: visible;
-    padding: 2px 0;
-  }
-
-  .pileCardInner .multichoiceQuestionContainer #multiChoice {
-    display: flex;
-    flex: 0 0 auto;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    // usePileHalfRowCut spreads the options to fill the room, so the list still ends partway through one.
-    gap: calc(8px + var(--pile-list-row-spread, 0px));
-    width: 100%;
-    max-width: 100%;
-    height: auto;
+// Classic 95 gives a prompt a tall document box; on a choice card it takes what the prompt needs, up to 40% of the
+// card, so the list keeps the room.
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .pileCardInner .pileCardBody:has(#multiChoice) .pileCardHeader {
+    flex: 0 1 auto;
     min-height: 0;
-    margin: 0;
-    // Room for each option's focus ring, which reaches 5px outside it.
-    padding: 5px;
+    max-height: 40%;
   }
+}
 
-  .pileCardInner .multichoiceQuestionContainer #multiChoice .checkboxOptionText {
-    width: 100%;
-    height: auto;
-    min-height: 44px;
-    margin: 0;
-    overflow: visible;
-    padding: 10px 14px;
-  }
+// Choice options stack one per line, at every width, and scroll inside the card's answer area (choice-list-scroll).
+// Keyed on the list itself, so a poll with options, which shares it, lists the same.
+// It takes the room the prompt leaves, never room from the prompt.
+.pileCardInner .pileCardMainContent:has(#multiChoice) {
+  @include choiceListScroll.choice-list-scroll;
+
+  flex: 1 1 0;
+  min-height: 0;
+  justify-content: flex-start;
+}
+
+.pileCardInner .pileCardMainContent :has(> #multiChoice) {
+  flex: 0 0 auto;
+  height: auto;
+  overflow: visible;
+  padding: 2px 0;
+}
+
+.pileCardInner .pileCardMainContent #multiChoice {
+  flex: 0 0 auto;
+  max-width: 100%;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  // Room for each option's focus ring, which reaches 5px outside it.
+  padding: 5px;
+}
+
+.pileCardInner .pileCardMainContent #multiChoice .checkboxOptionText {
+  width: 100%;
+  height: auto;
+  min-height: 44px;
+  margin: 0;
+  overflow: visible;
+  padding: 10px 14px;
 }
 
 // Once the card has an answer, Next is the step to take: the same arrow, the same size and place, in the theme's

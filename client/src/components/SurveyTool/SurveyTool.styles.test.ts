@@ -267,12 +267,11 @@ describe('Interview layout', () => {
   });
 });
 
-it('starts a phone choice list at its top, so an overflowing list keeps its first option in reach', () => {
+it('starts a choice list at its top, so an overflowing list keeps its first option in reach', () => {
   const scss = readSurveyToolScss();
-  const phone = scss.slice(scss.indexOf('// Mobile: options should be full-width and scroll within the card.'));
-  const rule = phone.slice(phone.indexOf('#multiChoice {'), phone.indexOf('}'));
-  expect(rule).toMatch(/overflow-y: auto;/);
+  const rule = ruleText(scss, '#multiChoice');
   expect(rule).toMatch(/justify-content: flex-start;/);
+  expect(rule).not.toMatch(/justify-content: center;/);
 });
 
 // A wide screen keeps the bar to one row, where the line saying why its Submit failed would push the buttons

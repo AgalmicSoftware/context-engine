@@ -1,6 +1,7 @@
 import { responseValuesEqual, answerValueType } from './responseValueEquality';
 import SessionInterviewHiddenAnswer from './SessionInterviewHiddenAnswer';
 import MultichoiceQuestionInput from './MultichoiceQuestionInput';
+import { ScrollingAnswerArea } from './surveyPileActiveQuestionCard';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Input } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -376,7 +377,13 @@ function SessionInterviewDraftCardContent({
       <div className={styles.editorStack}>
         {blindNote ? <strong>Your answer</strong> : null}
         {useNativeAnswer && renderAnswerInput ? (
-          renderAnswerInput(draft.questionId, answerValue, onAnswerChange, question, draft.answer)
+          question?.type === 'multichoice' ? (
+            <ScrollingAnswerArea className={styles.choiceList}>
+              {renderAnswerInput(draft.questionId, answerValue, onAnswerChange, question, draft.answer)}
+            </ScrollingAnswerArea>
+          ) : (
+            renderAnswerInput(draft.questionId, answerValue, onAnswerChange, question, draft.answer)
+          )
         ) : question?.type === 'quadratic' ? (
           <QuadraticAllocationInput
             questionId={draft.questionId}
@@ -389,14 +396,16 @@ function SessionInterviewDraftCardContent({
             disabled={disabled}
           />
         ) : question?.type === 'multichoice' ? (
-          <MultichoiceQuestionInput
-            questionId={`interview-${draft.questionId}`}
-            options={question.options}
-            selectedValues={Array.isArray(answerValue) ? answerValue : answerValue ? [answerValue] : []}
-            isSingleSelect={question.singleSelect}
-            onChange={onAnswerChange}
-            disabled={disabled}
-          />
+          <ScrollingAnswerArea className={styles.choiceList}>
+            <MultichoiceQuestionInput
+              questionId={`interview-${draft.questionId}`}
+              options={question.options}
+              selectedValues={Array.isArray(answerValue) ? answerValue : answerValue ? [answerValue] : []}
+              isSingleSelect={question.singleSelect}
+              onChange={onAnswerChange}
+              disabled={disabled}
+            />
+          </ScrollingAnswerArea>
         ) : question?.type === 'binary' ? (
           <BinaryChoiceInput
             questionId={draft.questionId}
