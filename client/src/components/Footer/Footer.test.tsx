@@ -83,10 +83,7 @@ describe('Footer', () => {
       expect(screen.getByRole('link', { name: 'ABOUT' })).toHaveAttribute('href', '/ce/about');
       expect(screen.getByRole('link', { name: 'POSTS' })).toHaveAttribute('href', '/ce/posts');
       expect(screen.getByRole('link', { name: 'DOCS' })).toHaveAttribute('href', '/ce/docs');
-      expect(screen.getByTestId('ce-footer-link-github')).toHaveAttribute(
-        'href',
-        'https://github.com/AgalmicSoftware/context-engine',
-      );
+      expect(screen.getByTestId('ce-footer-link-github')).toHaveAttribute('href', 'https://github.com/AgalmicSoftware');
     } finally {
       if (previousPublicUrl === undefined) {
         delete process.env.PUBLIC_URL;
@@ -96,19 +93,21 @@ describe('Footer', () => {
     }
   });
 
-  it('renders the footer attribution text with a separate GitHub icon link', () => {
+  // The credit was its words beside a separate icon link to the repository, named for Context Engine.
+  it('credits Agalmic Software in one link, words and GitHub icon together', () => {
     renderFooter();
 
-    const attributionLink = screen.getByTestId('ce-footer-brand-attribution');
-    const githubLink = screen.getByTestId('ce-footer-link-github');
+    const attribution = screen.getByTestId('ce-footer-brand-attribution');
+    const githubLink = screen.getByRole('link', { name: 'Agalmic Software on GitHub' });
 
-    expect(attributionLink).toHaveTextContent('Software by Agalmic');
-    expect(attributionLink.tagName).toBe('SPAN');
-    expect(githubLink).toHaveAttribute('href', 'https://github.com/AgalmicSoftware/context-engine');
+    expect(githubLink).toBe(screen.getByTestId('ce-footer-link-github'));
+    expect(attribution).toHaveTextContent(/^Agalmic Software$/);
+    expect(githubLink).toHaveTextContent(/^Agalmic Software$/);
+    expect(githubLink.querySelector('svg[data-icon="github"]')).toBeInstanceOf(SVGElement);
+    expect(attribution.querySelectorAll('a')).toHaveLength(1);
+    expect(githubLink).toHaveAttribute('href', 'https://github.com/AgalmicSoftware');
     expect(githubLink).toHaveAttribute('target', '_blank');
     expect(githubLink).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(screen.queryByTestId('ce-footer-brand-link')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('ce-footer-agalmic-link')).not.toBeInTheDocument();
   });
 
   it('keeps tablet footer links, however many, on one full-width row', () => {

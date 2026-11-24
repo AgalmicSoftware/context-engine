@@ -646,7 +646,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       })
     : null;
   const footerAttributionText = routeCase.requiresFooterButtons
-    ? page.getByText('Software by Agalmic', { exact: true })
+    ? page.getByText('Agalmic Software', { exact: true })
     : null;
   const footerGithubLink = routeCase.requiresFooterButtons ? page.getByTestId('ce-footer-link-github') : null;
   const classicFooterBrandState = footerAttributionText && footerGithubLink
