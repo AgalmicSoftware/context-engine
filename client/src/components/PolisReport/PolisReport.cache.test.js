@@ -25,6 +25,7 @@ import PolisReport, {
   shouldAutoEnablePolisDemoData,
 } from './PolisReport';
 import { buildReportResponseStats } from './polisReportAnswers';
+import { firstAnswerTimes, orderByFirstAnswer } from './polisReportRuntime';
 import { useSessionNames } from '../../utilities/session/useSessionNames';
 import {
   buildUmapParticipantData,
@@ -2738,6 +2739,40 @@ describe('PolisReport demo data defaults', () => {
         },
       ),
     ).toEqual(['0x0000000000000000000000000000000000000001']);
+  });
+
+  it('orders participants by when they first answered, those with no answer time last', () => {
+    const row = (responder, timeStamp) => ({
+      responder,
+      questionId: 'q',
+      response: JSON.stringify({ type: 'binary', answer: { value: 'Agree' }, ...(timeStamp ? { timeStamp } : {}) }),
+    });
+    const times = firstAnswerTimes({
+      q1: [row('0xB', 3_000_000_000_000), row('0xC'), row('0xA', 2_000_000_000_000)],
+      // The earliest of B's answers counts; D's time is in seconds.
+      q2: [row('0xB', 1_000_000_000_000), row('0xD', 1_500_000_000)],
+    });
+    expect(orderByFirstAnswer(['0xe', '0xa', '0xc', '0xb', '0xd'], times)).toEqual(['0xb', '0xd', '0xa', '0xe', '0xc']);
+  });
+
+  it('shows the earliest first answer at the top of the List of Participants', async () => {
+    const address = (digit) => `0x${digit.repeat(40)}`;
+    const row = (digit, qid, timeStamp) => ({
+      responder: address(digit),
+      questionId: qid,
+      response: JSON.stringify({ type: 'binary', prompt: `Prompt ${qid}`, answer: { value: 'Agree' }, timeStamp }),
+    });
+    const responses = {
+      q1: [row('1', 'q1', 1_700_000_300_000), row('2', 'q1', 1_700_000_200_000), row('3', 'q1', 1_700_000_100_000)],
+      q2: [row('1', 'q2', 1_700_000_000_000)],
+    };
+    render(<PolisReport {...baseReportProps} slug="first-answers" questionResponses={responses} />);
+    await waitFor(() => expect(screen.getByTitle(address('1'))).toBeInTheDocument());
+    const listed = screen
+      .getAllByTitle(/^0x[0-9a-f]{40}$/)
+      .filter((node) => node.textContent.includes('0x'))
+      .map((node) => node.getAttribute('title'));
+    expect(listed).toEqual([address('1'), address('3'), address('2')]);
   });
 
   it('resolves demo historical participants to blockie avatars instead of remote photos', () => {

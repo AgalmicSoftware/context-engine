@@ -115,7 +115,13 @@ import {
 } from './polisReportRuntime';
 import PolisAnswerSections, { type AnswerSectionsOpen } from './PolisAnswerSections';
 import { buildReportResponseStats, buildReportAnswerQuestions } from './polisReportAnswers';
-import { polisAgentLabel, readPolisReportCacheContext, type PolisAgentDetail } from './polisReportRuntime';
+import {
+  firstAnswerTimes,
+  orderByFirstAnswer,
+  polisAgentLabel,
+  readPolisReportCacheContext,
+  type PolisAgentDetail,
+} from './polisReportRuntime';
 import { useSessionNames } from '../../utilities/session/useSessionNames';
 import ShowSessionNames from '../Shared/ShowSessionNames';
 import ParticipantsGraphControls from './ParticipantsGraphControls';
@@ -929,6 +935,8 @@ export default function PolisReport({
       retainedReport.current = { scope: reportScope, data: pendingReportData };
     }
   }, [cacheRefreshPending, showsArrivedAnswers, pendingReportData, reportScope]);
+  // When each participant first answered, for the order of the List of Participants.
+  const participantFirstAnswers = useMemo(() => firstAnswerTimes(reportData.filtered), [reportData.filtered]);
 
   /***************************************************************
    * Build rating matrix from real or demo
@@ -1440,7 +1448,11 @@ export default function PolisReport({
       return <p style={{ fontStyle: 'italic', marginLeft: '10px' }}>(No participants found.)</p>;
     }
 
-    const unique = getRenderableParticipantList(allResponders, participantNames);
+    // Earliest first answer at the top; those with no answer time after them.
+    const unique = orderByFirstAnswer(
+      getRenderableParticipantList(allResponders, participantNames),
+      participantFirstAnswers,
+    );
 
     if (unique.length === 0) {
       return <p style={{ fontStyle: 'italic', marginLeft: '10px' }}>(No valid participant addresses.)</p>;

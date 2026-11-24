@@ -1293,6 +1293,31 @@ export function getRenderableParticipantList(responders: unknown[] = [], display
   return unique;
 }
 
+// When each participant first answered: the earliest time on their answers in the report. An answer's time is the
+// `timeStamp` the answering page put on it when it was saved (milliseconds; seconds are read as such), so an edited
+// answer carries the time of its edit. An answer without one, as from an agent's client, gives no time.
+export function firstAnswerTimes(responses: PolisQuestionResponses | UnknownRecord = {}): Map<string, number> {
+  const first = new Map<string, number>();
+  Object.values(responses || {}).forEach((rows) => {
+    if (!Array.isArray(rows)) return;
+    (rows as PolisResponseRow[]).forEach((row) => {
+      const responder = String(row?.responder || '').toLowerCase();
+      const payload = safeJsonParse(row?.response) || {};
+      const value = Number(payload.timeStamp ?? payload.timestamp);
+      if (!responder || !Number.isFinite(value) || value <= 0) return;
+      const ms = value < 1e12 ? value * 1000 : value;
+      if (ms < (first.get(responder) ?? Infinity)) first.set(responder, ms);
+    });
+  });
+  return first;
+}
+
+// Earliest first answer first. Participants with no answer time follow, in the order they came in.
+export function orderByFirstAnswer(participants: string[], times: Map<string, number>): string[] {
+  const timeOf = (participant: string) => times.get(participant.toLowerCase()) ?? Infinity;
+  return [...participants].sort((a, b) => (timeOf(a) === timeOf(b) ? 0 : timeOf(a) < timeOf(b) ? -1 : 1));
+}
+
 export function formatBlockchainNetworkLabel(network: UnknownRecord | null = null, fallbackChainId: unknown = null) {
   const networkChainId = Number(network?.id ?? network?.chainId ?? network?.networkChainId ?? 0) || 0;
   const chainId = Number(fallbackChainId ?? networkChainId ?? 0) || 0;

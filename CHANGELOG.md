@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Site — available when the site deploys
 
+- **The report lists participants by when they first answered.** The List of Participants starts with whoever answered first, going by the earliest time on each person's answers in the report (the time an answer was last saved). Anyone whose answers carry no time, as some agents' do, follows in the previous order.
 - **Positions, most widely held first.** In Results' Atlas, each topic's positions (and a question's categories of answer) are listed by how many participants hold them, most first; positions held by the same number keep their order.
 
 ## [0.9.41] - 2026-11-24
