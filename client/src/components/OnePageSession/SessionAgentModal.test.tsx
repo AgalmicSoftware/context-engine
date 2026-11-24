@@ -645,6 +645,11 @@ describe('SessionAgentModal', () => {
     expect(await dialog.findByText('Not signed in, you get General answers.')).toBeInTheDocument();
     expect(readStatus).toHaveBeenCalledWith({ ...OPTIONS, account: '' });
     expect(dialog.queryByRole('switch')).not.toBeInTheDocument();
+    // How it works stays a link away without the switches' "?".
+    expect(dialog.getByRole('link', { name: 'How the Session Agent works' })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/README\.md#session-agent$/),
+    );
     // They may store a chat, with a name if they like, and never an address.
     expect(dialog.getByRole('checkbox', { name: 'Store this chat' })).toBeChecked();
     expect(dialog.queryByRole('radio')).not.toBeInTheDocument();

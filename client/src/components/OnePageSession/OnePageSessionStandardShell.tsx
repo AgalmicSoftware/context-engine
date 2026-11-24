@@ -559,13 +559,29 @@ export default function OnePageSessionStandardShell({
             {sessionInfoTooltip || 'Share input; your responses help generate a collective intelligence map.'}
           </CETooltip>
           {sessionAgentOn ? (
+            // Opens the Session Agent for whoever can ask it; for anyone else it stays the link to how it works.
             <SessionAgentNotice
               id={`${sessionInfoTooltipId}-agent`}
               where="page"
               className={styles.sessionInfoButton}
               sessionConfig={resolvedSessionConfig}
               note={normalizeInterviewSettings((resolvedSessionConfig as UnknownRecord | null)?.interviewMode).dataNote}
+              onOpen={showSessionAgent ? () => setSessionAgentOpen(true) : undefined}
             />
+          ) : null}
+          {/* Here, not in the Context section, so the title's robot opens it while that section is closed. */}
+          {showSessionAgent && sessionAgentOpen ? (
+            <Suspense fallback={null}>
+              <SessionAgentModal
+                sessionSlug={effectiveSlug}
+                sessionConfig={resolvedSessionConfig}
+                account={viewerAccount}
+                onOpenResults={() => {
+                  if (!showResults) onToggleResults();
+                }}
+                onClose={() => setSessionAgentOpen(false)}
+              />
+            </Suspense>
           ) : null}
         </div>
 
@@ -809,19 +825,6 @@ export default function OnePageSessionStandardShell({
                       <FontAwesomeIcon icon={faRobot} aria-hidden="true" />
                       Session Agent
                     </button>
-                    {sessionAgentOpen ? (
-                      <Suspense fallback={null}>
-                        <SessionAgentModal
-                          sessionSlug={effectiveSlug}
-                          sessionConfig={resolvedSessionConfig}
-                          account={viewerAccount}
-                          onOpenResults={() => {
-                            if (!showResults) onToggleResults();
-                          }}
-                          onClose={() => setSessionAgentOpen(false)}
-                        />
-                      </Suspense>
-                    ) : null}
                   </div>
                 ) : null}
                 {renderSessionContext(sessionContext)}

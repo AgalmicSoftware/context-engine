@@ -7,7 +7,7 @@ import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 import { SESSION_AGENT_LIMITS } from '@ce-shared/sessionAgent.mjs';
 import { dictationNeedsSignIn, dictationOffered, sessionEnded } from '../../domains/worker/sessionDictationPorts';
 import CETooltip from '../Shared/CETooltip';
-import SessionAgentNotice from './SessionAgentNotice';
+import SessionAgentNotice, { SESSION_AGENT_README_URL } from './SessionAgentNotice';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import SessionDictation from './SessionDictation';
@@ -549,6 +549,22 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
       <ModalHeader toggle={onClose} className={styles.header}>
         <span id={`${baseId}-title`}>Session Agent</span>
         <span className={styles.badge}>Preview</span>
+        {/* For everyone, signed in or not, since the robot by the session's title opens this dialog. */}
+        <a
+          id={`${baseId}-how`}
+          href={SESSION_AGENT_README_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={styles.helpLink}
+          aria-label="How the Session Agent works"
+          data-ce-control-appearance="frameless"
+          data-testid="ce-session-agent-how"
+        >
+          <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
+        </a>
+        <CETooltip target={`${baseId}-how`} placement="bottom" trigger="hover focus" autohide={false}>
+          How the Session Agent works, on GitHub.
+        </CETooltip>
       </ModalHeader>
       <ModalBody className={styles.body} data-testid="ce-session-agent">
         {body}

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Site — available when the site deploys
+
+- **The robot by a session's title opens the Session Agent.** It linked to how the Session Agent works on GitHub; that link is now a "?" by the dialog's title, for everyone who opens it, and the Context section's Session Agent button stays. Where a person can't ask the agent, such as signed out on a session that asks for sign-in, the robot still links to how it works.
+
 ## [0.9.39] - 2026-11-24
 
 A Worker updated to this release no longer answers `503` to requests that share a settings read with a request that ended first, so sign-in, lists and names keep working after a reload or a quiet spell. No site change beyond the Deploy helper; no MCP change.

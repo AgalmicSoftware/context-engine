@@ -1991,12 +1991,31 @@ describe('OnePageSession results routing', () => {
       expect(mockSessionAgentStatus).toHaveBeenCalledTimes(checks + 1);
     });
 
-    it('says by the title that the Session Agent is on, even to someone signed out', async () => {
-      await renderSession([file, link], false, withSessionAgent());
-      expect(screen.getByTestId('ce-session-agent-notice-page')).toHaveAttribute(
+    it('opens the Session Agent from the robot by the title, with the Context section closed', async () => {
+      mockSessionAgentStatus.mockResolvedValue({ on: true, answers: 'general', audience: 0, optedOut: false });
+      await renderSession([], false, withSessionAgent({ account: '0xabc', loginComplete: true }));
+      const robot = screen.getByRole('button', { name: 'Open the Session Agent' });
+      expect(robot).toBe(screen.getByTestId('ce-session-agent-notice-page'));
+      fireEvent.click(robot);
+      const dialog = await screen.findByRole('dialog', { name: 'Session Agent' });
+      expect(await within(dialog).findByText('You get General answers.')).toBeInTheDocument();
+      // How it works is still a link away, from the "?" by the dialog's title.
+      expect(within(dialog).getByTestId('ce-session-agent-how')).toHaveAttribute(
         'href',
         expect.stringMatching(/README\.md#session-agent$/),
       );
+      // The Context section's own button stays.
+      expect(screen.queryByTestId('ce-session-agent-open')).not.toBeInTheDocument();
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      expect(screen.getByTestId('ce-session-agent-open')).toBeInTheDocument();
+    });
+
+    it('says by the title that the Session Agent is on, even to someone signed out', async () => {
+      await renderSession([file, link], false, withSessionAgent());
+      // Signed out, this session still lets them ask, so the robot opens it.
+      expect(screen.getByRole('button', { name: 'Open the Session Agent' })).toBeInTheDocument();
       // Behind the icon, not on the page: who is shown what a person gives.
       const notice = screen.getByTestId('ce-session-agent-notice-page');
       // What it says follows the session's own results setting. This session names none, so only
@@ -2076,7 +2095,12 @@ describe('OnePageSession results routing', () => {
         sessionConfig: { ...buildProps().sessionConfig, sessionAgent: { ...sessionAgent, anyoneCanAsk: false } },
       });
       fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
-      expect(screen.getByTestId('ce-session-agent-notice-page')).toBeInTheDocument();
+      // Someone who can't ask it still learns how it works from the robot.
+      expect(screen.getByTestId('ce-session-agent-notice-page')).toHaveAttribute(
+        'href',
+        expect.stringMatching(/README\.md#session-agent$/),
+      );
+      expect(screen.queryByRole('button', { name: 'Open the Session Agent' })).not.toBeInTheDocument();
       expect(screen.queryByTestId('ce-session-agent-open')).not.toBeInTheDocument();
     });
 
