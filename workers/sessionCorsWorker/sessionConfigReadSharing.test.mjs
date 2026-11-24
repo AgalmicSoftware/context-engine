@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import test from 'node:test';
 
 import {
@@ -144,6 +145,44 @@ const controlled = () => {
   const elsewhere = { CE_SESSION_COORDINATOR: { idFromName: (name) => name, get: () => ({ fetch }) } };
   return { env, elsewhere, held, cachedRead, waiting, answer, reads: () => reads };
 };
+
+// The runtime's rule, made strict: a promise belongs to the request that made
+// it, and another request that attaches to it gets the runtime's error, even
+// when the first request has already answered and ended.
+const requests = new AsyncLocalStorage();
+const REQUEST_ENDED = 'This promise was created by a request that has since ended, so it can never settle.';
+class RequestPromise extends Promise {
+  constructor(executor) {
+    super(executor);
+    this.request = requests.getStore();
+  }
+  then(onFulfilled, onRejected) {
+    if (!this.request || requests.getStore() === this.request) return super.then(onFulfilled, onRejected);
+    return super.then(() => { throw new Error(REQUEST_ENDED); }, () => { throw new Error(REQUEST_ENDED); }).then(onFulfilled, onRejected);
+  }
+}
+
+test('requests sharing a read never attach to the promise of the request that started it, which may answer and end first', async () => {
+  const env = { CE_SESSION_COORDINATOR: {} };
+  let answer = null;
+  let calls = 0;
+  const read = () => new RequestPromise((resolve) => {
+    calls += 1;
+    answer = () => resolve({ ok: true, state: { jobState: 'succeeded' } });
+  });
+  const ask = (request) => requests.run({ request }, () => shareResultsAnalysisStatusRead({ env, slug: 'salon', read }));
+
+  const first = ask('first');
+  await until(() => answer);
+  const others = ['second', 'third', 'fourth'].map(ask);
+  answer();
+  assert.deepEqual(await first, { ok: true, state: { jobState: 'succeeded' } });
+  for (const result of await Promise.allSettled(others)) {
+    assert.equal(result.status, 'fulfilled', result.reason?.message);
+    assert.deepEqual(result.value, { ok: true, state: { jobState: 'succeeded' } });
+  }
+  assert.equal(calls, 1);
+});
 
 test('a read in flight across a config change is not kept or passed on', async () => {
   const c = controlled();
