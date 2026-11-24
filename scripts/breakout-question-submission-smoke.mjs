@@ -45,7 +45,7 @@ const worker = createWorkerRuntime(env, { rpcFetch: async () => assert.fail('No 
   assert.equal(new URL(url).origin, 'https://api.openai.com');
   providerCalls.push(new URL(url).pathname);
   if (new URL(url).pathname.endsWith('/audio/transcriptions')) {
-    assert.equal(init.body.get('model'), GROUP_TRANSCRIPTION_MODEL, 'Default speaker labels use the permitted Worker diarization route');
+    assert.equal(init.body.get('model'), DEFAULT_TRANSCRIPTION_MODEL, 'A room of more than four is transcribed plain');
     return Response.json({ text: transcript, segments: [{ speaker: 'A', start: 0, end: 2, text: transcript }] });
   }
   const body = JSON.parse(init.body);
@@ -107,7 +107,7 @@ try {
   });
   await page.goto(`${base}/breakout-submit-probe`);
   await page.getByRole('checkbox', { name: 'More than 4 people in the room' }).waitFor();
-  assert.equal(await page.getByRole('checkbox', { name: 'More than 4 people in the room' }).isChecked(), false);
+  assert.equal(await page.getByRole('checkbox', { name: 'More than 4 people in the room' }).isChecked(), true, 'A room starts plain');
   await page.getByTestId('ce-session-listening-start').click();
   await page.getByRole('button', { name: 'Stop recording' }).click();
   await page.getByTestId('ce-session-listening-suggestions').waitFor({ timeout: 30000 });

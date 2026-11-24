@@ -161,13 +161,14 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       return false;
     }
   });
-  // More voices than speaker labels keep apart: a plain transcript, with no part for each person. Kept on this
-  // device, so a recording reopened in the same room stays plain.
+  // More voices than speaker labels keep apart: a plain transcript, with no part for each person. Ticked until this
+  // device chooses otherwise, since a breakout room is usually larger than four; the choice is kept on the device,
+  // so a recording reopened in the same room stays as it was.
   const [manyVoices, setManyVoices] = useState(() => {
     try {
-      return window.localStorage.getItem(MANY_VOICES_KEY) === 'true';
+      return window.localStorage.getItem(MANY_VOICES_KEY) !== 'false';
     } catch {
-      return false;
+      return true;
     }
   });
   // Only where the choice is shown: one kept from an OpenAI session does nothing where labels aren't offered.
@@ -925,11 +926,12 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             recorder.segments.some((segment) => !['complete', 'failed'].includes(segment.status))
           }
           onClear={() => setConfirmClear(true)}
-          onSelectSpeaker={panelMode === 'recordGroup' && !plainRoom ? setClaimPerson : undefined}
+          onSelectSpeaker={panelMode === 'recordGroup' ? setClaimPerson : undefined}
         />
       )}
 
-      {panelMode === 'recordGroup' && hasTranscript && !plainRoom ? (
+      {/* Parts follow the transcript's labels, not the box: a labelled recording keeps them where the box is ticked. */}
+      {panelMode === 'recordGroup' && hasTranscript ? (
         <SessionTranscriptClaimShare
           transcript={shownTranscript}
           sessionSlug={sessionSlug}
