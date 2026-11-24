@@ -7,6 +7,10 @@
 // chunk must be Transcribed, every byte must have reached the Worker apart from the tail a reload or closed tab can
 // lose by design (bounded below), and the transcript must hold each chunk's text once, in order.
 //
+// "More than 4 people in the room" decides whether the recorder samples voices: unticked, chunk 1's voice is sampled
+// and sent with later chunks; ticked, as a new device starts, nothing is sampled. ROOM=large runs ticked, ROOM=small
+// (the default) unticked; the npm script runs both.
+//
 // Run: npm run test:e2e:recording-durability. With no BASE_URL it starts the client's Vite dev server on
 // 127.0.0.1:4192 and stops it at the end; BASE_URL=http://127.0.0.1:<port> uses one already running from client/
 // (PUBLIC_URL=/ npx vite --host 127.0.0.1 --port <port> --strictPort).
@@ -29,6 +33,9 @@ const BASE = process.env.BASE_URL || 'http://127.0.0.1:4192';
 assert(['localhost', '127.0.0.1'].includes(new URL(BASE).hostname), 'Use a local Vite server');
 const WORKER = 'https://worker.example';
 const SLUG = 'breakout-durability';
+const ROOM = process.env.ROOM || 'small';
+assert(['small', 'large'].includes(ROOM), 'ROOM is small or large');
+const MORE_THAN_FOUR = ROOM === 'large';
 const CHUNK_MS = 180_000; // the recorder's chunk length
 // 4 kHz 8-bit mono WAV: about the size of a phone's speech recording, and decodable, so voice samples get cut.
 const BYTES_PER_SECOND = 4000;
@@ -109,6 +116,8 @@ async function createFakeWorker() {
 
   // What the Worker does with each chunk's transcription requests: 503s, an upload held or one that never answers.
   const plan = { unavailable: new Map(), hang: 0, hold: null };
+  // How many transcription requests came with a voice sample.
+  const heard = { voiceSamples: 0 };
   const openAi = async (url, init) => {
     const { origin, pathname } = new URL(url);
     assert.equal(origin, 'https://api.openai.com', `Unexpected provider call ${url}`);
@@ -125,6 +134,7 @@ async function createFakeWorker() {
       if (form.get('response_format') !== 'diarized_json') return Response.json({ text });
       // One voice: under its known name once the recorder sends its sample, otherwise the model's own label.
       const speaker = form.getAll('known_speaker_names[]')[0] || 'A';
+      if (form.getAll('known_speaker_names[]').length) heard.voiceSamples += 1;
       return Response.json({ text, segments: [{ id: 'seg_0', type: 'transcript.text.segment', speaker, start: 0, end: seconds(file.length - WAV_HEADER_BYTES), text }] });
     }
     if (pathname.endsWith('/responses')) return Response.json({ model: 'fake-model', output_text: QUESTIONS });
@@ -171,7 +181,7 @@ async function createFakeWorker() {
     if (upload) upload.outcome = upload.outcome === 'held' ? `held, then ${response.status}` : String(response.status);
     return route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: Buffer.from(await response.arrayBuffer()) }).catch(() => {});
   };
-  return { config, address: participant.address, token: login.token, exp: Number(login.exp), plan, handle, statuses, release };
+  return { config, address: participant.address, token: login.token, exp: Number(login.exp), plan, heard, handle, statuses, release };
 }
 
 // ---- Page stubs: a microphone, a screen lock, and a MediaRecorder that hands over a WAV in one-second fragments
@@ -367,6 +377,7 @@ try {
   await context.exposeBinding('__durabilityLedger', recordLedger);
   await context.clock.install({ time: Date.now() });
   await context.addInitScript(installStubs, { bytesPerSecond: BYTES_PER_SECOND });
+  await context.addInitScript((ticked) => localStorage.setItem('ce:record-more-than-four:v1', String(ticked)), MORE_THAN_FOUR);
   await context.route('**/*', async (route) => {
     const url = new URL(route.request().url());
     if (url.origin === WORKER) return fake.handle(route);
@@ -396,7 +407,9 @@ try {
     return chunks.length >= count && chunks.slice(0, count).every((chunk) => chunk.status === 'complete') && chunks;
   });
   const recorderReady = async (page) => {
-    await page.getByRole('checkbox', { name: 'More than 4 people in the room' }).waitFor({ timeout: 60_000 });
+    const manyVoices = page.getByRole('checkbox', { name: 'More than 4 people in the room' });
+    await manyVoices.waitFor({ timeout: 60_000 });
+    assert.equal(await manyVoices.isChecked(), MORE_THAN_FOUR, `"More than 4 people in the room" is set for ROOM=${ROOM}`);
     await page.waitForFunction(() => {
       const record = document.querySelector('[data-testid="ce-session-listening-start"]');
       return record && !record.disabled && [...document.querySelectorAll('.modal, .modal-dialog')].every((element) => getComputedStyle(element).opacity === '1');
@@ -468,12 +481,12 @@ try {
     }
   };
 
-  // 1. Record. Chunk 1 is transcribed and its voice sampled, so later chunks send the voice sample.
+  // 1. Record. Chunk 1 is transcribed; with four people or fewer its voice is sampled, so later chunks send the sample.
   let page = await openPage();
   let since = await record(page);
   await advanceTo(page, since + CHUNK_MS + 1000);
   let chunks = await transcribed(page, 1);
-  await until('a voice sample', async () => (await readStore(page)).some((entry) => entry.voiceSamples.length));
+  if (!MORE_THAN_FOUR) await until('a voice sample', async () => (await readStore(page)).some((entry) => entry.voiceSamples.length));
   assertRetention(await readStore(page));
 
   // 2. Six minutes offline while recording goes on: chunks 2 and 3 wait on the device, then upload in order.
@@ -590,6 +603,8 @@ try {
   assert.equal(await page.getByText('Transcribing…').count(), 0, 'Nothing is left uploading');
   assert.deepEqual(await page.getByRole('alert').allInnerTexts(), [], 'No notice is left');
   assert.equal(dialogs.filter((type) => type === 'beforeunload').length, 2, 'The reload and the tab close asked first');
+  if (MORE_THAN_FOUR) assert.equal(fake.heard.voiceSamples, 0, 'With more than 4 people no voice sample is sent');
+  else assert(fake.heard.voiceSamples > 0, 'With 4 people or fewer later chunks send the voice sample');
 
   // ---- Close with every chunk transcribed, reopen, then Clear: nothing is left on the device. ----
   await page.locator('.modal.show .modal-header .btn-close').first().click();
@@ -607,7 +622,7 @@ try {
   assert.deepEqual(consoleErrors.filter((text) => !text.startsWith('Failed to load resource')), [], 'No console errors');
   assert.equal(fake.statuses.filter((status) => !/^(200|204|503) /.test(status)).length, 0, `Unexpected Worker answers: ${fake.statuses.filter((status) => !/^(200|204|503) /.test(status)).join('; ')}`);
   failed = false;
-  console.log(`PASS breakout recording durability: ${made.length} chunks, ${(made.reduce((total, recorder) => total + produced(recorder).length, 0) / 1e6).toFixed(1)} MB recorded, worst loss ${Math.max(...rows.map((row) => Number.parseFloat(row.lost) || 0)).toFixed(3)} s, ${((performance.now() - started) / 1000).toFixed(1)} s`);
+  console.log(`PASS breakout recording durability, ROOM=${ROOM}: ${made.length} chunks, ${(made.reduce((total, recorder) => total + produced(recorder).length, 0) / 1e6).toFixed(1)} MB recorded, worst loss ${Math.max(...rows.map((row) => Number.parseFloat(row.lost) || 0)).toFixed(3)} s, ${((performance.now() - started) / 1000).toFixed(1)} s`);
 } finally {
   fake.release();
   if (failed) console.log({ uploads: ledger.uploads, consoleErrors: consoleErrors.slice(-20), errors, dialogs });
