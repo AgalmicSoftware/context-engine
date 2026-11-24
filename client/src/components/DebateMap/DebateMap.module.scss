@@ -1,3 +1,5 @@
+@use 'scss/answerChoiceType' as answerChoiceType;
+
 /* @file DebateMap.module.scss */
 /* --- Variables --- */
 $bg-dark: var(--ce-document-text);
@@ -2301,8 +2303,8 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
           padding: 8px 14px;
           border-radius: var(--ce-radius-4);
           border: 0;
+          @include answerChoiceType.answer-choice-type;
           font-size: 1rem;
-          font-weight: 600;
         }
 
         > span:nth-child(1) {

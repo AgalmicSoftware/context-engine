@@ -1,5 +1,6 @@
 @use 'scss/finalSubmitCta' as finalSubmitCta;
 @use 'scss/groupImagePlaceholder' as groupImagePlaceholder;
+@use 'scss/answerChoiceType' as answerChoiceType;
 
 /* NEW - Color variables for dropdown items */
 $questions-item-bg: var(--ce-color-success-soft); // Light green
@@ -227,6 +228,7 @@ $binary-choice-dim-opacity: 0.7;
     align-items: center;
     justify-content: center;
     margin: 0 0.1rem;
+    @include answerChoiceType.answer-choice-type;
     font-size: 1.5rem;
     color: var(--ce-color-border);
     cursor: pointer;
