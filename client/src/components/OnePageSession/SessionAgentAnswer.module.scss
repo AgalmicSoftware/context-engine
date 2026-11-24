@@ -16,6 +16,12 @@
     margin-bottom: 0;
   }
 
+  // A line break in an answer stays one.
+  p,
+  blockquote {
+    white-space: pre-line;
+  }
+
   ul,
   ol {
     padding-left: 1.4em;
