@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Site — available when the site deploys
+
+- **Positions, most widely held first.** In Results' Atlas, each topic's positions (and a question's categories of answer) are listed by how many participants hold them, most first; positions held by the same number keep their order.
+
 ## [0.9.41] - 2026-11-24
 
 Group Conversation drafts each multiple-choice question as pick one or pick any, an added transcript shows in the session's context at once, and who can read the transcript has room on a phone. Stats shows its counts without waiting for its block check, and a passkey sign-in's spinner has Cancel. Site only: the Session Worker's code is unchanged and MCP stays 0.9.35.

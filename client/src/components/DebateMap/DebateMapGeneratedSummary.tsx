@@ -44,13 +44,16 @@ type Props = {
 };
 
 // The AI's summary of a node: a short lead (the whole summary on request), then every position with how many
-// participants hold it. The positions show straight away: they are what a reader opens the node for. A question's
+// participants hold it, most widely held first. The positions show straight away: they are what a reader opens the node for. A question's
 // node lists its categories of answer the same way.
 export default function DebateMapGeneratedSummary({ entries, afterSummary, label = 'AI-generated summary' }: Props) {
   const [open, setOpen] = useState(false);
   const detailsId = `generated-summary-${useId().replace(/:/g, '')}`;
   const summary = String(entries.find((entry) => !entry.label)?.comment || '').trim();
-  const positions = entries.filter((entry) => String(entry.label || '').trim());
+  // Most widely held first; ties keep the order they came in.
+  const positions = entries
+    .filter((entry) => String(entry.label || '').trim())
+    .sort((a, b) => (Number(b.participantCount) || 0) - (Number(a.participantCount) || 0));
   // A question's entries are the kinds of answer it drew, not positions on a map.
   const listName = positions.some((entry) => entry.kind === 'category') ? 'Categories' : 'Positions';
   const lead = shortenSummary(summary);
