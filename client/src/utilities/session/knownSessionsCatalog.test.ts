@@ -19,9 +19,14 @@ it("lists each known session's catalog address as its page builds it, and the pr
     if (interviewCatalog === undefined) continue;
     const lines = prompt.split('\n');
     const site = `https://contextengine.sh/questions/${slug}`;
-    // The two addresses come in the generator's order, as llms.txt shows them for this session.
+    // The two JSON addresses come in the generator's order, as llms.txt shows them for this session after its
+    // question pages' index, which the prompt does not need: it carries the ids itself.
     const listedOrder = llms
-      .match(new RegExp(`/session/${slug} \\([^\\n]*\\): (\\S+)\\n\\s+second address: (\\S+)\\n`))!
+      .match(
+        new RegExp(
+          `/session/${slug} \\([^\\n]*\\): ${site}\\.md\\n\\s+as JSON: (\\S+)\\n\\s+second address: (\\S+)\\n`,
+        ),
+      )!
       .slice(1, 3);
     expect([...listedOrder].sort()).toEqual([site, interviewCatalog].sort());
     const page = `https://contextengine.sh/session/${slug}`;
@@ -74,14 +79,26 @@ it("keeps the Worker's address for any other catalog", () => {
   expect(fetchLine({ catalogTicket: 'ticket-1' })).toMatch(
     /^https:\/\/.*\/agent\/interview-catalog\?.*&ticket=ticket-1$/,
   );
-  expect(fetchLine({ sessionUrl: `https://contextengine.sh/session/${slug}?src=x` })).toMatch(
-    /\/agent\/interview-catalog\?/,
-  );
+  // A link that names a source or a group still gets the site's address first, which more chat AIs can
+  // open; its own catalog, which lists that group, is the second.
+  for (const query of ['src=x', 'joinGroup=g1']) {
+    const prompt = buildExternalInterviewKickoff({
+      workerUrl: worker,
+      sessionSlug: slug,
+      sessionUrl: `https://contextengine.sh/session/${slug}?${query}`,
+    });
+    const lines = prompt.split('\n');
+    const at = lines.indexOf(`https://contextengine.sh/questions/${slug}`);
+    expect(at).toBeGreaterThan(0);
+    expect(lines[at + 1]).toBe('Second address, if the first does not give you that:');
+    expect(lines[at + 2]).toMatch(
+      new RegExp(`^${worker.replace(/[.]/g, '\\.')}/agent/interview-catalog\\?.*${query.split('=')[0]}`),
+    );
+  }
   expect(fetchLine({ sessionSlug: 'not-listed', sessionUrl: 'https://contextengine.sh/session/not-listed' })).toMatch(
     /\/agent\/interview-catalog\?slug=not-listed/,
   );
   for (const fields of [
-    { sessionUrl: `https://contextengine.sh/session/${slug}?joinGroup=g1` },
     { sessionUrl: `http://localhost:3000/session/${slug}` },
     { workerUrl: 'https://ce-other.example.workers.dev' },
     { sessionSlug: 'toString', sessionUrl: 'https://contextengine.sh/session/toString' },

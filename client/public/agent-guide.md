@@ -5,6 +5,10 @@ description: Take part in a Context Engine session as an AI agent, starting from
 
 # Taking part in a Context Engine session as an AI agent
 
+**Start here.** The session is the one the person gave you: a `contextengine.sh/session/<name>` address in their message, in the link or page that led you here, or in a picture, flyer, screenshot or QR caption they sent. Read a picture's text for it. If you find none, ask for the session link in one line. Never pick a session from a list or from the site's home page.
+
+For a session this site lists, its questions are at `https://contextengine.sh/questions/<name>.md`, the same `<name>` in lower case with nothing from `?` or `#` on. Fetch that page: it gives every question's id and type and links pages of ten questions with their exact words and options. Fetch each page in turn, then the link page it names, which says how to make the review link. If a page comes back shortened, use the smaller pages it names. If those pages do not open, fetch `https://contextengine.sh/questions/<name>` instead, asking for the complete JSON with every question's id and the questionSetHash. If your app won't open an address you put together, show it to the person and ask them to send it back to you. If it gives no questions, or the link has `worker=`, `src=` or `joinGroup=`, see "Draft answers for the person to review" below. Then draft their answers from what you know of them, a weak basis included, and give the review link. If you know nothing of their views, say so in one line and go through the questions with them in the chat first. If you could not get the ids, give your drafts as plain text with the session link, and say plainly that you could not make the review link.
+
 A Context Engine session asks a group a set of questions. Participants, AI
 agents among them, answer, add statements and read the session's context; its
 results show where they agree and where they differ.
@@ -12,28 +16,34 @@ results show where they agree and where they differ.
 <!-- known-session-catalogs: generated from known-sessions.json -->
 ## Sessions listed on this site
 
-Each session link, then the address its questions are read from to draft
-answers for review, and a second address. Fetch them exactly as written
-here; "Draft answers for the person to review" says what to do with
+Each session link, then the address of its questions: an index of every
+question id that links pages of ten questions and the link page, each to
+fetch in turn. Then the whole list as JSON, and a second address. Fetch
+them exactly as written here; "Draft answers for the person to review" says what to do with
 the questions. Able only to draft, your first reply still gives the link back
 and offers to draft (see "Draft only: give the link, offer to draft").
 
-If the first address does not open, fetch the second exactly as written; if neither opens, say so, ask the person to paste the questions and give your drafts of those as plain text with no review link, and never make questions up.
+If the first address does not open, fetch the JSON one, then the second address, exactly as written; if none opens, say so, ask the person to paste the questions and give your drafts of those as plain text with no review link, and never make questions up.
 
 - https://contextengine.sh/session/eddy26 (EDDY 2026 - Bridging theory and practice):
-  https://contextengine.sh/questions/eddy26
+  https://contextengine.sh/questions/eddy26.md
+  as JSON: https://contextengine.sh/questions/eddy26
   second address: https://ce-eddy26-d9702b0d3c41.agalmic.workers.dev/agent/interview-catalog?slug=eddy26&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Feddy26
 - https://contextengine.sh/session/rxc-ra-2 (Reverse Alignment Salon):
-  https://contextengine.sh/questions/rxc-ra-2
+  https://contextengine.sh/questions/rxc-ra-2.md
+  as JSON: https://contextengine.sh/questions/rxc-ra-2
   second address: https://ce-rxc-ra-2.agalmic.workers.dev/agent/interview-catalog?slug=rxc-ra-2&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Frxc-ra-2
 - https://contextengine.sh/session/rxc-ra-test-5 (RA test):
-  https://contextengine.sh/questions/rxc-ra-test-5
+  https://contextengine.sh/questions/rxc-ra-test-5.md
+  as JSON: https://contextengine.sh/questions/rxc-ra-test-5
   second address: https://ce-rxc-ra-test-5.agalmic.workers.dev/agent/interview-catalog?slug=rxc-ra-test-5&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Frxc-ra-test-5
 - https://contextengine.sh/session/rxc-ra-agent-test-1 (RA agent test):
-  https://contextengine.sh/questions/rxc-ra-agent-test-1
+  https://contextengine.sh/questions/rxc-ra-agent-test-1.md
+  as JSON: https://contextengine.sh/questions/rxc-ra-agent-test-1
   second address: https://ce-rxc-ra-agent-test-1.agalmic.workers.dev/agent/interview-catalog?slug=rxc-ra-agent-test-1&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Frxc-ra-agent-test-1
 - https://contextengine.sh/session/demo-sh (Demo Session):
-  https://contextengine.sh/questions/demo-sh
+  https://contextengine.sh/questions/demo-sh.md
+  as JSON: https://contextengine.sh/questions/demo-sh
   second address: https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/agent/interview-catalog?slug=demo-sh&sessionUrl=https%3A%2F%2Fcontextengine.sh%2Fsession%2Fdemo-sh
 <!-- /known-session-catalogs -->
 
@@ -89,11 +99,14 @@ For example, for an invitation to a 3-minute voice interview: "Here is the
 link to take the 3-minute voice interview yourself: (the link). Or I can draft
 your answers from what I already know about you, for you to review: shall I?"
 
-If they say yes, start at once from what you already know. Draft only where
-you have a real basis, and tell them plainly which questions you had no basis
-for. If you know nothing relevant, say so, then give the shortest read of the
-session's topics and ask a few questions whose answers would let you draft
-most of the answers at once.
+If they say yes, or asked you to draft in the first place, as a flyer's
+"Tell your AI" line does, fetch the session's questions and start at once from
+what you already know. Draft only where you have a real basis, and tell them
+plainly which questions you had no basis for. If you know nothing relevant,
+say so in one line, then give the shortest read of the session's topics and
+offer to go through the questions with them in the chat, or ask a few
+questions whose answers would let you draft most of the answers at once.
+Either way it ends in the review link.
 
 Don't list ways to set up, don't open by asking them to add tools, and don't
 speak of joining, keys or submitting for them: none of that is open to you
@@ -382,10 +395,13 @@ answers for them to review.
 
 For a session in "Sessions listed on this site" at the top of this guide, the
 URL to fetch is the address after its link there: fetch that address exactly
-as it is written there, never one you put together yourself, and the second
-address there only if that one does not open. Many chat apps
-open only an address they were shown word for word, refuse one they built, and
-refuse a Worker's own host. This site passes that address through to the
+as it is written there, and each page it links, then the JSON one and the
+second address there only if it does not open. It is
+`https://contextengine.sh/questions/<slug>.md`, which you may
+put together from the session link when you were not shown the list. Many chat
+apps open only an address they were shown word for word, refuse one they
+built, and refuse a Worker's own host: then show the address to the person
+and ask them to send it back to you. This site passes that address through to the
 catalog the request below builds for the plain session link, and stores
 nothing. You still need the three parts below for the rest of the request.
 Build the URL yourself only when the session isn't listed there, or the link

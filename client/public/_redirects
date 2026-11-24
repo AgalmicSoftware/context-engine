@@ -8,9 +8,24 @@
 /agent-guide /skill.md 302
 # known-session-catalogs: generated from known-sessions.json
 /questions/eddy26 https://ce-eddy26-d9702b0d3c41.agalmic.workers.dev/agent/interview-catalog?slug=eddy26&sessionUrl=https://contextengine.sh/session/eddy26 200
+/questions/eddy26.md https://ce-eddy26-d9702b0d3c41.agalmic.workers.dev/agent/interview-catalog/index?slug=eddy26&sessionUrl=https://contextengine.sh/session/eddy26&site=1 200
+/questions/eddy26/:page https://ce-eddy26-d9702b0d3c41.agalmic.workers.dev/agent/interview-catalog/:page?slug=eddy26&sessionUrl=https://contextengine.sh/session/eddy26&site=1 200
+/questions/eddy26/size/:size/:page https://ce-eddy26-d9702b0d3c41.agalmic.workers.dev/agent/interview-catalog/size/:size/:page?slug=eddy26&sessionUrl=https://contextengine.sh/session/eddy26&site=1 200
 /questions/rxc-ra-2 https://ce-rxc-ra-2.agalmic.workers.dev/agent/interview-catalog?slug=rxc-ra-2&sessionUrl=https://contextengine.sh/session/rxc-ra-2 200
+/questions/rxc-ra-2.md https://ce-rxc-ra-2.agalmic.workers.dev/agent/interview-catalog/index?slug=rxc-ra-2&sessionUrl=https://contextengine.sh/session/rxc-ra-2&site=1 200
+/questions/rxc-ra-2/:page https://ce-rxc-ra-2.agalmic.workers.dev/agent/interview-catalog/:page?slug=rxc-ra-2&sessionUrl=https://contextengine.sh/session/rxc-ra-2&site=1 200
+/questions/rxc-ra-2/size/:size/:page https://ce-rxc-ra-2.agalmic.workers.dev/agent/interview-catalog/size/:size/:page?slug=rxc-ra-2&sessionUrl=https://contextengine.sh/session/rxc-ra-2&site=1 200
 /questions/rxc-ra-test-5 https://ce-rxc-ra-test-5.agalmic.workers.dev/agent/interview-catalog?slug=rxc-ra-test-5&sessionUrl=https://contextengine.sh/session/rxc-ra-test-5 200
+/questions/rxc-ra-test-5.md https://ce-rxc-ra-test-5.agalmic.workers.dev/agent/interview-catalog/index?slug=rxc-ra-test-5&sessionUrl=https://contextengine.sh/session/rxc-ra-test-5&site=1 200
+/questions/rxc-ra-test-5/:page https://ce-rxc-ra-test-5.agalmic.workers.dev/agent/interview-catalog/:page?slug=rxc-ra-test-5&sessionUrl=https://contextengine.sh/session/rxc-ra-test-5&site=1 200
+/questions/rxc-ra-test-5/size/:size/:page https://ce-rxc-ra-test-5.agalmic.workers.dev/agent/interview-catalog/size/:size/:page?slug=rxc-ra-test-5&sessionUrl=https://contextengine.sh/session/rxc-ra-test-5&site=1 200
 /questions/rxc-ra-agent-test-1 https://ce-rxc-ra-agent-test-1.agalmic.workers.dev/agent/interview-catalog?slug=rxc-ra-agent-test-1&sessionUrl=https://contextengine.sh/session/rxc-ra-agent-test-1 200
+/questions/rxc-ra-agent-test-1.md https://ce-rxc-ra-agent-test-1.agalmic.workers.dev/agent/interview-catalog/index?slug=rxc-ra-agent-test-1&sessionUrl=https://contextengine.sh/session/rxc-ra-agent-test-1&site=1 200
+/questions/rxc-ra-agent-test-1/:page https://ce-rxc-ra-agent-test-1.agalmic.workers.dev/agent/interview-catalog/:page?slug=rxc-ra-agent-test-1&sessionUrl=https://contextengine.sh/session/rxc-ra-agent-test-1&site=1 200
+/questions/rxc-ra-agent-test-1/size/:size/:page https://ce-rxc-ra-agent-test-1.agalmic.workers.dev/agent/interview-catalog/size/:size/:page?slug=rxc-ra-agent-test-1&sessionUrl=https://contextengine.sh/session/rxc-ra-agent-test-1&site=1 200
 /questions/demo-sh https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/agent/interview-catalog?slug=demo-sh&sessionUrl=https://contextengine.sh/session/demo-sh 200
+/questions/demo-sh.md https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/agent/interview-catalog/index?slug=demo-sh&sessionUrl=https://contextengine.sh/session/demo-sh&site=1 200
+/questions/demo-sh/:page https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/agent/interview-catalog/:page?slug=demo-sh&sessionUrl=https://contextengine.sh/session/demo-sh&site=1 200
+/questions/demo-sh/size/:size/:page https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/agent/interview-catalog/size/:size/:page?slug=demo-sh&sessionUrl=https://contextengine.sh/session/demo-sh&site=1 200
 # /known-session-catalogs
 /* /index.html 200

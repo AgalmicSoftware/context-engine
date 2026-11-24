@@ -106,8 +106,8 @@ try {
     return route.continue();
   });
   await page.goto(`${base}/breakout-submit-probe`);
-  await page.getByRole('checkbox', { name: 'Label speakers' }).waitFor();
-  assert.equal(await page.getByRole('checkbox', { name: 'Label speakers' }).isChecked(), true);
+  await page.getByRole('checkbox', { name: 'More than 4 people in the room' }).waitFor();
+  assert.equal(await page.getByRole('checkbox', { name: 'More than 4 people in the room' }).isChecked(), false);
   await page.getByTestId('ce-session-listening-start').click();
   await page.getByRole('button', { name: 'Stop recording' }).click();
   await page.getByTestId('ce-session-listening-suggestions').waitFor({ timeout: 30000 });

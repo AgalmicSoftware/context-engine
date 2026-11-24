@@ -99,6 +99,9 @@ export { formatSessionRecordingElapsed };
 
 const KEEP_AUDIO_HELP =
   'Closes without waiting for transcription. Audio still waiting for it stays on this device and resumes uploading when you reopen this recording.';
+const MANY_VOICES_KEY = 'ce:record-more-than-four:v1';
+const MANY_VOICES_HELP =
+  "Ticked, the transcript is plain text, with no speaker labels and no part for each person. Unticked, OpenAI labels who spoke as Person 1, Person 2…: up to four voices keep their number; with more, numbers may change. Numbers don't identify people.";
 
 const getSessionInstructions = (sessionConfig: unknown) =>
   sessionConfig && typeof sessionConfig === 'object'
@@ -120,7 +123,6 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     closeActionRef,
     onBusyChange,
   } = props;
-  const [labelSpeakers, setLabelSpeakers] = useState(true);
   const [speakerLabelsSupported, setSpeakerLabelsSupported] = useState<boolean | null>(null);
   const [speakerLabelsCheckTimedOut, setSpeakerLabelsCheckTimedOut] = useState(false);
   const recordPressedRef = useRef(false);
@@ -159,8 +161,19 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       return false;
     }
   });
+  // More voices than speaker labels keep apart: a plain transcript, with no part for each person. Kept on this
+  // device, so a recording reopened in the same room stays plain.
+  const [manyVoices, setManyVoices] = useState(() => {
+    try {
+      return window.localStorage.getItem(MANY_VOICES_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+  // Only where the choice is shown: one kept from an OpenAI session does nothing where labels aren't offered.
+  const plainRoom = manyVoices && speakerLabelsSupported === true;
   const speakerHelpId = `ce-record-speaker-help-${useId().replace(/:/g, '')}`;
-  const labelsHelpId = `ce-speaker-labels-help-${useId().replace(/:/g, '')}`;
+  const manyVoicesHelpId = `ce-many-voices-help-${useId().replace(/:/g, '')}`;
   const keepHelpId = `ce-keep-audio-help-${useId().replace(/:/g, '')}`;
   const recordingContext = useMemo(
     () => ({
@@ -175,7 +188,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     context: recordingContext,
     workerUrl,
     chunkMs: DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
-    labelSpeakers: panelMode === 'recordGroup' && speakerLabelsSupported === true && labelSpeakers,
+    labelSpeakers: panelMode === 'recordGroup' && speakerLabelsSupported === true && !plainRoom,
     recordSpeakerAudio: panelMode === 'recordGroup' && recordSpeakerAudio,
   });
   const transcriptContext = useTranscriptContextUpload({
@@ -193,6 +206,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const [generatedTitle, setGeneratedTitle] = useState('');
   // The last draft added nothing: the discussion supported no new question, which is a result, not an error.
   const [noNewQuestions, setNoNewQuestions] = useState(false);
+  // The draft after Stop came back empty twice, so Generate questions sits beside that note until a draft adds one.
+  const [offerGenerate, setOfferGenerate] = useState(false);
   const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState(0);
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
   // The speaker whose code is showing, chosen by their button or their label in the transcript.
@@ -208,6 +223,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const lastAutoRequestedTranscriptRef = useRef('');
   const generationInFlightRef = useRef(false);
   const activeGenerationRequestRef = useRef(0);
+  // Recordings begun, so a draft can tell that Record more started a new discussion while it waited.
+  const recordingsBegunRef = useRef(0);
   // Kept with the recording (see recordingChunkQueue), so reopening shows the drafts as the host left them and
   // drafts only newer transcript text.
   const keptRef = useRef<QuestionDrafts>({ questions: [], prompts: [], draftedTranscript: '' });
@@ -245,6 +262,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       setPendingDraftCount(null);
       setGeneratedTitle('');
       setNoNewQuestions(false);
+      setOfferGenerate(false);
       setGenerationError('');
     },
     [handleSubmittingChange],
@@ -457,6 +475,9 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       const requestId = activeGenerationRequestRef.current + 1;
       activeGenerationRequestRef.current = requestId;
       generationInFlightRef.current = true;
+      const begun = recordingsBegunRef.current;
+      // Its answer says nothing of a discussion recorded since it was asked.
+      const recordingAgain = () => recordingsBegunRef.current !== begun;
       // Every prompt drafted so far, and the host's edits of them.
       const { prompts: drafted, questions: shown } = keptRef.current;
       // Once at the end, the recording's number is a total: Record more then Stop adds what is left, at least one.
@@ -472,28 +493,43 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       try {
         // Future optional source path is intentionally disabled for now:
         // generateAudioDiscussionSummary -> uploadMarkdownSummaryToArweave -> documentURLs.
-        const result = await generateQuestionsFromListeningTranscript(transcriptSnapshot, {
-          sessionSlug,
-          sessionConfig,
-          context,
-          workerUrl,
-          defaultTags,
-          count,
-          sessionInstructions: getSessionInstructions(sessionConfig),
-          sourceTypeOverride: 'transcript',
-          multiSpeakerHintOverride: 'likely_multiple_speakers',
-          existingQuestionPrompts: existingPrompts,
-          sessionQuestionPrompts: sessionPrompts,
-          sessionSubject,
-        });
-        if (!isMountedRef.current || activeGenerationRequestRef.current !== requestId) return;
-        const addDrafts = (previous: GeneratedQuestionDraft[]) =>
-          mergeGeneratedQuestionDrafts(previous, result.statements, [...drafted, ...sessionPrompts]);
+        const request = () =>
+          generateQuestionsFromListeningTranscript(transcriptSnapshot, {
+            sessionSlug,
+            sessionConfig,
+            context,
+            workerUrl,
+            defaultTags,
+            count,
+            sessionInstructions: getSessionInstructions(sessionConfig),
+            sourceTypeOverride: 'transcript',
+            multiSpeakerHintOverride: 'likely_multiple_speakers',
+            existingQuestionPrompts: existingPrompts,
+            sessionQuestionPrompts: sessionPrompts,
+            sessionSubject,
+          });
+        const isCurrent = () => isMountedRef.current && activeGenerationRequestRef.current === requestId;
+        const merge = (previous: GeneratedQuestionDraft[], incoming: GeneratedQuestionDraft[]) =>
+          mergeGeneratedQuestionDrafts(previous, incoming, [...drafted, ...sessionPrompts]);
+        let result = await request();
+        if (!isCurrent()) return;
+        // The model may answer with no questions by chance, where the same request again gives some, so the draft
+        // after Stop asks once more before it says there are none.
+        const stopDraft = auto && draftAtEnd;
+        const addsNone = (statements: GeneratedQuestionDraft[]) =>
+          merge(keptRef.current.questions, statements) === keptRef.current.questions;
+        if (stopDraft && !recordingAgain() && addsNone(result.statements)) {
+          result = await request();
+          if (!isCurrent()) return;
+        }
+        const { statements, surveyTitle } = result;
         const kept = keptRef.current.questions;
-        const merged = addDrafts(kept);
-        setNoNewQuestions(merged === kept);
-        setGeneratedQuestions(addDrafts);
-        setGeneratedTitle((previous) => previous || result.surveyTitle);
+        const merged = merge(kept, statements);
+        const nothingNew = merged === kept && !recordingAgain();
+        setNoNewQuestions(nothingNew);
+        setOfferGenerate((offered) => nothingNew && (stopDraft || offered));
+        setGeneratedQuestions((previous) => merge(previous, statements));
+        setGeneratedTitle((previous) => previous || surveyTitle);
         // Kept with the recording at once, so drafts held back while a submit publishes are never lost.
         // Only drafts actually added count towards the recording's number; repeats of session questions don't.
         keepDrafts({
@@ -505,6 +541,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         if (!isMountedRef.current || activeGenerationRequestRef.current !== requestId) return;
         const message = error instanceof Error ? error.message : String(error || 'Failed to generate questions.');
         setGenerationError(message);
+        // Drafts may hide the Generate questions below the transcript, so a failed draft after Stop offers it here.
+        if (auto && draftAtEnd && !recordingAgain()) setOfferGenerate(true);
       } finally {
         if (isMountedRef.current && activeGenerationRequestRef.current === requestId) {
           generationInFlightRef.current = false;
@@ -531,7 +569,10 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
 
   // A new recording starts a new discussion, so an older "no new questions" no longer applies.
   useEffect(() => {
-    if (isRecorderSessionActive) setNoNewQuestions(false);
+    if (!isRecorderSessionActive) return;
+    recordingsBegunRef.current += 1;
+    setNoNewQuestions(false);
+    setOfferGenerate(false);
   }, [isRecorderSessionActive]);
 
   useEffect(() => {
@@ -556,6 +597,20 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   };
 
   const showPanelHeader = !embeddedInModal;
+  const generateButton = (
+    <Button
+      type="button"
+      className={styles.sessionListeningGenerate}
+      onClick={() => {
+        void handleGenerateQuestions();
+      }}
+      disabled={!canGenerate}
+      data-testid={E2E_TESTIDS.SESSION_LISTENING_GENERATE}
+    >
+      <FontAwesomeIcon icon={isGenerating ? faSpinner : faQuestionCircle} spin={isGenerating} />
+      <span>{isGenerating ? `Generating... ${generationElapsedSeconds}s` : 'Generate questions'}</span>
+    </Button>
+  );
 
   return (
     <aside
@@ -735,23 +790,34 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
               <label>
                 <input
                   type="checkbox"
-                  checked={labelSpeakers}
+                  checked={manyVoices}
+                  aria-describedby={`${manyVoicesHelpId}-about`}
                   disabled={isRecorderSessionActive || recorder.isBusy || Boolean(recorder.labelsUnavailableReason)}
-                  onChange={(event) => setLabelSpeakers(event.target.checked)}
+                  onChange={(event) => {
+                    setManyVoices(event.target.checked);
+                    try {
+                      window.localStorage.setItem(MANY_VOICES_KEY, String(event.target.checked));
+                    } catch {
+                      /* The option still works when browser storage is unavailable. */
+                    }
+                  }}
                 />{' '}
-                Label speakers
+                More than 4 people in the room
               </label>
               <button
                 type="button"
-                id={labelsHelpId}
+                id={manyVoicesHelpId}
                 className={styles.sessionInterviewHeaderButton}
-                aria-label="About speaker labels"
+                aria-label="About more than 4 people in the room"
+                aria-describedby={`${manyVoicesHelpId}-about`}
               >
                 <FontAwesomeIcon icon={faQuestionCircle} />
               </button>
-              <UncontrolledTooltip target={labelsHelpId} trigger="hover focus" autohide={false}>
-                Shows who spoke as Person 1, Person 2… using OpenAI. Up to four voices keep their number across the
-                conversation; a fifth may change number. Numbers don&apos;t identify people.
+              <span id={`${manyVoicesHelpId}-about`} hidden>
+                {MANY_VOICES_HELP}
+              </span>
+              <UncontrolledTooltip target={manyVoicesHelpId} trigger="hover focus" autohide={false}>
+                {MANY_VOICES_HELP}
               </UncontrolledTooltip>
             </span>
           ) : null}
@@ -775,8 +841,17 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
               onToggle={() => setIsTranscriptOpen((open) => !open)}
             />
           )}
-          {isGenerating && <span>{`Generating questions... ${generationElapsedSeconds}s`}</span>}
-          {!isGenerating && noNewQuestions ? <span role="status">No new questions from this discussion.</span> : null}
+          {/* Generate questions beside the note counts the seconds itself. */}
+          {isGenerating && !offerGenerate && <span>{`Generating questions... ${generationElapsedSeconds}s`}</span>}
+          {!isGenerating && noNewQuestions ? (
+            <span role="status">
+              {offerGenerate
+                ? 'No new questions from this discussion. Press Generate questions to ask again.'
+                : 'No new questions from this discussion.'}
+            </span>
+          ) : null}
+          {/* Here even beside drafts, where the button below is hidden, and while it generates, so focus stays. */}
+          {offerGenerate ? generateButton : null}
         </div>
       )}
 
@@ -850,11 +925,11 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             recorder.segments.some((segment) => !['complete', 'failed'].includes(segment.status))
           }
           onClear={() => setConfirmClear(true)}
-          onSelectSpeaker={panelMode === 'recordGroup' ? setClaimPerson : undefined}
+          onSelectSpeaker={panelMode === 'recordGroup' && !plainRoom ? setClaimPerson : undefined}
         />
       )}
 
-      {panelMode === 'recordGroup' && hasTranscript ? (
+      {panelMode === 'recordGroup' && hasTranscript && !plainRoom ? (
         <SessionTranscriptClaimShare
           transcript={shownTranscript}
           sessionSlug={sessionSlug}
@@ -907,21 +982,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         testId="ce-recording-clear"
       />
 
-      {hasTranscript && !hasGeneratedDraft && (
-        <div className={styles.sessionListeningActions}>
-          <Button
-            type="button"
-            className={styles.sessionListeningGenerate}
-            onClick={() => {
-              void handleGenerateQuestions();
-            }}
-            disabled={!canGenerate}
-            data-testid={E2E_TESTIDS.SESSION_LISTENING_GENERATE}
-          >
-            <FontAwesomeIcon icon={isGenerating ? faSpinner : faQuestionCircle} spin={isGenerating} />
-            <span>{isGenerating ? `Generating... ${generationElapsedSeconds}s` : 'Generate questions'}</span>
-          </Button>
-        </div>
+      {hasTranscript && !hasGeneratedDraft && !offerGenerate && (
+        <div className={styles.sessionListeningActions}>{generateButton}</div>
       )}
 
       {transcriptContext.status ? (

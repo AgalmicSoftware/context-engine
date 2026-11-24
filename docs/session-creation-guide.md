@@ -1456,18 +1456,21 @@ the test sessions `rxc-ra-test-5` and `rxc-ra-agent-test-1`, and the demo
 session (`demo-sh`). The About page's **Demo** button opens `rxc-ra-2`, so
 its entry stays while the button does. The films, stills, promo slides and
 writeup carry `rxc-ra-test-5`'s link: delete its entry only once those links
-switch to another listed session. A listed session that also has demo data in `demo_sessions.json`, as
-`demo-sh` does, keeps that data; the list sets only its Worker, its session ID
-and its normal link.
+switch to another session in the file. Until then the site's lists leave it
+off (see below), so `rxc-ra-agent-test-1` is the only test session they take
+from the file. A session in the file that also has demo data in
+`demo_sessions.json`, as `demo-sh` does, keeps that data; the file sets only
+its Worker, its session ID and its normal link.
 
 The site's session lists (the Session drop-down in Stats, Users and the log-in
 dialog, the Tools and Groups session pickers, and the Sessions directory) show
-the listed sessions first, in the file's order, then any other session the
-browser knows of, by name. They leave out, for now, sessions whose slugs match
+the file's sessions first, in its order, then any other session the browser
+knows of, by name. They leave out, for now, sessions whose slugs match
 `UNLISTED_SESSION_PATTERNS` in `client/src/utilities/session/sessionListing.ts`:
-automated test runs (`cloudflare-`, `e2e-`, `live-gates-` and similar) and the
+automated test runs (`cloudflare-`, `e2e-`, `live-gates-` and similar), the
 older demos (`demo-sh`, `demo-interview`, `demo-1`, the Telegram and dweb
-demos). That is a display filter only: each still opens from its link, and a
+demos) and the earlier trials (`rxc-test`, `rxc-ra-test` and `rxc-ra-test-5`).
+That is a display filter only: each still opens from its link, and a
 session a person has chosen stays shown. The Session drop-down shows **General**
 (content in no session) only while it is the current choice.
 

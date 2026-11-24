@@ -209,6 +209,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+// Darkens an option beside the chosen one by 30%, laid over its colour and under its label.
+$binary-choice-dim: color-mix(in srgb, var(--ce-color-black) 30%, transparent);
+
 #binaryChoice {
   display: flex;
   flex-direction: row;
@@ -231,6 +234,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     &.selected {
       font-weight: 900;
       font-style: italic;
+      // A ring inside the chosen option, in its label's colour, so the choice shows without telling colours apart.
+      outline: 2px solid currentColor;
+      outline-offset: -5px;
+    }
+
+    // Once one is chosen the others dim, so the choice stands out. Only their colour darkens: white labels
+    // gain contrast and dark ones keep at least 4.5:1 in every theme.
+    &.dimmed {
+      background-image: linear-gradient($binary-choice-dim, $binary-choice-dim);
     }
 
     input[type='radio'] {
@@ -5796,6 +5808,11 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
   #binaryChoice .radioOptionText.disagree::before {
     background: var(--ce-binary-choice-disagree-bg);
+  }
+
+  // The faces stay grey here, so an option beside the chosen one dims its swatch.
+  #binaryChoice .radioOptionText.dimmed::before {
+    background-image: linear-gradient($binary-choice-dim, $binary-choice-dim);
   }
 
   #binaryChoice .radioOptionText:hover {

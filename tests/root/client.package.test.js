@@ -96,7 +96,8 @@ test('Netlify builds the client from the repository-root deployment contract', (
   // Each listed session's questions pass through to its catalog, generated from known-sessions.json
   // (scripts/sync-known-session-catalogs.js; scripts/public-discovery.test.js checks each rule).
   const redirects = readText('client/public/_redirects');
-  const generated = /# known-session-catalogs: generated from known-sessions\.json\n((?:\/questions\/[a-z0-9-]+ https:\/\/\S+ 200\n)+)# \/known-session-catalogs\n/;
+  // Each has its JSON catalog and its Markdown pages: the index, a page, and a page of another size.
+  const generated = /# known-session-catalogs: generated from known-sessions\.json\n((?:\/questions\/[a-z0-9-]+(?:\.md|\/:page|\/size\/:size\/:page)? https:\/\/\S+ 200\n)+)# \/known-session-catalogs\n/;
   assert.match(redirects, generated);
   assert.equal(
     redirects.replace(generated, ''),

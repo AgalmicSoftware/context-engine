@@ -127,7 +127,7 @@ try {
       await page.getByRole('tooltip').getByText('Record, upload audio, or add a transcript.', { exact: true }).waitFor();
       assert.equal(await panel.getByText('Record, upload audio, or add a transcript.', { exact: true }).count(), 0);
       await assertReadable(page.getByRole('tooltip'));
-      await page.getByRole('checkbox', { name: 'Label speakers', exact: true }).uncheck();
+      await page.getByRole('checkbox', { name: 'More than 4 people in the room', exact: true }).check();
       assert.equal((await page.getByTestId(ids.SESSION_RECORDING_ADD_INPUT).innerText()).trim(), '+');
       // The + sits in the dialog's header, whose text this audits; its choices open in the panel.
       assert(await page.getByTestId(ids.SESSION_RECORDING_ADD_INPUT).evaluate((el) => !!el.closest('.modal-header')));

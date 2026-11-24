@@ -1,4 +1,5 @@
 import { AGENT_SIGN_IN_PATHS } from '../../shared/agentSignIn.mjs';
+import { CATALOG_PAGE_PATH } from './interviewCatalogPages.js';
 
 const AGENT_SIGN_IN_ROUTES = Object.values(AGENT_SIGN_IN_PATHS);
 
@@ -59,7 +60,8 @@ export const resolveTopLevelRouteSelection = ({
 
   if (path === '/llms.txt' && method === 'GET') return { kind: 'agent-instructions' };
 
-  if ((path === '/agent/interview-catalog' || path === '/agent/interview-brief') && method === 'GET') {
+  // The catalog's Markdown pages are paths under it: /agent/interview-catalog/index, /link and /1, /2 ….
+  if ((path === '/agent/interview-catalog' || path === '/agent/interview-brief' || CATALOG_PAGE_PATH.test(path)) && method === 'GET') {
     return { kind: 'interview-brief' };
   }
 

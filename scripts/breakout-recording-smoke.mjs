@@ -67,8 +67,8 @@ try {
     await speaker.waitFor();
     assert.equal(await speaker.isChecked(), false);
     await speaker.check();
-    const labels = page.getByRole('checkbox', { name: 'Label speakers' });
-    assert.equal(await labels.isChecked(), true, 'OpenAI speaker labels start enabled');
+    const manyVoices = page.getByRole('checkbox', { name: 'More than 4 people in the room' });
+    assert.equal(await manyVoices.isChecked(), false, 'OpenAI speaker labels start enabled');
     await readable(speaker.locator('..'));
     await page.waitForFunction(() => [...document.querySelectorAll('.modal, .modal-dialog')].every(element => getComputedStyle(element).opacity === '1'));
     await page.getByTestId('ce-session-listening-panel').screenshot({ path: path.join(output, `setup-${theme}-${width}.png`) });
@@ -77,7 +77,7 @@ try {
     assert.equal(await page.evaluate(() => window.__captureConstraints.audio.echoCancellation), false);
     await page.waitForFunction(() => window.__wakeHeld === true);
     assert.equal(await speaker.isDisabled(), true);
-    assert.equal(await labels.isDisabled(), true);
+    assert.equal(await manyVoices.isDisabled(), true);
     await page.evaluate(() => window.__wakeSentinel.release());
     await page.getByText('Screen lock is unavailable. Keep this page visible and the screen unlocked.').waitFor();
     await readable(page.getByText('Screen lock is unavailable. Keep this page visible and the screen unlocked.'));
@@ -97,7 +97,7 @@ try {
     const recorder = page.getByRole('dialog', { name: /Group Conversation/ });
     for (const dismissal of ['Close', 'Escape', 'outside']) {
       await page.getByRole('button', { name: 'Reopen recording' }).click();
-      await page.getByRole('checkbox', { name: 'Label speakers' }).check();
+      await page.getByRole('checkbox', { name: 'More than 4 people in the room' }).uncheck();
       await page.getByTestId('ce-session-listening-start').click();
       await page.getByRole('button', { name: 'Stop recording' }).waitFor();
       transcriptionGate = new Promise(resolve => { releaseTranscription = resolve; });

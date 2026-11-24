@@ -28,7 +28,7 @@ import {
   getPasskeyDerivedPrfSalt,
 } from './keystore/derivePrivateKey.js';
 import { encryptPrivateKey } from './keystore/encryptPrivateKey.js';
-import { indexedDbWalletStorage } from './keystore/storage.js';
+import { walletStorage } from './keystore/storage.js';
 import {
   LoginFileExpiredError,
   LoginFileOtherAccountError,
@@ -271,7 +271,7 @@ export class PasskeyEoaWalletClient {
 
   constructor(deps: PasskeyWalletClientDeps = {}) {
     this.config = deps.config || getPasskeyWalletConfig();
-    this.storage = deps.storage || indexedDbWalletStorage;
+    this.storage = deps.storage || walletStorage;
     this.credentials = deps.credentials;
     this.sessionClientFactory = deps.sessionClientFactory || createWorkerSoftSessionClient;
     this.sessionClient = deps.sessionClient || this.sessionClientFactory();

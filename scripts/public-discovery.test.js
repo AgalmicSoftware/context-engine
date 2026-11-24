@@ -133,17 +133,41 @@ test('index.html tells a fetching agent where the guide is, in body text that is
   // fetch only an address they were shown word for word.
   const noSetUpTalk = /Don't list ways to set up, and don't speak of adding tools, joining, keys or submitting for them\./;
   const literalCatalog =
-    /To draft, fetch the address after the session's link in the list below exactly as it is written, never one you put together yourself/;
+    /To draft, fetch the address after the session's link in the list below exactly as it is written \(it is https:\/\/contextengine\.sh\/questions\/&lt;name&gt;, which you may put together from the session link when you were not shown the list\);/;
   for (const where of [plain, noscript]) {
     assert.match(where, noSetUpTalk);
     assert.match(where, literalCatalog);
   }
   assert.match(llmsTxt.replace(/\s+/g, ' '), noSetUpTalk);
-  assert.match(llmsTxt.replace(/\s+/g, ' '), /To draft: fetch the address after the session's link in the list below exactly as it is written, never one you put together yourself/);
-  assert.match(guide, /the URL to fetch is the address after its link there: fetch that address exactly as it is written there, never one you put together yourself/);
+  assert.match(llmsTxt.replace(/\s+/g, ' '), /To draft: fetch the address after the session's link in the list below exactly as it is written, and each page it links \(it is `https:\/\/contextengine\.sh\/questions\/<name>\.md`, which you may put together from the session link when you were not shown the list\)/);
+  assert.match(guide, /the URL to fetch is the address after its link there: fetch that address exactly\s+as it is written there, and each page it links, then the JSON one and the\s+second address there only if it does not open\. It is\s+`https:\/\/contextengine\.sh\/questions\/<slug>\.md`, which you may\s+put together from the session link when you were not shown the list/);
   assert.match(guide, /This site passes that address through to the catalog the request below builds for the plain session link, and stores nothing\./);
-  // With nothing to go on it says so, then asks a few questions that could seed most of the drafts at once.
-  assert.match(guide, /Draft only where you have a real basis, and tell them plainly which questions you had no basis for\. If you know nothing relevant, say so, then give the shortest read of the session's topics and ask a few questions whose answers would let you draft most of the answers at once\./);
+  // With nothing to go on it says so in one line, then goes through the questions with the person or asks a
+  // few that could seed most of the drafts at once; it still ends in the review link.
+  assert.match(guide, /Draft only where you have a real basis, and tell them plainly which questions you had no basis for\. If you know nothing relevant, say so in one line, then give the shortest read of the session's topics and offer to go through the questions with them in the chat, or ask a few questions whose answers would let you draft most of the answers at once\. Either way it ends in the review link\./);
+  // The guide opens on which session to work on and where its questions are: a reader that keeps only a
+  // page's first lines, or a summary of it, still has both. The session comes from what the person gave,
+  // a picture's text included, never from a list.
+  const opening = skillMd.slice(0, skillMd.indexOf('A Context Engine session asks'));
+  assert.ok(opening.length < 1800, 'the guide opens short');
+  assert.match(opening, /^---\n[^]*?---\n\n# [^\n]+\n\n\*\*Start here\.\*\* The session is the one the person gave you: a `contextengine\.sh\/session\/<name>` address in their message, in the link or page that led you here, or in a picture, flyer, screenshot or QR caption they sent\. Read a picture's text for it\. If you find none, ask for the session link in one line\. Never pick a session from a list or from the site's home page\.\n/);
+  // Its questions come as short pages a summarizing reader passes on whole, ids and all; the whole list as
+  // JSON, which a summary loses the ids of, is the fallback for a Worker that has no pages yet.
+  assert.match(opening, /\n\nFor a session this site lists, its questions are at `https:\/\/contextengine\.sh\/questions\/<name>\.md`, the same `<name>` in lower case with nothing from `\?` or `#` on\. Fetch that page: it gives every question's id and type and links pages of ten questions with their exact words and options\. Fetch each page in turn, then the link page it names, which says how to make the review link\. If a page comes back shortened, use the smaller pages it names\. If those pages do not open, fetch `https:\/\/contextengine\.sh\/questions\/<name>` instead, asking for the complete JSON with every question's id and the questionSetHash\./);
+  // Any other session, and a link that carries more than its name, is sent to the section that handles it.
+  assert.match(opening, /If it gives no questions, or the link has `worker=`, `src=` or `joinGroup=`, see "Draft answers for the person to review" below\./);
+  // It never promises a review link it cannot make: without the ids it says so.
+  assert.match(opening, /If you could not get the ids, give your drafts as plain text with the session link, and say plainly that you could not make the review link\./);
+  assert.match(opening, /If you know nothing of their views, say so in one line and go through the questions with them in the chat first\./);
+  assert.ok(opening.indexOf('Start here') < skillMd.indexOf('## Sessions listed on this site'));
+  // Every listed session's questions are at the address the opening gives, so one put together from it opens.
+  const listedSlugs = Object.keys(JSON.parse(fs.readFileSync(path.join(repoRoot, 'known-sessions.json'), 'utf8')));
+  assert.ok(listedSlugs.length > 0);
+  for (const slug of listedSlugs) {
+    assert.ok(skillMd.includes(`https://contextengine.sh/questions/${slug}\n`), slug);
+  }
+  assert.match(llmsTxt, /- Start here: the session is the one the person gave you, a `contextengine\.sh\/session\/<name>` address/);
+  assert.match(llmsTxt, /its questions are at `https:\/\/contextengine\.sh\/questions\/<name>\.md`, the same `<name>` in lower case: fetch that page, each page of ten questions it links, and the link page it names \(if a page comes back shortened, use the smaller pages it names\); if they do not open, fetch `https:\/\/contextengine\.sh\/questions\/<name>`/);
   for (const where of [plain, guide, llmsTxt]) assert.doesNotMatch(where, /state their views first/);
   assert.match(guide, /A chat app's own sandbox, which reaches few sites or none, doesn't count: take case 4\./);
   assert.match(guide, /Build the URL yourself only when the session isn't listed there, or the link has `src=` or `joinGroup=`\./);
@@ -172,29 +196,33 @@ test('index.html tells a fetching agent where the guide is, in body text that is
   const salon = listed(knownSessions).find(({ page }) => page.endsWith('/session/rxc-ra-2'));
   assert.equal(salon.catalog, knownSessions['rxc-ra-2'].interviewCatalog);
   assert.equal(salon.questions, 'https://contextengine.sh/questions/rxc-ra-2');
-  for (const where of [plain, noscript]) assert.ok(where.includes(`${salon.page} (${salon.title}): ${salon.questions}`));
-  assert.ok(skillMd.includes(`- ${salon.page} (${salon.title}):\n  ${salon.questions}\n`));
-  assert.ok(llmsTxt.includes(`  - ${salon.page} (${salon.title}): ${salon.questions}\n`));
-  assert.ok(skillMd.indexOf(salon.questions) < skillMd.indexOf('## You were given a session link'));
+  // Each link is followed first by its question pages' index, which a summarizing reader passes on whole.
+  assert.equal(salon.pages, 'https://contextengine.sh/questions/rxc-ra-2.md');
+  for (const where of [plain, noscript]) assert.ok(where.includes(`${salon.page} (${salon.title}): ${salon.pages} as JSON: ${salon.questions} `));
+  assert.ok(skillMd.includes(`- ${salon.page} (${salon.title}):\n  ${salon.pages}\n  as JSON: ${salon.questions}\n`));
+  assert.ok(llmsTxt.includes(`  - ${salon.page} (${salon.title}): ${salon.pages}\n    as JSON: ${salon.questions}\n`));
+  assert.ok(skillMd.indexOf(salon.pages) < skillMd.indexOf('## You were given a session link'));
   // Where the list is, one sentence says to try the second address, and never to make questions up.
   const { FALLBACK } = require('./sync-known-session-catalogs.js');
-  assert.match(FALLBACK, /^If the first address does not open, fetch the second exactly as written; if neither opens, say so, ask the person to paste the questions and give your drafts of those as plain text with no review link, and never make questions up\.$/);
+  assert.match(FALLBACK, /^If the first address does not open, fetch the JSON one, then the second address, exactly as written; if none opens, say so, ask the person to paste the questions and give your drafts of those as plain text with no review link, and never make questions up\.$/);
   for (const [text, count] of [[indexHtml, 2], [skillMd, 1], [llmsTxt, 1]]) assert.equal(text.split(FALLBACK).length - 1, count);
   const redirects = fs.readFileSync(path.join(repoRoot, 'client', 'public', '_redirects'), 'utf8').split('\n');
-  for (const { slug, catalog, questions, target } of listed(knownSessions)) {
+  for (const { slug, catalog, questions, pages, target } of listed(knownSessions)) {
     // Nothing follows an address but a line break, so an address copied whole is the address itself.
     for (const [text, count] of [[indexHtml, 2], [skillMd, 1], [llmsTxt, 1]]) {
-      const after = text.split(questions).slice(1);
-      assert.equal(after.length, count, `${questions} shown ${count} times`);
-      for (const rest of after) assert.match(rest, /^\n/);
+      for (const address of [pages, questions]) {
+        const after = text.split(new RegExp(`${escapeRegExp(address)}(?![.\\w/-])`)).slice(1);
+        assert.equal(after.length, count, `${address} shown ${count} times`);
+        for (const rest of after) assert.match(rest, /^\n/);
+      }
     }
-    // The Worker's own address is shown only as the second address, whole, right after the site's.
+    // The pages' index comes first, then the site's JSON, then the Worker's own address, shown only as the
+    // second address, whole, right after the site's.
     for (const [text, count] of [[indexHtml, 2], [skillMd, 1], [llmsTxt, 1]]) {
       const host = new URL(catalog).host;
       assert.equal(text.split(host).length - 1, count, `${slug}'s Worker host shown ${count} times`);
-      assert.equal(text.split(`${questions}\n`).length - 1, count);
-      const pair = new RegExp(`${escapeRegExp(questions)}\\n[ \\t]*second address: ${escapeRegExp(catalog)}\\n`, 'g');
-      assert.equal((text.match(pair) || []).length, count, `${slug}: the Worker's address follows the site's`);
+      const three = new RegExp(`${escapeRegExp(pages)}\\n[ \\t]*as JSON: ${escapeRegExp(questions)}\\n[ \\t]*second address: ${escapeRegExp(catalog)}\\n`, 'g');
+      assert.equal((text.match(three) || []).length, count, `${slug}: the pages, then the JSON, then the Worker's address`);
     }
     // The pass-through reads the same catalog, with sessionUrl left plain, before the host's catch-all.
     const at = redirects.indexOf(`/questions/${slug} ${target} 200`);
@@ -204,7 +232,17 @@ test('index.html tells a fetching agent where the guide is, in body text that is
     assert.equal(sent.origin + sent.pathname, shown.origin + shown.pathname);
     assert.deepEqual([...sent.searchParams], [...shown.searchParams]);
     assert.ok(!target.includes('%'));
+    // The same catalog's Markdown pages: the index at <questions>.md and each page under <questions>/,
+    // as paths under the Worker's catalog route, told they are reached through the site.
+    const route = `${sent.origin}${sent.pathname}`;
+    const query = target.slice(route.length);
+    for (const [from, to] of [[`${questions}.md`, 'index'], [`${questions}/:page`, ':page'], [`${questions}/size/:size/:page`, 'size/:size/:page']]) {
+      const rule = redirects.indexOf(`${from.slice('https://contextengine.sh'.length)} ${route}/${to}${query}&site=1 200`);
+      assert.ok(rule > at && rule < redirects.indexOf('/* /index.html 200'), `${slug}: ${from} passes through to its page`);
+    }
   }
+  // No rule takes the app's own /questions/results pages.
+  assert.ok(redirects.every((line) => !line.startsWith('/questions/results')));
   // A fetcher that keeps <noscript> reads the agents' paragraph before any GitHub link.
   assert.ok(noscript.indexOf('AI agents: to take part') < noscript.indexOf('github.com'));
   // Changing a listed address changes the generated text.
@@ -225,6 +263,7 @@ test('index.html tells a fetching agent where the guide is, in body text that is
     { 'rxc-ra-2': { ...salonEntry, worker: 'https://ce-other.example.workers.dev' } },
     { 'rxc-ra-2': { ...salonEntry, interviewCatalog: salonEntry.interviewCatalog.replace('%2Frxc-ra-2', '%2Fother') } },
     { 'Rxc:2': { ...salonEntry, interviewCatalog: salonEntry.interviewCatalog.replace(/rxc-ra-2/g, 'Rxc:2') } },
+    { results: { ...salonEntry, interviewCatalog: salonEntry.interviewCatalog.replace(/rxc-ra-2/g, 'results') } },
   ]) {
     assert.throws(() => expectedFiles(bad));
   }

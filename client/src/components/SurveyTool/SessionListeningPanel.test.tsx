@@ -121,6 +121,8 @@ describe('SessionListeningPanel', () => {
   });
   beforeEach(() => {
     jest.clearAllMocks();
+    // Replies a test queued but never used would otherwise answer the next test's drafts.
+    mockGenerateQuestionsFromListeningTranscript.mockReset();
     mockCreateQuestionsMountCount = 0;
     mockReadThemeToken.mockImplementation((_token, fallback = '') => fallback);
     mockSubscribeThemeChanges.mockImplementation(() => jest.fn());
@@ -210,8 +212,12 @@ describe('SessionListeningPanel', () => {
       raw: { questions: [] },
     });
     render(<SessionListeningPanel panelMode="recordGroup" />);
-    await waitFor(() => expect(mockGenerateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1));
-    expect(mockGenerateQuestionsFromListeningTranscript.mock.calls[0][0]).toBe(transcript);
+    // The draft after Stop came back empty, so it was asked once more.
+    await waitFor(() => expect(mockGenerateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(2));
+    expect(mockGenerateQuestionsFromListeningTranscript.mock.calls.map(([text]) => text)).toEqual([
+      transcript,
+      transcript,
+    ]);
   });
 
   it('keeps an unfinished pasted transcript while microphone capture is active', async () => {
@@ -1380,20 +1386,26 @@ describe('SessionListeningPanel', () => {
       );
       const once = { transcript: first, segments: [chunk('s1', 0, first)] };
       (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder(once));
-      mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(drafts([asked]));
+      // Asked twice after Stop, both times for a question the session already has.
+      mockGenerateQuestionsFromListeningTranscript
+        .mockResolvedValueOnce(drafts([asked]))
+        .mockResolvedValueOnce(drafts([asked]));
       const { rerender } = render(pooled());
-      expect(await screen.findByText('No new questions from this discussion.')).toBeInTheDocument();
+      expect(await screen.findByText(/^No new questions from this discussion\./)).toBeInTheDocument();
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(2);
       (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
         buildRecorder({ ...once, status: 'recording', isRecording: true }),
       );
       rerender(pooled());
-      await waitFor(() => expect(screen.queryByText('No new questions from this discussion.')).toBeNull());
+      await waitFor(() => expect(screen.queryByText(/No new questions/)).toBeNull());
+      // Only the usual Generate questions is left, below the transcript.
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE).closest('[aria-live]')).toBeNull();
       mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(drafts(['D?']));
       (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
         buildRecorder({ transcript: `${first}\n${second}`, segments: [chunk('s1', 0, first), chunk('s2', 1, second)] }),
       );
       rerender(pooled());
-      await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(3));
       // The repeat of a session question added nothing, so all three are still to come.
       expect(generateQuestionsFromListeningTranscript).toHaveBeenLastCalledWith(
         `${first}\n${second}`,
@@ -1419,6 +1431,153 @@ describe('SessionListeningPanel', () => {
         expect.any(String),
         expect.objectContaining({ count: 3 }),
       );
+    });
+
+    it('asks once more when the draft after Stop comes back empty, and keeps what the second gives', async () => {
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript: `${first}\n${second}`, segments: [chunk('s1', 0, first), chunk('s2', 1, second)] }),
+      );
+      mockGenerateQuestionsFromListeningTranscript
+        .mockResolvedValueOnce(drafts([]))
+        .mockResolvedValueOnce(drafts(['A?', 'B?']));
+      const { rerender } = render(panel());
+      expect(await screen.findByTestId('mock-create-questions')).toHaveAttribute('data-count', '2');
+      const [firstAsk, secondAsk] = mockGenerateQuestionsFromListeningTranscript.mock.calls;
+      expect(secondAsk).toEqual(firstAsk);
+      expect(screen.queryByText(/No new questions/)).toBeNull();
+      rerender(panel());
+      await nextFrame();
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(2);
+    });
+
+    it('offers Generate questions beside the note when the draft after Stop is empty twice', async () => {
+      // Drafted before Record more, so the Generate questions below the transcript is hidden.
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({
+          transcript: `${first}\n${second}`,
+          segments: [chunk('s1', 0, first), chunk('s2', 1, second)],
+          questionDrafts: { questions: drafts(['A?']).statements, prompts: ['A?'], draftedTranscript: first },
+        }),
+      );
+      let answer!: (result: ReturnType<typeof drafts>) => void;
+      mockGenerateQuestionsFromListeningTranscript
+        .mockResolvedValueOnce(drafts([]))
+        // A repeat of a draft adds nothing either.
+        .mockResolvedValueOnce(drafts(['A?']))
+        .mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+      render(panel());
+      const note = await screen.findByText(
+        'No new questions from this discussion. Press Generate questions to ask again.',
+      );
+      expect(note).toHaveAttribute('role', 'status');
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(2);
+      const generate = screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE);
+      expect(note.parentElement).toContainElement(generate);
+      fireEvent.click(generate);
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(3);
+      // The pressed button stays, counting the seconds, so focus has somewhere to stay.
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).toBe(generate);
+      expect(generate).toHaveTextContent('Generating... 0s');
+      expect(screen.queryByText(/Generating questions/)).toBeNull();
+      await act(async () => answer(drafts(['A?', 'B?'])));
+      expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-count', '2');
+      expect(screen.queryByText(/No new questions/)).toBeNull();
+      expect(screen.queryByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).toBeNull();
+    });
+
+    it('asks no more, and says nothing, once Record more begins during the draft after Stop', async () => {
+      const stopped = { transcript: `${first}\n${second}`, segments: [chunk('s1', 0, first), chunk('s2', 1, second)] };
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder(stopped));
+      let answer!: (result: ReturnType<typeof drafts>) => void;
+      mockGenerateQuestionsFromListeningTranscript.mockImplementationOnce(
+        () => new Promise((resolve) => (answer = resolve)),
+      );
+      const { rerender } = render(panel());
+      await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1));
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ ...stopped, status: 'recording', isRecording: true }),
+      );
+      rerender(panel());
+      await act(async () => answer(drafts([])));
+      await nextFrame();
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText(/No new questions/)).toBeNull();
+      // Only the usual Generate questions is left, below the transcript.
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE).closest('[aria-live]')).toBeNull();
+    });
+
+    it('offers Generate questions when the draft after Stop fails, even beside earlier drafts', async () => {
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({
+          transcript: `${first}\n${second}`,
+          segments: [chunk('s1', 0, first), chunk('s2', 1, second)],
+          questionDrafts: { questions: drafts(['A?']).statements, prompts: ['A?'], draftedTranscript: first },
+        }),
+      );
+      mockGenerateQuestionsFromListeningTranscript
+        .mockRejectedValueOnce(new Error('AI unavailable'))
+        .mockResolvedValueOnce(drafts(['A?', 'B?']));
+      render(panel());
+      expect(await screen.findByRole('alert')).toHaveTextContent('AI unavailable');
+      await nextFrame();
+      // A failure is not asked again by itself.
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE));
+      await waitFor(() => expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-count', '2'));
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(screen.queryByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).toBeNull();
+    });
+
+    it('asks only once for a draft pressed by hand', async () => {
+      const transcript = `${first}\n${second}`;
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({
+          transcript,
+          segments: [chunk('s1', 0, first), chunk('s2', 1, second)],
+          questionDrafts: { questions: [], prompts: [], draftedTranscript: transcript },
+        }),
+      );
+      mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(drafts([]));
+      render(panel());
+      fireEvent.click(await screen.findByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE));
+      expect(await screen.findByText('No new questions from this discussion.')).toBeInTheDocument();
+      await nextFrame();
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1);
+    });
+
+    it('drafts once from every part, only when Stop has sent the last one', async () => {
+      const third = 'Person 3: The pilot needs a named officer who answers for each summary it publishes.';
+      const parts = [chunk('s1', 0, first), chunk('s2', 1, second)];
+      const sent = { transcript: `${first}\n${second}`, segments: parts };
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ ...sent, status: 'stopping', isStopping: true }),
+      );
+      mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(drafts(['A?', 'B?', 'C?']));
+      const { rerender } = render(panel());
+      await nextFrame();
+      // Stopped while its last part is still transcribing.
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({
+          ...sent,
+          segments: [...parts, { id: 's3', index: 2, status: 'transcribing', text: '', startedAt: 3 }],
+          pendingSegmentCount: 1,
+        }),
+      );
+      rerender(panel());
+      await nextFrame();
+      expect(generateQuestionsFromListeningTranscript).not.toHaveBeenCalled();
+      const transcript = `${first}\n${second}\n${third}`;
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript, segments: [...parts, chunk('s3', 2, third)] }),
+      );
+      rerender(panel());
+      await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1));
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledWith(
+        transcript,
+        expect.objectContaining({ count: 3 }),
+      );
+      expect(await screen.findByTestId('mock-create-questions')).toHaveAttribute('data-count', '3');
     });
   });
 
@@ -1472,7 +1631,9 @@ describe('SessionListeningPanel', () => {
         embeddedInModal
       />,
     );
-    expect(await screen.findByText('No new questions from this discussion.')).toHaveAttribute('role', 'status');
+    expect(
+      await screen.findByText('No new questions from this discussion. Press Generate questions to ask again.'),
+    ).toHaveAttribute('role', 'status');
     expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledWith(
       transcript,
       expect.objectContaining({
@@ -1482,7 +1643,8 @@ describe('SessionListeningPanel', () => {
     );
     expect(screen.queryByTestId('mock-create-questions')).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1);
+    // Asked once more after Stop, and no more.
+    expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(2);
   });
 
   it('drafts the set number after each part while recording, when the session asks for that', async () => {
@@ -1514,6 +1676,29 @@ describe('SessionListeningPanel', () => {
         expect.objectContaining({ count: 2 }),
       ),
     );
+  });
+
+  it('asks only once when the draft after a part comes back empty, as more parts follow', async () => {
+    const transcript = 'Person 1: The council should pilot AI summaries in the February budget consultation.';
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript,
+        status: 'recording',
+        isRecording: true,
+        segments: [{ id: 's1', index: 0, status: 'complete', text: transcript, startedAt: 1, completedAt: 2 }],
+      }),
+    );
+    mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce({
+      surveyTitle: '',
+      statements: [],
+      raw: { questions: [] },
+    });
+    render(
+      <SessionListeningPanel sessionSlug="demo" sessionConfig={PER_CHUNK} panelMode="recordGroup" embeddedInModal />,
+    );
+    expect(await screen.findByText('No new questions from this discussion.')).toBeInTheDocument();
+    await nextFrame();
+    expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1);
   });
 
   it('shows a stopped recorder ahead of an earlier question-generation error', async () => {
@@ -1715,28 +1900,78 @@ it('remembers the optional speaker-audio setting and locks it while recording', 
   window.localStorage.removeItem('ce:record-speaker-audio:v1');
 });
 
-it('defaults speaker labels on for OpenAI Group Conversation and lets the recorder opt out', async () => {
-  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
-  const { rerender } = render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
-  const toggle = await screen.findByRole('checkbox', { name: 'Label speakers' });
-  expect(toggle).toBeChecked();
-  expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
-  fireEvent.click(toggle);
-  expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
-  rerender(<SessionListeningPanel sessionSlug="workshop" panelMode="listening" />);
-  expect(screen.queryByRole('checkbox', { name: 'Label speakers' })).not.toBeInTheDocument();
-  expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+it('labels speakers by default, and gives a room of more than 4 a plain transcript with no parts', async () => {
+  const key = 'ce:record-more-than-four:v1';
+  window.localStorage.removeItem(key);
+  const labelled =
+    'Person 1: Enough words here for a whole part of the talk.\nPerson 2: And quite a lot more from another person.';
+  const choice = () => screen.findByRole('checkbox', { name: 'More than 4 people in the room' });
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ transcript: labelled }));
+  try {
+    const { unmount } = render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+    expect(await choice()).not.toBeChecked();
+    // The "?" help is read with the box and with its button, not only shown on hover.
+    expect(await choice()).toHaveAccessibleDescription(/^Ticked, the transcript is plain text/);
+    expect(screen.getByRole('button', { name: 'About more than 4 people in the room' })).toHaveAccessibleDescription(
+      /up to four voices keep their number/,
+    );
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Person 2:' })).toBeInTheDocument();
+    fireEvent.click(await choice());
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+    // Labels from an earlier part stay in its text, but no part is given out.
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Person 2:' })).toBeNull();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).toHaveTextContent('Person 2:');
+    expect(window.localStorage.getItem(key)).toBe('true');
+    // Reopened on this device, the room stays plain.
+    unmount();
+    const { rerender } = render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+    expect(await choice()).toBeChecked();
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({ transcript: labelled, isRecording: true, status: 'recording' }),
+    );
+    rerender(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+    expect(await choice()).toBeDisabled();
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ transcript: labelled }));
+    rerender(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+    fireEvent.click(await choice());
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeInTheDocument();
+    expect(window.localStorage.getItem(key)).toBe('false');
+    rerender(<SessionListeningPanel sessionSlug="workshop" panelMode="listening" />);
+    expect(screen.queryByRole('checkbox', { name: 'More than 4 people in the room' })).not.toBeInTheDocument();
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+  } finally {
+    window.localStorage.removeItem(key);
+  }
 });
 
-it.each(['custom', 'local'])('hides speaker labels for the effective %s transcription provider', async (provider) => {
+it.each(['custom', 'local'])('hides the label choice for the effective %s transcription provider', async (provider) => {
   jest
     .mocked(getEffectiveTranscriptionConfig)
     .mockResolvedValueOnce({ provider } as Awaited<ReturnType<typeof getEffectiveTranscriptionConfig>>);
-  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
-  render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
-  await waitFor(() => expect(getEffectiveTranscriptionConfig).toHaveBeenCalled());
-  expect(screen.queryByRole('checkbox', { name: 'Label speakers' })).not.toBeInTheDocument();
-  expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+  // Ticked in an OpenAI session on this device: hidden here, the choice hides no part either.
+  window.localStorage.setItem('ce:record-more-than-four:v1', 'true');
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({
+      transcript:
+        'Person 1: Enough words here for a whole part of the talk.\nPerson 2: And quite a lot more from another person.',
+    }),
+  );
+  try {
+    render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+    await waitFor(() => expect(getEffectiveTranscriptionConfig).toHaveBeenCalled());
+    await nextFrame();
+    expect(screen.queryByRole('checkbox', { name: 'More than 4 people in the room' })).not.toBeInTheDocument();
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Person 2:' })).toBeInTheDocument();
+  } finally {
+    window.localStorage.removeItem('ce:record-more-than-four:v1');
+  }
 });
 
 it('shows when recording continues without speaker labels', async () => {
@@ -1777,7 +2012,7 @@ it('waits for the transcription provider before starting Group Conversation with
     resolve({ provider: 'openai' } as Config);
   });
   expect(start).toBeEnabled();
-  expect(screen.getByRole('checkbox', { name: 'Label speakers' })).toBeChecked();
+  expect(screen.getByRole('checkbox', { name: 'More than 4 people in the room' })).not.toBeChecked();
   expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
   fireEvent.click(start);
   expect(startRecording).toHaveBeenCalledTimes(1);
@@ -1950,7 +2185,7 @@ it('applies a provider check that answers after two seconds as long as Record ha
     await act(async () => {
       resolve({ provider: 'openai' } as Config);
     });
-    expect(screen.getByRole('checkbox', { name: 'Label speakers' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'More than 4 people in the room' })).not.toBeChecked();
     expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
     expect(screen.queryByText(/Speaker label check timed out/)).not.toBeInTheDocument();
   } finally {
@@ -1988,7 +2223,7 @@ it('makes Record available with plain transcription after two seconds and ignore
       resolve({ provider: 'openai' } as Config);
     });
     expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
-    expect(screen.queryByRole('checkbox', { name: 'Label speakers' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'More than 4 people in the room' })).not.toBeInTheDocument();
   } finally {
     jest.useRealTimers();
   }

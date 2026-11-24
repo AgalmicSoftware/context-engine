@@ -13,6 +13,18 @@ describe('BinaryChoiceInput', () => {
     );
   });
 
+  it('dims the other options once one is chosen, and none before', () => {
+    const { container, rerender } = render(<BinaryChoiceInput questionId="q1" />);
+    const dimmed = () => [...container.querySelectorAll(`.${styles.dimmed}`)].map((el) => el.textContent);
+
+    expect(dimmed()).toEqual([]);
+
+    rerender(<BinaryChoiceInput questionId="q1" value="Disagree" />);
+
+    expect(dimmed()).toEqual(['Agree', 'Unsure']);
+    expect(container.querySelector(`.${styles.selected}`)).toHaveTextContent('Disagree');
+  });
+
   it('forwards option changes and repeat clicks on the current selection', () => {
     const onChange = jest.fn();
     render(<BinaryChoiceInput questionId="q1" value="Agree" onChange={onChange} />);

@@ -47,7 +47,9 @@ export const isKnownSessionWorker = ({ workerUrl, sessionSlug }: { workerUrl: st
 // For the listed catalog (the session's own Worker and its hosted page), this returns the two
 // addresses to try, in the generator's order: the site's, then the Worker's own, written out whole.
 // The Worker keeps only the page's origin and path, plus src= and joinGroup=, so another query (such
-// as worker=) asks for the same catalog; src= or joinGroup= asks for another. Otherwise it returns [].
+// as worker=) asks for the same catalog. A page with src= or joinGroup= is given the site's address
+// too: the questions are the same, and without it the only address offered was the Worker's own host,
+// which some chat AIs cannot open. Otherwise it returns [].
 export const knownSessionQuestionsAddresses = ({
   workerUrl,
   sessionSlug,
@@ -65,7 +67,6 @@ export const knownSessionQuestionsAddresses = ({
   } catch {
     return [];
   }
-  if (page.searchParams.has('src') || page.searchParams.has('joinGroup')) return [];
   const hosted = `https://contextengine.sh/session/${sessionSlug}`;
   return `${page.origin}${page.pathname.replace(/\/+$/, '')}` === hosted
     ? [`https://contextengine.sh/questions/${sessionSlug}`, entry.interviewCatalog]

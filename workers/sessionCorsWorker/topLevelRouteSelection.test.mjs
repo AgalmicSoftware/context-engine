@@ -84,6 +84,10 @@ test('resolveTopLevelRouteSelection exposes the per-session interview brief with
     }),
     { kind: 'interview-brief' },
   );
+  // Its Markdown pages too, and no other path under it.
+  const under = (path) => resolveTopLevelRouteSelection({ path, method: 'GET', request: createRequest(), deps: { toStr: String } }).kind;
+  for (const path of ['/agent/interview-catalog/index', '/agent/interview-catalog/link', '/agent/interview-catalog/12', '/agent/interview-catalog/size/5/2', '/agent/interview-catalog/size/99/index']) assert.equal(under(path), 'interview-brief', path);
+  for (const path of ['/agent/interview-catalog/', '/agent/interview-catalog/0', '/agent/interview-catalog/x', '/agent/interview-brief/1']) assert.equal(under(path), 'authenticated', path);
   // Only a signed-in POST gets a ticket for a private catalog link.
   const route = (method) => resolveTopLevelRouteSelection({
     path: '/agent/interview-catalog-ticket', method, request: createRequest(), deps: { toStr: String },

@@ -686,8 +686,11 @@ export const buildExternalInterviewKickoff = ({
   const [listedFirst, listedSecond] = ticket
     ? []
     : knownSessionQuestionsAddresses({ workerUrl: base, sessionSlug: slugText, sessionUrl: returnUrl });
+  // A page that names a source or a group keeps its own catalog as the second address: it differs only in
+  // the groups and the review address it lists, which the first, shorter address leaves out.
+  const second = /[?&](?:src|joinGroup)=/.test(returnUrl) ? workerCatalogUrl : listedSecond;
   const addresses = listedSecond
-    ? `${listedFirst}\nSecond address, if the first does not give you that:\n${listedSecond}`
+    ? `${listedFirst}\nSecond address, if the first does not give you that:\n${second}`
     : workerCatalogUrl;
   const privateLink = ticket
     ? 'The link is private to me and expires within an hour; never repeat it or put it in the packet.\n'
