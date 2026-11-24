@@ -210,14 +210,14 @@
 .choiceTrackBg {
   fill: var(--ce-document-border);
 }
-// A card per option: its name, then its bar with the count under it.
+// A card per option: its name, then its bar with the count beside it, close together so a list stays short.
 .choices li {
   display: grid;
   grid-template-columns: minmax(100px, 1fr) 2fr;
-  gap: 14px;
+  gap: 12px;
   align-items: center;
-  margin: 8px 0;
-  padding: 10px 14px;
+  margin: 4px 0;
+  padding: 6px 12px;
   border: var(--answer-card-border);
   border-radius: 8px;
   background: var(--answer-card-bg);
@@ -227,7 +227,9 @@
 }
 .choiceShare {
   display: grid;
-  gap: 2px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
   min-width: 0;
 }
 .choiceShare .numeric {
@@ -240,8 +242,45 @@
   display: block;
   width: 100%;
   min-width: 0;
-  height: 16px;
+  height: 12px;
   border-radius: 999px;
+}
+// A multiple choice question folds to its heading and the option chosen most. The caret matches the sections'.
+.choiceQuestion > summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 8px;
+  list-style: none;
+  cursor: pointer;
+}
+.choiceQuestion > summary::-webkit-details-marker {
+  display: none;
+}
+.choiceQuestion > summary::before {
+  content: '▸';
+  grid-row: span 2;
+  font-size: 18px;
+  line-height: 1.3;
+}
+.choiceQuestion[open] > summary::before {
+  content: '▾';
+}
+.choiceQuestion > summary:focus-visible {
+  outline: 2px solid var(--ce-document-text);
+  outline-offset: 3px;
+}
+.choiceQuestion:not([open]) .questionHeading {
+  margin-bottom: 4px;
+}
+.choiceLeading {
+  grid-column: 2;
+  color: var(--ce-document-text-muted);
+  font-size: 15px;
+}
+// Open, the bars say it.
+.choiceQuestion[open] .choiceLeading,
+.pdf .choiceQuestion > summary::before {
+  display: none;
 }
 .numeric {
   text-align: right;

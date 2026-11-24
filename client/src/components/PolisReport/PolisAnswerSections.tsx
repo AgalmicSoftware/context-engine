@@ -167,6 +167,14 @@ function AnswerChart({
   );
 }
 
+// A folded multiple choice question's line: the option chosen most (or those tied for it), with its count.
+export const mostChosenLine = (question: ReportAnswerQuestion): string => {
+  const top = Math.max(0, ...question.options.map((option) => option.count));
+  if (!top) return 'No option chosen';
+  const leaders = question.options.filter((option) => option.count === top).map((option) => option.label);
+  return `Most chosen: ${leaders.join(', ')} · ${top}/${question.count}${leaders.length > 1 ? ' each' : ''}`;
+};
+
 type AnswerSectionType = AnswerType | 'binary';
 const sectionTitles = { binary: 'Binary', ...answerTypeTitles };
 export type AnswerSectionsOpen = Partial<Record<AnswerSectionType, boolean>>;
@@ -231,9 +239,8 @@ export default function PolisAnswerSections({
               <div id={bodyId} className={styles.sectionContent}>
                 {type === 'binary'
                   ? renderBinaryQuestions?.(pdfMode ? <h3>{sectionTitles.binary}</h3> : null, showAll ? undefined : 5)
-                  : (showAll ? items : items.slice(0, 1)).map((question, index) => (
-                      <article key={question.id} data-pdf-keep-together className={styles.question}>
-                        {pdfMode && index === 0 && <h3>{sectionTitles[type]}</h3>}
+                  : (showAll ? items : items.slice(0, 1)).map((question, index) => {
+                      const heading = (
                         <div className={styles.questionHeading} data-pdf-keep-together>
                           <h4>
                             {question.prompt}
@@ -243,9 +250,29 @@ export default function PolisAnswerSections({
                             {question.count} {question.count === 1 ? 'response' : 'responses'}
                           </span>
                         </div>
-                        <AnswerChart question={question} showAll={showAll} pdfMode={pdfMode} />
-                      </article>
-                    ))}
+                      );
+                      const chart = <AnswerChart question={question} showAll={showAll} pdfMode={pdfMode} />;
+                      return (
+                        <article key={question.id} data-pdf-keep-together className={styles.question}>
+                          {pdfMode && index === 0 && <h3>{sectionTitles[type]}</h3>}
+                          {question.type === 'multichoice' ? (
+                            // Folded to its line, so a long list of them can be read down; the export shows each open.
+                            <details className={styles.choiceQuestion} open={pdfMode || undefined}>
+                              <summary>
+                                {heading}
+                                <span className={styles.choiceLeading}>{mostChosenLine(question)}</span>
+                              </summary>
+                              {chart}
+                            </details>
+                          ) : (
+                            <>
+                              {heading}
+                              {chart}
+                            </>
+                          )}
+                        </article>
+                      );
+                    })}
                 {!pdfMode && remaining > 0 && (
                   <button
                     type="button"

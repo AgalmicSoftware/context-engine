@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, within } from '@testing-library/react';
-import PolisAnswerSections, { writtenAnswerPreview } from './PolisAnswerSections';
+import PolisAnswerSections, { mostChosenLine, writtenAnswerPreview } from './PolisAnswerSections';
 import { buildReportAnswerQuestions } from './polisReportAnswers';
 import { choiceKindLabel } from '../SurveyTool/MultichoiceQuestionInput';
 
@@ -138,6 +138,67 @@ it('lists multiple choice options most chosen first, for Pick one and Pick any, 
   expect(any).toEqual(['Library3/4', 'Garden2/4', 'Bus1/4', 'Paths1/4']);
   // Only the display is sorted: the summaries keep the question's order.
   ranked.forEach((question) => expect(question.options.map((option) => option.label)).toEqual(options));
+});
+
+// A long list of multiple choice questions took a lot of scrolling: each now folds to one line.
+it('folds each multiple choice question to its prompt and most chosen option, and opens it on request', () => {
+  const picks = (values: unknown[]) =>
+    values.map((value, index) => ({ responder: `p${index}`, response: { type: 'multichoice', answer: { value } } }));
+  const folded = buildReportAnswerQuestions(
+    {
+      poll: picks(['Bus', 'Garden', 'Bus']),
+      rated: [{ responder: 'a', response: { type: 'rating', answer: { value: 3 } } }],
+    },
+    {
+      poll: { type: 'multichoice', prompt: 'How do you travel?', options: ['Garden', 'Bus'], singleSelect: true },
+      rated: { type: 'rating', prompt: 'How was it?' },
+    },
+  );
+  render(<PolisAnswerSections questions={folded} openSections={{ multichoice: true, rating: true }} />);
+  const section = screen.getByTestId('ce-polis-answers-multichoice');
+  const details = section.querySelector('details') as HTMLDetailsElement;
+  const summary = details.querySelector('summary') as HTMLElement;
+  expect(details.open).toBe(false);
+  expect(summary).toHaveTextContent('How do you travel?Pick one3 responsesMost chosen: Bus · 2/3');
+  fireEvent.click(summary);
+  expect(details.open).toBe(true);
+  expect(
+    within(details)
+      .getAllByRole('listitem')
+      .map((row) => row.textContent),
+  ).toEqual(['Bus2/3', 'Garden1/3']);
+  // Other kinds of question are drawn as before, with no fold.
+  expect(screen.getByTestId('ce-polis-answers-rating').querySelector('details')).toBeNull();
+});
+
+it('names every option tied for most chosen, and says when none was', () => {
+  const [tied] = buildReportAnswerQuestions(
+    {
+      tied: ['a', 'b'].map((responder) => ({
+        responder,
+        response: { type: 'multichoice', answer: { value: ['Bus', 'Garden'] } },
+      })),
+    },
+    { tied: { type: 'multichoice', prompt: 'Tied', options: ['Garden', 'Bus', 'Paths'] } },
+  );
+  expect(mostChosenLine(tied)).toBe('Most chosen: Garden, Bus · 2/2 each');
+  const none = { ...tied, options: tied.options.map((option) => ({ ...option, count: 0 })) };
+  expect(mostChosenLine(none)).toBe('No option chosen');
+});
+
+it('shows every multiple choice question open in the export', () => {
+  const exported = buildReportAnswerQuestions({
+    poll: [
+      {
+        responder: 'a',
+        response: { type: 'multichoice', prompt: 'Poll', options: ['A', 'B'], answer: { value: 'A' } },
+      },
+    ],
+  });
+  render(<PolisAnswerSections questions={exported} pdfMode />);
+  expect((screen.getByTestId('ce-polis-answers-multichoice').querySelector('details') as HTMLDetailsElement).open).toBe(
+    true,
+  );
 });
 
 it('keeps binary independent, includes it in PDF, and restores its collapsed state', () => {

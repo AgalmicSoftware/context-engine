@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Site — available when the site deploys
 
+- **The report's multiple-choice questions fold.** Each starts as one line, with its prompt, how many answered and the option chosen most, and opens with a click or the keyboard; its options sit closer together when open. The PDF export shows each open.
 - **The report lists participants by when they first answered.** The List of Participants starts with whoever answered first, going by the earliest time on each person's answers in the report (the time an answer was last saved). Anyone whose answers carry no time, as some agents' do, follows in the previous order.
 - **Positions, most widely held first.** In Results' Atlas, each topic's positions (and a question's categories of answer) are listed by how many participants hold them, most first; positions held by the same number keep their order.
 
