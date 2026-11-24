@@ -8,8 +8,6 @@ import SessionAgentModal from './SessionAgentModal';
 import {
   askSessionAgent,
   readSessionAgentStatus,
-  setSessionAgentOptOut,
-  setSessionAgentUnattributed,
   type SessionAgentReply,
   type SessionAgentStatus,
 } from './sessionAgentRequests';
@@ -36,14 +34,10 @@ jest.mock('../../utilities/useWhisper', () => ({
 jest.mock('./sessionAgentRequests', () => ({
   readSessionAgentStatus: jest.fn(),
   askSessionAgent: jest.fn(),
-  setSessionAgentOptOut: jest.fn(),
-  setSessionAgentUnattributed: jest.fn(),
 }));
 
 const readStatus = jest.mocked(readSessionAgentStatus);
 const ask = jest.mocked(askSessionAgent);
-const setOptOut = jest.mocked(setSessionAgentOptOut);
-const setUnattributed = jest.mocked(setSessionAgentUnattributed);
 const speech = jest.mocked(dictationOffered);
 const speechNeedsSignIn = jest.mocked(dictationNeedsSignIn);
 const ended = jest.mocked(sessionEnded);
@@ -382,129 +376,26 @@ describe('SessionAgentModal', () => {
     expect(dialog.getByRole('button', { name: 'What Detailed answers draw on' })).toBeInTheDocument();
   });
 
-  it('tells someone it doesn’t answer them, and leaves using their answers and files to the Context section', async () => {
+  it('tells someone it doesn’t answer them, and leaves their switches to the Context section', async () => {
     const { dialog } = await renderModal({ ...member, answers: null, audience: null });
     expect(dialog.getByText('The Session Agent isn’t open to you in this session.')).toBeInTheDocument();
     expect(dialog.queryByLabelText('Your question')).not.toBeInTheDocument();
-    expect(dialog.queryByRole('switch', { name: 'Use my answers and files' })).not.toBeInTheDocument();
+    expect(dialog.queryByRole('switch')).not.toBeInTheDocument();
   });
 
-  it('includes a person’s address unless they turn that off, and says what it changes', async () => {
-    const { dialog } = await renderModal(member);
-    const include = dialog.getByRole('switch', { name: 'Include my address with my answers' });
-    // On to start: it is turned off to opt out.
-    expect(include).toBeChecked();
-    const help = dialog.getByRole('button', { name: 'About your address on your answers' });
-    // This session's config names no results setting, so only its organisers are claimed; the switch
-    // takes the address off what the person wrote and added in exports, not off a group's member list, and says so.
-    expect(help).toHaveAccessibleDescription(
-      'What you wrote and the files you added are available with your account address to this session’s ' +
-        'organisers, and may be exported with it. Turn this off and exports leave your address off what you ' +
-        'wrote and added; a group’s member list in an export still includes it, and it still shows wherever ' +
-        'this session shows your answers. Copies already made keep it.',
-    );
-
-    setUnattributed.mockResolvedValueOnce(true);
-    fireEvent.click(include);
-    await waitFor(() => expect(include).not.toBeChecked());
-    expect(setUnattributed).toHaveBeenCalledWith(true, OPTIONS);
-    // Whether the agent may use them was never saved.
-    expect(setOptOut).not.toHaveBeenCalled();
-
-    setUnattributed.mockRejectedValueOnce(new Error('Your choice couldn’t be saved just now.'));
-    fireEvent.click(include);
-    expect(await dialog.findByRole('alert')).toHaveTextContent('couldn’t be saved just now');
-    expect(setUnattributed).toHaveBeenLastCalledWith(false, OPTIONS);
-    expect(include).not.toBeChecked();
-  });
-
-  it('says behind the address switch who is shown a person’s answers, by the session’s results setting', async () => {
-    readStatus.mockResolvedValue(member);
-    const members = { slug: 'salon', sessionModeProfile: { results: { visibility: 'session_member_full' } } };
-    render(<SessionAgentModal {...OPTIONS} sessionConfig={members} onClose={() => {}} />);
-    const dialog = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
-    expect(
-      await dialog.findByRole('button', { name: 'About your address on your answers' }),
-    ).toHaveAccessibleDescription(
-      expect.stringContaining(
-        'are available with your account address to this session’s organisers and its signed-in members, and may be exported with it.',
-      ),
-    );
-    cleanup();
-    const open = { slug: 'salon', sessionModeProfile: { results: { visibility: 'public_full_if_storage_public' } } };
-    render(<SessionAgentModal {...OPTIONS} sessionConfig={open} onClose={() => {}} />);
-    const second = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
-    expect(
-      await second.findByRole('button', { name: 'About your address on your answers' }),
-    ).toHaveAccessibleDescription(
-      expect.stringContaining('are available with your account address to anyone with this session’s link, and may be'),
-    );
-  });
-
-  it('shows the address switch as off for someone who turned it off, and not at all for someone who has none', async () => {
-    const chosen = await renderModal({ ...member, unattributed: true });
-    expect(chosen.dialog.getByRole('switch', { name: 'Include my address with my answers' })).not.toBeChecked();
-    cleanup();
-    const none = await renderModal({ ...member, unattributed: null });
-    expect(none.dialog.queryByRole('switch', { name: 'Include my address with my answers' })).not.toBeInTheDocument();
-  });
-
-  it('keeps an address choice saved while a status check was on its way', async () => {
-    readStatus.mockResolvedValueOnce(member);
-    const view = render(<SessionAgentModal {...OPTIONS} onClose={() => {}} />);
-    const dialog = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
-    const include = await dialog.findByRole('switch', { name: 'Include my address with my answers' });
-    let answer: (status: SessionAgentStatus) => void = () => {};
-    readStatus.mockReturnValueOnce(new Promise<SessionAgentStatus>((resolve) => (answer = resolve)));
-    view.rerender(<SessionAgentModal {...OPTIONS} sessionConfig={{ slug: 'salon' }} onClose={() => {}} />);
-    setUnattributed.mockResolvedValueOnce(true);
-    fireEvent.click(include);
-    await waitFor(() => expect(include).not.toBeChecked());
-    // That check was sent before the save, so it still says their address is included.
-    await act(async () => answer(member));
-    expect(include).not.toBeChecked();
-  });
-
-  it('still offers the address switch once the session has ended or its AI is off, and no question box', async () => {
+  it('says when the session has ended or its AI is off, with no question box and no switches', async () => {
     const ended = await renderModal({ ...member, answers: null, audience: null, closed: 'session_ended' });
     expect(
       ended.dialog.getByText('This session has ended, so the Session Agent no longer answers.'),
     ).toBeInTheDocument();
     expect(ended.dialog.queryByLabelText('Your question')).not.toBeInTheDocument();
-    setUnattributed.mockResolvedValueOnce(true);
-    const include = ended.dialog.getByRole('switch', { name: 'Include my address with my answers' });
-    fireEvent.click(include);
-    await waitFor(() => expect(include).not.toBeChecked());
-    expect(setUnattributed).toHaveBeenCalledWith(true, OPTIONS);
+    expect(ended.dialog.queryByRole('switch')).not.toBeInTheDocument();
     cleanup();
     const aiOff = await renderModal({ ...member, answers: null, audience: null, closed: 'ai_disabled' });
     expect(
       aiOff.dialog.getByText('AI is turned off for this session, so the Session Agent isn’t answering.'),
     ).toBeInTheDocument();
-    expect(aiOff.dialog.getAllByRole('switch')).toHaveLength(1);
-  });
-
-  it('never shows one person’s saved choice as another’s when the account changes mid-save', async () => {
-    readStatus.mockResolvedValueOnce(member);
-    const view = render(<SessionAgentModal {...OPTIONS} onClose={() => {}} />);
-    const dialog = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
-    let saved: (unattributed: boolean) => void = () => {};
-    setUnattributed.mockReturnValueOnce(new Promise<boolean>((resolve) => (saved = resolve)));
-    fireEvent.click(await dialog.findByRole('switch', { name: 'Include my address with my answers' }));
-    // Someone else signs in before that save answers.
-    let answer: (status: SessionAgentStatus) => void = () => {};
-    readStatus.mockReturnValueOnce(new Promise<SessionAgentStatus>((resolve) => (answer = resolve)));
-    view.rerender(<SessionAgentModal {...OPTIONS} account="0xdef" onClose={() => {}} />);
-    expect(readStatus).toHaveBeenLastCalledWith({ ...OPTIONS, account: '0xdef' });
-    // Until their own status is read, nothing of the person before is on screen.
-    expect(await dialog.findByText('Checking…')).toBeInTheDocument();
-    expect(dialog.queryByRole('switch')).not.toBeInTheDocument();
-    await act(async () => answer(member));
-    const theirs = await dialog.findByRole('switch', { name: 'Include my address with my answers' });
-    // The first person turned theirs off; this person's is still on.
-    await act(async () => saved(true));
-    expect(theirs).toBeChecked();
-    await waitFor(() => expect(theirs).toBeEnabled());
+    expect(aiOff.dialog.queryByRole('switch')).not.toBeInTheDocument();
   });
 
   it('shows a "?" when clicked or tapped, keeps it while the "?" has focus, and with the app’s tooltips off', async () => {

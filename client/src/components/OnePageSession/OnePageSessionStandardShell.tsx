@@ -562,7 +562,6 @@ export default function OnePageSessionStandardShell({
             // Opens the Session Agent for whoever can ask it; for anyone else it stays the link to how it works.
             <SessionAgentNotice
               id={`${sessionInfoTooltipId}-agent`}
-              where="page"
               className={styles.sessionInfoButton}
               sessionConfig={resolvedSessionConfig}
               note={normalizeInterviewSettings((resolvedSessionConfig as UnknownRecord | null)?.interviewMode).dataNote}
