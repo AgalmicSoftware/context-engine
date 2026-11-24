@@ -38,7 +38,8 @@ test('answers at once with a 200 and spaces, then the reply, which still parses 
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('Content-Type'), 'application/json');
   assert.equal(response.headers.get('Access-Control-Allow-Origin'), 'https://site.example');
-  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  // Uncompressed, so no compressor on the way holds the spaces back.
+  assert.equal(response.headers.get('Cache-Control'), 'no-store, no-transform');
   const waited = new Promise((resolve) => setTimeout(resolve, 40));
   const reading = readAll(response, waited);
   await waited;
@@ -63,11 +64,16 @@ test("tells a provider's refusal in the body, with its status and wait", async (
   });
 });
 
-test('tells a failure with no readable reply, or a call that threw, as an error', async () => {
+test('tells a failure with no readable reply, or a call that threw, as an error', async (t) => {
   const unreadable = keepAliveAiResponse(async () => new Response('<html>bad gateway</html>', { status: 502 }), CORS);
   assert.deepEqual(await unreadable.json(), { error: 'AI request failed', status: 502 });
+  // A call that threw is logged and its message passed on, as the route did before.
+  const logged = t.mock.method(console, 'error', () => {});
   const thrown = keepAliveAiResponse(async () => { throw new Error('socket hang up'); }, CORS);
-  assert.deepEqual(await thrown.json(), { error: 'AI request failed', status: 500 });
+  assert.deepEqual(await thrown.json(), { error: 'socket hang up', status: 500 });
+  assert.deepEqual(logged.mock.calls.map((call) => call.arguments), [['[ai] provider call failed', 'socket hang up']]);
+  const silent = keepAliveAiResponse(async () => { throw new Error(''); }, CORS);
+  assert.deepEqual(await silent.json(), { error: 'AI request failed', status: 500 });
 });
 
 const secrets = { openaiKey: 'test-key' };

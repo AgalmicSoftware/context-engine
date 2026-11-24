@@ -4,8 +4,10 @@
 // Spaces before JSON are allowed, so a reader that parses the whole body gets the same object as before.
 //
 // The status is sent before the outcome is known, so it is always 200. A failure is told in the body as before,
-// `{ error, ... }`, with the status it would have had as `status`. Only the provider call is answered this way:
-// sign-in, limits and the other refusals before it keep their own status, which callers act on.
+// `{ error, ... }`, with the status it would have had as `status`. That includes the provider adapter's own refusals
+// (no AI key, a model the session doesn't allow, a custom RPC's refusal), which no caller acts on by status. Sign-in,
+// limits and the other refusals before the adapter keep their own status, which callers act on. Cloudflare's
+// analytics count a failed call answered this way as a 200.
 export const AI_KEEP_ALIVE_INTERVAL_MS = 10_000;
 
 export const asksForAiKeepAlive = (payload) => payload?.keepAlive === true;
@@ -25,7 +27,8 @@ const failureBody = (data, status, retryAfter = '') => ({
 export const keepAliveAiResponse = (call, baseHeaders, { intervalMs = AI_KEEP_ALIVE_INTERVAL_MS } = {}) => {
   const headers = new Headers(baseHeaders);
   headers.set('Content-Type', 'application/json');
-  headers.set('Cache-Control', 'no-store');
+  // No compression on the way: a compressor may hold the spaces back until it has enough to send.
+  headers.set('Cache-Control', 'no-store, no-transform');
   headers.delete('Content-Length');
   const encoder = new TextEncoder();
   const { readable, writable } = new TransformStream();
@@ -45,8 +48,10 @@ export const keepAliveAiResponse = (call, baseHeaders, { intervalMs = AI_KEEP_AL
           ? data
           : failureBody(data, response.status, response.headers?.get?.('retry-after') || ''),
       );
-    } catch {
-      text = JSON.stringify(failureBody(null, 500));
+    } catch (error) {
+      // As the route would have done had it thrown there: logged, and its message passed on.
+      console.error('[ai] provider call failed', error?.message);
+      text = JSON.stringify(failureBody({ error: error?.message }, 500));
     } finally {
       clearInterval(timer);
     }
