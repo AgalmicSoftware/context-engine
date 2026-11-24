@@ -139,6 +139,10 @@ pasted or uploaded after the last transcribed part waits for **Generate question
 transcribing after such text still drafts on its own. New drafts append to the existing editor, while exact
 ID or prompt duplicates are skipped and prior generated prompts are included as avoidance context. Manual retry
 remains available after a generation error; the client does not auto-retry unchanged transcript text in a loop.
+Each multichoice draft is **Pick one** or **Pick any**, as the AI judges from its options: the request asks for a
+`singleSelect` with each question, and only `true` on a multichoice question makes it pick one, with a question id
+that says so. A missing or unclear answer leaves it pick any, as before. The card shows the mode at the end of its
+prompt, as any choice question does. The session's own question instructions go in as written.
 
 Session `interviewMode` settings are available under **Participation** on `/new` and on the session's settings page:
 

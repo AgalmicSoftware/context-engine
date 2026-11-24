@@ -193,6 +193,8 @@ export type GeneratedAiQuestion = {
   questionType: string;
   prompt: string;
   options?: string[];
+  /** Untrusted: only `true` counts. */
+  singleSelect?: unknown;
   voiceCredits?: number;
   tags?: string[];
 };
@@ -207,6 +209,8 @@ export type GeneratedSurveyStatement = {
   type: string;
   prompt: string;
   options?: string[];
+  /** Only on a multichoice question that takes one answer. */
+  singleSelect?: true;
   voiceCredits?: number;
   tags: string[];
 };
@@ -522,23 +526,29 @@ export const buildGeneratedSurveyStatements = ({
     question.tags = question.tags || [];
   });
 
-  const statements = questions.map((question) => ({
-    id:
-      question.questionType === 'quadratic'
-        ? generateQuestionId(
-            question.questionType,
-            question.prompt,
-            question.options || [],
-            false,
-            question.voiceCredits ?? 99,
-          )
-        : generateQuestionId(question.questionType, question.prompt, question.options || []),
-    type: question.questionType,
-    prompt: question.prompt,
-    options: ['multichoice', 'quadratic'].includes(question.questionType) ? question.options : undefined,
-    ...(question.questionType === 'quadratic' ? { voiceCredits: question.voiceCredits ?? 99 } : {}),
-    tags: question.tags || [],
-  }));
+  const statements = questions.map((question) => {
+    // Pick one only where the reply says exactly `true` for a multichoice question (only prompts that ask for it
+    // get one); anything else leaves it pick any.
+    const singleSelect = question.questionType === 'multichoice' && question.singleSelect === true;
+    return {
+      id:
+        question.questionType === 'quadratic'
+          ? generateQuestionId(
+              question.questionType,
+              question.prompt,
+              question.options || [],
+              false,
+              question.voiceCredits ?? 99,
+            )
+          : generateQuestionId(question.questionType, question.prompt, question.options || [], singleSelect),
+      type: question.questionType,
+      prompt: question.prompt,
+      options: ['multichoice', 'quadratic'].includes(question.questionType) ? question.options : undefined,
+      ...(singleSelect ? { singleSelect: true as const } : {}),
+      ...(question.questionType === 'quadratic' ? { voiceCredits: question.voiceCredits ?? 99 } : {}),
+      tags: question.tags || [],
+    };
+  });
 
   return {
     statements,

@@ -262,6 +262,29 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     ).toHaveLength(0);
   });
 
+  it('marks a drafted choice question Pick one or Pick any, as the draft says', () => {
+    const draft = (prompt: string, singleSelect?: boolean) => ({
+      type: 'multichoice',
+      prompt,
+      options: ['Pilot', 'Full launch'],
+      ...(singleSelect === undefined ? {} : { singleSelect }),
+    });
+    const instance = makeInstance({
+      interviewQuestionReview: true,
+      preformedQuestions: [draft('Which path comes first?', true), draft('Which paths are worth testing?')],
+      preformedMode: 'questions',
+    });
+    const markup = renderToStaticMarkup(instance.render());
+    // The pill ends each prompt, as on any choice question.
+    const pills = [
+      ...markup.matchAll(/(first|testing)\? <span class="choiceKindPill" aria-hidden="true">(Pick \w+)</g),
+    ];
+    expect(pills.map(([, word, pill]) => [word, pill])).toEqual([
+      ['first', 'Pick one'],
+      ['testing', 'Pick any'],
+    ]);
+  });
+
   it('shows interview suggestion type, options, and compact tag authoring while keeping review-only chrome hidden', () => {
     const instance = makeInstance({
       interviewQuestionReview: true,
