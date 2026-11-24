@@ -3037,6 +3037,19 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   min-width: 100%;
 }
 
+// On a phone the box's line is too narrow for the picker, so it takes the whole row below the box and the
+// button, which keep their line.
+@media (max-width: 480px) {
+  .sessionTranscriptContext {
+    display: contents;
+  }
+
+  .sessionTranscriptContext .sessionTranscriptContextAccess {
+    order: 1;
+    flex: 1 0 100%;
+  }
+}
+
 // In the dialog it rests 10px above the body's edge, inside the body's 18px padding, on a strip of the
 // dialog's own colour (like the interview's review bar), so no draft shows around or beneath it.
 .sessionListeningPanelEmbedded .sessionListeningSubmit {
