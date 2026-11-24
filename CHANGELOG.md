@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Site — available when the site deploys
 
 - **The robot by a session's title opens the Session Agent.** It linked to how the Session Agent works on GitHub; that link is now a "?" by the dialog's title, for everyone who opens it, and the Context section's Session Agent button stays. Where a person can't ask the agent, such as signed out on a session that asks for sign-in, the robot still links to how it works.
+- **The Session Agent dialog's "?"s show their words on a click or tap.** On phones a tap opened and closed them at once, and with tooltips turned off they showed nothing; now they also stay open while focused. The "?" by "Use my answers and files" explains it there instead of opening GitHub, and the two switches sit under "Your answers and files in this session", apart from storing a chat.
 
 ## [0.9.39] - 2026-11-24
 

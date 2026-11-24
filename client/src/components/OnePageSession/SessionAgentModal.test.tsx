@@ -2,6 +2,8 @@ import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { dictationNeedsSignIn, dictationOffered, sessionEnded } from '../../domains/worker/sessionDictationPorts';
+import { Provider } from 'react-redux';
+import { createStore } from 'redux';
 import SessionAgentModal from './SessionAgentModal';
 import {
   askSessionAgent,
@@ -384,11 +386,9 @@ describe('SessionAgentModal', () => {
     expect(dialog.queryByLabelText('Your question')).not.toBeInTheDocument();
     const use = dialog.getByRole('switch', { name: 'Use my answers and files' });
     expect(use).toBeChecked();
-    expect(dialog.getByTestId('ce-session-agent-notice-switch')).toHaveAttribute(
-      'href',
-      expect.stringMatching(/README\.md#session-agent$/),
-    );
-    expect(dialog.getByTestId('ce-session-agent-notice-switch')).toHaveAccessibleDescription(
+    // Headed apart from storing a chat, whose address choice is a different one.
+    expect(dialog.getByRole('group', { name: 'Your answers and files in this session' })).toContainElement(use);
+    expect(dialog.getByRole('button', { name: 'About using your answers and files' })).toHaveAccessibleDescription(
       'The Session Agent may draw on the files you added, and Detailed answers on your answers too, never naming ' +
         'you. Turning it off stops future use and keeps them out of exports made from then on; it can’t take back ' +
         'answers already given.',
@@ -543,6 +543,33 @@ describe('SessionAgentModal', () => {
     await act(async () => saved(true));
     expect(theirs).toBeChecked();
     await waitFor(() => expect(theirs).toBeEnabled());
+  });
+
+  it('shows a "?" when clicked or tapped, keeps it while the "?" has focus, and with the app’s tooltips off', async () => {
+    const store = createStore(() => ({ sessionState: { tooltipsEnabled: false } }));
+    readStatus.mockResolvedValue({ ...member, recording: true });
+    render(
+      <Provider store={store}>
+        <SessionAgentModal {...OPTIONS} onClose={() => {}} />
+      </Provider>,
+    );
+    const dialog = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
+    const help = await dialog.findByRole('button', { name: 'About storing this chat' });
+    fireEvent.click(help);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Untick it to keep this one out.');
+    // A tap ends with the mouse leaving: the words stay while the "?" has focus.
+    fireEvent.mouseOut(help);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Untick it to keep this one out.');
+    act(() => help.blur());
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+    // Without focus, the mouse leaving closes it.
+    fireEvent.mouseOver(help);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Untick it to keep this one out.');
+    fireEvent.mouseOut(help);
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
   });
 
   it('offers no way to store a chat in a session that stores none, and sends nothing about storing', async () => {

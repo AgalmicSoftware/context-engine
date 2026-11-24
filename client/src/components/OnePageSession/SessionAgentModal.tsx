@@ -2,16 +2,19 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
-import { Modal, ModalBody, ModalHeader } from 'reactstrap';
+import { Modal, ModalBody, ModalHeader, Tooltip, UncontrolledTooltip } from 'reactstrap';
 
 import { SESSION_AGENT_LIMITS } from '@ce-shared/sessionAgent.mjs';
 import { dictationNeedsSignIn, dictationOffered, sessionEnded } from '../../domains/worker/sessionDictationPorts';
-import CETooltip from '../Shared/CETooltip';
-import SessionAgentNotice, { SESSION_AGENT_README_URL } from './SessionAgentNotice';
+import { SESSION_AGENT_README_URL } from './SessionAgentNotice';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import SessionDictation from './SessionDictation';
-import { sessionAgentAddressNotice, sessionAgentFullerAnswersNote } from './sessionAgentWording';
+import {
+  SESSION_AGENT_USE_NOTICE,
+  sessionAgentAddressNotice,
+  sessionAgentFullerAnswersNote,
+} from './sessionAgentWording';
 import {
   askSessionAgent,
   readSessionAgentStatus,
@@ -94,28 +97,44 @@ const Source = ({ source }: { source: SessionAgentSource }) => (
 
 type HelpProps = { id: string; label: string; text: string };
 
-// A "?" whose text a screen reader hears as its description and everyone else sees on hover or focus.
-const Help = ({ id, label, text }: HelpProps) => (
-  <>
-    <button
-      type="button"
-      id={id}
-      className={styles.helpLink}
-      data-ce-control-appearance="frameless"
-      aria-label={label}
-      aria-describedby={`${id}-text`}
-      onClick={(event) => event.currentTarget.focus()}
-    >
-      <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
-    </button>
-    <span id={`${id}-text`} className={styles.hidden}>
-      {text}
-    </span>
-    <CETooltip target={id} placement="bottom" trigger="hover focus" autohide={false}>
-      {text}
-    </CETooltip>
-  </>
-);
+// A "?" whose text a screen reader hears as its description and everyone else sees on hover, focus, click or
+// tap. While it has focus a mouse leaving it doesn't close it: on phones a tap's mouseout closed it at once.
+// It shows with the app's tooltips turned off too, since a "?" is there only for its words.
+const Help = ({ id, label, text }: HelpProps) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        id={id}
+        className={styles.helpLink}
+        data-ce-control-appearance="frameless"
+        aria-label={label}
+        aria-describedby={`${id}-text`}
+        // Safari doesn't focus a button it clicks.
+        onClick={(event) => event.currentTarget.focus()}
+      >
+        <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
+      </button>
+      <span id={`${id}-text`} className={styles.hidden}>
+        {text}
+      </span>
+      <Tooltip
+        target={id}
+        placement="bottom"
+        trigger="hover focus"
+        autohide={false}
+        isOpen={open}
+        toggle={(event?: { type?: string }) => {
+          const keep = event?.type === 'mouseout' && document.activeElement?.id === id;
+          setOpen((was) => !was || keep);
+        }}
+      >
+        {text}
+      </Tooltip>
+    </>
+  );
+};
 
 // The dialog shows only the latest answer. A chat is kept only where the
 // session stores chats and the asker leaves "Store this chat" ticked.
@@ -258,7 +277,11 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
   // Someone not signed in has no answers or files of their own here, so no switches.
   const switches =
     status && !status.signedOut ? (
-      <div className={styles.switches}>
+      // Set apart from this chat's storing above: these cover the person's answers and files in the session.
+      <div className={styles.switches} role="group" aria-labelledby={`${baseId}-yours`}>
+        <p id={`${baseId}-yours`} className={styles.label}>
+          Your answers and files in this session
+        </p>
         <div className={styles.switchRow}>
           <label htmlFor={`${baseId}-use`}>
             <input
@@ -275,7 +298,7 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
             />
             Use my answers and files
           </label>
-          <SessionAgentNotice id={`${baseId}-notice`} where="switch" className={styles.helpLink} />
+          <Help id={`${baseId}-use-help`} label="About using your answers and files" text={SESSION_AGENT_USE_NOTICE} />
         </div>
         {status.unattributed === null ? null : (
           <div className={styles.switchRow}>
@@ -562,9 +585,9 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
         >
           <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
         </a>
-        <CETooltip target={`${baseId}-how`} placement="bottom" trigger="hover focus" autohide={false}>
+        <UncontrolledTooltip target={`${baseId}-how`} placement="bottom" trigger="hover focus" autohide={false}>
           How the Session Agent works, on GitHub.
-        </CETooltip>
+        </UncontrolledTooltip>
       </ModalHeader>
       <ModalBody className={styles.body} data-testid="ce-session-agent">
         {body}
