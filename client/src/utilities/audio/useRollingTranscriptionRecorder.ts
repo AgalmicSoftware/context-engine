@@ -14,6 +14,8 @@ type UseRollingTranscriptionRecorderOptions = {
   chunkMs?: number;
   recordSpeakerAudio?: boolean;
   labelSpeakers?: boolean;
+  // With labelSpeakers: each part's voices are lettered for that part alone, with no voice samples.
+  speakersPerPart?: boolean;
 };
 
 type FinalizeRecordingOptions = {
@@ -55,6 +57,7 @@ export const useRollingTranscriptionRecorder = ({
   chunkMs = DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
   recordSpeakerAudio = false,
   labelSpeakers = false,
+  speakersPerPart = false,
 }: UseRollingTranscriptionRecorderOptions = {}) => {
   const [status, setStatus] = useState<RollingRecorderStatus>('idle');
   // Read by the microphone restart, which runs outside a render.
@@ -71,6 +74,7 @@ export const useRollingTranscriptionRecorder = ({
     context,
     workerUrl,
     labelSpeakers,
+    speakersPerPart,
     chunkMs: chunkDurationMs,
     capturing: status !== 'idle' && status !== 'error',
   });

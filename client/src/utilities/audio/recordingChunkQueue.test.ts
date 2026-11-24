@@ -1037,6 +1037,64 @@ describe('speaker labels across chunks', () => {
     expect(sentNames(cleared)).toEqual([[]]);
   });
 
+  // More than four people in the room: each part's voices are lettered for that part alone.
+  const recordPart = async (queue: RecordingChunkQueue) => {
+    queue.capture(queue.begin(true, undefined, true), new Blob([`part ${queue.segments.length}`]), true);
+    await queue.finish();
+  };
+
+  it('letters each part on its own, and never cuts, keeps or sends a voice sample', async () => {
+    const transcribe = replies(
+      [turn('A', 0, 6), turn('B', 6, 9), turn('A', 9, 10)],
+      // A label that is not the model's own voice letter, as a name would be, joins its neighbour.
+      [turn('B', 0, 4), turn('Dana', 4, 6), turn('A', 6, 12)],
+      // Speech without turns, as when labels fall back to plain text.
+      [],
+    );
+    const queue = create(transcribe, 'parts-1');
+    await queue.ready;
+    await recordPart(queue);
+    await recordPart(queue);
+    await recordPart(queue);
+    await queue.settled();
+    expect(transcribe.mock.calls.map(([, labels]) => labels)).toEqual([true, true, true]);
+    expect(sentNames(transcribe)).toEqual([[], [], []]);
+    expect(sampleVoices).not.toHaveBeenCalled();
+    expect(saved.has('known-speakers')).toBe(false);
+    expect(voices(queue)).toEqual([
+      ['Speaker A', 'Speaker B', 'Speaker A'],
+      ['Speaker A', 'Speaker A', 'Speaker B'],
+      [],
+    ]);
+    // No part asks for a code, notes renumbered voices, or calls its plain text unlabelled speech.
+    expect(
+      queue.segments.map(({ speakersPerPart, speakersRenumbered, oneOffSpeakers, speakersDropped }) => [
+        speakersPerPart,
+        speakersRenumbered,
+        oneOffSpeakers,
+        speakersDropped,
+      ]),
+    ).toEqual([
+      [true, undefined, undefined, undefined],
+      [true, undefined, undefined, undefined],
+      [true, undefined, undefined, undefined],
+    ]);
+  });
+
+  it('drops the samples an earlier take kept once a part lettered on its own begins', async () => {
+    const transcribe = replies([turn('A', 0, 6)], [turn('A', 0, 3)]);
+    const queue = create(transcribe, 'parts-2');
+    await queue.ready;
+    await record(queue);
+    expect(saved.get('known-speakers')?.knownSpeakers?.map((speaker) => speaker.name)).toEqual(['Person 1']);
+    await recordPart(queue);
+    await queue.settled();
+    expect(saved.has('known-speakers')).toBe(false);
+    expect(queue.speakers.knownSpeakers).toEqual([]);
+    expect(sentNames(transcribe)).toEqual([[], []]);
+    expect(voices(queue)).toEqual([['Person 1'], ['Speaker A']]);
+  });
+
   it('forgets the voice samples once the recorder closes with every chunk transcribed', async () => {
     const transcribe = replies([turn('A', 0, 6)], [turn('Person 1', 0, 4)]);
     const first = create(transcribe, 'voices-forgotten');

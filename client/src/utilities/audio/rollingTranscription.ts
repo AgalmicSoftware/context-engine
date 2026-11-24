@@ -25,6 +25,9 @@ export type RollingTranscriptSegment = {
   oneOffSpeakers?: string[];
   // Its labelled uploads kept stalling, so it was transcribed without labels: its speech is in nobody's part.
   speakersDropped?: boolean;
+  // Its voices are lettered Speaker A, B… for this part only (see letterSpeakerTurns): the next part's Speaker A
+  // may be someone else, so the transcript marks where each part starts.
+  speakersPerPart?: boolean;
   gapBefore?: CaptureGap;
 };
 
@@ -39,17 +42,22 @@ const duration = (milliseconds: number) => {
 };
 const captureGap = ({ startedAt, endedAt, cause }: CaptureGap) =>
   `[${cause === 'muted' ? 'Microphone paused' : 'No audio'} for ${duration(endedAt - startedAt)}.]`;
+/** Where a part with lettered speakers, or the part after one, starts: "— Part 2 —". */
+export const PART_BREAK = /^— Part (\d+) —$/;
+const partBreak = (segment: RollingTranscriptSegment) => `— Part ${segment.index + 1} —`;
+
 /** The words people said: gap markers keep a transcript honest about missing audio, but they are not speech. */
 export const transcriptSpeech = (transcript: string): string =>
   transcript
     .replace(/\[Recording gap: chunk \d+ could not be transcribed\.\]/g, '')
     .replace(/\[Recording gap: audio could not be transcribed\.\]/g, '')
     .replace(/\[(?:Microphone paused|No audio) for [\w ]+\.\]/g, '')
-    .replace(/^Person \d+: /gm, '')
+    .replace(/^(?:Person \d+|Speaker [A-Z]{1,2}): /gm, '')
+    .replace(/^— Part \d+ —$/gm, '')
     .trim();
 
-// A line of the transcript: a voice's turn, or plain text and gap markers (no speaker).
-type TranscriptLine = { speaker: string; text: string };
+// A line of the transcript: a voice's turn, plain text and gap markers (no speaker), or a part's start.
+type TranscriptLine = { speaker: string; text: string; partBreak?: boolean };
 const chunkLines = (segment: RollingTranscriptSegment): TranscriptLine[] => {
   const gap = segment.gapBefore ? [{ speaker: '', text: captureGap(segment.gapBefore) }] : [];
   if (segment.status === 'failed') return [...gap, { speaker: '', text: recordingGap() }];
@@ -62,25 +70,32 @@ const chunkLines = (segment: RollingTranscriptSegment): TranscriptLine[] => {
  * Chunks in order, each voice's turns as "Person N: …" lines. Speech that the last line already ends with is
  * dropped from a chunk's first line when both are the same voice (or either is unlabelled): a second person
  * echoing "I agree" keeps their words. A voice that carries on, like plain text and gap markers, stays on the
- * same line.
+ * same line. A part whose voices are lettered for that part alone, and the part after it, start under a
+ * "— Part N —" line, which nothing joins across, and their seam is compared whatever its letters, since the
+ * same voice may have another letter on each side.
  */
 export const stitchRollingTranscriptSegments = (segments: RollingTranscriptSegment[] = []): string => {
   const lines: TranscriptLine[] = [];
+  let previous: RollingTranscriptSegment | undefined;
   for (const segment of [...segments].sort((a, b) => a.index - b.index)) {
     if (segment.status !== 'complete' && segment.status !== 'failed') continue;
     const next = chunkLines(segment);
     const last = lines[lines.length - 1];
     const first = next[0];
-    if (last && first && (last.speaker === first.speaker || !last.speaker || !first.speaker)) {
+    const newPart = Boolean(last && (segment.speakersPerPart || previous?.speakersPerPart));
+    if (last && first && (newPart || last.speaker === first.speaker || !last.speaker || !first.speaker)) {
       const tail = transcriptOverlapTail(last.text, first.text, OVERLAP_WORDS);
       if (tail === '') next.shift();
       else if (tail != null) next[0] = { ...first, text: tail };
     }
+    if (newPart && next.length) lines.push({ speaker: '', text: partBreak(segment), partBreak: true });
     for (const line of next) {
       const last = lines[lines.length - 1];
-      if (last?.speaker === line.speaker) last.text = joinTranscriptText(last.text, line.text);
+      if (last && !last.partBreak && last.speaker === line.speaker)
+        last.text = joinTranscriptText(last.text, line.text);
       else lines.push(line);
     }
+    previous = segment;
   }
   return lines.map(({ speaker, text }) => (speaker ? `${speaker}: ${text}` : text)).join('\n');
 };

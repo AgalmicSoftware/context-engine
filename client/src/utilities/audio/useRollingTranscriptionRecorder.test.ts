@@ -1778,6 +1778,35 @@ describe('useRollingTranscriptionRecorder', () => {
     ).toEqual([['Person 1'], ['Person 1']]);
     restored.unmount();
   });
+  // More than four people in the room: the part's own letters, no voice samples, and each part marked.
+  it('letters each part on its own, cutting and sending no voice sample', async () => {
+    const turn = (speaker: string, text: string, start = 0) => ({ speaker, start, end: start + 4, text });
+    (transcribeGroupAudio as jest.Mock)
+      .mockImplementationOnce(async () => ({
+        text: 'Room question. Room answer.',
+        segments: [turn('A', 'Room question.'), turn('B', 'Room answer.', 4)],
+      }))
+      .mockImplementation(async () => ({ text: 'Later.', segments: [turn('B', 'Later.')] }));
+    const { result, unmount } = renderHook(() =>
+      useRollingTranscriptionRecorder({ sessionSlug: 'workshop-parts', labelSpeakers: true, speakersPerPart: true }),
+    );
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    for (let i = 0; i < 2; i++)
+      await act(async () => {
+        jest.advanceTimersByTime(180000);
+        await flushPromises();
+      });
+    const requests = (transcribeGroupAudio as jest.Mock).mock.calls as Array<[Blob, { knownSpeakers: unknown }]>;
+    expect(requests.map(([, options]) => options.knownSpeakers)).toEqual([[], []]);
+    expect(cutSpeakerSamples).not.toHaveBeenCalled();
+    expect(result.current.transcript).toBe(
+      'Speaker A: Room question.\nSpeaker B: Room answer.\n— Part 2 —\nSpeaker A: Later.',
+    );
+    instances[instances.length - 1].state = 'inactive';
+    unmount();
+  });
   it('lets one tab at a time open a recording, and hands it over when that tab closes', async () => {
     const uninstallLocks = installFakeWebLocks();
     try {

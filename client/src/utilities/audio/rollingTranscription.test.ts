@@ -162,3 +162,71 @@ it('notes time without audio before a chunk, without counting it as speech', () 
   expect(transcriptSpeech(muted)).toBe('Before.  After.');
   expect(transcriptSpeech(stalled)).toBe('Before.\n\nAfter.');
 });
+
+// With more than four people in the room, letters hold within one part only, so a part's Speaker A must never read
+// as an earlier part's.
+describe('parts lettered on their own', () => {
+  const part = (index: number, turns: ReturnType<typeof turn>[], text = turns.map((t) => t.text).join(' ')) => ({
+    ...chunk(index, text, turns),
+    speakersPerPart: true,
+  });
+
+  it('starts each part under its own line, joining a voice only within a part', () => {
+    const transcript = stitchRollingTranscriptSegments([
+      part(0, [turn('Speaker A', 'Should we fund it?'), turn('Speaker B', 'Yes,'), turn('Speaker B', 'this year.')]),
+      part(1, [turn('Speaker A', 'Agreed.'), turn('Speaker B', 'Then we vote.')]),
+    ]);
+    expect(transcript).toBe(
+      [
+        'Speaker A: Should we fund it?',
+        'Speaker B: Yes, this year.',
+        '— Part 2 —',
+        'Speaker A: Agreed.',
+        'Speaker B: Then we vote.',
+      ].join('\n'),
+    );
+    expect(transcriptSpeech(transcript)).toBe('Should we fund it?\nYes, this year.\n\nAgreed.\nThen we vote.');
+  });
+
+  it('drops speech both parts heard, whatever letter each part gave it', () => {
+    expect(
+      stitchRollingTranscriptSegments([
+        part(0, [turn('Speaker A', 'We talked about budget timing and risk thresholds')]),
+        part(1, [turn('Speaker B', 'risk thresholds that the group should review.')]),
+      ]),
+    ).toBe(
+      'Speaker A: We talked about budget timing and risk thresholds\n— Part 2 —\nSpeaker B: that the group should review.',
+    );
+  });
+
+  it('reads a part that fell back to plain text cleanly between lettered ones, and a lost one as a gap', () => {
+    expect(
+      stitchRollingTranscriptSegments([
+        part(0, [turn('Speaker A', 'Should we fund it?')]),
+        { ...chunk(1, 'The budget is due in May.'), speakersPerPart: true },
+        { id: 'lost', index: 2, status: 'failed' as const, text: '', startedAt: 2, speakersPerPart: true },
+        part(3, [turn('Speaker A', 'Then we vote.')]),
+      ]),
+    ).toBe(
+      [
+        'Speaker A: Should we fund it?',
+        '— Part 2 —',
+        'The budget is due in May.',
+        '— Part 3 —',
+        '[Recording gap: audio could not be transcribed.]',
+        '— Part 4 —',
+        'Speaker A: Then we vote.',
+      ].join('\n'),
+    );
+  });
+
+  it('marks where tracked voices give way to lettered ones, and back', () => {
+    expect(
+      stitchRollingTranscriptSegments([
+        chunk(0, 'First.', [turn('Person 1', 'First.')]),
+        part(1, [turn('Speaker A', 'Second.')]),
+        chunk(2, 'Third.', [turn('Person 1', 'Third.')]),
+      ]),
+    ).toBe(['Person 1: First.', '— Part 2 —', 'Speaker A: Second.', '— Part 3 —', 'Person 1: Third.'].join('\n'));
+  });
+});

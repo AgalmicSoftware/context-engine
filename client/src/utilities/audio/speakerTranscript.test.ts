@@ -1,4 +1,9 @@
-import { nameSpeakerTurns, planSpeakerTurns, type SpeakerTranscriptTurn } from './speakerTranscript';
+import {
+  letterSpeakerTurns,
+  nameSpeakerTurns,
+  planSpeakerTurns,
+  type SpeakerTranscriptTurn,
+} from './speakerTranscript';
 
 const turn = (
   speaker: string,
@@ -85,4 +90,41 @@ it('tolerates odd labels and repeated lines from the model', () => {
   expect(speakers(named.turns)).toEqual(['Person 1', 'Person 1', 'Person 2', 'Person 2', 'Person 2']);
   // A chunk with only odd labels has no turns, so its plain text is shown instead.
   expect(nameSpeakerTurns(planSpeakerTurns([turn('@', 0, 1)], []), [], []).turns).toEqual([]);
+});
+
+// With more than four people in the room, labels hold within one part of the recording and start again in the next.
+describe('letterSpeakerTurns', () => {
+  it('letters one part\u2019s voices in the order they first speak', () => {
+    expect(
+      letterSpeakerTurns([turn('C', 0, 3), turn('A', 3, 5), turn('C', 5, 8), turn('B', 8, 9)]).map(
+        ({ speaker }) => speaker,
+      ),
+    ).toEqual(['Speaker A', 'Speaker B', 'Speaker A', 'Speaker C']);
+    // Each part starts again at A.
+    expect(letterSpeakerTurns([turn('B', 0, 2)])[0].speaker).toBe('Speaker A');
+  });
+
+  it('keeps any other label, as a name would be, out of the transcript', () => {
+    const lettered = letterSpeakerTurns([
+      turn('A', 0, 2, 'One.'),
+      turn('Dana', 2, 4, 'Two.'),
+      turn('Person 3', 4, 6, 'Three.'),
+      turn('B', 6, 8, 'Four.'),
+    ]);
+    expect(lettered.map(({ speaker }) => speaker)).toEqual(['Speaker A', 'Speaker A', 'Speaker A', 'Speaker B']);
+    expect(JSON.stringify(lettered)).not.toMatch(/Dana|Person/);
+  });
+
+  it('runs past Z without repeating a letter', () => {
+    const labels = Array.from({ length: 28 }, (_, index) =>
+      index < 26 ? String.fromCharCode(65 + index) : `A${String.fromCharCode(65 + index - 26)}`,
+    );
+    const lettered = letterSpeakerTurns(labels.map((label, index) => turn(label, index, index + 1)));
+    expect(lettered.slice(24).map(({ speaker }) => speaker)).toEqual([
+      'Speaker Y',
+      'Speaker Z',
+      'Speaker AA',
+      'Speaker AB',
+    ]);
+  });
 });

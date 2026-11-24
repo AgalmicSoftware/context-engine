@@ -45,12 +45,13 @@ const worker = createWorkerRuntime(env, { rpcFetch: async () => assert.fail('No 
   assert.equal(new URL(url).origin, 'https://api.openai.com');
   providerCalls.push(new URL(url).pathname);
   if (new URL(url).pathname.endsWith('/audio/transcriptions')) {
-    assert.equal(init.body.get('model'), DEFAULT_TRANSCRIPTION_MODEL, 'A room of more than four is transcribed plain');
+    assert.equal(init.body.get('model'), GROUP_TRANSCRIPTION_MODEL, 'Each part labels its own speakers on the permitted Worker diarization route');
+    assert.deepEqual([...init.body.keys()].filter(key => key.startsWith('known_speaker')), [], 'No voice sample leaves the device for a room of more than four');
     return Response.json({ text: transcript, segments: [{ speaker: 'A', start: 0, end: 2, text: transcript }] });
   }
   const body = JSON.parse(init.body);
   assert(JSON.stringify(body).includes(instruction), 'Generation uses the saved session questionsGenPrompt');
-  assert(JSON.stringify(body).includes(transcript), 'Generation includes the complete recorded transcript');
+  assert(JSON.stringify(body).includes(`Speaker A: ${transcript}`), 'Generation includes the complete recorded transcript, with its part\'s speaker letters');
   return Response.json({ output_text: JSON.stringify({ surveyTitle: 'Breakout questions', questions: [{ prompt: questionPrompt, questionType: 'binary', tags: ['trial'] }] }) });
 } });
 let login;
@@ -107,7 +108,7 @@ try {
   });
   await page.goto(`${base}/breakout-submit-probe`);
   await page.getByRole('checkbox', { name: 'More than 4 people in the room' }).waitFor();
-  assert.equal(await page.getByRole('checkbox', { name: 'More than 4 people in the room' }).isChecked(), true, 'A room starts plain');
+  assert.equal(await page.getByRole('checkbox', { name: 'More than 4 people in the room' }).isChecked(), true, 'A room starts with per-part speaker letters');
   await page.getByTestId('ce-session-listening-start').click();
   await page.getByRole('button', { name: 'Stop recording' }).click();
   await page.getByTestId('ce-session-listening-suggestions').waitFor({ timeout: 30000 });

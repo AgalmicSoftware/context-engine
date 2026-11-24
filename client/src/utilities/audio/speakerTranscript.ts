@@ -101,3 +101,18 @@ export const nameSpeakerTurns = (plan: SpeakerPlan, known: string[], sampled: st
     oneOff,
   };
 };
+
+/** The Nth voice's letter: A to Z, then AA, AB… */
+const speakerLetter = (number: number): string =>
+  (number > 26 ? speakerLetter(Math.floor((number - 1) / 26)) : '') + String.fromCharCode(65 + ((number - 1) % 26));
+
+/**
+ * Names one part's voices Speaker A, Speaker B… in the order they first speak, for that part only: no sample is
+ * cut or sent and no voice is matched with another part's, so the letters start again in each part. Only the
+ * model's own voice labels name anyone; a turn with any other label, as a name would be, joins its neighbour.
+ */
+export const letterSpeakerTurns = (turns: SpeakerTranscriptTurn[]): SpeakerTranscriptTurn[] =>
+  nameSpeakerTurns(planSpeakerTurns(turns, []), [], []).turns.map((turn) => ({
+    ...turn,
+    speaker: `Speaker ${speakerLetter(personNumber(turn.speaker))}`,
+  }));

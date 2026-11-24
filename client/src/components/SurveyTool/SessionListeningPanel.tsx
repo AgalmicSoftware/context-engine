@@ -102,7 +102,7 @@ const KEEP_AUDIO_HELP =
   'Closes without waiting for transcription. Audio still waiting for it stays on this device and resumes uploading when you reopen this recording.';
 const MANY_VOICES_KEY = 'ce:record-more-than-four:v1';
 const MANY_VOICES_HELP =
-  "Ticked, the transcript is plain text, with no speaker labels and no part for each person. Unticked, OpenAI labels who spoke as Person 1, Person 2…: up to four voices keep their number; with more, numbers may change. Numbers don't identify people.";
+  'Ticked, speakers are labelled Speaker A, B… within each part of the recording only, so a letter may be someone else in the next part. Unticked, up to four voices keep a Person number throughout.';
 
 const getSessionInstructions = (sessionConfig: unknown) =>
   sessionConfig && typeof sessionConfig === 'object'
@@ -162,9 +162,10 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       return false;
     }
   });
-  // More voices than speaker labels keep apart: a plain transcript, with no part for each person. Ticked until this
-  // device chooses otherwise, since a breakout room is usually larger than four; the choice is kept on the device,
-  // so a recording reopened in the same room stays as it was.
+  // More voices than speaker labels keep apart: each part of the recording letters its own speakers, with no voice
+  // samples and no part for each person. Ticked until this device chooses otherwise, since a breakout room is
+  // usually larger than four; the choice is kept on the device, so a recording reopened in the same room stays as it
+  // was.
   const [manyVoices, setManyVoices] = useState(() => {
     try {
       return window.localStorage.getItem(MANY_VOICES_KEY) !== 'false';
@@ -173,7 +174,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     }
   });
   // Only where the choice is shown: one kept from an OpenAI session does nothing where labels aren't offered.
-  const plainRoom = manyVoices && speakerLabelsSupported === true;
+  const speakersPerPart = panelMode === 'recordGroup' && manyVoices && speakerLabelsSupported === true;
   const speakerHelpId = `ce-record-speaker-help-${useId().replace(/:/g, '')}`;
   const manyVoicesHelpId = `ce-many-voices-help-${useId().replace(/:/g, '')}`;
   const keepHelpId = `ce-keep-audio-help-${useId().replace(/:/g, '')}`;
@@ -190,7 +191,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     context: recordingContext,
     workerUrl,
     chunkMs: DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
-    labelSpeakers: panelMode === 'recordGroup' && speakerLabelsSupported === true && !plainRoom,
+    labelSpeakers: panelMode === 'recordGroup' && speakerLabelsSupported === true,
+    speakersPerPart,
     recordSpeakerAudio: panelMode === 'recordGroup' && recordSpeakerAudio,
   });
   const transcriptContext = useTranscriptContextUpload({

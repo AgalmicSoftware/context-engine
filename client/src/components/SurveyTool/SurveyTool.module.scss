@@ -2900,6 +2900,27 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   overflow-wrap: anywhere;
 }
 
+// Where a part whose speakers are lettered for it alone starts: a light rule with the part's number, so a later
+// part's Speaker A doesn't read as an earlier one's.
+.sessionListeningTranscript p.sessionTranscriptPartBreak {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 8px;
+  // The transcript's own text colour, which every theme keeps readable on its white.
+  color: var(--ce-document-text);
+  font-size: 0.8em;
+  font-weight: 600;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid currentColor;
+    opacity: 0.4;
+  }
+}
+
 // A speaker's label, opening their code: it reads as the label it replaces, underlined under the pointer.
 .sessionTranscriptSpeaker {
   display: inline;

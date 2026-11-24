@@ -1,7 +1,8 @@
 import { getEffectiveTranscriptionConfig } from '../../utilities/ai/aiSettings';
 import React from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SessionListeningPanel from './SessionListeningPanel';
+import styles from './SurveyTool.module.scss';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { generateQuestionsFromListeningTranscript } from './sessionListeningQuestions';
@@ -1992,7 +1993,7 @@ it('remembers the optional speaker-audio setting and locks it while recording', 
   window.localStorage.removeItem('ce:record-speaker-audio:v1');
 });
 
-it('starts a room plain unless this device chose labels, and gives parts wherever the transcript has labels', async () => {
+it('letters a room part by part unless this device chose tracked labels, and gives parts wherever Persons are', async () => {
   const key = 'ce:record-more-than-four:v1';
   window.localStorage.removeItem(key);
   const labelled =
@@ -2001,19 +2002,24 @@ it('starts a room plain unless this device chose labels, and gives parts whereve
   const choice = () => screen.findByRole('checkbox', { name: 'More than 4 people in the room' });
   (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ transcript: plain }));
   try {
-    // A breakout room is usually larger than four, so a device that never chose starts ticked: plain, no parts.
+    // A breakout room is usually larger than four, so a device that never chose starts ticked: each part letters
+    // its own speakers, with no voice samples and no parts.
     const { unmount } = render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
     expect(await choice()).toBeChecked();
     // The "?" help is read with the box and with its button, not only shown on hover.
-    expect(await choice()).toHaveAccessibleDescription(/^Ticked, the transcript is plain text/);
+    expect(await choice()).toHaveAccessibleDescription(/^Ticked, speakers are labelled Speaker A, B… within each part/);
     expect(screen.getByRole('button', { name: 'About more than 4 people in the room' })).toHaveAccessibleDescription(
-      /up to four voices keep their number/,
+      /Unticked, up to four voices keep a Person number throughout\.$/,
     );
-    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(
+      expect.objectContaining({ labelSpeakers: true, speakersPerPart: true }),
+    );
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeNull();
     expect(window.localStorage.getItem(key)).toBeNull();
     fireEvent.click(await choice());
-    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(
+      expect.objectContaining({ labelSpeakers: true, speakersPerPart: false }),
+    );
     expect(window.localStorage.getItem(key)).toBe('false');
     // Reopened on this device, the stored choice wins over the default.
     unmount();
@@ -2022,7 +2028,9 @@ it('starts a room plain unless this device chose labels, and gives parts whereve
       <SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />,
     );
     expect(await choice()).not.toBeChecked();
-    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(
+      expect.objectContaining({ labelSpeakers: true, speakersPerPart: false }),
+    );
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Person 2:' })).toBeInTheDocument();
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
@@ -2034,7 +2042,9 @@ it('starts a room plain unless this device chose labels, and gives parts whereve
     rerender(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
     // Ticked over a labelled recording, its parts stay: they follow the transcript's labels, not the box.
     fireEvent.click(await choice());
-    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(
+      expect.objectContaining({ labelSpeakers: true, speakersPerPart: true }),
+    );
     expect(window.localStorage.getItem(key)).toBe('true');
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Person 2:' })).toBeInTheDocument();
@@ -2046,10 +2056,37 @@ it('starts a room plain unless this device chose labels, and gives parts whereve
     cleanup();
     render(<SessionListeningPanel sessionSlug="workshop" panelMode="listening" />);
     expect(screen.queryByRole('checkbox', { name: 'More than 4 people in the room' })).not.toBeInTheDocument();
-    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(
+      expect.objectContaining({ labelSpeakers: false, speakersPerPart: false }),
+    );
   } finally {
     window.localStorage.removeItem(key);
   }
+});
+
+// Letters hold within one part only, so the transcript marks each part and gives the letters no colour or code.
+it('shows a room lettered per part with each part marked, and no codes', async () => {
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({
+      transcript: [
+        'Speaker A: Enough words here for a whole part of the talk.',
+        'Speaker B: And quite a lot more from another person.',
+        '— Part 2 —',
+        'Speaker A: Someone who may not be the first part’s Speaker A.',
+      ].join('\n'),
+    }),
+  );
+  render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+  const transcript = await screen.findByRole('region', { name: 'Transcript' });
+  const labels = within(transcript).getAllByText('Speaker A:');
+  expect(labels).toHaveLength(2);
+  labels.forEach((label) => {
+    expect(label.tagName).toBe('STRONG');
+    expect(label).not.toHaveAttribute('style');
+    expect(label.closest('button')).toBeNull();
+  });
+  expect(within(transcript).getByText('Part 2')).toHaveClass(styles.sessionTranscriptPartBreak);
+  expect(screen.queryByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeNull();
 });
 
 it.each(['custom', 'local'])('hides the label choice for the effective %s transcription provider', async (provider) => {

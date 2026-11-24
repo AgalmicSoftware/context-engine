@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { PART_BREAK } from '../../utilities/audio/rollingTranscription';
 import styles from './SurveyTool.module.scss';
 
 type SessionListeningTranscriptToggleProps = {
@@ -57,6 +58,8 @@ const FOLLOW_SLACK_PX = 24;
 // Enough colours that a room's speakers stay apart; a ninth voice shares the first's.
 const SPEAKER_COLORS = 8;
 const SPEAKER_LINE = /^(Person (\d+):) (.*)$/;
+// A voice lettered within one part of the recording only: no colour, which would read as the same person later.
+const LETTERED_LINE = /^(Speaker [A-Z]{1,2}:) (.*)$/;
 /** A speaker's label colour, for text on the transcript's white in every theme. */
 export const speakerColor = (number: number) =>
   `var(--ce-speaker-${((number - 1 + SPEAKER_COLORS) % SPEAKER_COLORS) + 1})`;
@@ -95,6 +98,20 @@ export function SessionListeningTranscript({
           data-testid={E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT}
         >
           {transcript.split('\n').map((line, index) => {
+            const partStart = PART_BREAK.exec(line);
+            if (partStart)
+              return (
+                <p key={index} className={styles.sessionTranscriptPartBreak}>
+                  Part {partStart[1]}
+                </p>
+              );
+            const lettered = LETTERED_LINE.exec(line);
+            if (lettered)
+              return (
+                <p key={index}>
+                  <strong>{lettered[1]}</strong> {lettered[2]}
+                </p>
+              );
             const turn = SPEAKER_LINE.exec(line);
             const label = turn ? <strong style={{ color: speakerColor(Number(turn[2])) }}>{turn[1]}</strong> : null;
             return (
