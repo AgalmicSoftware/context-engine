@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.40] - 2026-11-24
 
-The robot by a session's title opens the Session Agent, and its dialog is simpler: its "?"s show their words on a click or tap, the microphone sits beside the question box, Ask is a larger, filled button, the Name field is gone, and its two stored switches move to the Context section with the same choices and defaults. Site only: the Session Worker's code is unchanged and MCP stays 0.9.35.
+In Group Conversation, Add transcript to context starts ticked, with who can read the transcript chosen right below it, from the same choices and starting point as before. The robot by a session's title opens the Session Agent, and its dialog is simpler: its "?"s show their words on a click or tap, the microphone sits beside the question box, Ask is a larger, filled button, the Name field is gone, and its two stored switches move to the Context section with the same choices and defaults. Site only: the Session Worker's code is unchanged and MCP stays 0.9.35.
 
 ### Site — available when the site deploys
 
