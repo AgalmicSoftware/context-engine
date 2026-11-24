@@ -1,7 +1,13 @@
 import { clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth';
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
-import { buildPasskeyWalletNetwork, createLoginPasskeyActions } from './loginAndSettingsPasskeyActions';
+import {
+  PASSKEY_STOPPED_MESSAGE,
+  buildPasskeyWalletNetwork,
+  createLoginPasskeyActions,
+  takePasskeyStatusForNextOpening,
+  type LoginPasskeyActionsDeps,
+} from './loginAndSettingsPasskeyActions';
 import { createLoginAgentActions, formatAgentTokenError } from './loginAndSettingsAgentTokenActions';
 
 // The dialog's agent token control is hidden for now; these tests keep the code behind it working.
@@ -119,6 +125,7 @@ describe('loginAndSettings auth controllers', () => {
 
   it.each(['create', 'sign-in'] as const)('wallet cancellation leaves no %s error banner', async (mode) => {
     const setStatus = jest.fn();
+    const updateLoginInfo = jest.fn();
     const accountLogError = jest.fn();
     const changeAccount = jest.fn();
     const cancelled = Object.assign(new Error('Wallet operation cancelled.'), {
@@ -146,7 +153,7 @@ describe('loginAndSettings auth controllers', () => {
       setActionMode: jest.fn(),
       setStatus,
       startAction: () => 1,
-      updateLoginInfo: jest.fn(),
+      updateLoginInfo,
     });
     if (mode === 'create') await actions.handlePasskeyWalletCreate();
     else await actions.handlePasskeyWalletSignIn();
@@ -154,6 +161,79 @@ describe('loginAndSettings auth controllers', () => {
     expect(setStatus).toHaveBeenCalledWith({ passkeyWalletStatusMessage: '', passkeyWalletStatusTone: '' });
     expect(changeAccount).not.toHaveBeenCalled();
     expect(accountLogError).not.toHaveBeenCalled();
+    // Cancelled from outside the dialog while still its action: the spinner ends.
+    expect(updateLoginInfo).toHaveBeenLastCalledWith({ loginInProgress: false, loginComplete: false, provider: null });
+  });
+
+  describe('a passkey step that never ends', () => {
+    const setup = () => {
+      let currentAction = 0;
+      const reply: { resolve: (address: string) => void } = { resolve: () => undefined };
+      const deps: LoginPasskeyActionsDeps = {
+        accountLogError: jest.fn(),
+        changeAccount: jest.fn(),
+        clearAllWorkerSessionTokens: jest.fn(),
+        getAccount: () => '',
+        getErrorMessage: () => '',
+        getProvider: () => '',
+        getTargetNetwork: () => ({ id: 11155420 }),
+        isCurrentAction: (actionId) => actionId === currentAction,
+        normalizeAccountForComparison: String,
+        notifyInfo: jest.fn(),
+        passkeyWallet: {
+          cancelPasskeyWalletOperation: jest.fn(),
+          createPasskeyWallet: () => new Promise((resolve) => (reply.resolve = resolve)),
+          setPasskeyWalletChain: jest.fn(),
+          signInWithLoginFile: jest.fn(),
+          unlockPasskeyWallet: jest.fn(),
+        },
+        setActionMode: jest.fn(),
+        setStatus: jest.fn(),
+        startAction: () => ++currentAction,
+        updateLoginInfo: jest.fn(),
+      };
+      return { deps, reply, actions: createLoginPasskeyActions(deps) };
+    };
+
+    it('Cancel stops the wallet, ends the spinner and says to choose Login; a late answer changes nothing', async () => {
+      const { deps, reply, actions } = setup();
+      const created = actions.handlePasskeyWalletCreate();
+      expect(deps.updateLoginInfo).toHaveBeenLastCalledWith(expect.objectContaining({ loginInProgress: true }));
+      actions.cancelPasskeyWalletAction();
+      expect(deps.passkeyWallet.cancelPasskeyWalletOperation).toHaveBeenCalledTimes(1);
+      expect(deps.setActionMode).toHaveBeenLastCalledWith('');
+      expect(deps.setStatus).toHaveBeenLastCalledWith({
+        passkeyWalletStatusMessage: PASSKEY_STOPPED_MESSAGE,
+        passkeyWalletStatusTone: '',
+      });
+      expect(deps.updateLoginInfo).toHaveBeenLastCalledWith({
+        loginInProgress: false,
+        loginComplete: false,
+        provider: null,
+      });
+      const calls = jest.mocked(deps.updateLoginInfo).mock.calls.length;
+      reply.resolve('0xbbb');
+      await expect(created).resolves.toBe(false);
+      expect(deps.changeAccount).not.toHaveBeenCalled();
+      expect(deps.updateLoginInfo).toHaveBeenCalledTimes(calls);
+    });
+
+    it('closing the dialog on it stops it the same way, and keeps the message for the next opening, once', () => {
+      const { deps, actions } = setup();
+      void actions.handlePasskeyWalletCreate();
+      actions.cancelPasskeyWalletAction({ closing: true });
+      expect(deps.passkeyWallet.cancelPasskeyWalletOperation).toHaveBeenCalledTimes(1);
+      expect(deps.updateLoginInfo).toHaveBeenLastCalledWith({
+        loginInProgress: false,
+        loginComplete: false,
+        provider: null,
+      });
+      expect(deps.setStatus).not.toHaveBeenCalledWith(
+        expect.objectContaining({ passkeyWalletStatusMessage: PASSKEY_STOPPED_MESSAGE }),
+      );
+      expect(takePasskeyStatusForNextOpening()).toBe(PASSKEY_STOPPED_MESSAGE);
+      expect(takePasskeyStatusForNextOpening()).toBe('');
+    });
   });
 
   it('formats agent-token errors with current user-facing copy', () => {

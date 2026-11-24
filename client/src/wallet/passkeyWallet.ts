@@ -724,6 +724,15 @@ export class PasskeyEoaWalletClient {
     await this.endWallet(false);
   }
 
+  /**
+   * Stops a create or sign-in still waiting, as on a prompt that never came back: it goes no further than a step
+   * already under way, and signs no one in. What is saved and who is signed in stay as they are.
+   */
+  cancelPendingOperation(): void {
+    this.operationGeneration += 1;
+    this.transitionInProgress = false;
+  }
+
   async deleteWallet(): Promise<void> {
     await this.endWallet(true);
   }
@@ -1077,6 +1086,7 @@ export {
 export const restorePasskeyWalletSession = (options: RestoreOptions = {}): Promise<HexString | null> =>
   getPasskeyWalletClient().restoreSession(options);
 export const logoutPasskeyWallet = (): Promise<void> => getPasskeyWalletClient().disconnect();
+export const cancelPasskeyWalletOperation = (): void => getPasskeyWalletClient().cancelPendingOperation();
 export const isPasskeyWalletAutoSignReady = (): boolean => getPasskeyWalletClient().isUnlocked();
 export const createPasskeyEip1193Provider = (): Eip1193Provider => getPasskeyWalletClient().createProvider();
 

@@ -8,6 +8,7 @@ import {
 import { cacheAgentClientLoginEnvelope } from '../OnePageSession/onePageSessionAgentController';
 import { ethers } from 'ethers';
 import { LoginAndSettingsModal } from './LoginAndSettingsModal';
+import { PASSKEY_STOPPED_MESSAGE } from './loginAndSettingsPasskeyActions';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
@@ -62,6 +63,7 @@ jest.mock('../../wallet/passkeyWallet.js', () => ({
   })),
   isLoginFileProtected: jest.fn((text: string) => /"protected":true/.test(text)),
   logoutPasskeyWallet: jest.fn(),
+  cancelPasskeyWalletOperation: jest.fn(),
 }));
 
 jest.mock('../../utilities/ai/aiSettings.js', () => {
@@ -254,6 +256,33 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(mockedPasskeyWallet.restorePasskeyWalletSession).toHaveBeenCalledTimes(1);
     expect(mockedPasskeyWallet.restorePasskeyWalletSession).toHaveBeenCalledWith({ requireSigner: false });
     expect(setStateSpy).not.toHaveBeenCalled();
+  });
+
+  it('stops a passkey action left on its spinner when the dialog closes, and opens next with how to finish', async () => {
+    const props = buildProps({ provider: 'passkey_eoa', loginInProgress: true });
+    mountClassSubject(new LoginAndSettingsModalSubject(props)).componentWillUnmount();
+    expect(mockedPasskeyWallet.cancelPasskeyWalletOperation).toHaveBeenCalledTimes(1);
+    expect(props.updateLoginInfo).toHaveBeenLastCalledWith({
+      loginInProgress: false,
+      loginComplete: false,
+      provider: null,
+    });
+    const reopened = new LoginAndSettingsModalSubject(buildProps());
+    const setState = jest.fn();
+    reopened.setState = setState;
+    await reopened.componentDidMount();
+    reopened.componentWillUnmount();
+    expect(setState).toHaveBeenCalledWith({
+      passkeyWalletStatusMessage: PASSKEY_STOPPED_MESSAGE,
+      passkeyWalletStatusTone: '',
+    });
+  });
+
+  it('leaves another wallet’s sign-in running when the dialog closes', () => {
+    const props = buildProps({ provider: 'wagmi', loginInProgress: true });
+    mountClassSubject(new LoginAndSettingsModalSubject(props)).componentWillUnmount();
+    expect(mockedPasskeyWallet.cancelPasskeyWalletOperation).not.toHaveBeenCalled();
+    expect(props.updateLoginInfo).not.toHaveBeenCalled();
   });
 
   it('hydrates passkey wallet login state from stored session metadata on mount without forcing signer restore', async () => {

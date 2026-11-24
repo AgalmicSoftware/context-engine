@@ -577,6 +577,32 @@ describe('PasskeyEoaWalletClient', () => {
     expect(credentials.get).toHaveBeenCalledTimes(1);
   });
 
+  it('a cancelled create whose passkey step never came back saves and signs in nothing when it does', async () => {
+    const credentials = makeCredentials({ createPrfOutput: null });
+    const storage = createMemoryWalletStorage();
+    const reply = deferred<PublicKeyCredential>();
+    const prompted = deferred<void>();
+    (credentials.get as jest.Mock).mockImplementationOnce(() => {
+      prompted.resolve();
+      return reply.promise;
+    });
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage,
+      credentials,
+      sessionClient: makeSessionClient(),
+    });
+    const outcome = client.createWallet().catch((error: unknown) => error);
+    await prompted.promise;
+    client.cancelPendingOperation();
+    reply.resolve(makeCredential());
+    expect(await outcome).toMatchObject({ code: 'CE_PASSKEY_WALLET_OPERATION_CANCELLED' });
+    expect(client.getAddress()).toBeNull();
+    expect(await storage.read()).toBeNull();
+    // Nothing is left waiting: a sign-in after it goes ahead.
+    await expect(client.unlockWallet({ selectCredential: true })).resolves.toBe(DERIVED_ADDRESS);
+  });
+
   it('makes the passkey on another device when asked, and derives the wallet the same way', async () => {
     const credentials = makeCredentials();
     const client = new PasskeyEoaWalletClient({
