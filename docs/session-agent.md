@@ -609,4 +609,12 @@ answered, asks one question at a time, and shows only the latest answer, with
 what it drew on. Errors say what went wrong. A chat is kept only as
 [Recorded chats](#recorded-chats) says.
 
+The answer is shown with the simple Markdown models write even when asked for
+plain text: paragraphs, "- " and numbered lists, short `#` headings, quotes,
+**bold** and inline code, through the Posts page's parser. React escapes every
+piece, so HTML shows as text; an image shows only its alt text, a link its
+Markdown as written, and a chart block its text, so nothing is fetched from an
+answer. Admins' list of stored chats shows answers the same way. Only the view
+changes: stored chats and exports keep the answer's text as it came.
+
 Not yet: letting participants decide an audience's `match`.

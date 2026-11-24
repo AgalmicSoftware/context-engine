@@ -21,6 +21,7 @@ import {
   type SessionAgentStatus,
 } from './sessionAgentRequests';
 import styles from './SessionAgentModal.module.scss';
+import SessionAgentAnswer from './SessionAgentAnswer';
 
 type Props = SessionAgentRequestOptions & {
   onClose: () => void;
@@ -353,7 +354,7 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
         <div aria-live="polite">
           {reply ? (
             <div className={styles.answer} data-testid="ce-session-agent-answer">
-              <p className={styles.answerText}>{reply.answer}</p>
+              <SessionAgentAnswer text={reply.answer} />
               {reply.sources?.length ? (
                 <details className={styles.sources} data-testid="ce-session-agent-sources">
                   <summary className={styles.hint}>{drewOn(reply.read)}</summary>

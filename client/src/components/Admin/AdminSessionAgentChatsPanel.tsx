@@ -5,6 +5,7 @@ import { fetchWorkerWithAuth } from '../../utilities/worker/workerAuth';
 import { defaultStrictAllowDemoFallback } from '../../utilities/worker/workerSessionResolution.js';
 import panel from './AdminSessionBackupPanel.module.scss';
 import styles from './AdminSessionAgentChatsPanel.module.scss';
+import SessionAgentAnswer from '../OnePageSession/SessionAgentAnswer';
 
 type Chat = {
   id: string;
@@ -198,9 +199,9 @@ const AdminSessionAgentChatsPanel = ({
               <p>
                 <strong>Asked:</strong> {chat.question}
               </p>
-              <p>
-                <strong>Answered:</strong> {chat.answer}
-              </p>
+              <div>
+                <strong>Answered:</strong> <SessionAgentAnswer text={chat.answer} />
+              </div>
               <button
                 type="button"
                 className={panel.actionButton}
