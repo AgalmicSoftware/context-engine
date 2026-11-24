@@ -782,27 +782,6 @@ $icon-size-standard: 1.25rem;
   color: var(--ce-document-text-muted);
 }
 
-/* Inspired by CompareAddresses' agreement/disagreement cards, adapted for light modal */
-.historicalAlignment {
-  margin-top: 16px;
-  padding: 12px 14px;
-  background: var(--ce-status-info-text);
-  /* light card background */
-  border: 1px solid var(--ce-document-border);
-  border-radius: var(--ce-radius-12);
-  h4 {
-    margin: 0 0 8px 0;
-    font-weight: 700;
-    color: var(--ce-document-text-muted);
-    font-size: 1.05rem;
-  }
-
-  p {
-    margin: 4px 0;
-    color: var(--ce-document-text-muted);
-  }
-}
-
 @media (max-width: 768px) {
   .userPage {
     padding: 10px;
@@ -1352,10 +1331,6 @@ $icon-size-standard: 1.25rem;
   gap: 8px;
 }
 
-.analysisDetails {
-  margin-top: 8px;
-}
-
 .headerChevron {
   margin-right: 8px;
 }
@@ -1375,18 +1350,12 @@ $icon-size-standard: 1.25rem;
     color: inherit;
   }
 
-  .modalBody,
-  .historicalAlignment,
-  .historicalAlignment h4 {
+  .modalBody {
     color: var(--ce-document-text);
   }
 
   .placeholderNote {
     color: var(--ce-document-text-muted);
-  }
-
-  .historicalAlignment {
-    background: var(--ce-document-surface);
   }
 
   .refreshIconButton,

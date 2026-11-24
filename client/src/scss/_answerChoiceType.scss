@@ -1,0 +1,10 @@
+// The type of Agree / Unsure / Disagree wherever a question shows them, as the question pile sets it: the theme's
+// body font at its normal weight, whatever font the panel around them uses. A chosen answer may add weight and
+// slant on top.
+@mixin answer-choice-type {
+  font-family: var(--ce-font-body);
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: normal;
+  text-transform: none;
+}

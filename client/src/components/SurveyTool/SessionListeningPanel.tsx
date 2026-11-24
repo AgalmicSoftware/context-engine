@@ -2,6 +2,7 @@ import { getEffectiveTranscriptionConfig } from '../../utilities/ai/aiSettings';
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
+  faArrowDown,
   faCircle,
   faMicrophone,
   faPause,
@@ -101,7 +102,7 @@ const KEEP_AUDIO_HELP =
   'Closes without waiting for transcription. Audio still waiting for it stays on this device and resumes uploading when you reopen this recording.';
 const MANY_VOICES_KEY = 'ce:record-more-than-four:v1';
 const MANY_VOICES_HELP =
-  "Ticked, the transcript is plain text, with no speaker labels and no part for each person. Unticked, OpenAI labels who spoke as Person 1, Person 2…: up to four voices keep their number; with more, numbers may change. Numbers don't identify people.";
+  'Ticked, speakers are labelled Speaker A, B… within each part of the recording only, so a letter may be someone else in the next part. Unticked, up to four voices keep a Person number throughout.';
 
 const getSessionInstructions = (sessionConfig: unknown) =>
   sessionConfig && typeof sessionConfig === 'object'
@@ -161,17 +162,19 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       return false;
     }
   });
-  // More voices than speaker labels keep apart: a plain transcript, with no part for each person. Kept on this
-  // device, so a recording reopened in the same room stays plain.
+  // More voices than speaker labels keep apart: each part of the recording letters its own speakers, with no voice
+  // samples and no part for each person. Ticked until this device chooses otherwise, since a breakout room is
+  // usually larger than four; the choice is kept on the device, so a recording reopened in the same room stays as it
+  // was.
   const [manyVoices, setManyVoices] = useState(() => {
     try {
-      return window.localStorage.getItem(MANY_VOICES_KEY) === 'true';
+      return window.localStorage.getItem(MANY_VOICES_KEY) !== 'false';
     } catch {
-      return false;
+      return true;
     }
   });
   // Only where the choice is shown: one kept from an OpenAI session does nothing where labels aren't offered.
-  const plainRoom = manyVoices && speakerLabelsSupported === true;
+  const speakersPerPart = panelMode === 'recordGroup' && manyVoices && speakerLabelsSupported === true;
   const speakerHelpId = `ce-record-speaker-help-${useId().replace(/:/g, '')}`;
   const manyVoicesHelpId = `ce-many-voices-help-${useId().replace(/:/g, '')}`;
   const keepHelpId = `ce-keep-audio-help-${useId().replace(/:/g, '')}`;
@@ -188,7 +191,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     context: recordingContext,
     workerUrl,
     chunkMs: DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
-    labelSpeakers: panelMode === 'recordGroup' && speakerLabelsSupported === true && !plainRoom,
+    labelSpeakers: panelMode === 'recordGroup' && speakerLabelsSupported === true,
+    speakersPerPart,
     recordSpeakerAudio: panelMode === 'recordGroup' && recordSpeakerAudio,
   });
   const transcriptContext = useTranscriptContextUpload({
@@ -208,6 +212,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const [noNewQuestions, setNoNewQuestions] = useState(false);
   // The draft after Stop came back empty twice, so Generate questions sits beside that note until a draft adds one.
   const [offerGenerate, setOfferGenerate] = useState(false);
+  // How many drafts the latest generation added, said beside the controls until drafts are removed or sent.
+  const [addedDrafts, setAddedDrafts] = useState<{ count: number } | null>(null);
   const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState(0);
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
   // The speaker whose code is showing, chosen by their button or their label in the transcript.
@@ -263,6 +269,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       setGeneratedTitle('');
       setNoNewQuestions(false);
       setOfferGenerate(false);
+      setAddedDrafts(null);
       setGenerationError('');
     },
     [handleSubmittingChange],
@@ -316,6 +323,12 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   }, [hasTranscript]);
   const draftCount = pendingDraftCount ?? generatedQuestions.length;
   const hasGeneratedDraft = draftCount > 0;
+  // The count of drafts added no longer describes the list once any draft is removed or sent.
+  const shownDraftCountRef = useRef(draftCount);
+  useEffect(() => {
+    if (draftCount < shownDraftCountRef.current) setAddedDrafts(null);
+    shownDraftCountRef.current = draftCount;
+  }, [draftCount]);
   const latestSuccessfulTranscriptAt = useMemo(() => {
     // The latest to complete decides, not the order of parts: text pasted while a chunk transcribes leaves that
     // chunk's questions automatic, and text added after the last chunk waits for an explicit Generate.
@@ -489,6 +502,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       const existingPrompts = [...new Set([...drafted, ...shown.map(getGeneratedQuestionPrompt)])].filter(Boolean);
       setIsGenerating(true);
       setNoNewQuestions(false);
+      setAddedDrafts(null);
       setGenerationError('');
       try {
         // Future optional source path is intentionally disabled for now:
@@ -528,6 +542,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         const nothingNew = merged === kept && !recordingAgain();
         setNoNewQuestions(nothingNew);
         setOfferGenerate((offered) => nothingNew && (stopDraft || offered));
+        setAddedDrafts(merged.length > kept.length ? { count: merged.length - kept.length } : null);
         setGeneratedQuestions((previous) => merge(previous, statements));
         setGeneratedTitle((previous) => previous || surveyTitle);
         // Kept with the recording at once, so drafts held back while a submit publishes are never lost.
@@ -573,6 +588,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     recordingsBegunRef.current += 1;
     setNoNewQuestions(false);
     setOfferGenerate(false);
+    setAddedDrafts(null);
   }, [isRecorderSessionActive]);
 
   useEffect(() => {
@@ -627,7 +643,14 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       data-testid={E2E_TESTIDS.SESSION_LISTENING_PANEL}
     >
       {panelMode === 'recordGroup' ? (
-        <SessionNewDraftsCue key={keptDraftsShown} count={draftCount} draftsRef={draftsRef} />
+        // Once recording stops, new drafts are scrolled to; while it runs, Stop stays in view and the cue says how
+        // many came.
+        <SessionNewDraftsCue
+          key={keptDraftsShown}
+          count={draftCount}
+          draftsRef={draftsRef}
+          reveal={!isRecorderSessionActive}
+        />
       ) : null}
       {isClosing ? <div role="status">Finalizing recording…</div> : null}
       {showPanelHeader ? (
@@ -843,6 +866,12 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           )}
           {/* Generate questions beside the note counts the seconds itself. */}
           {isGenerating && !offerGenerate && <span>{`Generating questions... ${generationElapsedSeconds}s`}</span>}
+          {!isGenerating && addedDrafts && hasGeneratedDraft ? (
+            <span role="status">
+              <FontAwesomeIcon icon={faArrowDown} />{' '}
+              {addedDrafts.count === 1 ? '1 question added below.' : `${addedDrafts.count} questions added below.`}
+            </span>
+          ) : null}
           {!isGenerating && noNewQuestions ? (
             <span role="status">
               {offerGenerate
@@ -925,11 +954,12 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             recorder.segments.some((segment) => !['complete', 'failed'].includes(segment.status))
           }
           onClear={() => setConfirmClear(true)}
-          onSelectSpeaker={panelMode === 'recordGroup' && !plainRoom ? setClaimPerson : undefined}
+          onSelectSpeaker={panelMode === 'recordGroup' ? setClaimPerson : undefined}
         />
       )}
 
-      {panelMode === 'recordGroup' && hasTranscript && !plainRoom ? (
+      {/* Parts follow the transcript's labels, not the box: a labelled recording keeps them where the box is ticked. */}
+      {panelMode === 'recordGroup' && hasTranscript ? (
         <SessionTranscriptClaimShare
           transcript={shownTranscript}
           sessionSlug={sessionSlug}

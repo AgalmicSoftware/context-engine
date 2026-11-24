@@ -12,6 +12,7 @@ import type { CaptureGap, RollingTranscriptSegment } from './rollingTranscriptio
 import { readSpeakerMerges, type SpeakerMerges } from './speakerMerges';
 import { cutSpeakerSamples } from './speakerSamples';
 import {
+  letterSpeakerTurns,
   MAX_KNOWN_SPEAKERS,
   nameSpeakerTurns,
   personNumber,
@@ -323,13 +324,26 @@ export class RecordingChunkQueue {
     await this.ready;
     if (this.storageError && !this.records.size) await this.restore();
   }
-  begin(labelSpeakers: boolean, gapBefore?: CaptureGap): string {
+  /**
+   * A chunk with `speakersPerPart` letters its voices for itself alone and sends no voice samples; samples kept
+   * from an earlier take of this recording go when it begins, so none are kept while such parts record.
+   */
+  begin(labelSpeakers: boolean, gapBefore?: CaptureGap, speakersPerPart = false): string {
     const index = this.segments.reduce((max, entry) => Math.max(max, entry.index), -1) + 1;
     const id = `segment-${Date.now()}-${index}`;
+    if (speakersPerPart) this.forgetSpeakers();
     this.records.set(id, {
       scope: this.options.scope,
       labelSpeakers,
-      segment: { id, index, status: 'recording', text: '', startedAt: Date.now(), ...(gapBefore && { gapBefore }) },
+      segment: {
+        id,
+        index,
+        status: 'recording',
+        text: '',
+        startedAt: Date.now(),
+        ...(gapBefore && { gapBefore }),
+        ...(speakersPerPart && { speakersPerPart }),
+      },
     });
     this.changed();
     return id;
@@ -347,9 +361,9 @@ export class RecordingChunkQueue {
     await this.save(record);
   }
   /** Adds an import's parts as finished chunks, saved in one write so that a reload finds all of them or none. */
-  addParts(parts: Blob[], labelSpeakers: boolean) {
+  addParts(parts: Blob[], labelSpeakers: boolean, speakersPerPart = false) {
     const records = parts.map((audio) => {
-      const id = this.begin(labelSpeakers);
+      const id = this.begin(labelSpeakers, undefined, speakersPerPart);
       const begun = this.records.get(id)!;
       const record: RecordingChunk = { ...begun, audio, segment: { ...begun.segment, status: 'queued' } };
       this.records.set(id, record);
@@ -466,6 +480,7 @@ export class RecordingChunkQueue {
     this.uploading = { id, controller };
     const stalledLabels = (this.stalls.get(id) || 0) >= STALLS_BEFORE_PLAIN;
     const labels = record.labelSpeakers && !this.labelsUnavailableReason && !stalledLabels;
+    const perPart = Boolean(record.segment.speakersPerPart);
     const startedAt = Date.now();
     const prompt = this.retriedByHand.delete(id);
     let deadlinePassed = false;
@@ -488,7 +503,7 @@ export class RecordingChunkQueue {
             record.audio!,
             labels,
             controller.signal,
-            labels && !speakerSamplesRefused ? knownSpeakers : [],
+            labels && !perPart && !speakerSamplesRefused ? knownSpeakers : [],
             prompt,
           )
           .then(resolve, reject)
@@ -502,11 +517,17 @@ export class RecordingChunkQueue {
       if (labels) this.labelRefusals = result.labelsUnavailableReason ? this.labelRefusals + 1 : 0;
       if (result.labelsUnavailableReason && this.labelRefusals >= 2)
         this.labelsUnavailableReason = result.labelsUnavailableReason;
-      const named = result.speakerTurns?.length ? await this.nameSpeakers(record.audio!, result) : null;
+      const named = !result.speakerTurns?.length
+        ? null
+        : perPart
+          ? { turns: letterSpeakerTurns(result.speakerTurns), renumbered: false, oneOff: [] }
+          : await this.nameSpeakers(record.audio!, result);
       if (this.disposed) return;
-      // Words without a speaker are in no one's code. Labels off for the whole recording say so on their own.
+      // Words without a speaker are in no one's code. Labels off for the whole recording say so on their own. A
+      // part lettered on its own gives no codes, so its plain text reads as it is.
       const speakersDropped =
         record.labelSpeakers &&
+        !perPart &&
         !this.labelsUnavailableReason &&
         Boolean(String(result.text || '').trim()) &&
         !result.speakerTurns?.length;
@@ -725,6 +746,10 @@ export class RecordingChunkQueue {
   private forgetSpeakersIfDone() {
     if (!this.speakers.knownSpeakers.length || this.failedWrites.size) return;
     if (this.segments.some((segment) => segment.status !== 'complete')) return;
+    this.forgetSpeakers();
+  }
+  private forgetSpeakers() {
+    if (!this.speakers.knownSpeakers.length) return;
     this.speakers = { knownSpeakers: [], speakerSamplesRefused: false };
     // Kept on this page too, so reopening before the delete lands doesn't bring them back.
     memorySpeakers.set(this.options.scope, this.speakers);

@@ -68,7 +68,9 @@ try {
     assert.equal(await speaker.isChecked(), false);
     await speaker.check();
     const manyVoices = page.getByRole('checkbox', { name: 'More than 4 people in the room' });
-    assert.equal(await manyVoices.isChecked(), false, 'OpenAI speaker labels start enabled');
+    assert.equal(await manyVoices.isChecked(), true, 'A room starts plain');
+    // This run follows speaker labels, as a host of four or fewer chooses them.
+    await manyVoices.uncheck();
     await readable(speaker.locator('..'));
     await page.waitForFunction(() => [...document.querySelectorAll('.modal, .modal-dialog')].every(element => getComputedStyle(element).opacity === '1'));
     await page.getByTestId('ce-session-listening-panel').screenshot({ path: path.join(output, `setup-${theme}-${width}.png`) });

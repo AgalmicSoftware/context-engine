@@ -1639,7 +1639,8 @@ views retain their existing typography, button sizes, and answer layout.
 - Binary choices use their original larger sizing when the full-size prompt and
   controls fit; otherwise they share one compact row. Rating sliders sit at the
   card's vertical center when the prompt and footer leave enough room.
-  Multichoice options use two rows with horizontal scrolling.
+  Multichoice options stack one per line, as at every width, and a list too
+  long for the card scrolls up and down inside it.
 
 Above 768px, the navigation arrows and question-action icons form one evenly
 spaced vertical rail alongside the full card height, with the question counter

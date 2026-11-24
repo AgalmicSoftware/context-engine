@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import * as sass from 'sass';
 
@@ -52,7 +53,7 @@ it('gives every phone question card one height that leaves the controls row in v
   expect(heightsOf('.pileCardInner')).toContain('var(--pile-phone-card-height, 380px)');
   // Choices scroll from the top: centring pushed the first ones out of reach.
   expect(css).toMatch(
-    /\.pileCardInner \.pileCardMainContent:has\(\.multichoiceQuestionContainer\)\s*\{[^}]*?justify-content: flex-start;/,
+    /\.pileCardInner \.pileCardMainContent:has\(#multiChoice\)\s*\{[^}]*?justify-content: flex-start;/,
   );
 });
 
@@ -277,8 +278,80 @@ it('fades a phone choice list where more options are', () => {
 
 // The options spread apart by what usePileHalfRowCut measures, so a long list fills its room and still ends
 // partway through an option; a fixed gap left a blank band under it.
-it('lets a phone choice list spread its options to fill the card', () => {
+it('lets a choice list spread its options to fill the card', () => {
   expect(css).toMatch(
-    /\.pileCardInner \.multichoiceQuestionContainer #multiChoice\s*\{[^}]*flex-direction: column;[^}]*gap: calc\(8px \+ var\(--pile-list-row-spread, 0px\)\);/,
+    /^#multiChoice\s*\{[^}]*flex-direction: column;[^}]*gap: calc\(8px \+ var\(--pile-list-row-spread, 0px\)\);/m,
   );
+});
+
+// Choice options ran sideways in a strip on a computer and stacked on a phone. They stack one per line at every
+// width, in an answer area that scrolls up and down and takes the room the prompt leaves, never room from it.
+it('lists choice options one per line at every width, scrolling up and down only', () => {
+  // A rule at the top level of the stylesheet, which holds at every width.
+  const everywhere = (selector: string) =>
+    css.match(new RegExp(`^${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm'))?.[1] || '';
+  expect(everywhere('.pileCardInner .pileCardMainContent:has(#multiChoice)')).toMatch(
+    /flex: 1 1 0;\s*min-height: 0;[\s\S]*overflow-x: hidden;[\s\S]*overflow-y: auto;/,
+  );
+  expect(everywhere('#multiChoice')).toMatch(/flex-direction: column;\s*flex-wrap: nowrap;\s*align-items: stretch;/);
+  expect(everywhere('#multiChoice .checkboxOptionText')).toMatch(/width: 100%;\s*max-width: 100%;/);
+  // Nothing in a choice list scrolls or snaps sideways, or wraps its options into columns.
+  const choiceRules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(([selectors]) =>
+    /multichoiceQuestionContainer|#multiChoice/.test(selectors),
+  );
+  expect(choiceRules.length).toBeGreaterThan(5);
+  choiceRules.forEach(([selectors, body]) =>
+    expect([selectors.trim(), body]).toEqual([
+      selectors.trim(),
+      expect.not.stringMatching(/overflow-x: (auto|scroll)|scroll-snap-type: x|flex-wrap: wrap|grid-auto-flow: column/),
+    ]),
+  );
+});
+
+// A list scrolled to its end lets the wheel move the page on, on a computer and in the review, where the page goes on
+// below it; only the phone card, the screen's height, keeps the page still.
+it('holds the page only from a phone choice card', () => {
+  const ruleBodies = (selector: string) =>
+    [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter(([, selectors]) => selectors.trim() === selector)
+      .map(([, , body]) => body);
+  const atRules = (source: string) => source.split(/(?=@media )/);
+  const phone = atRules(css).filter((part) => part.startsWith('@media (max-width: 768px)'));
+  expect(
+    ruleBodies('.pileCardInner .pileCardMainContent:has(#multiChoice)').filter((body) =>
+      /overscroll-behavior/.test(body),
+    ),
+  ).toHaveLength(1);
+  expect(
+    phone.some((part) =>
+      /\.pileCardInner \.pileCardMainContent:has\(#multiChoice\)\s*\{\s*overscroll-behavior-y: contain;\s*\}/.test(
+        part,
+      ),
+    ),
+  ).toBe(true);
+  expect(fs.readFileSync(path.join(scssDir, 'scss', '_choiceListScroll.scss'), 'utf8')).not.toMatch(
+    /overscroll-behavior/,
+  );
+});
+
+// Declarations after a mixin's nested rules draw a Sass warning on every build, and a later Sass puts them in a rule
+// of their own; every rule that uses the choice list's scroll includes it last.
+it('includes the choice list scroll last in every rule that uses it', () => {
+  const scssFiles = (dir: string): string[] =>
+    fs
+      .readdirSync(dir, { withFileTypes: true })
+      .flatMap((entry) =>
+        entry.isDirectory()
+          ? scssFiles(path.join(dir, entry.name))
+          : entry.name.endsWith('.scss')
+            ? [path.join(dir, entry.name)]
+            : [],
+      );
+  const uses = scssFiles(scssDir).flatMap((file) =>
+    [...fs.readFileSync(file, 'utf8').matchAll(/@include choiceListScroll\.choice-list-scroll;([^}]*)\}/g)].map(
+      ([, after]) => [path.relative(scssDir, file), after.trim()],
+    ),
+  );
+  expect(uses.length).toBeGreaterThanOrEqual(2);
+  expect(uses).toEqual(uses.map(([file]) => [file, '']));
 });

@@ -37,6 +37,8 @@ export type CommunityWorkerGroupCountCacheEntry = {
   status: 'idle' | 'loading' | 'ready' | 'error' | 'unavailable';
   updatedAtMs: number;
   promise?: Promise<void>;
+  // While a settled count is read again, what it settled as: the tile keeps showing that, not a spinner.
+  settledStatus?: 'ready' | 'error' | 'unavailable';
 };
 
 type CommunityWorkerScope = {
@@ -56,6 +58,8 @@ type CommunityWorkerGroupRuntime = {
 const WORKER_GROUP_COUNT_TTL_MS = 30000;
 // Short: the other tiles show their own numbers without the groups, whose tile keeps its spinner until they settle.
 export const WORKER_GROUP_COUNT_WAIT_MS = 250;
+// A count with no answer by then is shown as unread, so one slow or dead Worker does not hold the Groups tile.
+export const WORKER_GROUP_COUNT_TIMEOUT_MS = 15000;
 
 /**
  * Live group counts are optional: a load can wait on a Worker sign-in that is
@@ -193,7 +197,7 @@ export const getCommunityWorkerGroupCountState = (
     workerGroupIds: Array.isArray(cached?.groupIds) ? cached.groupIds : [],
     workerVisibleUserIds: Array.isArray(cached?.visibleUserIds) ? cached.visibleUserIds : [],
     workerGroupsCount: Number(cached?.count || 0),
-    workerGroupsStatus: String(cached?.status || 'idle'),
+    workerGroupsStatus: String((cached?.status === 'loading' && cached.settledStatus) || cached?.status || 'idle'),
   };
 };
 
@@ -232,12 +236,15 @@ export const loadCommunityWorkerGroupCount = async ({
   cache,
   revisions,
   onWarning,
+  onLateSettle,
 }: {
   scopeEntry: CommunityWorkerScope;
   runtime: CommunityWorkerGroupRuntime;
   cache: Map<string, CommunityWorkerGroupCountCacheEntry>;
   revisions: Map<string, number>;
   onWarning?: (message: string, error: unknown) => void;
+  // Called when a count that ran past the time limit settles after all.
+  onLateSettle?: () => void;
 }): Promise<void> => {
   if (!scopeEntry.isWorkerCanonical || !scopeEntry.workerCanonicalIdentity) return;
   const identity = scopeEntry.workerCanonicalIdentity;
@@ -366,8 +373,32 @@ export const loadCommunityWorkerGroupCount = async ({
     groupIds: existing?.groupIds || [],
     visibleUserIds: existing?.visibleUserIds || [],
     status: 'loading',
+    settledStatus:
+      existing?.status === 'loading'
+        ? existing.settledStatus
+        : existing?.status === 'idle'
+          ? undefined
+          : existing?.status,
     updatedAtMs: existing?.updatedAtMs || 0,
     promise: request,
   });
-  await request;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      // An answer that comes later still replaces this.
+      if (requestIsCurrent() && cache.get(countCacheKey)?.promise === request) {
+        cache.set(countCacheKey, {
+          count: existing?.count || 0,
+          groupIds: existing?.groupIds || [],
+          visibleUserIds: existing?.visibleUserIds || [],
+          status: 'error',
+          updatedAtMs: Date.now(),
+        });
+      }
+      void request.then(() => onLateSettle?.());
+      resolve();
+    }, WORKER_GROUP_COUNT_TIMEOUT_MS);
+  });
+  await Promise.race([request, timedOut]);
+  clearTimeout(timer);
 };

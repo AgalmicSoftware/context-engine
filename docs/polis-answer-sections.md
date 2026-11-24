@@ -84,7 +84,10 @@ are questions an admin has hidden. A zero rating and an explicit all-zero
 quadratic allocation remain valid answers.
 Repeated rows for the same respondent count once within the new sections.
 Multiple-choice percentages use respondents as the denominator, so a question
-allowing several choices can exceed 100% across its options. Quadratic bars show
+allowing several choices can exceed 100% across its options. Its options are listed
+most chosen first, with options chosen as often kept in the question's order, and
+the PDF export follows that order; the question's own option order, its answers and
+the data exports are unchanged. Quadratic bars show
 positive and negative vote totals on a common scale, with a separate signed net;
 credit costs are omitted. Canonical option labels and custom budgets are used to
 validate allocations.

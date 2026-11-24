@@ -4,6 +4,8 @@ import path from 'path';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SessionInterviewDraftCard from './SessionInterviewDraftCard';
 import QuadraticAllocationInput from './QuadraticAllocationInput';
+import MultichoiceQuestionInput from './MultichoiceQuestionInput';
+import draftCardStyles from './SessionInterviewDraftCard.module.scss';
 import { startingInterviewComment } from './sessionInterviewComments';
 import type { InterviewDraftResponse } from './sessionInterview';
 
@@ -655,6 +657,46 @@ describe('interview multiple-choice review', () => {
     expect(screen.getByRole('checkbox', { name: 'Transit' })).toBeChecked();
     if (singleSelect) expect(screen.getByRole('checkbox', { name: 'Parks' })).not.toBeChecked();
     else expect(screen.getByRole('checkbox', { name: 'Parks' })).toBeChecked();
+  });
+});
+
+// A long list made the review card as tall as its options, in a row of pills that wrapped on a computer. The review
+// lists them as the pile does, one per line, in an answer area that scrolls inside the card.
+describe('interview multiple-choice review list', () => {
+  it.each([false, true])('lists the options in a scrolling answer area (with the pile input: %s)', (injected) => {
+    const question = { id: 'choice', type: 'multichoice', prompt: 'Pick topics', options: ['Parks', 'Transit'] };
+    const draft = { questionId: 'choice', answer: ['Parks'], confidence: 0.8 };
+    render(
+      <SessionInterviewDraftCard
+        draft={draft}
+        edited={draft}
+        question={question}
+        selected
+        existing={false}
+        disabled={false}
+        onSelect={jest.fn()}
+        onEdit={jest.fn()}
+        renderAnswerInput={
+          injected
+            ? (questionId, value, onChange) => (
+                <MultichoiceQuestionInput
+                  questionId={questionId}
+                  options={question.options}
+                  selectedValues={value as unknown[]}
+                  onChange={onChange}
+                  kindInPrompt
+                />
+              )
+            : undefined
+        }
+      />,
+    );
+    const area = screen.getByRole('checkbox', { name: 'Transit' }).closest(`.${draftCardStyles.choiceList}`);
+    expect(area).toBeInstanceOf(HTMLElement);
+    expect(area).toHaveAttribute('id');
+    expect(readDraftCardScss()).toMatch(
+      /\.choiceList \{\s*max-height: 42vh;[^{}]*@include choiceListScroll\.choice-list-scroll;\s*\}/,
+    );
   });
 });
 

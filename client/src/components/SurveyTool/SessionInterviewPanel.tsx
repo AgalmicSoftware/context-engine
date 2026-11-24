@@ -3,6 +3,7 @@ import { useSessionNames } from '../../utilities/session/useSessionNames';
 import { summarizeInterviewConsent, type InterviewConsentOverrides } from './sessionInterviewConsent';
 import { useInterviewSavedAnswers } from './useInterviewSavedAnswers';
 import { getSessionAiSettings } from '../../utilities/ai/aiSettings';
+import { resolveAiSessionOptions } from '../../utilities/ai/aiClientRequestOptions';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import {
   appendInterviewTranscript,
@@ -221,10 +222,14 @@ export default function SessionInterviewPanel({
   const hasPredictionRevisions = drafts.some((draft) => (draft.revisions?.length || 0) > 1);
   const hasAiGeneratedReview = drafts.length > 0 && !isDirectUserContextPrefill;
   const researchAvailable = hasAiPrefill || hasPredictionRevisions || hasAiGeneratedReview;
-  const mappingModelId = useMemo(
-    () => getSessionAiSettings(sessionSlug, sessionConfig).models.thinking,
-    [sessionSlug, sessionConfig],
-  );
+  // The drafting call's own settings, read as callAI reads them: a config without its own slug takes the session's.
+  const mappingAi = useMemo(() => {
+    const resolved = resolveAiSessionOptions({ sessionSlug, sessionConfig });
+    return getSessionAiSettings(resolved.sessionSlug, resolved.sessionConfig);
+  }, [sessionSlug, sessionConfig]);
+  const mappingModelId = mappingAi.models.thinking;
+  // The provider the drafting call goes to, as getEffectiveAiConfig picks it with the session's settings.
+  const mappingProvider = mappingAi.modelProviders?.thinking || mappingAi.mode;
   const researchPacket = buildResearchPacket(prefillPacket, sessionSlug, mappingModelId);
   const [includeProvenance, setIncludeProvenance] = useState(kept.includeProvenance);
   const [researchSharingChoice, setResearchSharingChoice] = useState<{
@@ -1198,6 +1203,7 @@ export default function SessionInterviewPanel({
   return (
     <>
       <SessionInterviewModalHeader
+        aiProvider={mappingProvider}
         guidance={guidance}
         idle={idle}
         onClose={onClose}

@@ -1,0 +1,39 @@
+// A choice list's answer area: it scrolls up and down, never sideways, from the top (centring would push the first
+// options out of reach). When more are below, the area ends partway through an option (usePileHalfRowCut) and that
+// edge fades a little; once scrolled, the top edge does too. The padding, and keyboard scrolling, keep the last option
+// clear at the end. A list scrolled to its end passes the wheel on to the page; only the phone card, which is the
+// screen's height, keeps it (SurveyTool.module.scss). Include it last in a rule: Sass warns of declarations after
+// its nested rules.
+@mixin choice-list-scroll {
+  --pile-list-fade-top: black;
+  --pile-list-fade-bottom: black;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-bottom: 28px;
+  scroll-padding-bottom: 28px;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    var(--pile-list-fade-top),
+    black 20px,
+    black calc(100% - 20px),
+    var(--pile-list-fade-bottom)
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    var(--pile-list-fade-top),
+    black 20px,
+    black calc(100% - 20px),
+    var(--pile-list-fade-bottom)
+  );
+
+  &[data-list-cue='start'],
+  &[data-list-cue='middle'] {
+    --pile-list-fade-bottom: color-mix(in srgb, black 35%, transparent);
+  }
+
+  &[data-list-cue='middle'],
+  &[data-list-cue='end'] {
+    --pile-list-fade-top: color-mix(in srgb, black 35%, transparent);
+  }
+}

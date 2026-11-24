@@ -1445,6 +1445,13 @@ $user-page-background: var(--ce-surface-sunken);
     color: inherit;
   }
 
+  // A choice list stacks one option per line, so a long one scrolls inside the preview, at most 42% of the
+  // screen's height as on a phone before, rather than pushing the next drafts far down.
+  :global([id*='multiChoice'][role='group']) {
+    max-height: 42vh;
+    overflow-y: auto;
+  }
+
   button[data-step]:disabled {
     opacity: 1;
   }

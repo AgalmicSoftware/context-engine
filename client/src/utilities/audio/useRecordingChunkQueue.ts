@@ -62,6 +62,8 @@ const MAX_IMPORT_SECONDS = 30 * 60;
 
 type Options = RecordingOptions & {
   labelSpeakers: boolean;
+  // Letters each chunk's voices for that chunk alone, with no voice samples (see RecordingChunkQueue.begin).
+  speakersPerPart?: boolean;
   // The recorder's chunk length, which imported audio is cut to.
   chunkMs: number;
   // Another account's recording stays open while capture continues.
@@ -250,7 +252,7 @@ export function useRecordingChunkQueue(options: Options) {
   }, [identity, scope]);
   const beginChunk = useCallback((gapBefore?: CaptureGap) => {
     const queue = queueRef.current!;
-    const id = queue.begin(latest.current.labelSpeakers, gapBefore);
+    const id = queue.begin(latest.current.labelSpeakers, gapBefore, latest.current.speakersPerPart);
     return (audio: Blob, finished = false) => queue.capture(id, audio, finished);
   }, []);
   // An import is decoded once, when added, into chunk-length parts that upload like recorded chunks, each with
@@ -268,7 +270,7 @@ export function useRecordingChunkQueue(options: Options) {
         const parts = audioBufferToWavParts(decoded, latest.current.chunkMs / 1000);
         await prepare();
         if (!queue || queue !== queueRef.current) throw new Error('The recording changed. Add the audio again.');
-        queue.addParts(parts, latest.current.labelSpeakers);
+        queue.addParts(parts, latest.current.labelSpeakers, latest.current.speakersPerPart);
       })();
       importRef.current = adding.catch(() => {});
       setImporting(true);

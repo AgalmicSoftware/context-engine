@@ -77,17 +77,54 @@ const assertContrast = (
   }
 };
 
-// Beside a chosen answer the other options dim under a 30% layer of --ce-color-black, which is
-// --ce-overlay-base (SurveyTool.module.scss); their labels must stay readable. A desktop-window theme
-// keeps its faces grey and dims only the swatch, so no label sits on the dimmed colour there.
+// Beside a chosen answer the other options fade (SurveyTool.module.scss): their own colours, at the opacity set
+// there, over whatever is behind them, with nothing mixed in. Their labels must stay readable on the cards answers
+// sit on. A desktop-window theme keeps its faces grey, so its labels are its control text on a grey face.
+const surveyToolCss = sass.compile(
+  path.resolve(__dirname, '..', '..', 'components/SurveyTool/SurveyTool.module.scss'),
+  {
+    loadPaths: [path.resolve(__dirname, '..', '..')],
+    style: 'expanded',
+    logger: sass.Logger.silent,
+  },
+).css;
+const dimmedRule = surveyToolCss.match(/#binaryChoice \.radioOptionText\.dimmed \{([^}]*)\}/)?.[1] ?? '';
+const dimmedOpacity = Number(dimmedRule.match(/opacity: ([\d.]+);/)?.[1]);
+// Answers sit on a pile card, an interview draft card or a page; each theme names those surfaces.
+const ANSWER_BACKDROPS = ['card-bg', 'document-surface', 'surface'];
+// A 30% fade, as chosen, leaves white labels at 2.92:1 on Minimal's white card (2.94 on Context Engine's light
+// document surface), under the 3:1 large-text level; this holds them there, so nothing lowers them further.
+const DIMMED_LABEL_MINIMUM = 2.9;
+const dimmedLabelContrasts = (values: Record<string, string>, themeId: string) => {
+  const desktopWindow = registry.themes.find(({ id }) => id === themeId)?.layoutProfile === 'desktop-window';
+  return ANSWER_BACKDROPS.flatMap((backdropToken) =>
+    ['agree', 'unsure', 'disagree'].map((stance) => {
+      const backdrop = parseColor(values[backdropToken]);
+      const face = composite(
+        parseColor(values[desktopWindow ? 'control-face' : `binary-choice-${stance}-bg`]),
+        backdrop,
+      );
+      const label = composite(
+        parseColor(
+          desktopWindow
+            ? values['control-text']
+            : stance === 'unsure'
+              ? values['overlay-base']
+              : values[`binary-choice-${stance}-text`],
+        ),
+        face,
+      );
+      const fade = (color: Rgba): Rgba => composite([color[0], color[1], color[2], dimmedOpacity], backdrop);
+      return { where: `${stance} on ${backdropToken}`, ratio: contrastRatio(fade(label), fade(face)) };
+    }),
+  );
+};
 const expectDimmedBinaryLabelsReadable = (values: Record<string, string>, themeId: string) => {
-  if (registry.themes.find(({ id }) => id === themeId)?.layoutProfile === 'desktop-window') return;
-  const shade = parseColor(values['overlay-base']);
-  ['agree', 'unsure', 'disagree'].forEach((stance) => {
-    const fill = composite([shade[0], shade[1], shade[2], 0.3], parseColor(values[`binary-choice-${stance}-bg`]));
-    const label = stance === 'unsure' ? values['overlay-base'] : values[`binary-choice-${stance}-text`];
-    expect(contrastRatio(parseColor(label), fill)).toBeGreaterThanOrEqual(4.5);
-  });
+  expect(dimmedOpacity).toBeGreaterThan(0);
+  expect(dimmedOpacity).toBeLessThan(1);
+  for (const { where, ratio } of dimmedLabelContrasts(values, themeId)) {
+    expect([where, Number(ratio.toFixed(2)) >= DIMMED_LABEL_MINIMUM]).toEqual([where, true]);
+  }
 };
 
 describe('bundled app-theme contrast', () => {

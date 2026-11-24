@@ -1,7 +1,8 @@
 import { getEffectiveTranscriptionConfig } from '../../utilities/ai/aiSettings';
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SessionListeningPanel from './SessionListeningPanel';
+import styles from './SurveyTool.module.scss';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { generateQuestionsFromListeningTranscript } from './sessionListeningQuestions';
@@ -781,6 +782,8 @@ describe('SessionListeningPanel', () => {
       delete (globalThis as Partial<typeof globalThis>).IntersectionObserver;
     });
 
+    // While recording, drafts are not scrolled to (Stop stays in view), so the cue offers the way down.
+    const recording = { status: 'recording', isRecording: true };
     it('says how many drafts are new, scrolls to them, and then counts only later ones', async () => {
       const scrollIntoView = jest.fn();
       Element.prototype.scrollIntoView = scrollIntoView;
@@ -788,7 +791,7 @@ describe('SessionListeningPanel', () => {
         .mockResolvedValueOnce(result('What evidence matters?'))
         .mockResolvedValueOnce(result('How should trust be measured?', 'Who may trigger a review?'));
       (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
-        buildRecorder({ transcript: firstTranscript, segments: [firstSegment] }),
+        buildRecorder({ transcript: firstTranscript, segments: [firstSegment], ...recording }),
       );
       const { rerender } = render(
         <SessionListeningPanel sessionConfig={PER_CHUNK} sessionSlug="demo" panelMode="recordGroup" embeddedInModal />,
@@ -805,6 +808,7 @@ describe('SessionListeningPanel', () => {
         buildRecorder({
           transcript: secondTranscript,
           segments: [firstSegment, { id: 's2', index: 1, status: 'complete', text: 'Later.', completedAt: 5 }],
+          ...recording,
         }),
       );
       rerender(
@@ -835,7 +839,9 @@ describe('SessionListeningPanel', () => {
       return observers;
     };
 
-    it('never shows for new drafts already on screen', async () => {
+    it('never shows, or scrolls, for new drafts already on screen', async () => {
+      const scrollIntoView = jest.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
       const observers = observeDrafts([true]);
       mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(result('What evidence matters?'));
       (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
@@ -848,13 +854,29 @@ describe('SessionListeningPanel', () => {
       await nextFrame();
       expect(observers.map((observer) => observer.target)).toEqual([screen.getByText('What evidence matters?')]);
       expect(screen.queryByRole('button', { name: /new draft/ })).not.toBeInTheDocument();
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it('scrolls to the first new draft out of view once recording has stopped, with no cue', async () => {
+      const scrollIntoView = jest.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+      observeDrafts([false]);
+      mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(result('What evidence matters?'));
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript: firstTranscript, segments: [firstSegment] }),
+      );
+      render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+      expect(scrollIntoView.mock.contexts).toEqual([screen.getByText('What evidence matters?')]);
+      expect(screen.queryByRole('button', { name: /new draft/ })).not.toBeInTheDocument();
     });
 
     it('shows once the first new draft is out of view, and goes once it is seen', async () => {
       const observers = observeDrafts([false]);
       mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(result('What evidence matters?'));
       (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
-        buildRecorder({ transcript: firstTranscript, segments: [firstSegment] }),
+        buildRecorder({ transcript: firstTranscript, segments: [firstSegment], ...recording }),
       );
       render(
         <SessionListeningPanel sessionConfig={PER_CHUNK} sessionSlug="demo" panelMode="recordGroup" embeddedInModal />,
@@ -1450,6 +1472,75 @@ describe('SessionListeningPanel', () => {
       expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(2);
     });
 
+    // New drafts landed below the transcript, often out of sight, and the person had to find them.
+    describe('new questions are obvious', () => {
+      const scrollIntoView = jest.fn();
+      beforeEach(() => {
+        scrollIntoView.mockClear();
+        Element.prototype.scrollIntoView = scrollIntoView;
+      });
+      afterEach(() => {
+        delete (Element.prototype as Partial<Element>).scrollIntoView;
+        delete (window as Partial<Window>).matchMedia;
+      });
+      const stopped = { transcript: `${first}\n${second}`, segments: [chunk('s1', 0, first), chunk('s2', 1, second)] };
+
+      it('says how many a draft added and brings the first of them into view, without moving focus', async () => {
+        (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder(stopped));
+        mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(drafts(['A?', 'B?']));
+        render(panel());
+        const focused = document.activeElement;
+        const added = await screen.findByText('2 questions added below.');
+        expect(added).toHaveAttribute('role', 'status');
+        await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+        expect(scrollIntoView.mock.contexts).toEqual([screen.getByText('A?')]);
+        expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+        expect(focused).toHaveFocus();
+      });
+
+      it('drops the count once drafts are removed or uploaded, so it never reads stale', async () => {
+        (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder(stopped));
+        mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(drafts(['A?', 'B?']));
+        render(panel());
+        expect(await screen.findByText('2 questions added below.')).toBeInTheDocument();
+        act(() => mockCreateQuestionsProps.onDraftQuestionsChange(drafts(['B?']).statements));
+        expect(screen.queryByText(/added below/)).toBeNull();
+      });
+
+      it('jumps without motion where motion is reduced, and counts only the drafts added', async () => {
+        window.matchMedia = jest.fn((query: string) => ({ matches: query.includes('reduced-motion') })) as never;
+        (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+          buildRecorder({
+            ...stopped,
+            questionDrafts: { questions: drafts(['A?']).statements, prompts: ['A?'], draftedTranscript: first },
+          }),
+        );
+        mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(drafts(['A?', 'B?']));
+        render(panel());
+        expect(await screen.findByText('1 question added below.')).toBeInTheDocument();
+        await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' }));
+        expect(scrollIntoView.mock.contexts).toEqual([screen.getByText('B?')]);
+      });
+
+      it('leaves the view alone for someone typing', async () => {
+        const field = document.createElement('textarea');
+        document.body.appendChild(field);
+        field.focus();
+        try {
+          (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder(stopped));
+          mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(drafts(['A?']));
+          render(panel());
+          expect(await screen.findByText('1 question added below.')).toBeInTheDocument();
+          await nextFrame();
+          await nextFrame();
+          expect(scrollIntoView).not.toHaveBeenCalled();
+          expect(field).toHaveFocus();
+        } finally {
+          field.remove();
+        }
+      });
+    });
+
     it('offers Generate questions beside the note when the draft after Stop is empty twice', async () => {
       // Drafted before Record more, so the Generate questions below the transcript is hidden.
       (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
@@ -1470,6 +1561,7 @@ describe('SessionListeningPanel', () => {
         'No new questions from this discussion. Press Generate questions to ask again.',
       );
       expect(note).toHaveAttribute('role', 'status');
+      expect(screen.queryByText(/added below/)).toBeNull();
       expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(2);
       const generate = screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE);
       expect(note.parentElement).toContainElement(generate);
@@ -1482,6 +1574,7 @@ describe('SessionListeningPanel', () => {
       await act(async () => answer(drafts(['A?', 'B?'])));
       expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-count', '2');
       expect(screen.queryByText(/No new questions/)).toBeNull();
+      expect(screen.getByText('1 question added below.')).toHaveAttribute('role', 'status');
       expect(screen.queryByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).toBeNull();
     });
 
@@ -1900,36 +1993,46 @@ it('remembers the optional speaker-audio setting and locks it while recording', 
   window.localStorage.removeItem('ce:record-speaker-audio:v1');
 });
 
-it('labels speakers by default, and gives a room of more than 4 a plain transcript with no parts', async () => {
+it('letters a room part by part unless this device chose tracked labels, and gives parts wherever Persons are', async () => {
   const key = 'ce:record-more-than-four:v1';
   window.localStorage.removeItem(key);
   const labelled =
     'Person 1: Enough words here for a whole part of the talk.\nPerson 2: And quite a lot more from another person.';
+  const plain = 'Enough words here for a whole part of the talk, and quite a lot more from another person.';
   const choice = () => screen.findByRole('checkbox', { name: 'More than 4 people in the room' });
-  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ transcript: labelled }));
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ transcript: plain }));
   try {
+    // A breakout room is usually larger than four, so a device that never chose starts ticked: each part letters
+    // its own speakers, with no voice samples and no parts.
     const { unmount } = render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
-    expect(await choice()).not.toBeChecked();
+    expect(await choice()).toBeChecked();
     // The "?" help is read with the box and with its button, not only shown on hover.
-    expect(await choice()).toHaveAccessibleDescription(/^Ticked, the transcript is plain text/);
+    expect(await choice()).toHaveAccessibleDescription(/^Ticked, speakers are labelled Speaker A, B… within each part/);
     expect(screen.getByRole('button', { name: 'About more than 4 people in the room' })).toHaveAccessibleDescription(
-      /up to four voices keep their number/,
+      /Unticked, up to four voices keep a Person number throughout\.$/,
     );
-    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(
+      expect.objectContaining({ labelSpeakers: true, speakersPerPart: true }),
+    );
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeNull();
+    expect(window.localStorage.getItem(key)).toBeNull();
+    fireEvent.click(await choice());
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(
+      expect.objectContaining({ labelSpeakers: true, speakersPerPart: false }),
+    );
+    expect(window.localStorage.getItem(key)).toBe('false');
+    // Reopened on this device, the stored choice wins over the default.
+    unmount();
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ transcript: labelled }));
+    const { rerender, unmount: unmountLabelled } = render(
+      <SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />,
+    );
+    expect(await choice()).not.toBeChecked();
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(
+      expect.objectContaining({ labelSpeakers: true, speakersPerPart: false }),
+    );
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Person 2:' })).toBeInTheDocument();
-    fireEvent.click(await choice());
-    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
-    // Labels from an earlier part stay in its text, but no part is given out.
-    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Person 2:' })).toBeNull();
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).toHaveTextContent('Person 2:');
-    expect(window.localStorage.getItem(key)).toBe('true');
-    // Reopened on this device, the room stays plain.
-    unmount();
-    const { rerender } = render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
-    expect(await choice()).toBeChecked();
-    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
       buildRecorder({ transcript: labelled, isRecording: true, status: 'recording' }),
     );
@@ -1937,16 +2040,53 @@ it('labels speakers by default, and gives a room of more than 4 a plain transcri
     expect(await choice()).toBeDisabled();
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ transcript: labelled }));
     rerender(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+    // Ticked over a labelled recording, its parts stay: they follow the transcript's labels, not the box.
     fireEvent.click(await choice());
-    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(
+      expect.objectContaining({ labelSpeakers: true, speakersPerPart: true }),
+    );
+    expect(window.localStorage.getItem(key)).toBe('true');
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeInTheDocument();
-    expect(window.localStorage.getItem(key)).toBe('false');
-    rerender(<SessionListeningPanel sessionSlug="workshop" panelMode="listening" />);
+    expect(screen.getByRole('button', { name: 'Person 2:' })).toBeInTheDocument();
+    unmountLabelled();
+    // Reopened ticked, a labelled recording still offers its parts.
+    render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+    expect(await choice()).toBeChecked();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeInTheDocument();
+    cleanup();
+    render(<SessionListeningPanel sessionSlug="workshop" panelMode="listening" />);
     expect(screen.queryByRole('checkbox', { name: 'More than 4 people in the room' })).not.toBeInTheDocument();
-    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: false }));
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(
+      expect.objectContaining({ labelSpeakers: false, speakersPerPart: false }),
+    );
   } finally {
     window.localStorage.removeItem(key);
   }
+});
+
+// Letters hold within one part only, so the transcript marks each part and gives the letters no colour or code.
+it('shows a room lettered per part with each part marked, and no codes', async () => {
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({
+      transcript: [
+        'Speaker A: Enough words here for a whole part of the talk.',
+        'Speaker B: And quite a lot more from another person.',
+        '— Part 2 —',
+        'Speaker A: Someone who may not be the first part’s Speaker A.',
+      ].join('\n'),
+    }),
+  );
+  render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+  const transcript = await screen.findByRole('region', { name: 'Transcript' });
+  const labels = within(transcript).getAllByText('Speaker A:');
+  expect(labels).toHaveLength(2);
+  labels.forEach((label) => {
+    expect(label.tagName).toBe('STRONG');
+    expect(label).not.toHaveAttribute('style');
+    expect(label.closest('button')).toBeNull();
+  });
+  expect(within(transcript).getByText('Part 2')).toHaveClass(styles.sessionTranscriptPartBreak);
+  expect(screen.queryByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeNull();
 });
 
 it.each(['custom', 'local'])('hides the label choice for the effective %s transcription provider', async (provider) => {
@@ -2003,19 +2143,25 @@ it('waits for the transcription provider before starting Group Conversation with
   );
   const startRecording = jest.fn();
   (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ startRecording }));
-  render(<SessionListeningPanel sessionSlug="pending-provider" panelMode="recordGroup" />);
-  const start = screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_START);
-  expect(start).toBeDisabled();
-  fireEvent.click(start);
-  expect(startRecording).not.toHaveBeenCalled();
-  await act(async () => {
-    resolve({ provider: 'openai' } as Config);
-  });
-  expect(start).toBeEnabled();
-  expect(screen.getByRole('checkbox', { name: 'More than 4 people in the room' })).not.toBeChecked();
-  expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
-  fireEvent.click(start);
-  expect(startRecording).toHaveBeenCalledTimes(1);
+  // This device chose labels, so the provider check decides them.
+  window.localStorage.setItem('ce:record-more-than-four:v1', 'false');
+  try {
+    render(<SessionListeningPanel sessionSlug="pending-provider" panelMode="recordGroup" />);
+    const start = screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_START);
+    expect(start).toBeDisabled();
+    fireEvent.click(start);
+    expect(startRecording).not.toHaveBeenCalled();
+    await act(async () => {
+      resolve({ provider: 'openai' } as Config);
+    });
+    expect(start).toBeEnabled();
+    expect(screen.getByRole('checkbox', { name: 'More than 4 people in the room' })).not.toBeChecked();
+    expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
+    fireEvent.click(start);
+    expect(startRecording).toHaveBeenCalledTimes(1);
+  } finally {
+    window.localStorage.removeItem('ce:record-more-than-four:v1');
+  }
 });
 
 it('generates with a gap warning and offers closing while keeping pending audio', async () => {
@@ -2177,6 +2323,7 @@ it('applies a provider check that answers after two seconds as long as Record ha
   );
   (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
   try {
+    window.localStorage.setItem('ce:record-more-than-four:v1', 'false');
     render(<SessionListeningPanel sessionSlug="slow-provider" panelMode="recordGroup" />);
     await act(async () => {
       await jest.advanceTimersByTimeAsync(2000);
@@ -2189,6 +2336,7 @@ it('applies a provider check that answers after two seconds as long as Record ha
     expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
     expect(screen.queryByText(/Speaker label check timed out/)).not.toBeInTheDocument();
   } finally {
+    window.localStorage.removeItem('ce:record-more-than-four:v1');
     jest.useRealTimers();
   }
 });

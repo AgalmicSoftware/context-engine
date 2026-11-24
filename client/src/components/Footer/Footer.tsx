@@ -217,17 +217,19 @@ class Footer extends React.Component<FooterProps, FooterState> {
           <div className={styles.copyright}>
             <span className="copyright-link" data-testid="ce-footer-brand-attribution">
               <span className={styles.copyrightContent}>
-                <span className={styles.copyrightText}>Software by Agalmic</span>
+                {/* One link, its words and icon together, to Context Engine's repository; Classic 95's taskbar shows
+                    only the icon. Its name starts with the words it shows. */}
                 <a
                   href={PUBLIC_REPO_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={styles.githubLink}
                   data-testid="ce-footer-link-github"
-                  aria-label="View Context Engine on GitHub"
-                  title="View Context Engine on GitHub"
+                  aria-label="Agalmic Software: view Context Engine on GitHub"
+                  title="Agalmic Software: view Context Engine on GitHub"
                 >
-                  <FontAwesomeIcon icon={faGithub} />
+                  <span className={styles.copyrightText}>Agalmic Software</span>
+                  <FontAwesomeIcon icon={faGithub} className={styles.githubIcon} />
                 </a>
               </span>
             </span>

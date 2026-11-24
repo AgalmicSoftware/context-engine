@@ -1,5 +1,7 @@
 @use 'scss/finalSubmitCta' as finalSubmitCta;
 @use 'scss/groupImagePlaceholder' as groupImagePlaceholder;
+@use 'scss/answerChoiceType' as answerChoiceType;
+@use 'scss/choiceListScroll' as choiceListScroll;
 
 /* NEW - Color variables for dropdown items */
 $questions-item-bg: var(--ce-color-success-soft); // Light green
@@ -170,13 +172,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   margin-right: 10px;
 }
 
+// Choice options stack one per line at every width, each as wide as the list: never in a row that wraps or runs
+// sideways. Where the list may be long, its answer area scrolls (choice-list-scroll).
 #multiChoice {
   display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  // Not center: an overflowing list would push its first options above the scroll top, out of reach.
+  justify-content: flex-start;
+  // usePileHalfRowCut spreads the options to fill a scrolling list's room, so it still ends partway through one.
+  gap: calc(8px + var(--pile-list-row-spread, 0px));
   margin: 0;
   padding: 0;
   width: 100%;
@@ -184,33 +190,15 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 #multiChoice .checkboxOptionText {
+  width: 100%;
+  max-width: 100%;
   margin: 0;
-  max-width: min(420px, 90%);
+  justify-content: center;
+  text-align: center;
 }
 
-// Mobile: options should be full-width and scroll within the card.
-@media (max-width: 480px) {
-  #multiChoice {
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: stretch;
-    // Not center: an overflowing list would push its first options above the scroll top, out of reach.
-    justify-content: flex-start;
-    max-height: 42vh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  #multiChoice .checkboxOptionText {
-    width: 100%;
-    max-width: 100%;
-    justify-content: center;
-    text-align: center;
-  }
-}
-
-// Darkens an option beside the chosen one by 30%, laid over its colour and under its label.
-$binary-choice-dim: color-mix(in srgb, var(--ce-color-black) 30%, transparent);
+// How much of an option beside the chosen one shows: its own colours, faded by 30%, with nothing mixed in.
+$binary-choice-dim-opacity: 0.7;
 
 #binaryChoice {
   display: flex;
@@ -221,10 +209,13 @@ $binary-choice-dim: color-mix(in srgb, var(--ce-color-black) 30%, transparent);
   align-items: center;
   margin-top: 1rem;
   .radioOptionText {
+    // The frame of the chosen option's ring.
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
     margin: 0 0.1rem;
+    @include answerChoiceType.answer-choice-type;
     font-size: 1.5rem;
     color: var(--ce-color-border);
     cursor: pointer;
@@ -234,15 +225,23 @@ $binary-choice-dim: color-mix(in srgb, var(--ce-color-black) 30%, transparent);
     &.selected {
       font-weight: 900;
       font-style: italic;
-      // A ring inside the chosen option, in its label's colour, so the choice shows without telling colours apart.
-      outline: 2px solid currentColor;
-      outline-offset: -5px;
     }
 
-    // Once one is chosen the others dim, so the choice stands out. Only their colour darkens: white labels
-    // gain contrast and dark ones keep at least 4.5:1 in every theme.
+    // A ring inside the chosen option, in its label's colour, so the choice shows without telling colours apart.
+    // Drawn apart from the outline, which the keyboard's focus ring takes: an outline ring gave way to it.
+    &.selected::after {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      border: 2px solid currentColor;
+      border-radius: inherit;
+      pointer-events: none;
+    }
+
+    // Once one is chosen the others fade, so the choice stands out. The chosen one keeps exactly the colours it
+    // had before; the others keep theirs too and only lose some opacity.
     &.dimmed {
-      background-image: linear-gradient($binary-choice-dim, $binary-choice-dim);
+      opacity: $binary-choice-dim-opacity;
     }
 
     input[type='radio'] {
@@ -2888,6 +2887,27 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   overflow-wrap: anywhere;
 }
 
+// Where a part whose speakers are lettered for it alone starts: a light rule with the part's number, so a later
+// part's Speaker A doesn't read as an earlier one's.
+.sessionListeningTranscript p.sessionTranscriptPartBreak {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 8px;
+  // The transcript's own text colour, which every theme keeps readable on its white.
+  color: var(--ce-document-text);
+  font-size: 0.8em;
+  font-weight: 600;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid currentColor;
+    opacity: 0.4;
+  }
+}
+
 // A speaker's label, opening their code: it reads as the label it replaces, underlined under the pointer.
 .sessionTranscriptSpeaker {
   display: inline;
@@ -4726,10 +4746,13 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
+// The interview's Submit is at least this tall, and exactly this tall where it has a row of its own on a phone.
+$session-interview-submit-height: 48px;
+
 .sessionInterviewPanel .sessionInterviewSubmitButton {
   @include finalSubmitCta.final-submit-cta-shell(
     $padding: 12px 24px,
-    $min-height: 48px,
+    $min-height: $session-interview-submit-height,
     $font-size: 1rem,
     $border-radius: var(--ce-radius-8)
   );
@@ -4746,6 +4769,45 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   // quiet fill its words are set on instead, as every busy Submit does.
   &:disabled:hover {
     background: var(--ce-action-submit-disabled-bg) !important;
+  }
+}
+
+// The interview's Submit fills its button with its words. The button takes its size from where it sits, never from
+// its words, and the words take theirs from the button: half its height, unless that is wider than the button less
+// the count's corner on each side (so they stay centred), by how many letters show (--ce-submit-fill-letters, set by
+// the button). So "Submit and join" is set smaller than "Submit", and neither grows the button or leaves it. The count
+// grows with the button too, but never past the words. Browsers without container units keep the button as it was.
+@supports (width: 1cqi) {
+  .sessionInterviewPanel .sessionInterviewSubmitFill {
+    container-type: size;
+    padding-block: 0;
+    padding-inline: 0;
+    // The count's frame, kept clear on each side for the largest the count can be: the count and its gap to the edge.
+    --ce-submit-fill-corner: max(24px, calc(max(16px, 42cqh) * 1.6));
+    // How wide one capital of the theme's bold body font is, with the button's letter spacing, in em: 0.63 to 0.69 in
+    // the bundled themes' fonts, with room to spare.
+    --ce-submit-fill-advance: 0.72;
+    --ce-submit-fill-size: max(
+      1rem,
+      min(
+        50cqh,
+        (100cqi - 2 * var(--ce-submit-fill-corner)) / (var(--ce-submit-fill-letters) * var(--ce-submit-fill-advance))
+      )
+    );
+    // Grows with the words, a little smaller than them, and never below every other Submit's count.
+    --ce-submit-fill-count: max(16px, min(42cqh, 0.84 * var(--ce-submit-fill-size)));
+
+    .pileSubmitButtonCount {
+      top: calc(var(--ce-submit-fill-count) * 0.25);
+      right: calc(var(--ce-submit-fill-count) * 0.3);
+      font-size: var(--ce-submit-fill-count);
+    }
+  }
+
+  .sessionInterviewSubmitFillText {
+    font-size: var(--ce-submit-fill-size);
+    line-height: 1.12;
+    white-space: nowrap;
   }
 }
 
@@ -4966,6 +5028,13 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     width: 100%;
     flex-basis: auto;
     margin-left: 0;
+  }
+
+  // In this column its words, which fill it, would otherwise find no height to fill.
+  @supports (width: 1cqi) {
+    .sessionInterviewReviewActions .sessionInterviewSubmitFill {
+      height: $session-interview-submit-height;
+    }
   }
 }
 
@@ -5808,11 +5877,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
   #binaryChoice .radioOptionText.disagree::before {
     background: var(--ce-binary-choice-disagree-bg);
-  }
-
-  // The faces stay grey here, so an option beside the chosen one dims its swatch.
-  #binaryChoice .radioOptionText.dimmed::before {
-    background-image: linear-gradient($binary-choice-dim, $binary-choice-dim);
   }
 
   #binaryChoice .radioOptionText:hover {
@@ -6723,52 +6787,12 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: flex-start;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 4px 0 12px;
-  scroll-padding-inline: 4px;
-  scroll-snap-type: x proximity;
-  scrollbar-width: auto;
-  scrollbar-color: var(--ce-action-accent) color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
-  -webkit-overflow-scrolling: touch;
-
-  &::-webkit-scrollbar {
-    height: 10px;
-  }
-
-  &::-webkit-scrollbar-track {
-    border-radius: var(--ce-radius-pill);
-    background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
-  }
-
-  &::-webkit-scrollbar-thumb {
-    border: 2px solid transparent;
-    border-radius: var(--ce-radius-pill);
-    background: var(--ce-action-accent);
-    background-clip: padding-box;
-  }
 }
 
 .multichoiceQuestionContainer #multiChoice {
   font-size: 1rem;
-  // The space the pill above leaves, so the wrapped columns are not clipped at the bottom.
-  flex: 1 1 0;
-  flex-direction: column;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  align-content: flex-start;
-  align-items: flex-start;
-  gap: 14px 18px;
-  height: auto;
-  min-height: 0;
-  // Leave room for the next wrapped column to peek into view as a scroll cue.
-  width: 70%;
-  max-width: 70%;
-  max-height: none;
-  padding: 2px 28px 4px 2px;
-  overflow: visible;
 }
 
 .multichoiceQuestionContainer #multiChoice .checkboxOptionText {
@@ -6778,7 +6802,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   padding: 14px 18px;
   font-size: 1rem !important;
   line-height: 1.35;
-  align-self: flex-start;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -6786,7 +6809,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   border-radius: var(--ce-radius-10);
   background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
   box-shadow: 0 4px 12px color-mix(in srgb, var(--ce-overlay-base) 18%, transparent);
-  scroll-snap-align: start;
   transition:
     background-color 0.16s ease,
     border-color 0.16s ease,
@@ -7758,8 +7780,9 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     flex-basis: 104px;
   }
 
-  .pileCardMainContent:has(.multichoiceQuestionContainer) {
-    flex-basis: 176px;
+  // The phone card is the screen's height, so a choice list scrolled to its end keeps the page still, as the prompt does.
+  .pileCardInner .pileCardMainContent:has(#multiChoice) {
+    overscroll-behavior-y: contain;
   }
 
   .pileCardInner.pileQuadraticCard .pileCardMainContent {
@@ -7827,32 +7850,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
       padding: 6px 4px;
       font-size: 1rem;
       line-height: 1.25;
-    }
-
-    .pileCardInner .multichoiceQuestionContainer {
-      padding: 0 0 6px;
-    }
-
-    .pileCardInner .multichoiceQuestionContainer #multiChoice {
-      display: grid;
-      grid-auto-flow: column;
-      grid-template-rows: repeat(2, minmax(0, 1fr));
-      grid-auto-columns: 72%;
-      gap: 8px;
-      width: 100%;
-      max-width: 100%;
-      min-height: 0;
-      margin: 0;
-      padding: 2px;
-    }
-
-    .pileCardInner .multichoiceQuestionContainer #multiChoice .checkboxOptionText {
-      height: 100%;
-      min-height: 44px;
-      margin: 0;
-      padding: 4px 10px;
-      align-self: stretch;
-      overflow-y: auto;
     }
 
     @container ce-theme style(--ce-layout-profile: desktop-window) {
@@ -8010,7 +8007,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     min-height: 0;
   }
 
-  .pileCardInner .pileCardBody:has(.multichoiceQuestionContainer, .quadraticQuestionContainer) {
+  .pileCardInner .pileCardBody:has(#multiChoice, .quadraticQuestionContainer) {
     .pileCardHeader {
       flex: 0 1 auto;
       max-height: 40%;
@@ -8061,78 +8058,53 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
       }
     }
   }
+}
 
-  // Choice options stack one per line and scroll up and down inside the answer area, never sideways, from the top
-  // (centring would push the first ones out of reach). When more are below, the area fills its room and ends partway
-  // through an option (usePileHalfRowCut), and that edge fades a little; once scrolled, the top edge does too. The
-  // padding, and keyboard scrolling, keep the last option clear at the end.
-  .pileCardInner .pileCardMainContent:has(.multichoiceQuestionContainer) {
-    --pile-list-fade-top: black;
-    --pile-list-fade-bottom: black;
-
-    justify-content: flex-start;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior-y: contain;
-    padding-bottom: 28px;
-    scroll-padding-bottom: 28px;
-    -webkit-mask-image: linear-gradient(
-      to bottom,
-      var(--pile-list-fade-top),
-      black 20px,
-      black calc(100% - 20px),
-      var(--pile-list-fade-bottom)
-    );
-    mask-image: linear-gradient(
-      to bottom,
-      var(--pile-list-fade-top),
-      black 20px,
-      black calc(100% - 20px),
-      var(--pile-list-fade-bottom)
-    );
-
-    &[data-list-cue='start'],
-    &[data-list-cue='middle'] {
-      --pile-list-fade-bottom: color-mix(in srgb, black 35%, transparent);
-    }
-
-    &[data-list-cue='middle'],
-    &[data-list-cue='end'] {
-      --pile-list-fade-top: color-mix(in srgb, black 35%, transparent);
-    }
-  }
-
-  .pileCardInner .multichoiceQuestionContainer {
-    flex: 0 0 auto;
-    height: auto;
-    overflow: visible;
-    padding: 2px 0;
-  }
-
-  .pileCardInner .multichoiceQuestionContainer #multiChoice {
-    display: flex;
-    flex: 0 0 auto;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    // usePileHalfRowCut spreads the options to fill the room, so the list still ends partway through one.
-    gap: calc(8px + var(--pile-list-row-spread, 0px));
-    width: 100%;
-    max-width: 100%;
-    height: auto;
+// Classic 95 gives a prompt a tall document box; on a choice card it takes what the prompt needs, up to 40% of the
+// card, so the list keeps the room.
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .pileCardInner .pileCardBody:has(#multiChoice) .pileCardHeader {
+    flex: 0 1 auto;
     min-height: 0;
-    margin: 0;
-    // Room for each option's focus ring, which reaches 5px outside it.
-    padding: 5px;
+    max-height: 40%;
   }
+}
 
-  .pileCardInner .multichoiceQuestionContainer #multiChoice .checkboxOptionText {
-    width: 100%;
-    height: auto;
-    min-height: 44px;
-    margin: 0;
-    overflow: visible;
-    padding: 10px 14px;
-  }
+// Choice options stack one per line, at every width, and scroll inside the card's answer area (choice-list-scroll).
+// Keyed on the list itself, so a poll with options, which shares it, lists the same.
+// It takes the room the prompt leaves, never room from the prompt.
+.pileCardInner .pileCardMainContent:has(#multiChoice) {
+  flex: 1 1 0;
+  min-height: 0;
+  justify-content: flex-start;
+
+  @include choiceListScroll.choice-list-scroll;
+}
+
+.pileCardInner .pileCardMainContent :has(> #multiChoice) {
+  flex: 0 0 auto;
+  height: auto;
+  overflow: visible;
+  padding: 2px 0;
+}
+
+.pileCardInner .pileCardMainContent #multiChoice {
+  flex: 0 0 auto;
+  max-width: 100%;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  // Room for each option's focus ring, which reaches 5px outside it.
+  padding: 5px;
+}
+
+.pileCardInner .pileCardMainContent #multiChoice .checkboxOptionText {
+  width: 100%;
+  height: auto;
+  min-height: 44px;
+  margin: 0;
+  overflow: visible;
+  padding: 10px 14px;
 }
 
 // Once the card has an answer, Next is the step to take: the same arrow, the same size and place, in the theme's
