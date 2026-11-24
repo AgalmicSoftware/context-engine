@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.9.38] - 2026-11-24
+
+The interview's Submit fills its button, Agree / Unsure / Disagree keep their own colours and one font, multiple choice lists one option per line, a room of more than four letters its speakers part by part and new questions from a recording are easy to find; the report lists choices most chosen first, the interview says who processes it, the Stats panel settles, the Analyze box drops its Text view and the footer credits Agalmic Software. No Worker or MCP change.
 
 ### Site — available when the site deploys
 
@@ -18,10 +20,11 @@ All notable changes to this project will be documented in this file.
 - **Multiple choice lists its options one per line at every width.** On a computer the question pile set them side by side in a strip that scrolled sideways, and the interview's review and the AI prefill review wrapped them into rows, so a long list made a review card as tall as its options. Now Pick one and Pick any questions, polls included, list their options one per line, top to bottom, wherever they are answered. On the pile the list takes the room the prompt leaves, so a choice card is as tall as any other question's, and a list too long for it scrolls up and down inside the card, ending partway through an option, with a fade and the card's arrows showing there is more. In the interview's review a long Pick one or Pick any list scrolls inside at most 42% of the screen's height, with the same arrows, and a drafted question's preview in Group Conversation scrolls inside the same height. Once a list is scrolled to its end, the mouse wheel moves the page on; only a phone's card keeps the page still.
 - **The footer credits Agalmic Software in one link.** It read "Software by Agalmic", plain text beside a GitHub icon that was a separate link to the repository, named "View Context Engine on GitHub". Now "Agalmic Software" and the GitHub icon are one link to the repository, as the icon was, named "Agalmic Software: view Context Engine on GitHub". The words take the link's colour rather than the dimmer credit colour. Classic 95's taskbar still shows only the icon.
 - **The Analyze box has no Options and no Text view.** Under the analysis an Options box held one tick box, **Show the Text view**, which added a Text button showing what the Breakdown already shows, in a plainer layout. Both are gone: the analysis shows as the Breakdown, and as the Card where the session makes one. A browser where the box was ticked opens on the Breakdown like any other, since the choice it kept is no longer read.
+- **Deploy helper.** It deploys the 0.9.37 Worker bundles. A Worker updated from the site gets this release's.
 
 ### Local tooling
 
-- **The recording smokes expect a room to start plain.** The question-submission smoke checks the box starts ticked; the recording smoke unticks it to follow speaker labels.
+- **The recording smokes expect the room box to start ticked.** The question-submission smoke checks the box starts ticked; the recording smoke unticks it to follow speaker labels.
 
 ## [0.9.37] - 2026-11-23
 
