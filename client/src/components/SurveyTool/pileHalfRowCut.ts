@@ -78,8 +78,8 @@ const ROW_SPREAD = '--pile-list-row-spread';
 /**
  * Keeps a scrolling answer area ending inside a row, and marks which ends have more (`data-list-cue`), so a long list
  * never looks complete. The rows spread apart to fill the room, and the area shortens where they cannot
- * (resolvePileListFit). Applies only while the area scrolls (phones); elsewhere it leaves it alone. Returns the
- * cue, or 'off' where the area cannot scroll.
+ * (resolvePileListFit). Applies only while the area scrolls, as a list longer than its room does, at any width;
+ * elsewhere it leaves it alone. Returns the cue, or 'off' where the area cannot scroll.
  */
 export const usePileHalfRowCut = (
   ref: React.RefObject<HTMLElement | null>,

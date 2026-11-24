@@ -72,13 +72,22 @@ describe('CreateQuestionsAndSurveys.module.scss interview suggestion review guar
   });
 
   // Choice options stack one per line everywhere, so a draft with a long list would push the drafts after it
-  // far down; its preview scrolls instead.
+  // far down; its preview scrolls instead, and once at its end lets the wheel move the page on.
   it('scrolls a long choice list inside a draft preview', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'CreateQuestionsAndSurveys.module.scss'), 'utf8');
-    const preview = scss.slice(scss.indexOf('.interviewQuestionPreview {'));
+    // The preview's own block, to its closing brace, so the rule is known to be inside it.
+    const start = scss.indexOf('\n.interviewQuestionPreview {');
+    let depth = 0;
+    let end = scss.indexOf('{', start);
+    do {
+      if (scss[end] === '{') depth += 1;
+      if (scss[end] === '}') depth -= 1;
+      end += 1;
+    } while (depth > 0 && end < scss.length);
+    const preview = scss.slice(start, end);
+    const list = preview.match(/\n {2}:global\(\[id\*='multiChoice'\]\[role='group'\]\) \{([^{}]*)\}/)?.[1] || '';
 
-    expect(preview).toMatch(
-      /^\.interviewQuestionPreview \{[^]*?\n {2}:global\(\[id\*='multiChoice'\]\[role='group'\]\) \{\s*max-height: 42vh;\s*overflow-y: auto;/,
-    );
+    expect(start).toBeGreaterThan(-1);
+    expect(list).toMatch(/^\s*max-height: 42vh;\s*overflow-y: auto;\s*$/);
   });
 });

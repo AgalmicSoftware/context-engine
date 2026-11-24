@@ -695,7 +695,7 @@ describe('interview multiple-choice review list', () => {
     expect(area).toBeInstanceOf(HTMLElement);
     expect(area).toHaveAttribute('id');
     expect(readDraftCardScss()).toMatch(
-      /\.choiceList \{\s*@include choiceListScroll\.choice-list-scroll;\s*max-height: 42vh;/,
+      /\.choiceList \{\s*max-height: 42vh;[^{}]*@include choiceListScroll\.choice-list-scroll;\s*\}/,
     );
   });
 });

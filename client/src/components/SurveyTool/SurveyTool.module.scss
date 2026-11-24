@@ -7780,8 +7780,9 @@ $session-interview-submit-height: 48px;
     flex-basis: 104px;
   }
 
-  .pileCardMainContent:has(#multiChoice) {
-    flex-basis: 176px;
+  // The phone card is the screen's height, so a choice list scrolled to its end keeps the page still, as the prompt does.
+  .pileCardInner .pileCardMainContent:has(#multiChoice) {
+    overscroll-behavior-y: contain;
   }
 
   .pileCardInner.pileQuadraticCard .pileCardMainContent {
@@ -8073,11 +8074,11 @@ $session-interview-submit-height: 48px;
 // Keyed on the list itself, so a poll with options, which shares it, lists the same.
 // It takes the room the prompt leaves, never room from the prompt.
 .pileCardInner .pileCardMainContent:has(#multiChoice) {
-  @include choiceListScroll.choice-list-scroll;
-
   flex: 1 1 0;
   min-height: 0;
   justify-content: flex-start;
+
+  @include choiceListScroll.choice-list-scroll;
 }
 
 .pileCardInner .pileCardMainContent :has(> #multiChoice) {

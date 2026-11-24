@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import * as sass from 'sass';
 
@@ -290,7 +291,7 @@ it('lists choice options one per line at every width, scrolling up and down only
   const everywhere = (selector: string) =>
     css.match(new RegExp(`^${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm'))?.[1] || '';
   expect(everywhere('.pileCardInner .pileCardMainContent:has(#multiChoice)')).toMatch(
-    /overflow-x: hidden;[\s\S]*overflow-y: auto;[\s\S]*flex: 1 1 0;\s*min-height: 0;/,
+    /flex: 1 1 0;\s*min-height: 0;[\s\S]*overflow-x: hidden;[\s\S]*overflow-y: auto;/,
   );
   expect(everywhere('#multiChoice')).toMatch(/flex-direction: column;\s*flex-wrap: nowrap;\s*align-items: stretch;/);
   expect(everywhere('#multiChoice .checkboxOptionText')).toMatch(/width: 100%;\s*max-width: 100%;/);
@@ -305,4 +306,52 @@ it('lists choice options one per line at every width, scrolling up and down only
       expect.not.stringMatching(/overflow-x: (auto|scroll)|scroll-snap-type: x|flex-wrap: wrap|grid-auto-flow: column/),
     ]),
   );
+});
+
+// A list scrolled to its end lets the wheel move the page on, on a computer and in the review, where the page goes on
+// below it; only the phone card, the screen's height, keeps the page still.
+it('holds the page only from a phone choice card', () => {
+  const ruleBodies = (selector: string) =>
+    [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter(([, selectors]) => selectors.trim() === selector)
+      .map(([, , body]) => body);
+  const atRules = (source: string) => source.split(/(?=@media )/);
+  const phone = atRules(css).filter((part) => part.startsWith('@media (max-width: 768px)'));
+  expect(
+    ruleBodies('.pileCardInner .pileCardMainContent:has(#multiChoice)').filter((body) =>
+      /overscroll-behavior/.test(body),
+    ),
+  ).toHaveLength(1);
+  expect(
+    phone.some((part) =>
+      /\.pileCardInner \.pileCardMainContent:has\(#multiChoice\)\s*\{\s*overscroll-behavior-y: contain;\s*\}/.test(
+        part,
+      ),
+    ),
+  ).toBe(true);
+  expect(fs.readFileSync(path.join(scssDir, 'scss', '_choiceListScroll.scss'), 'utf8')).not.toMatch(
+    /overscroll-behavior/,
+  );
+});
+
+// Declarations after a mixin's nested rules draw a Sass warning on every build, and a later Sass puts them in a rule
+// of their own; every rule that uses the choice list's scroll includes it last.
+it('includes the choice list scroll last in every rule that uses it', () => {
+  const scssFiles = (dir: string): string[] =>
+    fs
+      .readdirSync(dir, { withFileTypes: true })
+      .flatMap((entry) =>
+        entry.isDirectory()
+          ? scssFiles(path.join(dir, entry.name))
+          : entry.name.endsWith('.scss')
+            ? [path.join(dir, entry.name)]
+            : [],
+      );
+  const uses = scssFiles(scssDir).flatMap((file) =>
+    [...fs.readFileSync(file, 'utf8').matchAll(/@include choiceListScroll\.choice-list-scroll;([^}]*)\}/g)].map(
+      ([, after]) => [path.relative(scssDir, file), after.trim()],
+    ),
+  );
+  expect(uses.length).toBeGreaterThanOrEqual(2);
+  expect(uses).toEqual(uses.map(([file]) => [file, '']));
 });

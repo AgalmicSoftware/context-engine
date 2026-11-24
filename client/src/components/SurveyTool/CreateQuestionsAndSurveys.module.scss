@@ -1450,7 +1450,6 @@ $user-page-background: var(--ce-surface-sunken);
   :global([id*='multiChoice'][role='group']) {
     max-height: 42vh;
     overflow-y: auto;
-    overscroll-behavior-y: contain;
   }
 
   button[data-step]:disabled {

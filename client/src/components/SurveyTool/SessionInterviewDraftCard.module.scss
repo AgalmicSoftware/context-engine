@@ -597,9 +597,9 @@
 // A choice list is the pile's: one option per line, and a long one scrolls inside the card, ending partway through
 // an option, with the up and down chevrons in the card's footer.
 .choiceList {
-  @include choiceListScroll.choice-list-scroll;
-
   max-height: 42vh;
-  // Room for each option's focus ring, which reaches 5px outside it.
+  // Room for each option's focus ring, which reaches 5px outside it; the foot is the scroll's own 28px.
   padding: 5px 5px 28px;
+
+  @include choiceListScroll.choice-list-scroll;
 }
