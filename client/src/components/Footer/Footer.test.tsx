@@ -83,7 +83,10 @@ describe('Footer', () => {
       expect(screen.getByRole('link', { name: 'ABOUT' })).toHaveAttribute('href', '/ce/about');
       expect(screen.getByRole('link', { name: 'POSTS' })).toHaveAttribute('href', '/ce/posts');
       expect(screen.getByRole('link', { name: 'DOCS' })).toHaveAttribute('href', '/ce/docs');
-      expect(screen.getByTestId('ce-footer-link-github')).toHaveAttribute('href', 'https://github.com/AgalmicSoftware');
+      expect(screen.getByTestId('ce-footer-link-github')).toHaveAttribute(
+        'href',
+        'https://github.com/AgalmicSoftware/context-engine',
+      );
     } finally {
       if (previousPublicUrl === undefined) {
         delete process.env.PUBLIC_URL;
@@ -93,19 +96,20 @@ describe('Footer', () => {
     }
   });
 
-  // The credit was its words beside a separate icon link to the repository, named for Context Engine.
-  it('credits Agalmic Software in one link, words and GitHub icon together', () => {
+  // The credit was its words beside a separate icon link to the repository, named for Context Engine. The one link
+  // goes there still, and its name starts with the words it shows, so speaking them selects it.
+  it('credits Agalmic Software in one link to the repository, words and GitHub icon together', () => {
     renderFooter();
 
     const attribution = screen.getByTestId('ce-footer-brand-attribution');
-    const githubLink = screen.getByRole('link', { name: 'Agalmic Software on GitHub' });
+    const githubLink = screen.getByRole('link', { name: 'Agalmic Software: view Context Engine on GitHub' });
 
     expect(githubLink).toBe(screen.getByTestId('ce-footer-link-github'));
     expect(attribution).toHaveTextContent(/^Agalmic Software$/);
     expect(githubLink).toHaveTextContent(/^Agalmic Software$/);
     expect(githubLink.querySelector('svg[data-icon="github"]')).toBeInstanceOf(SVGElement);
     expect(attribution.querySelectorAll('a')).toHaveLength(1);
-    expect(githubLink).toHaveAttribute('href', 'https://github.com/AgalmicSoftware');
+    expect(githubLink).toHaveAttribute('href', 'https://github.com/AgalmicSoftware/context-engine');
     expect(githubLink).toHaveAttribute('target', '_blank');
     expect(githubLink).toHaveAttribute('rel', 'noopener noreferrer');
   });

@@ -2,8 +2,7 @@ export const PUBLIC_GITHUB_ORG = 'AgalmicSoftware';
 export const PUBLIC_GITHUB_REPO = 'context-engine';
 export const PUBLIC_GITHUB_BRANCH = 'main';
 
-export const PUBLIC_GITHUB_ORG_URL = `https://github.com/${PUBLIC_GITHUB_ORG}`;
-export const PUBLIC_REPO_URL = `${PUBLIC_GITHUB_ORG_URL}/${PUBLIC_GITHUB_REPO}`;
+export const PUBLIC_REPO_URL = `https://github.com/${PUBLIC_GITHUB_ORG}/${PUBLIC_GITHUB_REPO}`;
 export const PUBLIC_REPO_SOURCE_URL = `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}`;
 export const PUBLIC_REPO_ISSUES_URL = `${PUBLIC_REPO_URL}/issues`;
 export const PUBLIC_REPO_NEW_ISSUE_URL = `${PUBLIC_REPO_ISSUES_URL}/new`;

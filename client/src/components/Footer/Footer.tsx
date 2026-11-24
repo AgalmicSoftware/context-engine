@@ -5,7 +5,7 @@ import { connect } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
 import { toggleLoginModal } from '../../actions/sessionStateActions.js';
-import { PUBLIC_GITHUB_ORG_URL } from '../../variables/publicRepoMetadata.js';
+import { PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { getResolvedTheme, subscribeThemeChanges } from '../../utilities/ui/themeRuntime';
@@ -217,15 +217,16 @@ class Footer extends React.Component<FooterProps, FooterState> {
           <div className={styles.copyright}>
             <span className="copyright-link" data-testid="ce-footer-brand-attribution">
               <span className={styles.copyrightContent}>
-                {/* One link, its words and icon together; Classic 95's taskbar shows only the icon. */}
+                {/* One link, its words and icon together, to Context Engine's repository; Classic 95's taskbar shows
+                    only the icon. Its name starts with the words it shows. */}
                 <a
-                  href={PUBLIC_GITHUB_ORG_URL}
+                  href={PUBLIC_REPO_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={styles.githubLink}
                   data-testid="ce-footer-link-github"
-                  aria-label="Agalmic Software on GitHub"
-                  title="Agalmic Software on GitHub"
+                  aria-label="Agalmic Software: view Context Engine on GitHub"
+                  title="Agalmic Software: view Context Engine on GitHub"
                 >
                   <span className={styles.copyrightText}>Agalmic Software</span>
                   <FontAwesomeIcon icon={faGithub} className={styles.githubIcon} />
