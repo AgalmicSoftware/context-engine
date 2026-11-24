@@ -111,12 +111,14 @@ function AnswerChart({
       </div>
     );
   }
-  if (question.type === 'multichoice')
+  if (question.type === 'multichoice') {
+    // Most chosen first; options chosen as often keep the question's own order.
+    const ranked = [...question.options].sort((a, b) => b.count - a.count);
     return (
       // One form for "Pick one" and "Pick any": each option has its own bar, the share of those who answered
       // that chose it, with the count under it. Picks of several options may add up to more than everyone.
       <ul className={styles.choices} aria-label="Multiple choice results">
-        {question.options.map((option, index) => (
+        {ranked.map((option, index) => (
           <li key={index}>
             <span className={styles.choiceLabel}>{option.label}</span>
             <span className={styles.choiceShare}>
@@ -132,6 +134,7 @@ function AnswerChart({
         ))}
       </ul>
     );
+  }
   const max = Math.max(1, ...question.options.flatMap((option) => [option.positive, -option.negative]));
   // Most supported first; options with the same net keep the question's own order.
   const ranked = [...question.options].sort((a, b) => b.net - a.net);

@@ -112,6 +112,34 @@ it('renders proportional multiple-choice bars with explicit geometry for PDF cap
   rows.forEach((row) => expect(row.querySelector('svg')).toHaveAttribute('viewBox', '0 0 100 16'));
 });
 
+// Options in the question's order made the most chosen hard to find in a long list.
+it('lists multiple choice options most chosen first, for Pick one and Pick any, ties in the question\u2019s order', () => {
+  const picks = (values: unknown[]) =>
+    values.map((value, index) => ({ responder: `p${index}`, response: { type: 'multichoice', answer: { value } } }));
+  const options = ['Garden', 'Bus', 'Paths', 'Library'];
+  const ranked = buildReportAnswerQuestions(
+    {
+      one: picks(['Paths', 'Library', 'Paths', 'Bus', 'Library', 'Paths', 'Garden']),
+      any: picks([['Library'], ['Library', 'Garden'], ['Paths', 'Library'], ['Garden', 'Bus']]),
+    },
+    {
+      one: { type: 'multichoice', prompt: 'One only', options, singleSelect: true },
+      any: { type: 'multichoice', prompt: 'Several', options },
+    },
+  );
+  render(<PolisAnswerSections questions={ranked} pdfMode />);
+  const [one, any] = screen.getAllByRole('list', { name: 'Multiple choice results' }).map((list) =>
+    within(list)
+      .getAllByRole('listitem')
+      .map((row) => row.textContent),
+  );
+  // Ties keep the question's order: Garden before Bus, then Bus before Paths.
+  expect(one).toEqual(['Paths3/7', 'Library2/7', 'Garden1/7', 'Bus1/7']);
+  expect(any).toEqual(['Library3/4', 'Garden2/4', 'Bus1/4', 'Paths1/4']);
+  // Only the display is sorted: the summaries keep the question's order.
+  ranked.forEach((question) => expect(question.options.map((option) => option.label)).toEqual(options));
+});
+
 it('keeps binary independent, includes it in PDF, and restores its collapsed state', () => {
   const binary = (heading: React.ReactNode) => (
     <article data-pdf-keep-together>
