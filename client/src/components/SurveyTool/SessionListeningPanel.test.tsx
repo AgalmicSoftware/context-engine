@@ -1967,6 +1967,129 @@ describe('SessionListeningPanel', () => {
   });
 });
 
+// A breakout on a video call was recorded with the box unticked: echo cancellation kept everyone but the host out.
+it('asks where the others are before a new group recording, and the answer sets the box and starts it', async () => {
+  window.localStorage.removeItem('ce:record-speaker-audio:v1');
+  const startRecording = jest.fn();
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ startRecording }));
+  const { unmount } = render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+  const start = screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_START);
+  await waitFor(() => expect(start).toBeEnabled());
+  fireEvent.click(start);
+  expect(startRecording).not.toHaveBeenCalled();
+  const question = screen.getByRole('group', { name: 'Where are the others?' });
+  const onCall = within(question).getByRole('button', { name: /On a call through this device/ });
+  expect(onCall).toHaveTextContent('Use speakers, not headphones');
+  // The keyboard lands on the question.
+  expect(within(question).getByRole('button', { name: 'In this room' })).toHaveFocus();
+  fireEvent.click(onCall);
+  // The same tap starts recording, with the answer, before the recorder's own options can catch up.
+  expect(startRecording).toHaveBeenCalledWith({ recordSpeakerAudio: true });
+  expect(screen.getByRole('checkbox', { name: 'Recording voices coming from this device' })).toBeChecked();
+  expect(window.localStorage.getItem('ce:record-speaker-audio:v1')).toBe('true');
+  expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(
+    expect.objectContaining({ recordSpeakerAudio: true }),
+  );
+  unmount();
+
+  // In the room: the box unticked, as Record left it before.
+  startRecording.mockClear();
+  render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+  await waitFor(() => expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_START)).toBeEnabled());
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_START));
+  fireEvent.click(screen.getByRole('button', { name: 'In this room' }));
+  expect(startRecording).toHaveBeenCalledWith({ recordSpeakerAudio: false });
+  expect(screen.getByRole('checkbox', { name: 'Recording voices coming from this device' })).not.toBeChecked();
+  expect(window.localStorage.getItem('ce:record-speaker-audio:v1')).toBe('false');
+  window.localStorage.removeItem('ce:record-speaker-audio:v1');
+});
+
+it('asks nothing for Record more, nor for Listening', async () => {
+  const startRecording = jest.fn();
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({
+      startRecording,
+      transcript: 'Earlier talk.',
+      segments: [{ id: 's0', index: 0, status: 'complete', text: 'Earlier talk.', startedAt: 1 }],
+    }),
+  );
+  const { unmount } = render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+  await waitFor(() => expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_START)).toBeEnabled());
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_START));
+  expect(startRecording).toHaveBeenCalledWith();
+  expect(screen.queryByRole('group', { name: 'Where are the others?' })).not.toBeInTheDocument();
+  unmount();
+  startRecording.mockClear();
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ startRecording }));
+  render(<SessionListeningPanel sessionSlug="workshop" />);
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_START));
+  expect(startRecording).toHaveBeenCalledWith();
+});
+
+it('warns when the latest finished parts each hold one voice, and never touches the recording', () => {
+  const part = (index: number, speakers: string[], status = 'complete') => ({
+    id: `s${index}`,
+    index,
+    status,
+    text: speakers.join(' '),
+    startedAt: index,
+    speakerTurns: speakers.map((speaker) => ({ speaker, text: `${speaker} spoke.` })),
+  });
+  const startRecording = jest.fn();
+  const stopRecording = jest.fn();
+  const pauseRecording = jest.fn();
+  const show = (segments: unknown[], speakerAudio = false) => {
+    window.localStorage.setItem('ce:record-speaker-audio:v1', String(speakerAudio));
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        status: 'recording',
+        isRecording: true,
+        transcript: 'Talk.',
+        segments,
+        startRecording,
+        stopRecording,
+        pauseRecording,
+      }),
+    );
+    return render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+  };
+  try {
+    // Two voices, then one part of one: not yet.
+    let view = show([part(0, ['Person 1', 'Person 2']), part(1, ['Person 1'])]);
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_RECORDING_ONE_VOICE)).not.toBeInTheDocument();
+    view.unmount();
+    // Two in a row, past a failed part and the one still recording: the box and the headphones are named.
+    view = show([
+      part(0, ['Person 1', 'Person 2']),
+      part(1, ['Person 1']),
+      part(2, [], 'failed'),
+      part(3, ['Person 1']),
+      part(4, [], 'recording'),
+    ]);
+    const warning = screen.getByTestId(E2E_TESTIDS.SESSION_RECORDING_ONE_VOICE);
+    expect(warning).toHaveAttribute('role', 'status');
+    expect(warning).toHaveTextContent(
+      'Only one voice in the last 2 parts. If others are on a call through this device, Stop, tick “Recording voices coming from this device”, play the call through speakers, not headphones, then Record more.',
+    );
+    view.unmount();
+    // Ticked already: only the headphones.
+    view = show([part(0, ['Speaker A']), part(1, ['Speaker A']), part(2, ['Speaker A'])], true);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_RECORDING_ONE_VOICE)).toHaveTextContent(
+      'Only one voice in the last 3 parts. If others are on a call through this device, play it through speakers, not headphones.',
+    );
+    view.unmount();
+    // Parts without speaker labels say nothing about voices.
+    view = show([0, 1, 2].map((index) => ({ ...part(index, []), text: 'Plain words.' })));
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_RECORDING_ONE_VOICE)).not.toBeInTheDocument();
+    view.unmount();
+    expect(startRecording).not.toHaveBeenCalled();
+    expect(stopRecording).not.toHaveBeenCalled();
+    expect(pauseRecording).not.toHaveBeenCalled();
+  } finally {
+    window.localStorage.removeItem('ce:record-speaker-audio:v1');
+  }
+});
+
 it('remembers the optional speaker-audio setting and locks it while recording', () => {
   window.localStorage.removeItem('ce:record-speaker-audio:v1');
   (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
@@ -2158,6 +2281,7 @@ it('waits for the transcription provider before starting Group Conversation with
     expect(screen.getByRole('checkbox', { name: 'More than 4 people in the room' })).not.toBeChecked();
     expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(expect.objectContaining({ labelSpeakers: true }));
     fireEvent.click(start);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RECORDING_OTHERS_ROOM));
     expect(startRecording).toHaveBeenCalledTimes(1);
   } finally {
     window.localStorage.removeItem('ce:record-more-than-four:v1');
@@ -2366,6 +2490,7 @@ it('makes Record available with plain transcription after two seconds and ignore
     expect(start).toBeEnabled();
     expect(screen.getByText(/Speaker label check timed out/)).toHaveTextContent('plain transcription');
     fireEvent.click(start);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RECORDING_OTHERS_ROOM));
     expect(startRecording).toHaveBeenCalledTimes(1);
     await act(async () => {
       resolve({ provider: 'openai' } as Config);

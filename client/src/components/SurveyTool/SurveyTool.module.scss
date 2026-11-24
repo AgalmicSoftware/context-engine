@@ -2752,6 +2752,27 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
+// "Where are the others?", in Record's place before a new group recording: each answer starts it.
+.sessionRecordingWhere {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: min(100%, 320px);
+
+  strong {
+    font-size: 1rem;
+  }
+
+  .sessionRecordingButton {
+    flex-direction: column;
+  }
+
+  small {
+    font-weight: 400;
+  }
+}
+
 // Capture warnings, such as a paused microphone or no screen lock: a bar and tint set them apart.
 .sessionRecordingWakeNotice {
   width: 100%;

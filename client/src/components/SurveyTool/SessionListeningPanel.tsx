@@ -26,7 +26,12 @@ import SessionTranscriptClaimShare from './SessionTranscriptClaimShare';
 import SessionTranscriptContextOption from './SessionTranscriptContextOption';
 import { useTranscriptContextUpload } from './useTranscriptContextUpload';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
-import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS, transcriptSpeech } from '../../utilities/audio/rollingTranscription';
+import {
+  DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
+  ONE_VOICE_PARTS_BEFORE_WARNING,
+  oneVoicePartsInARow,
+  transcriptSpeech,
+} from '../../utilities/audio/rollingTranscription';
 import { applySpeakerMerges } from '../../utilities/audio/speakerMerges';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SessionListeningWaveform } from './SessionListeningWaveform';
@@ -101,6 +106,8 @@ export { formatSessionRecordingElapsed };
 const KEEP_AUDIO_HELP =
   'Closes without waiting for transcription. Audio still waiting for it stays on this device and resumes uploading when you reopen this recording.';
 const MANY_VOICES_KEY = 'ce:record-more-than-four:v1';
+const SPEAKER_AUDIO_KEY = 'ce:record-speaker-audio:v1';
+const SPEAKER_AUDIO_LABEL = 'Recording voices coming from this device';
 const MANY_VOICES_HELP =
   'Ticked, speakers are labelled Speaker A, B… within each part of the recording only, so a letter may be someone else in the next part. Unticked, up to four voices keep a Person number throughout.';
 
@@ -157,11 +164,27 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   }, [sessionSlug, sessionConfig]);
   const [recordSpeakerAudio, setRecordSpeakerAudio] = useState(() => {
     try {
-      return window.localStorage.getItem('ce:record-speaker-audio:v1') === 'true';
+      return window.localStorage.getItem(SPEAKER_AUDIO_KEY) === 'true';
     } catch {
       return false;
     }
   });
+  const chooseSpeakerAudio = (checked: boolean) => {
+    setRecordSpeakerAudio(checked);
+    try {
+      window.localStorage.setItem(SPEAKER_AUDIO_KEY, String(checked));
+    } catch {
+      /* The option still works when browser storage is unavailable. */
+    }
+  };
+  // Echo cancellation keeps the voices of a call played through this device out of the recording, and nobody
+  // recording a breakout can be expected to know it: a new group recording first asks where the others are. The
+  // answer sets the box below, kept on this device; it is the tap that starts recording.
+  const [askWhereOthers, setAskWhereOthers] = useState(false);
+  const whereOthersRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (askWhereOthers) whereOthersRef.current?.querySelector('button')?.focus();
+  }, [askWhereOthers]);
   // More voices than speaker labels keep apart: each part of the recording letters its own speakers, with no voice
   // samples and no part for each person. Ticked until this device chooses otherwise, since a breakout room is
   // usually larger than four; the choice is kept on the device, so a recording reopened in the same room stays as it
@@ -394,7 +417,29 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     '';
   const gapWarning =
     failedCount > 0 ? "Some audio couldn't be transcribed. Retry transcription or download the audio below." : '';
+  // Only labelled parts can say how many voices they hold, so this needs speaker labels on.
+  const oneVoiceParts = useMemo(
+    () => (panelMode === 'recordGroup' ? oneVoicePartsInARow(recorder.segments) : 0),
+    [panelMode, recorder.segments],
+  );
+  const oneVoiceWarning =
+    oneVoiceParts < ONE_VOICE_PARTS_BEFORE_WARNING
+      ? ''
+      : `Only one voice in the last ${oneVoiceParts} parts. If others are on a call through this device, ${
+          recordSpeakerAudio
+            ? 'play it through speakers, not headphones.'
+            : `Stop, tick “${SPEAKER_AUDIO_LABEL}”, play the call through speakers, not headphones, then Record more.`
+        }`;
   const isPreparingRecording = panelMode === 'recordGroup' && speakerLabelsSupported === null;
+  const recordDisabled =
+    isClosing ||
+    recorder.isBusy ||
+    isPreparingRecording ||
+    Boolean(recorder.ownerNotice) ||
+    Boolean(recorder.openElsewhere) ||
+    Boolean(recorder.importing);
+  // Nothing recorded or transcribed yet: Record more, and Record after a reload with audio kept, ask nothing.
+  const isNewRecording = !hasTranscript && !recorder.segments.length;
   const recordButtonLabel = isRecorderSessionActive
     ? recorder.isStopping
       ? 'Stopping'
@@ -733,6 +778,40 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
               </button>
             </div>
           </div>
+        ) : askWhereOthers ? (
+          <div
+            ref={whereOthersRef}
+            className={styles.sessionRecordingWhere}
+            role="group"
+            aria-labelledby={`${speakerHelpId}-where`}
+          >
+            <strong id={`${speakerHelpId}-where`}>Where are the others?</strong>
+            {[
+              { onCall: false, label: 'In this room', testId: E2E_TESTIDS.SESSION_RECORDING_OTHERS_ROOM },
+              {
+                onCall: true,
+                label: 'On a call through this device',
+                testId: E2E_TESTIDS.SESSION_RECORDING_OTHERS_CALL,
+              },
+            ].map(({ onCall, label, testId }) => (
+              <Button
+                key={label}
+                type="button"
+                className={styles.sessionRecordingButton}
+                disabled={recordDisabled}
+                data-testid={testId}
+                onClick={() => {
+                  chooseSpeakerAudio(onCall);
+                  setAskWhereOthers(false);
+                  recordPressedRef.current = true;
+                  void recorder.startRecording({ recordSpeakerAudio: onCall });
+                }}
+              >
+                {label}
+                {onCall ? <small>Use speakers, not headphones</small> : null}
+              </Button>
+            ))}
+          </div>
         ) : (
           <Button
             type="button"
@@ -740,17 +819,14 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             color={embeddedInModal ? 'link' : 'secondary'}
             className={styles.sessionListeningRecordButton}
             onClick={() => {
+              if (panelMode === 'recordGroup' && isNewRecording) {
+                setAskWhereOthers(true);
+                return;
+              }
               recordPressedRef.current = true;
               void recorder.startRecording();
             }}
-            disabled={
-              isClosing ||
-              recorder.isBusy ||
-              isPreparingRecording ||
-              Boolean(recorder.ownerNotice) ||
-              recorder.openElsewhere ||
-              recorder.importing
-            }
+            disabled={recordDisabled}
             data-testid={E2E_TESTIDS.SESSION_LISTENING_START}
           >
             <span className={styles.sessionListeningRecordIcon} aria-hidden="true">
@@ -784,16 +860,9 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
                 type="checkbox"
                 checked={recordSpeakerAudio}
                 disabled={isRecorderSessionActive || recorder.isBusy}
-                onChange={(event) => {
-                  setRecordSpeakerAudio(event.target.checked);
-                  try {
-                    window.localStorage.setItem('ce:record-speaker-audio:v1', String(event.target.checked));
-                  } catch {
-                    /* The option still works when browser storage is unavailable. */
-                  }
-                }}
+                onChange={(event) => chooseSpeakerAudio(event.target.checked)}
               />{' '}
-              Recording voices coming from this device
+              {SPEAKER_AUDIO_LABEL}
             </label>
             <button
               type="button"
@@ -891,6 +960,15 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       )}
 
       {gapWarning ? <div role="status">{gapWarning}</div> : null}
+      {oneVoiceWarning ? (
+        <div
+          className={styles.sessionRecordingWakeNotice}
+          role="status"
+          data-testid={E2E_TESTIDS.SESSION_RECORDING_ONE_VOICE}
+        >
+          {oneVoiceWarning}
+        </div>
+      ) : null}
       {/* One tap must not end capture: Stop first, then close without waiting for uploads. */}
       {!isCapturing && (hasPendingTranscription || failedCount > 0 || isClosing) && onClose ? (
         <span className={styles.sessionRecordingOption}>

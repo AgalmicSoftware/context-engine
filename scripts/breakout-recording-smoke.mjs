@@ -75,6 +75,12 @@ try {
     await page.waitForFunction(() => [...document.querySelectorAll('.modal, .modal-dialog')].every(element => getComputedStyle(element).opacity === '1'));
     await page.getByTestId('ce-session-listening-panel').screenshot({ path: path.join(output, `setup-${theme}-${width}.png`) });
     await page.getByTestId('ce-session-listening-start').click();
+    // A new recording first asks where the others are; on a call, the answer ticks the box and starts recording.
+    const where = page.getByRole('group', { name: 'Where are the others?' });
+    await where.waitFor();
+    await readable(where);
+    await page.getByTestId('ce-session-listening-panel').screenshot({ path: path.join(output, `where-${theme}-${width}.png`) });
+    await page.getByTestId('ce-session-recording-others-call').click();
     await page.getByRole('button', { name: 'Stop recording' }).waitFor();
     assert.equal(await page.evaluate(() => window.__captureConstraints.audio.echoCancellation), false);
     await page.waitForFunction(() => window.__wakeHeld === true);
@@ -101,6 +107,8 @@ try {
       await page.getByRole('button', { name: 'Reopen recording' }).click();
       await page.getByRole('checkbox', { name: 'More than 4 people in the room' }).uncheck();
       await page.getByTestId('ce-session-listening-start').click();
+      // Record more asks nothing; only a recording with nothing in it yet asks where the others are.
+      assert.equal(await where.isVisible(), false, 'Record more asks nothing');
       await page.getByRole('button', { name: 'Stop recording' }).waitFor();
       transcriptionGate = new Promise(resolve => { releaseTranscription = resolve; });
       const dismiss = () => (dismissal === 'Escape' ? page.keyboard.press('Escape') : recorder.click({ position: { x: 2, y: 2 } }));

@@ -1,6 +1,9 @@
 import { joinTranscriptText, transcriptOverlapTail } from './transcriptOverlap';
 import type { SpeakerTranscriptTurn } from './speakerTranscript';
 export const DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS = 3 * 60 * 1000;
+// Finished parts in a row with one voice before the group recorder says the others may be missing: two parts are
+// six minutes, which one long turn rarely fills.
+export const ONE_VOICE_PARTS_BEFORE_WARNING = 2;
 export const LISTENING_MODE_QUERY_VALUE = 'listening';
 
 export type RollingTranscriptSegmentStatus =
@@ -29,6 +32,24 @@ export type RollingTranscriptSegment = {
   // may be someone else, so the transcript marks where each part starts.
   speakersPerPart?: boolean;
   gapBefore?: CaptureGap;
+};
+
+/**
+ * The latest finished parts in a row in which one labelled voice did all the talking. A part with no labelled
+ * speech (still recording, failed, silent, or transcribed without labels) says nothing either way and is passed
+ * over; a part with two voices ends the run.
+ */
+export const oneVoicePartsInARow = (segments: RollingTranscriptSegment[] = []): number => {
+  let run = 0;
+  for (const segment of [...segments].sort((a, b) => b.index - a.index)) {
+    if (segment.status !== 'complete') continue;
+    const voices = new Set(
+      (segment.speakerTurns || []).filter((turn) => turn.speaker && turn.text.trim()).map((turn) => turn.speaker),
+    );
+    if (voices.size > 1) break;
+    if (voices.size) run += 1;
+  }
+  return run;
 };
 
 // A chunk boundary repeats at most a second of speech, so only its last 80 words are compared.
