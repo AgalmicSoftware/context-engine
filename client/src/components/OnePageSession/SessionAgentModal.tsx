@@ -10,15 +10,10 @@ import { SESSION_AGENT_README_URL } from './SessionAgentNotice';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import SessionDictation from './SessionDictation';
-import {
-  SESSION_AGENT_USE_NOTICE,
-  sessionAgentAddressNotice,
-  sessionAgentFullerAnswersNote,
-} from './sessionAgentWording';
+import { sessionAgentAddressNotice, sessionAgentFullerAnswersNote } from './sessionAgentWording';
 import {
   askSessionAgent,
   readSessionAgentStatus,
-  setSessionAgentOptOut,
   setSessionAgentUnattributed,
   type SessionAgentReply,
   type SessionAgentRequestOptions,
@@ -45,7 +40,6 @@ const STYLE_HELP = {
 const STORE_HELP =
   'This question and its answer will be kept in this session’s records, available to its organisers, and may ' +
   'be exported. Untick it to keep this one out.';
-const NAME_HELP = 'Kept as you type it, for example Sam or Sam’s agent. It isn’t checked.';
 // The box starts ticked, and a chat is stored without the asker's address unless they choose it.
 const STORE_TO_START = true;
 const ADDRESS_TO_START = false;
@@ -150,7 +144,6 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
   const [askError, setAskError] = useState('');
   const [store, setStore] = useState(STORE_TO_START);
   const [withAddress, setWithAddress] = useState(ADDRESS_TO_START);
-  const [name, setName] = useState('');
   // Whether the session writes this person's speech down, as for an answer: asked once they may ask.
   const [speech, setSpeech] = useState<boolean | null>(null);
   // A visitor the session writes no speech down for, though it would once they sign in.
@@ -185,7 +178,6 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
       setCut(false);
       setStore(STORE_TO_START);
       setWithAddress(ADDRESS_TO_START);
-      setName('');
     }
     const savesBefore = switchSaves.current;
     setStatusError('');
@@ -244,7 +236,7 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
     try {
       // Only someone signed in with an address has one to store.
       const keep = store
-        ? { attribution: withAddress && hasAddress ? ('address' as const) : ('anonymous' as const), name: name.trim() }
+        ? { attribution: withAddress && hasAddress ? ('address' as const) : ('anonymous' as const) }
         : null;
       setReply(
         status?.recording
@@ -282,24 +274,6 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
         <p id={`${baseId}-yours`} className={styles.label}>
           Your answers and files in this session
         </p>
-        <div className={styles.switchRow}>
-          <label htmlFor={`${baseId}-use`}>
-            <input
-              id={`${baseId}-use`}
-              type="checkbox"
-              role="switch"
-              checked={!status.optedOut}
-              disabled={savingSwitch}
-              data-testid="ce-session-agent-use-mine"
-              onChange={(event) => {
-                const optOut = !event.target.checked;
-                void saveSwitch(async () => ({ optedOut: await setSessionAgentOptOut(optOut, options) }));
-              }}
-            />
-            Use my answers and files
-          </label>
-          <Help id={`${baseId}-use-help`} label="About using your answers and files" text={SESSION_AGENT_USE_NOTICE} />
-        </div>
         {status.unattributed === null ? null : (
           <div className={styles.switchRow}>
             <label htmlFor={`${baseId}-address`}>
@@ -394,19 +368,29 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
           <label htmlFor={`${baseId}-question`} className={styles.label}>
             Your question
           </label>
-          <textarea
-            id={`${baseId}-question`}
-            className={`form-control ${styles.question}`}
-            value={question}
-            maxLength={SESSION_AGENT_LIMITS.questionChars}
-            rows={3}
-            aria-describedby={`${baseId}-limits`}
-            data-testid="ce-session-agent-question"
-            onChange={(event) => {
-              setQuestion(event.target.value);
-              setCut(false);
-            }}
-          />
+          <div className={styles.questionRow}>
+            <textarea
+              id={`${baseId}-question`}
+              className={`form-control ${styles.question}`}
+              value={question}
+              maxLength={SESSION_AGENT_LIMITS.questionChars}
+              rows={3}
+              aria-describedby={`${baseId}-limits`}
+              data-testid="ce-session-agent-question"
+              onChange={(event) => {
+                setQuestion(event.target.value);
+                setCut(false);
+              }}
+            />
+            {microphone ? (
+              <SessionDictation
+                options={{ sessionSlug, sessionConfig, account }}
+                onWords={addWords}
+                onBusy={setListening}
+                testId="ce-session-agent-mic"
+              />
+            ) : null}
+          </div>
           {cut ? (
             <p className={styles.hint} role="status">
               The end of what you said didn’t fit in {SESSION_AGENT_LIMITS.questionChars} characters.
@@ -452,38 +436,16 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
                       </label>
                     </fieldset>
                   ) : null}
-                  <div className={styles.switchRow}>
-                    <label htmlFor={`${baseId}-name`}>Name (optional)</label>
-                    <Help id={`${baseId}-name-help`} label="About the name" text={NAME_HELP} />
-                    <input
-                      id={`${baseId}-name`}
-                      type="text"
-                      className={`form-control ${styles.name}`}
-                      value={name}
-                      maxLength={SESSION_AGENT_LIMITS.nameChars}
-                      autoComplete="off"
-                      data-testid="ce-session-agent-name"
-                      onChange={(event) => setName(event.target.value)}
-                    />
-                  </div>
                 </>
               ) : null}
             </div>
           ) : null}
-          <div className={`${styles.row} ${microphone ? styles.withMic : ''}`}>
+          <div className={styles.row}>
             <p id={`${baseId}-limits`} className={styles.hint}>
               Answers are at most {SESSION_AGENT_LIMITS.answerWords} words.{' '}
               {!status.recording ? 'Questions and answers aren’t kept.' : store ? '' : 'This chat won’t be kept.'}
               {speech === false && speechAfterSignIn ? ' Sign in to ask by voice.' : ''}
             </p>
-            {microphone ? (
-              <SessionDictation
-                options={{ sessionSlug, sessionConfig, account }}
-                onWords={addWords}
-                onBusy={setListening}
-                testId="ce-session-agent-mic"
-              />
-            ) : null}
             <button
               type="submit"
               className={styles.ask}

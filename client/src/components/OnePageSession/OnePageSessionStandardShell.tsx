@@ -808,7 +808,7 @@ export default function OnePageSessionStandardShell({
               <div className={`${styles.miniSectionContent} ${styles.documentsSectionContent}`.trim()}>
                 {showSessionAgent ? (
                   <div className={styles.sessionAgentBar}>
-                    {/* The dialog has the same switch: closing it shows the box again, read afresh. */}
+                    {/* Read afresh each time the dialog closes. */}
                     {sessionAgentOpen ? null : (
                       <SessionAgentUseOption
                         sessionSlug={effectiveSlug}

@@ -135,27 +135,35 @@
   .hint {
     flex: 1 1 200px;
   }
-
-  // A microphone error takes its own line under the row, so Ask keeps its place.
-  [role='alert'] {
-    order: 1;
-  }
 }
 
-// On a phone the three don't fit one line: the hint takes the line above, so the microphone and Ask stay
-// together on the right.
-@media (max-width: 420px) {
-  .withMic .hint {
+// The microphone beside the question box; an error from it takes its own line under them.
+.questionRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+
+  .question {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  [role='alert'] {
     flex-basis: 100%;
   }
 }
 
-// The accent pair, which every theme keeps readable, in each state.
+// The dialog's main action, in the accent pair every theme keeps readable, in each state.
 .ask {
-  padding: 6px 16px;
+  min-width: 96px;
+  padding: 8px 22px;
+  border: 2px solid var(--ce-action-accent);
+  border-radius: var(--ce-radius-8, 8px);
   background: var(--ce-action-accent);
   color: var(--ce-action-accent-text);
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 700;
   cursor: pointer;
 
   &:hover:not(:disabled),
@@ -165,11 +173,10 @@
     color: var(--ce-action-accent-text);
   }
 
-  // Muted text rather than opacity, so the label stays readable.
+  // Before there's a question it keeps its outline and the panel's text, so it still reads as the action.
   &:disabled {
-    border-style: dashed;
     background: transparent;
-    color: var(--ce-panel-text-muted);
+    color: var(--ce-panel-text);
     cursor: not-allowed;
   }
 }
@@ -281,13 +288,6 @@
 }
 
 // The setup page's field colours, as for the question.
-.name {
-  flex: 1 1 160px;
-  min-width: 0;
-  background: var(--ce-input-bg) !important;
-  border-color: var(--ce-input-border-strong) !important;
-  color: var(--ce-panel-text) !important;
-}
 
 // Read by screen readers as the "?"'s description; the tooltip shows it to everyone else.
 .hidden {

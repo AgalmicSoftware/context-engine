@@ -26,7 +26,7 @@ export type SessionAgentStatus = {
 };
 
 /** What to keep of one chat: with the asker's address or without, and a name if they gave one; null keeps nothing. */
-export type SessionAgentKeep = { attribution: 'address' | 'anonymous'; name: string } | null;
+export type SessionAgentKeep = { attribution: 'address' | 'anonymous'; name?: string } | null;
 
 /** One context item an answer drew on: a link or note from the session's settings, or an added link or file. */
 export type SessionAgentSource = {

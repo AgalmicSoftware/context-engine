@@ -228,9 +228,9 @@ untrusted data.
 
 ## Keeping your answers and files out
 
-Everyone's answers and files are in until they say otherwise. In the Session
-Agent's dialog, turning off **Use my answers and files** keeps them out of every
-answer from the next question on. The files stay in the session's file list, and
+Everyone's answers and files are in until they say otherwise. In the Context
+section, beside the Session Agent button, unticking **Session Agent may use my
+answers and files** keeps them out of every answer from the next question on. The files stay in the session's file list, and
 answers already given can't be taken back. The published results still count
 everyone's answers, as on the Results page. Anyone signed in with an address can
 turn it off, even someone the Session Agent doesn't answer, and turn it back on at
@@ -243,15 +243,15 @@ the Session Agent off, and a session backup made by a 0.9.9 or later Worker
 carries them, so its restore keeps everyone who turned it off opted out. An
 older backup has none: after restoring one, tell people to set the switch again.
 
-A second switch there, **Include my address with my answers**, is also on
-until the person turns it off. Off, their answers and files stay in, and the
+The Session Agent's dialog has a second switch, **Include my address with my
+answers**, also on until the person turns it off. Off, their answers and files stay in, and the
 [export](#export) leaves their account address off them. It changes the
 export only, and there only what they wrote and added: the export's group
 member lists still include their address, and it still shows wherever the
 session shows their answers. The Worker stores
 who turned it off, and backs that up, the same way, from 0.9.11. Only someone
 signed in with an address has it. The Context section carries the first
-switch only.
+switch only, and the dialog the second only.
 
 Both switches stay open after the session has ended or its AI is turned off,
 when the Session Agent answers no one: an export can still be made then, and
@@ -265,9 +265,9 @@ organisers and signed-in members, or its organisers alone. The robot's notice
 ends with the session's own note on where its data goes, when its admins wrote
 one (`interviewMode.dataNote`), as plain text.
 
-While it is on, the Context section carries the same switch beside the Session
-Agent button, **Session Agent may use my answers and files**, with the same
-"?", for someone signed in. It shows what the Worker holds, and a change made
+While it is on, the Context section carries the first switch beside the Session
+Agent button, **Session Agent may use my answers and files**, for someone
+signed in. It shows what the Worker holds, and a change made
 there is saved at once; if it can't be saved, the box goes back to what is
 stored and says so. The interview dialog has no switch of its own: submitting
 an interview changes nothing the Worker holds, so someone who turned it off
@@ -388,7 +388,7 @@ by elimination: leaving an address off is not anonymity within a small group.
 
 | Count | What stayed out |
 |---|---|
-| `optedOut` | Answers and files of people who turned off **Use my answers and files** |
+| `optedOut` | Answers and files of people who unticked **Session Agent may use my answers and files** |
 | `belowMinAnswers` | Questions fewer members answered than the session's minimum: no counts and nothing they wrote |
 | `answersWithoutAddress` | Answers from people who joined without an address, such as through Telegram, who have no switch to set; they aren't in the counts either |
 | `patternMatches` | Written answers holding an email address, an account address, an ENS name or a run of ten or more digits such as a phone number, dropped whole |
