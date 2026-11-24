@@ -58,9 +58,37 @@ describe('adding a transcript to context', () => {
     expect(older.result.current.available).toBe(false);
   });
 
-  it('uploads nothing unless ticked', async () => {
-    const { result } = await mount();
-    await act(() => result.current.upload('Person 1: Words.'));
+  it('starts ticked, and uploads nothing once unticked, however much more is recorded', async () => {
+    const view = await mount();
+    expect(view.result.current.chosen).toBe(true);
+    act(() => view.result.current.setChosen(false));
+    await act(() => view.result.current.upload('Person 1: Words.'));
+    // Record more: a longer transcript, the same panel, and the choice stays as left.
+    view.rerender(input());
+    expect(view.result.current.chosen).toBe(false);
+    await act(() => view.result.current.upload('Person 1: Words. Person 2: More words.'));
+    expect(uploadContextFile).not.toHaveBeenCalled();
+  });
+
+  it('uploads nothing where the box isn’t offered, though it starts ticked', async () => {
+    const offered = (hook: { result: { current: ReturnType<typeof useTranscriptContextUpload> } }) =>
+      hook.result.current;
+    // A participant in a session that takes context from admins only.
+    const limited = renderHook(() => useTranscriptContextUpload(input({ contextAdditionPolicy: 'admin_only' })));
+    await act(async () => undefined);
+    expect(offered(limited)).toMatchObject({ available: false, chosen: true });
+    await act(() => offered(limited).upload('Person 1: Words.'));
+    // A Worker that takes no participant context.
+    jest.mocked(workerAcceptsParticipantContext).mockResolvedValueOnce(false);
+    const older = renderHook(() => useTranscriptContextUpload(input()));
+    await act(async () => undefined);
+    expect(offered(older).available).toBe(false);
+    await act(() => offered(older).upload('Person 1: Words.'));
+    // Not a Group Conversation.
+    const solo = renderHook(() => useTranscriptContextUpload({ ...input(), enabled: false }));
+    await act(async () => undefined);
+    expect(offered(solo).available).toBe(false);
+    await act(() => offered(solo).upload('Person 1: Words.'));
     expect(uploadContextFile).not.toHaveBeenCalled();
   });
 

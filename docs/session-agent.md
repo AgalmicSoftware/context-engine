@@ -228,9 +228,9 @@ untrusted data.
 
 ## Keeping your answers and files out
 
-Everyone's answers and files are in until they say otherwise. In the Session
-Agent's dialog, turning off **Use my answers and files** keeps them out of every
-answer from the next question on. The files stay in the session's file list, and
+Everyone's answers and files are in until they say otherwise. In the Context
+section, beside the Session Agent button, unticking **Session Agent may use my
+answers and files** keeps them out of every answer from the next question on. The files stay in the session's file list, and
 answers already given can't be taken back. The published results still count
 everyone's answers, as on the Results page. Anyone signed in with an address can
 turn it off, even someone the Session Agent doesn't answer, and turn it back on at
@@ -243,31 +243,33 @@ the Session Agent off, and a session backup made by a 0.9.9 or later Worker
 carries them, so its restore keeps everyone who turned it off opted out. An
 older backup has none: after restoring one, tell people to set the switch again.
 
-A second switch there, **Include my address with my answers**, is also on
-until the person turns it off. Off, their answers and files stay in, and the
+A second box there, **Include my address with my answers**, is also on until
+the person turns it off. Off, their answers and files stay in, and the
 [export](#export) leaves their account address off them. It changes the
 export only, and there only what they wrote and added: the export's group
 member lists still include their address, and it still shows wherever the
 session shows their answers. The Worker stores
 who turned it off, and backs that up, the same way, from 0.9.11. Only someone
-signed in with an address has it. The Context section carries the first
-switch only.
+signed in with an address has it. The Session Agent's dialog carries neither
+box. Its **Store this chat** choice of **No address** or **My address** is
+another matter: it sets only whether that chat is stored with the address.
 
-Both switches stay open after the session has ended or its AI is turned off,
+Both boxes stay open after the session has ended or its AI is turned off,
 when the Session Agent answers no one: an export can still be made then, and
 each person's choices apply to it.
 
-A "?" by the switch, and a robot by the session's title while the Session Agent
-is on, say what it may read and link here through the README. The robot's notice
-and the second switch's "?" also say who is shown a person's answers with
+A "?" by each box says what it changes, on hover, focus, click or tap. A robot
+by the session's title while the Session Agent is on says what it may read: it
+opens the dialog for whoever may ask, whose "?" links here through the README,
+and links there itself for anyone else. The robot's notice and the address
+box's "?" also say who is shown a person's answers with
 their address, by the session's results setting: anyone with its link, its
 organisers and signed-in members, or its organisers alone. The robot's notice
 ends with the session's own note on where its data goes, when its admins wrote
 one (`interviewMode.dataNote`), as plain text.
 
-While it is on, the Context section carries the same switch beside the Session
-Agent button, **Session Agent may use my answers and files**, with the same
-"?", for someone signed in. It shows what the Worker holds, and a change made
+While it is on, the Context section carries both boxes beside the Session Agent
+button for someone signed in. They show what the Worker holds, and a change made
 there is saved at once; if it can't be saved, the box goes back to what is
 stored and says so. The interview dialog has no switch of its own: submitting
 an interview changes nothing the Worker holds, so someone who turned it off
@@ -350,7 +352,7 @@ wrote or added it. An `asked` item carries `by` only when its asker chose to
 store the chat with their address, and a `name` only when they typed one for
 it. No other item carries a name, and questions, counts, results and the
 session's own notes carry no address. Anyone signed in with an address can
-turn off **Include my address with my answers** in the Session Agent's dialog:
+untick **Include my address with my answers** in the Context section:
 their answers and files are still exported, without `by`. Answers without an
 address that say the same words to the same question are one item with a
 `count`, so they can't be told apart. The live Session Agent never sees an
@@ -388,7 +390,7 @@ by elimination: leaving an address off is not anonymity within a small group.
 
 | Count | What stayed out |
 |---|---|
-| `optedOut` | Answers and files of people who turned off **Use my answers and files** |
+| `optedOut` | Answers and files of people who unticked **Session Agent may use my answers and files** |
 | `belowMinAnswers` | Questions fewer members answered than the session's minimum: no counts and nothing they wrote |
 | `answersWithoutAddress` | Answers from people who joined without an address, such as through Telegram, who have no switch to set; they aren't in the counts either |
 | `patternMatches` | Written answers holding an email address, an account address, an ENS name or a run of ten or more digits such as a phone number, dropped whole |

@@ -22,7 +22,7 @@ export const sessionAgentPageNotice = (sessionConfig: unknown): string =>
   `They are available with your account address ${answersReach(sessionConfig)}, and may be exported; ` +
   'a summary without names or addresses may be published.';
 
-/** Behind the "?" of "Use my answers and files": the same under every results setting. */
+/** Behind the "?" of "Session Agent may use my answers and files": the same under every results setting. */
 export const SESSION_AGENT_USE_NOTICE =
   'The Session Agent may draw on the files you added, and Detailed answers on your answers too, never naming ' +
   'you. Turning it off stops future use and keeps them out of exports made from then on; it can’t take back ' +

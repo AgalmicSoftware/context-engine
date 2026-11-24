@@ -2,21 +2,19 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
-import { Modal, ModalBody, ModalHeader } from 'reactstrap';
+import { Modal, ModalBody, ModalHeader, UncontrolledTooltip } from 'reactstrap';
 
 import { SESSION_AGENT_LIMITS } from '@ce-shared/sessionAgent.mjs';
 import { dictationNeedsSignIn, dictationOffered, sessionEnded } from '../../domains/worker/sessionDictationPorts';
-import CETooltip from '../Shared/CETooltip';
-import SessionAgentNotice from './SessionAgentNotice';
+import SessionAgentHelp from './SessionAgentHelp';
+import { SESSION_AGENT_README_URL } from './SessionAgentNotice';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import SessionDictation from './SessionDictation';
-import { sessionAgentAddressNotice, sessionAgentFullerAnswersNote } from './sessionAgentWording';
+import { sessionAgentFullerAnswersNote } from './sessionAgentWording';
 import {
   askSessionAgent,
   readSessionAgentStatus,
-  setSessionAgentOptOut,
-  setSessionAgentUnattributed,
   type SessionAgentReply,
   type SessionAgentRequestOptions,
   type SessionAgentSource,
@@ -42,12 +40,10 @@ const STYLE_HELP = {
 const STORE_HELP =
   'This question and its answer will be kept in this session’s records, available to its organisers, and may ' +
   'be exported. Untick it to keep this one out.';
-const NAME_HELP = 'Kept as you type it, for example Sam or Sam’s agent. It isn’t checked.';
 // The box starts ticked, and a chat is stored without the asker's address unless they choose it.
 const STORE_TO_START = true;
 const ADDRESS_TO_START = false;
 
-// It answers no one, but each person's switches still count for what an admin exports.
 const CLOSED = {
   session_ended: 'This session has ended, so the Session Agent no longer answers.',
   ai_disabled: 'AI is turned off for this session, so the Session Agent isn’t answering.',
@@ -92,29 +88,8 @@ const Source = ({ source }: { source: SessionAgentSource }) => (
   </li>
 );
 
-type HelpProps = { id: string; label: string; text: string };
-
-// A "?" whose text a screen reader hears as its description and everyone else sees on hover or focus.
-const Help = ({ id, label, text }: HelpProps) => (
-  <>
-    <button
-      type="button"
-      id={id}
-      className={styles.helpLink}
-      data-ce-control-appearance="frameless"
-      aria-label={label}
-      aria-describedby={`${id}-text`}
-      onClick={(event) => event.currentTarget.focus()}
-    >
-      <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
-    </button>
-    <span id={`${id}-text`} className={styles.hidden}>
-      {text}
-    </span>
-    <CETooltip target={id} placement="bottom" trigger="hover focus" autohide={false}>
-      {text}
-    </CETooltip>
-  </>
+const Help = (props: { id: string; label: string; text: string }) => (
+  <SessionAgentHelp {...props} className={styles.helpLink} />
 );
 
 // The dialog shows only the latest answer. A chat is kept only where the
@@ -131,7 +106,6 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
   const [askError, setAskError] = useState('');
   const [store, setStore] = useState(STORE_TO_START);
   const [withAddress, setWithAddress] = useState(ADDRESS_TO_START);
-  const [name, setName] = useState('');
   // Whether the session writes this person's speech down, as for an answer: asked once they may ask.
   const [speech, setSpeech] = useState<boolean | null>(null);
   // A visitor the session writes no speech down for, though it would once they sign in.
@@ -142,21 +116,16 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
   // What is in the box now: words are written down after a wait, during which more may be typed.
   const typed = useRef(question);
   typed.current = question;
-  const [savingSwitch, setSavingSwitch] = useState(false);
-  const [switchError, setSwitchError] = useState('');
-  const switchSaves = useRef(0);
-  // Whose switches are on screen. When someone else signs in the dialog starts
-  // afresh, and a save that lands for the person before is not shown as theirs.
+  // Whose dialog is on screen. When someone else signs in it starts afresh, and
+  // a word that lands for the person before is not shown as theirs.
   const person = `${sessionSlug}\n${account}`;
   const shownFor = useRef(person);
 
   // A recheck keeps what was shown until the answer comes, so the form stays put.
-  // A switch saved after the check was sent is newer than its answer, so it stays.
   useEffect(() => {
     let active = true;
     if (shownFor.current !== person) {
       shownFor.current = person;
-      switchSaves.current = 0;
       setStatus(null);
       setReply(null);
       // What the person before typed and chose is theirs: the next starts as anyone does.
@@ -166,19 +135,10 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
       setCut(false);
       setStore(STORE_TO_START);
       setWithAddress(ADDRESS_TO_START);
-      setName('');
     }
-    const savesBefore = switchSaves.current;
     setStatusError('');
     readSessionAgentStatus({ sessionSlug, sessionConfig, account })
-      .then((next) => {
-        if (!active) return;
-        setStatus((current) =>
-          current && switchSaves.current !== savesBefore
-            ? { ...next, optedOut: current.optedOut, unattributed: current.unattributed }
-            : next,
-        );
-      })
+      .then((next) => active && setStatus(next))
       .catch((error) => active && setStatusError(errorText(error)));
     return () => {
       active = false;
@@ -225,7 +185,7 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
     try {
       // Only someone signed in with an address has one to store.
       const keep = store
-        ? { attribution: withAddress && hasAddress ? ('address' as const) : ('anonymous' as const), name: name.trim() }
+        ? { attribution: withAddress && hasAddress ? ('address' as const) : ('anonymous' as const) }
         : null;
       setReply(
         status?.recording
@@ -239,78 +199,6 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
       setAsking(false);
     }
   };
-
-  const saveSwitch = async (save: () => Promise<Partial<SessionAgentStatus>>) => {
-    setSavingSwitch(true);
-    setSwitchError('');
-    try {
-      const saved = await save();
-      if (shownFor.current !== person) return;
-      switchSaves.current += 1;
-      setStatus((current) => (current ? { ...current, ...saved } : current));
-    } catch (error) {
-      setSwitchError(errorText(error));
-    } finally {
-      setSavingSwitch(false);
-    }
-  };
-
-  // Someone not signed in has no answers or files of their own here, so no switches.
-  const switches =
-    status && !status.signedOut ? (
-      <div className={styles.switches}>
-        <div className={styles.switchRow}>
-          <label htmlFor={`${baseId}-use`}>
-            <input
-              id={`${baseId}-use`}
-              type="checkbox"
-              role="switch"
-              checked={!status.optedOut}
-              disabled={savingSwitch}
-              data-testid="ce-session-agent-use-mine"
-              onChange={(event) => {
-                const optOut = !event.target.checked;
-                void saveSwitch(async () => ({ optedOut: await setSessionAgentOptOut(optOut, options) }));
-              }}
-            />
-            Use my answers and files
-          </label>
-          <SessionAgentNotice id={`${baseId}-notice`} where="switch" className={styles.helpLink} />
-        </div>
-        {status.unattributed === null ? null : (
-          <div className={styles.switchRow}>
-            <label htmlFor={`${baseId}-address`}>
-              <input
-                id={`${baseId}-address`}
-                type="checkbox"
-                role="switch"
-                // On is the default: the Worker stores only who turned it off.
-                checked={!status.unattributed}
-                disabled={savingSwitch}
-                data-testid="ce-session-agent-include-address"
-                onChange={(event) => {
-                  const leaveOff = !event.target.checked;
-                  void saveSwitch(async () => ({
-                    unattributed: await setSessionAgentUnattributed(leaveOff, options),
-                  }));
-                }}
-              />
-              Include my address with my answers
-            </label>
-            <Help
-              id={`${baseId}-address-help`}
-              label="About your address on your answers"
-              text={sessionAgentAddressNotice(sessionConfig)}
-            />
-          </div>
-        )}
-        {switchError ? (
-          <p className={styles.error} role="alert">
-            {switchError}
-          </p>
-        ) : null}
-      </div>
-    ) : null;
 
   const style = status?.answers;
   let body: React.ReactNode;
@@ -335,7 +223,6 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
     body = (
       <>
         <p>{CLOSED[status.closed]}</p>
-        {switches}
       </>
     );
   } else if (!style) {
@@ -346,7 +233,6 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
             ? 'Sign in to ask the Session Agent.'
             : 'The Session Agent isn’t open to you in this session.'}
         </p>
-        {switches}
       </>
     );
   } else {
@@ -371,19 +257,29 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
           <label htmlFor={`${baseId}-question`} className={styles.label}>
             Your question
           </label>
-          <textarea
-            id={`${baseId}-question`}
-            className={`form-control ${styles.question}`}
-            value={question}
-            maxLength={SESSION_AGENT_LIMITS.questionChars}
-            rows={3}
-            aria-describedby={`${baseId}-limits`}
-            data-testid="ce-session-agent-question"
-            onChange={(event) => {
-              setQuestion(event.target.value);
-              setCut(false);
-            }}
-          />
+          <div className={styles.questionRow}>
+            <textarea
+              id={`${baseId}-question`}
+              className={`form-control ${styles.question}`}
+              value={question}
+              maxLength={SESSION_AGENT_LIMITS.questionChars}
+              rows={3}
+              aria-describedby={`${baseId}-limits`}
+              data-testid="ce-session-agent-question"
+              onChange={(event) => {
+                setQuestion(event.target.value);
+                setCut(false);
+              }}
+            />
+            {microphone ? (
+              <SessionDictation
+                options={{ sessionSlug, sessionConfig, account }}
+                onWords={addWords}
+                onBusy={setListening}
+                testId="ce-session-agent-mic"
+              />
+            ) : null}
+          </div>
           {cut ? (
             <p className={styles.hint} role="status">
               The end of what you said didn’t fit in {SESSION_AGENT_LIMITS.questionChars} characters.
@@ -429,38 +325,16 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
                       </label>
                     </fieldset>
                   ) : null}
-                  <div className={styles.switchRow}>
-                    <label htmlFor={`${baseId}-name`}>Name (optional)</label>
-                    <Help id={`${baseId}-name-help`} label="About the name" text={NAME_HELP} />
-                    <input
-                      id={`${baseId}-name`}
-                      type="text"
-                      className={`form-control ${styles.name}`}
-                      value={name}
-                      maxLength={SESSION_AGENT_LIMITS.nameChars}
-                      autoComplete="off"
-                      data-testid="ce-session-agent-name"
-                      onChange={(event) => setName(event.target.value)}
-                    />
-                  </div>
                 </>
               ) : null}
             </div>
           ) : null}
-          <div className={`${styles.row} ${microphone ? styles.withMic : ''}`}>
+          <div className={styles.row}>
             <p id={`${baseId}-limits`} className={styles.hint}>
               Answers are at most {SESSION_AGENT_LIMITS.answerWords} words.{' '}
               {!status.recording ? 'Questions and answers aren’t kept.' : store ? '' : 'This chat won’t be kept.'}
               {speech === false && speechAfterSignIn ? ' Sign in to ask by voice.' : ''}
             </p>
-            {microphone ? (
-              <SessionDictation
-                options={{ sessionSlug, sessionConfig, account }}
-                onWords={addWords}
-                onBusy={setListening}
-                testId="ce-session-agent-mic"
-              />
-            ) : null}
             <button
               type="submit"
               className={styles.ask}
@@ -539,7 +413,6 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
             </div>
           ) : null}
         </div>
-        {switches}
       </>
     );
   }
@@ -549,9 +422,33 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
       <ModalHeader toggle={onClose} className={styles.header}>
         <span id={`${baseId}-title`}>Session Agent</span>
         <span className={styles.badge}>Preview</span>
+        {/* For everyone, signed in or not, since the robot by the session's title opens this dialog. */}
+        <a
+          id={`${baseId}-how`}
+          href={SESSION_AGENT_README_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={styles.helpLink}
+          aria-label="How the Session Agent works"
+          data-ce-control-appearance="frameless"
+          data-testid="ce-session-agent-how"
+        >
+          <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
+        </a>
+        <UncontrolledTooltip target={`${baseId}-how`} placement="bottom" trigger="hover focus" autohide={false}>
+          How the Session Agent works, on GitHub.
+        </UncontrolledTooltip>
       </ModalHeader>
       <ModalBody className={styles.body} data-testid="ce-session-agent">
         {body}
+        {/* Their switches aren't here, and someone who came by the title's robot may not have seen them. */}
+        {status?.on && !status.signedOut ? (
+          <p className={styles.hint}>
+            {status.unattributed === null
+              ? 'Whether the Session Agent may use your answers and files is set in the Context section.'
+              : 'Whether the Session Agent may use your answers and files, and your address on them, is set in the Context section.'}
+          </p>
+        ) : null}
       </ModalBody>
     </Modal>
   );

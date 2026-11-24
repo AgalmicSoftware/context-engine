@@ -329,7 +329,6 @@ describe('DocsPage contract deep links', () => {
       'Keeping your answers and files out',
       'Which agent is which',
     ]);
-    expect(within(content).getByText(/Use my answers and files/)).toBeInTheDocument();
     expect(within(content).getByText(/Session Agent may use my answers and files/)).toBeInTheDocument();
 
     const fullDocs = within(content).getByRole('link', { name: 'Full Session Agent docs' });

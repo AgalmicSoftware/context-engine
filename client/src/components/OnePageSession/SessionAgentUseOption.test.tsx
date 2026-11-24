@@ -1,13 +1,14 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SessionVoiceModeModal from '../SurveyTool/SessionVoiceModeModal';
 import SessionAgentUseOption from './SessionAgentUseOption';
-import { readSessionAgentStatus, setSessionAgentOptOut } from './sessionAgentRequests';
+import { readSessionAgentStatus, setSessionAgentOptOut, setSessionAgentUnattributed } from './sessionAgentRequests';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 jest.mock('./sessionAgentRequests', () => ({
   readSessionAgentStatus: jest.fn(),
   setSessionAgentOptOut: jest.fn(),
+  setSessionAgentUnattributed: jest.fn(),
 }));
 jest.mock('../SurveyTool/SessionInterviewRecommendedGroups', () => ({ __esModule: true, default: () => null }));
 jest.mock('../SurveyTool/useSessionInterviewGroupRecommendations', () => ({
@@ -41,6 +42,7 @@ jest.mock('../../utilities/audio/realtimeInterviewClient', () => ({ startSession
 
 const readStatus = jest.mocked(readSessionAgentStatus);
 const setOptOut = jest.mocked(setSessionAgentOptOut);
+const setUnattributed = jest.mocked(setSessionAgentUnattributed);
 const ACCOUNT = '0x0000000000000000000000000000000000000001';
 const AGENT_ON = { sessionAgent: { audiences: [] } };
 const status = (optedOut = false, on = true) => ({
@@ -88,16 +90,18 @@ const renderReview = (sessionConfig: Record<string, unknown>) => {
   return { onSubmitResponses };
 };
 
-// Only these two: the other mocks keep the implementations their factories gave them.
+// Only these: the other mocks keep the implementations their factories gave them.
 afterEach(() => {
   readStatus.mockReset();
   setOptOut.mockReset();
+  setUnattributed.mockReset();
 });
 
 const OTHER = '0x0000000000000000000000000000000000000002';
 const renderOption = (account = ACCOUNT) =>
   render(<SessionAgentUseOption sessionSlug="demo" sessionConfig={AGENT_ON} account={account} />);
 const box = () => screen.queryByLabelText('Session Agent may use my answers and files');
+const addressBox = () => screen.queryByLabelText('Include my address with my answers');
 
 it('leaves the Session Agent choice out of the interview dialog', async () => {
   readStatus.mockResolvedValue(status(true));
@@ -125,7 +129,7 @@ it('shows the stored choice, so someone who opted out stays opted out', async ()
   await waitFor(() => expect(box()).not.toBeChecked());
   expect(box()).toBeEnabled();
   expect(readStatus).toHaveBeenCalledWith(expect.objectContaining({ sessionSlug: 'demo', account: ACCOUNT }));
-  expect(screen.getByTestId('ce-session-agent-notice-switch')).toHaveAccessibleDescription(
+  expect(screen.getByRole('button', { name: 'About using your answers and files' })).toHaveAccessibleDescription(
     expect.stringContaining('never naming you'),
   );
 });
@@ -163,4 +167,63 @@ it('reads the next person’s own choice when someone else signs in', async () =
   rerender(<SessionAgentUseOption sessionSlug="demo" sessionConfig={AGENT_ON} account={OTHER} />);
   await waitFor(() => expect(readStatus).toHaveBeenLastCalledWith(expect.objectContaining({ account: OTHER })));
   await waitFor(() => expect(box()).toBeChecked());
+});
+
+it('includes a person’s address unless they turn that off, saves it at once, and says what it changes', async () => {
+  readStatus.mockResolvedValue(status());
+  renderOption();
+  await waitFor(() => expect(addressBox()).toBeEnabled());
+  // On to start: the Worker stores only who turned it off.
+  expect(addressBox()).toBeChecked();
+  expect(screen.getByRole('button', { name: 'About your address on your answers' })).toHaveAccessibleDescription(
+    expect.stringContaining('Turn this off and exports leave your address off what you wrote and added'),
+  );
+  setUnattributed.mockResolvedValueOnce(true);
+  fireEvent.click(addressBox()!);
+  await waitFor(() => expect(addressBox()).not.toBeChecked());
+  expect(setUnattributed).toHaveBeenCalledWith(true, expect.objectContaining({ account: ACCOUNT }));
+  // Whether the agent may use them is untouched, and never saved.
+  expect(box()).toBeChecked();
+  expect(setOptOut).not.toHaveBeenCalled();
+  setUnattributed.mockRejectedValueOnce(new Error('down'));
+  fireEvent.click(addressBox()!);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Not saved. Try again.');
+  expect(addressBox()).not.toBeChecked();
+});
+
+it('shows the address box as off for someone who turned it off, and not at all for someone without one', async () => {
+  readStatus.mockResolvedValueOnce({ ...status(), unattributed: true });
+  renderOption();
+  await waitFor(() => expect(addressBox()).not.toBeChecked());
+  cleanup();
+  readStatus.mockResolvedValueOnce({ ...status(), unattributed: null });
+  renderOption();
+  await waitFor(() => expect(box()).toBeEnabled());
+  expect(addressBox()).not.toBeInTheDocument();
+});
+
+it('says behind the address "?" who is shown a person’s answers, by the session’s results setting', async () => {
+  readStatus.mockResolvedValue(status());
+  const members = { ...AGENT_ON, sessionModeProfile: { results: { visibility: 'session_member_full' } } };
+  render(<SessionAgentUseOption sessionSlug="demo" sessionConfig={members} account={ACCOUNT} />);
+  expect(await screen.findByRole('button', { name: 'About your address on your answers' })).toHaveAccessibleDescription(
+    expect.stringContaining('to this session’s organisers and its signed-in members, and may be exported with it.'),
+  );
+});
+
+it('never shows one person’s saved address choice as the next person’s', async () => {
+  readStatus.mockResolvedValue(status());
+  const { rerender } = renderOption();
+  await waitFor(() => expect(addressBox()).toBeEnabled());
+  let saved: (unattributed: boolean) => void = () => {};
+  setUnattributed.mockReturnValueOnce(new Promise<boolean>((resolve) => (saved = resolve)));
+  fireEvent.click(addressBox()!);
+  // Someone else signs in before that save answers.
+  rerender(<SessionAgentUseOption sessionSlug="demo" sessionConfig={AGENT_ON} account={OTHER} />);
+  await waitFor(() => expect(readStatus).toHaveBeenLastCalledWith(expect.objectContaining({ account: OTHER })));
+  await waitFor(() => expect(addressBox()).toBeChecked());
+  // The first person turned theirs off; this person's stays on, free once that save has answered.
+  await act(async () => saved(true));
+  expect(addressBox()).toBeChecked();
+  await waitFor(() => expect(addressBox()).toBeEnabled());
 });

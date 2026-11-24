@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.40] - 2026-11-24
+
+In Group Conversation, Add transcript to context starts ticked, with who can read the transcript chosen right below it, from the same choices and starting point as before. The robot by a session's title opens the Session Agent, and its dialog is simpler: its "?"s show their words on a click or tap, the microphone sits beside the question box, Ask is a larger, filled button, the Name field is gone, and its two stored switches move to the Context section with the same choices and defaults. Site only: the Session Worker's code is unchanged and MCP stays 0.9.35.
+
+### Site — available when the site deploys
+
+- **Add transcript to context starts ticked.** In Group Conversation the box beside **Submit questions** is ticked to start; unticked, nothing is uploaded. Who can read the transcript is chosen right below the box, with the same choices and starting point as before. The choice lasts while the panel is open, through **Record more**, and isn't stored. Where the box isn't offered, such as a participant in a session that takes context from admins only, nothing is uploaded.
+- **The robot by a session's title opens the Session Agent.** It linked to how the Session Agent works on GitHub; that link is now a "?" by the dialog's title, for everyone who opens it, and the Context section's Session Agent button stays. Where a person can't ask the agent, such as signed out on a session that asks for sign-in, the robot still links to how it works.
+- **The Session Agent dialog's "?"s show their words on a click or tap.** On phones a tap opened and closed them at once, and with tooltips turned off they showed nothing; now they also stay open while focused.
+- **The Session Agent dialog is simpler.** The microphone sits beside the question box and Ask is a larger, filled button. The optional Name field for a stored chat is gone, so a stored chat from the site carries no name. "Use my answers and files" and "Include my address with my answers" left the dialog: both are set in the Context section, beside the Session Agent button, with the same stored choices and defaults, each with a "?" that shows its words on a click or tap. A stored chat still carries no address unless its asker chooses "My address" for it.
+- **Deploy helper.** It deploys the 0.9.39 Worker bundles. A Worker updated from the site gets this release's.
+
 ## [0.9.39] - 2026-11-24
 
 A Worker updated to this release no longer answers `503` to requests that share a settings read with a request that ended first, so sign-in, lists and names keep working after a reload or a quiet spell. No site change beyond the Deploy helper; no MCP change.

@@ -19,7 +19,7 @@ const upload = (overrides = {}) =>
   }) as unknown as React.ComponentProps<typeof SessionTranscriptContextOption>['upload'];
 
 describe('the transcript box on the Submit questions line', () => {
-  it('starts unticked, with who can read it only once ticked', () => {
+  it('shows who can read the transcript only while ticked', () => {
     const state = upload();
     const { rerender } = render(<SessionTranscriptContextOption upload={state} />);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_TRANSCRIPT_CONTEXT)).not.toBeChecked();

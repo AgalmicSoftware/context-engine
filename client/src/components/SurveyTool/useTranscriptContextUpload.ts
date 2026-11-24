@@ -32,12 +32,13 @@ const ownerOf = (target: Target) => {
 const NOTHING_UPLOADED = { text: '', id: '', choice: '', owner: '' };
 
 /**
- * The Group Conversation's "Add transcript to context" choice. The file goes up after the questions submit, as
- * that is when someone has signed in.
+ * The Group Conversation's "Add transcript to context" choice, ticked to start. The file goes up after the
+ * questions submit, as that is when someone has signed in, and only where the box is offered. The choice lasts
+ * while the panel is open, through Record more; nothing stores it.
  */
 export function useTranscriptContextUpload({ sessionSlug, sessionConfig, context, enabled }: Input) {
   const [available, setAvailable] = useState(false);
-  const [chosen, setChosen] = useState(false);
+  const [chosen, setChosen] = useState(true);
   const [access, setAccess] = useState<ContextFileAccess | null>(null);
   const [status, setStatus] = useState('');
   const [failed, setFailed] = useState(false);
@@ -73,7 +74,8 @@ export function useTranscriptContextUpload({ sessionSlug, sessionConfig, context
   const upload = useCallback(
     (transcript: string) => {
       const text = transcript.trim();
-      if (!chosen || !text) return pending.current;
+      // Where the box isn't offered nothing goes up, though it starts ticked.
+      if (!available || !chosen || !text) return pending.current;
       // A queued upload goes up as the account, to the session and audience, it was asked for, or not at all.
       const target = latest.current;
       const owner = ownerOf(target);
@@ -117,7 +119,7 @@ export function useTranscriptContextUpload({ sessionSlug, sessionConfig, context
       });
       return pending.current;
     },
-    [chosenAccess, choice, chosen],
+    [available, chosenAccess, choice, chosen],
   );
 
   return {

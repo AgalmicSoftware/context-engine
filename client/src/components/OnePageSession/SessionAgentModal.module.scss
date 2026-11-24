@@ -135,27 +135,33 @@
   .hint {
     flex: 1 1 200px;
   }
-
-  // A microphone error takes its own line under the row, so Ask keeps its place.
-  [role='alert'] {
-    order: 1;
-  }
 }
 
-// On a phone the three don't fit one line: the hint takes the line above, so the microphone and Ask stay
-// together on the right.
-@media (max-width: 420px) {
-  .withMic .hint {
+// The microphone beside the question box; an error from it takes its own line under them.
+.questionRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+
+  .question {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  [role='alert'] {
     flex-basis: 100%;
   }
 }
 
-// The accent pair, which every theme keeps readable, in each state.
+// The dialog's main action, in the accent pair every theme keeps readable, in each state.
 .ask {
-  padding: 6px 16px;
+  min-width: 96px;
+  padding: 8px 22px;
   background: var(--ce-action-accent);
   color: var(--ce-action-accent-text);
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 700;
   cursor: pointer;
 
   &:hover:not(:disabled),
@@ -165,11 +171,11 @@
     color: var(--ce-action-accent-text);
   }
 
-  // Muted text rather than opacity, so the label stays readable.
+  // Themes draw a button's border, so the fill is what sets it apart. Waiting for a question it takes the
+  // disabled fill with the dialog's own text, dimmed but readable: some themes' disabled text is too faint.
   &:disabled {
-    border-style: dashed;
-    background: transparent;
-    color: var(--ce-panel-text-muted);
+    background: var(--ce-control-disabled-bg);
+    color: var(--ce-panel-text);
     cursor: not-allowed;
   }
 }
@@ -226,14 +232,6 @@
   }
 }
 
-.switches {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding-top: 10px;
-  border-top: 1px solid var(--ce-card-border);
-}
-
 .switchRow {
   display: flex;
   align-items: center;
@@ -278,26 +276,4 @@
     gap: 6px;
     margin: 0;
   }
-}
-
-// The setup page's field colours, as for the question.
-.name {
-  flex: 1 1 160px;
-  min-width: 0;
-  background: var(--ce-input-bg) !important;
-  border-color: var(--ce-input-border-strong) !important;
-  color: var(--ce-panel-text) !important;
-}
-
-// Read by screen readers as the "?"'s description; the tooltip shows it to everyone else.
-.hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
