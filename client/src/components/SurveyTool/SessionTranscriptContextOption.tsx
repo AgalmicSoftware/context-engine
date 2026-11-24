@@ -12,7 +12,7 @@ const ABOUT =
 
 type Props = { upload: ReturnType<typeof useTranscriptContextUpload> };
 
-/** On the Submit questions line: a large checkbox, and once ticked, who may read the transcript. */
+/** On the Submit questions line: a large checkbox, and once ticked, who may read the transcript, right below it. */
 export default function SessionTranscriptContextOption({ upload }: Props) {
   const id = useId().replace(/:/g, '');
   return (

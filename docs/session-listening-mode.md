@@ -594,7 +594,7 @@ Each speaker's label is bold and has its own colour in the transcript
 
 The **Add transcript to context** box sits on the **Submit questions** line and is ticked
 to start; unticked, nothing is uploaded. The choice lasts while the panel is open,
-through **Record more**, and isn't stored. Ticked, it asks who can read the transcript: anyone who can see the session,
+through **Record more**, and isn't stored. Ticked, it asks right below it who can read the transcript: anyone who can see the session,
 or some of its groups, starting with the group the page's link joined. Submitting uploads the
 transcript as a text file through the same path as any
 [context file](session-context-sources.md), after the questions, so the person has

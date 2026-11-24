@@ -2966,7 +2966,8 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   z-index: 2;
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  // At the top, so who can read the transcript hangs below its box and the button stays where it was.
+  align-items: flex-start;
   gap: 8px 12px;
   background: var(--ce-surface-sunken);
 }
@@ -2977,7 +2978,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   width: auto !important;
   min-width: 0;
   min-height: 56px !important;
-  margin: 0 !important;
   font-size: 1.1rem !important;
   white-space: normal !important;
 
@@ -2988,9 +2988,24 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// On the same line as Submit questions; once ticked, who can read it takes a line of its own above them.
+// No margin, so it sits level with the box beside it. The form's own submit margin is !important too, in a
+// stylesheet that can load after this one, so this rule outranks it rather than relying on order.
+.sessionListeningSubmit > .sessionListeningSubmitButton {
+  margin: 0 !important;
+}
+
+// Beside Submit questions; once ticked, who can read the transcript sits right below the box.
 .sessionTranscriptContext {
-  display: contents;
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+
+  // As tall as the button, so the box sits level with it.
+  > .sessionRecordingOption {
+    min-height: 56px;
+  }
 }
 
 .sessionTranscriptContextLabel {
@@ -3015,10 +3030,11 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// Who may read the transcript: the picker paints its own fields, so this only places it.
-.sessionTranscriptContextAccess {
-  order: -1;
-  flex: 1 1 100%;
+// Who may read the transcript: the picker paints its own fields, so this only sizes it. It takes the
+// width of the box's line, whatever it says, so a long choice never pushes the button off the line.
+.sessionTranscriptContext .sessionTranscriptContextAccess {
+  width: 0;
+  min-width: 100%;
 }
 
 // In the dialog it rests 10px above the body's edge, inside the body's 18px padding, on a strip of the
