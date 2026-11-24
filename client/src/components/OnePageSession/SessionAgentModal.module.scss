@@ -158,8 +158,6 @@
 .ask {
   min-width: 96px;
   padding: 8px 22px;
-  border: 2px solid var(--ce-action-accent);
-  border-radius: var(--ce-radius-8, 8px);
   background: var(--ce-action-accent);
   color: var(--ce-action-accent-text);
   font-size: 1rem;
@@ -173,10 +171,9 @@
     color: var(--ce-action-accent-text);
   }
 
-  // Before there's a question it keeps its outline and the panel's text, so it still reads as the action.
+  // Filled while it waits for a question too, so it always reads as the dialog's action. Themes draw a
+  // button's border, so the fill is what sets it apart.
   &:disabled {
-    background: transparent;
-    color: var(--ce-panel-text);
     cursor: not-allowed;
   }
 }
