@@ -209,8 +209,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-// Darkens an option beside the chosen one by 30%, laid over its colour and under its label.
-$binary-choice-dim: color-mix(in srgb, var(--ce-color-black) 30%, transparent);
+// How much of an option beside the chosen one shows: its own colours, faded by 30%, with nothing mixed in.
+$binary-choice-dim-opacity: 0.7;
 
 #binaryChoice {
   display: flex;
@@ -221,6 +221,8 @@ $binary-choice-dim: color-mix(in srgb, var(--ce-color-black) 30%, transparent);
   align-items: center;
   margin-top: 1rem;
   .radioOptionText {
+    // The frame of the chosen option's ring.
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -234,15 +236,23 @@ $binary-choice-dim: color-mix(in srgb, var(--ce-color-black) 30%, transparent);
     &.selected {
       font-weight: 900;
       font-style: italic;
-      // A ring inside the chosen option, in its label's colour, so the choice shows without telling colours apart.
-      outline: 2px solid currentColor;
-      outline-offset: -5px;
     }
 
-    // Once one is chosen the others dim, so the choice stands out. Only their colour darkens: white labels
-    // gain contrast and dark ones keep at least 4.5:1 in every theme.
+    // A ring inside the chosen option, in its label's colour, so the choice shows without telling colours apart.
+    // Drawn apart from the outline, which the keyboard's focus ring takes: an outline ring gave way to it.
+    &.selected::after {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      border: 2px solid currentColor;
+      border-radius: inherit;
+      pointer-events: none;
+    }
+
+    // Once one is chosen the others fade, so the choice stands out. The chosen one keeps exactly the colours it
+    // had before; the others keep theirs too and only lose some opacity.
     &.dimmed {
-      background-image: linear-gradient($binary-choice-dim, $binary-choice-dim);
+      opacity: $binary-choice-dim-opacity;
     }
 
     input[type='radio'] {
@@ -5857,11 +5867,6 @@ $session-interview-submit-height: 48px;
 
   #binaryChoice .radioOptionText.disagree::before {
     background: var(--ce-binary-choice-disagree-bg);
-  }
-
-  // The faces stay grey here, so an option beside the chosen one dims its swatch.
-  #binaryChoice .radioOptionText.dimmed::before {
-    background-image: linear-gradient($binary-choice-dim, $binary-choice-dim);
   }
 
   #binaryChoice .radioOptionText:hover {

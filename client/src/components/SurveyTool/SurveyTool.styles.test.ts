@@ -282,3 +282,28 @@ it('wraps the bar while it says why Submit failed, so that line takes a row of i
   expect(ruleText(scss, '#surveysRow:has(> .headerSubmitError)')).toMatch(/\{\s*flex-wrap: wrap;\s*\}$/);
   expect(ruleText(scss, '.headerSubmitError')).toMatch(/flex: 1 0 100%;/);
 });
+
+// After a choice the chosen answer keeps exactly the colours it had, and the others keep theirs, only faded: a dark
+// layer laid over them read as a muddier colour. The chosen one's ring is drawn apart from the outline, which the
+// keyboard's focus ring takes, so the two show together.
+describe('Agree / Unsure / Disagree after a choice', () => {
+  const scss = readSurveyToolScss();
+  const binary = ruleText(scss, '#binaryChoice');
+
+  it('fades the others by opacity alone and leaves the chosen one as it was', () => {
+    expect(scss).toMatch(/\$binary-choice-dim-opacity: 0\.7;/);
+    expect(binary).toMatch(/&\.dimmed \{\s*opacity: \$binary-choice-dim-opacity;\s*\}/);
+    expect(scss).not.toMatch(/binary-choice-dim:/);
+    expect(scss).not.toMatch(/\.dimmed::before/);
+    expect(binary).toMatch(/&\.selected \{\s*font-weight: 900;\s*font-style: italic;\s*\}/);
+  });
+
+  it('keeps the chosen ring beside the focus ring', () => {
+    expect(binary).toMatch(/\.radioOptionText \{\s*(\/\/[^\n]*\s*)*position: relative;/);
+    expect(binary).toMatch(
+      /&\.selected::after \{\s*content: '';\s*position: absolute;\s*inset: 3px;\s*border: 2px solid currentColor;/,
+    );
+    expect(binary).toMatch(/&:has\(input:focus-visible\) \{\s*outline: 2px solid var\(--ce-focus-ring\);/);
+    expect(binary).not.toMatch(/outline: 2px solid currentColor;/);
+  });
+});
