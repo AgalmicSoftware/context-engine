@@ -1510,14 +1510,17 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
           return <div className={styles.freeformAnswer}>No answer provided.</div>;
         }
         const ratingFillPercent = getRatingFillPercent(value, ratingScale.min, ratingScale);
+        // "8/10" already says a bare 10 and a bare 0 floor; show only ends it does not say.
+        const minEnd = ratingScale.min === 0 && ratingScale.minLabel === '0' ? '' : ratingScale.minLabel;
+        const maxEnd = ratingScale.maxLabel === String(ratingScale.max) ? '' : ratingScale.maxLabel;
         return (
           <div className={styles.readOnlyRating}>
             <div className={styles.ratingTrack}>
               <div className={styles.ratingBar} style={resolveSingleQuestionRatingBarStyle(ratingFillPercent)} />
             </div>
-            <span className={styles.ratingEndpointLabel}>{ratingScale.minLabel}</span>
+            {minEnd && <span className={styles.ratingEndpointLabel}>{minEnd}</span>}
             <span className={styles.ratingValueLabel}>{`${normalizedRatingValue}/${ratingScale.max}`}</span>
-            <span className={styles.ratingEndpointLabel}>{ratingScale.maxLabel}</span>
+            {maxEnd && <span className={styles.ratingEndpointLabel}>{maxEnd}</span>}
           </div>
         );
       }
