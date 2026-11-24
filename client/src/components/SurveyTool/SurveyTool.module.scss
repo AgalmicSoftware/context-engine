@@ -4726,10 +4726,13 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
+// The interview's Submit is at least this tall, and exactly this tall where it has a row of its own on a phone.
+$session-interview-submit-height: 48px;
+
 .sessionInterviewPanel .sessionInterviewSubmitButton {
   @include finalSubmitCta.final-submit-cta-shell(
     $padding: 12px 24px,
-    $min-height: 48px,
+    $min-height: $session-interview-submit-height,
     $font-size: 1rem,
     $border-radius: var(--ce-radius-8)
   );
@@ -4746,6 +4749,45 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   // quiet fill its words are set on instead, as every busy Submit does.
   &:disabled:hover {
     background: var(--ce-action-submit-disabled-bg) !important;
+  }
+}
+
+// The interview's Submit fills its button with its words. The button takes its size from where it sits, never from
+// its words, and the words take theirs from the button: half its height, unless that is wider than the button less
+// the count's corner on each side (so they stay centred), by how many letters show (--ce-submit-fill-letters, set by
+// the button). So "Submit and join" is set smaller than "Submit", and neither grows the button or leaves it. The count
+// grows with the button too, but never past the words. Browsers without container units keep the button as it was.
+@supports (width: 1cqi) {
+  .sessionInterviewPanel .sessionInterviewSubmitFill {
+    container-type: size;
+    padding-block: 0;
+    padding-inline: 0;
+    // The count's frame, kept clear on each side for the largest the count can be: the count and its gap to the edge.
+    --ce-submit-fill-corner: max(24px, calc(max(16px, 42cqh) * 1.6));
+    // How wide one capital of the theme's bold body font is, with the button's letter spacing, in em: 0.63 to 0.69 in
+    // the bundled themes' fonts, with room to spare.
+    --ce-submit-fill-advance: 0.72;
+    --ce-submit-fill-size: max(
+      1rem,
+      min(
+        50cqh,
+        (100cqi - 2 * var(--ce-submit-fill-corner)) / (var(--ce-submit-fill-letters) * var(--ce-submit-fill-advance))
+      )
+    );
+    // Grows with the words, a little smaller than them, and never below every other Submit's count.
+    --ce-submit-fill-count: max(16px, min(42cqh, 0.84 * var(--ce-submit-fill-size)));
+
+    .pileSubmitButtonCount {
+      top: calc(var(--ce-submit-fill-count) * 0.25);
+      right: calc(var(--ce-submit-fill-count) * 0.3);
+      font-size: var(--ce-submit-fill-count);
+    }
+  }
+
+  .sessionInterviewSubmitFillText {
+    font-size: var(--ce-submit-fill-size);
+    line-height: 1.12;
+    white-space: nowrap;
   }
 }
 
@@ -4966,6 +5008,13 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     width: 100%;
     flex-basis: auto;
     margin-left: 0;
+  }
+
+  // In this column its words, which fill it, would otherwise find no height to fill.
+  @supports (width: 1cqi) {
+    .sessionInterviewReviewActions .sessionInterviewSubmitFill {
+      height: $session-interview-submit-height;
+    }
   }
 }
 

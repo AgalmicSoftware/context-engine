@@ -210,6 +210,41 @@ describe('Interview layout', () => {
     expect(rule('.sessionInterviewReviewActions .sessionInterviewSubmitButton')).toMatch(/align-self: stretch;/);
   });
 
+  // Its words were 16px in a button three times as tall. They now take their size from the button, which takes
+  // its own from where it sits, so a longer label is set smaller and never grows, wraps or leaves the button.
+  it('fills the interview Submit with its words and count, sized by the button', () => {
+    const fill = rule('.sessionInterviewPanel .sessionInterviewSubmitFill');
+    expect(fill).toMatch(/container-type: size;/);
+    expect(fill).toMatch(
+      /--ce-submit-fill-size: max\(\s*1rem,\s*min\(\s*50cqh,\s*\(100cqi - 2 \* var\(--ce-submit-fill-corner\)\) \/ \(var\(--ce-submit-fill-letters\) \* var\(--ce-submit-fill-advance\)\)\s*\)\s*\);/,
+    );
+    // The count never outgrows the words, which a long label sets small in a tall button.
+    expect(fill).toMatch(/--ce-submit-fill-count: max\(16px, min\(42cqh, 0\.84 \* var\(--ce-submit-fill-size\)\)\);/);
+    // The corner is kept for the largest the count can be, so the words' size never depends on the count's.
+    expect(fill).toMatch(/--ce-submit-fill-corner: max\(24px, calc\(max\(16px, 42cqh\) \* 1\.6\)\);/);
+    expect(fill).toMatch(/\.pileSubmitButtonCount \{[^}]*font-size: var\(--ce-submit-fill-count\);/);
+    const text = rule('.sessionInterviewSubmitFillText');
+    expect(text).toMatch(/font-size: var\(--ce-submit-fill-size\);/);
+    expect(text).toMatch(/white-space: nowrap;/);
+    // Without container units the count would lose its place and the words their padding, so such browsers keep
+    // the button as it was.
+    const supported = scss.slice(
+      scss.lastIndexOf(
+        '@supports (width: 1cqi) {',
+        scss.indexOf('.sessionInterviewPanel .sessionInterviewSubmitFill {'),
+      ),
+    );
+    expect(supported.indexOf('.sessionInterviewSubmitFillText {')).toBeLessThan(supported.indexOf('\n}'));
+    expect(scss.match(/\.sessionInterviewSubmitFill(Text)? \{/g)).toHaveLength(3);
+    expect(scss).not.toMatch(/^\.sessionInterview(Panel \.sessionInterview)?SubmitFill(Text)? \{/m);
+    // A phone's column gives a size container no height of its own, so there it has the height it always had.
+    expect(scss).toMatch(/\$session-interview-submit-height: 48px;/);
+    expect(scss).toMatch(/\$min-height: \$session-interview-submit-height,/);
+    expect(scss).toMatch(
+      /@media \(max-width: 480px\) \{[\s\S]*?@supports \(width: 1cqi\) \{\s*\.sessionInterviewReviewActions \.sessionInterviewSubmitFill \{\s*height: \$session-interview-submit-height;/,
+    );
+  });
+
   it('keeps Share for research in the green box where it drops below the summary', () => {
     const query = scss.slice(scss.indexOf('@container (max-width: 640px)'));
     const share = query.slice(0, query.indexOf('\n  }'));
