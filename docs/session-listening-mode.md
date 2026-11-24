@@ -580,7 +580,12 @@ choice; the listening panel starts with it collapsed. An open transcript keeps
 its newest line in view as chunks arrive. A host who scrolls up to reread stays
 there until they scroll back to the end. Generated questions are drafts
 rendered through the existing `CreateQuestionsAndSurveys` review surface and
-are never auto-published. Generation uses the session’s `questionsGenPrompt`. A participant with question-authoring permission can review the generated questions and press Submit. Each chunk's audio stays on the device only until its transcript is saved, which replaces it in the same write. Recorder audio, and the voice samples cut from it, leave the device only for the session Worker's `/transcribe` relay, which forwards them to the transcription provider and stores nothing.
+are never auto-published. A draft that adds questions says how many beside the
+recording's controls ("2 questions added below.") until a draft is removed or
+uploaded. Once recording has stopped, a first new question out of sight is scrolled
+into view, at once where the device asks for reduced motion; while recording, or
+while someone types in a field, the **N new draft questions** button offers the way
+down instead. Focus never moves for drafts arriving. Generation uses the session’s `questionsGenPrompt`. A participant with question-authoring permission can review the generated questions and press Submit. Each chunk's audio stays on the device only until its transcript is saved, which replaces it in the same write. Recorder audio, and the voice samples cut from it, leave the device only for the session Worker's `/transcribe` relay, which forwards them to the transcription provider and stores nothing.
 
 Each speaker's label is bold and has its own colour in the transcript
 (`--ce-speaker-1` to `-8`, at least 4.5:1 on the transcript's white in every theme).

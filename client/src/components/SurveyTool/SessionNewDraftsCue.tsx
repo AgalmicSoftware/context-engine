@@ -9,6 +9,9 @@ type SessionNewDraftsCueProps = {
   count: number;
   // The draft list, which appends new drafts at its end.
   draftsRef: React.RefObject<HTMLElement | null>;
+  // New drafts found out of view are scrolled to rather than announced by the button, unless the person is
+  // typing in a field, whose place would move away under them. Off while recording keeps Stop in view.
+  reveal?: boolean;
 };
 
 const draftCards = (drafts: HTMLElement | null) =>
@@ -19,12 +22,26 @@ const firstNewDraft = (drafts: HTMLElement | null, unseen: number) => {
   return cards.length >= unseen ? cards[cards.length - unseen] : drafts;
 };
 
+const still = () => Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+const typing = () => {
+  const active = document.activeElement as HTMLElement | null;
+  return (
+    !!active &&
+    (active.isContentEditable ||
+      active.tagName === 'TEXTAREA' ||
+      active.tagName === 'SELECT' ||
+      (active instanceof HTMLInputElement && !['button', 'checkbox', 'radio', 'submit'].includes(active.type)))
+  );
+};
+
 // Drafts arrive after each chunk, usually below the fold. Once the first of them is found out of view, this
-// cue says how many are new until it is well in view, and its button scrolls there. Drafts that land in view
-// never show it, so its lane, which exists only while it shows, never moves the dialog for them. While it
-// shows, the submit button is not pinned (see .sessionNewDraftsCue), so uploading every draft means
-// scrolling past the new ones first.
-export function SessionNewDraftsCue({ count, draftsRef }: SessionNewDraftsCueProps) {
+// cue says how many are new until it is well in view, and its button scrolls there; with `reveal`, it scrolls
+// there itself instead. Drafts that land in view never show it, so its lane, which exists only while it shows,
+// never moves the dialog for them. While it shows, the submit button is not pinned (see .sessionNewDraftsCue),
+// so uploading every draft means scrolling past the new ones first. Focus never moves for drafts arriving.
+export function SessionNewDraftsCue({ count, draftsRef, reveal = false }: SessionNewDraftsCueProps) {
+  const revealRef = useRef(reveal);
+  revealRef.current = reveal;
   const seenRef = useRef(count);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const [unseen, setUnseen] = useState(0);
@@ -48,6 +65,11 @@ export function SessionNewDraftsCue({ count, draftsRef }: SessionNewDraftsCuePro
       return undefined;
     }
     let observer: IntersectionObserver | undefined;
+    const outOfSight = (card: HTMLElement) => {
+      if (!revealRef.current || typing()) return setOutOfView(true);
+      card.scrollIntoView?.({ behavior: still() ? 'auto' : 'smooth', block: 'start' });
+      return markSeen();
+    };
     // The draft list renders its new cards after this count changes.
     const frame = requestAnimationFrame(() => {
       const cards = draftCards(draftsRef.current);
@@ -57,15 +79,16 @@ export function SessionNewDraftsCue({ count, draftsRef }: SessionNewDraftsCuePro
         setUnseen(cards.length);
         return;
       }
+      const first = cards[cards.length - unseen];
       if (typeof IntersectionObserver === 'undefined') {
-        setOutOfView(true);
+        outOfSight(first);
         return;
       }
       // Seen once the card is above the bottom fifth, clear of the pinned submit button.
-      observer = new IntersectionObserver(([entry]) => (entry?.isIntersecting ? markSeen() : setOutOfView(true)), {
+      observer = new IntersectionObserver(([entry]) => (entry?.isIntersecting ? markSeen() : outOfSight(first)), {
         rootMargin: '0px 0px -20% 0px',
       });
-      observer.observe(cards[cards.length - unseen]);
+      observer.observe(first);
     });
     return () => {
       cancelAnimationFrame(frame);
@@ -74,7 +97,7 @@ export function SessionNewDraftsCue({ count, draftsRef }: SessionNewDraftsCuePro
   }, [count, draftsRef, markSeen, unseen]);
 
   const showDrafts = () => {
-    firstNewDraft(draftsRef.current, unseen)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    firstNewDraft(draftsRef.current, unseen)?.scrollIntoView({ behavior: still() ? 'auto' : 'smooth', block: 'start' });
     draftsRef.current?.focus({ preventScroll: true });
     markSeen();
   };

@@ -2,6 +2,7 @@ import { getEffectiveTranscriptionConfig } from '../../utilities/ai/aiSettings';
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
+  faArrowDown,
   faCircle,
   faMicrophone,
   faPause,
@@ -209,6 +210,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const [noNewQuestions, setNoNewQuestions] = useState(false);
   // The draft after Stop came back empty twice, so Generate questions sits beside that note until a draft adds one.
   const [offerGenerate, setOfferGenerate] = useState(false);
+  // How many drafts the latest generation added, said beside the controls until drafts are removed or sent.
+  const [addedDrafts, setAddedDrafts] = useState<{ count: number } | null>(null);
   const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState(0);
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
   // The speaker whose code is showing, chosen by their button or their label in the transcript.
@@ -264,6 +267,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       setGeneratedTitle('');
       setNoNewQuestions(false);
       setOfferGenerate(false);
+      setAddedDrafts(null);
       setGenerationError('');
     },
     [handleSubmittingChange],
@@ -317,6 +321,12 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   }, [hasTranscript]);
   const draftCount = pendingDraftCount ?? generatedQuestions.length;
   const hasGeneratedDraft = draftCount > 0;
+  // The count of drafts added no longer describes the list once any draft is removed or sent.
+  const shownDraftCountRef = useRef(draftCount);
+  useEffect(() => {
+    if (draftCount < shownDraftCountRef.current) setAddedDrafts(null);
+    shownDraftCountRef.current = draftCount;
+  }, [draftCount]);
   const latestSuccessfulTranscriptAt = useMemo(() => {
     // The latest to complete decides, not the order of parts: text pasted while a chunk transcribes leaves that
     // chunk's questions automatic, and text added after the last chunk waits for an explicit Generate.
@@ -490,6 +500,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       const existingPrompts = [...new Set([...drafted, ...shown.map(getGeneratedQuestionPrompt)])].filter(Boolean);
       setIsGenerating(true);
       setNoNewQuestions(false);
+      setAddedDrafts(null);
       setGenerationError('');
       try {
         // Future optional source path is intentionally disabled for now:
@@ -529,6 +540,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         const nothingNew = merged === kept && !recordingAgain();
         setNoNewQuestions(nothingNew);
         setOfferGenerate((offered) => nothingNew && (stopDraft || offered));
+        setAddedDrafts(merged.length > kept.length ? { count: merged.length - kept.length } : null);
         setGeneratedQuestions((previous) => merge(previous, statements));
         setGeneratedTitle((previous) => previous || surveyTitle);
         // Kept with the recording at once, so drafts held back while a submit publishes are never lost.
@@ -574,6 +586,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     recordingsBegunRef.current += 1;
     setNoNewQuestions(false);
     setOfferGenerate(false);
+    setAddedDrafts(null);
   }, [isRecorderSessionActive]);
 
   useEffect(() => {
@@ -628,7 +641,14 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       data-testid={E2E_TESTIDS.SESSION_LISTENING_PANEL}
     >
       {panelMode === 'recordGroup' ? (
-        <SessionNewDraftsCue key={keptDraftsShown} count={draftCount} draftsRef={draftsRef} />
+        // Once recording stops, new drafts are scrolled to; while it runs, Stop stays in view and the cue says how
+        // many came.
+        <SessionNewDraftsCue
+          key={keptDraftsShown}
+          count={draftCount}
+          draftsRef={draftsRef}
+          reveal={!isRecorderSessionActive}
+        />
       ) : null}
       {isClosing ? <div role="status">Finalizing recording…</div> : null}
       {showPanelHeader ? (
@@ -844,6 +864,12 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           )}
           {/* Generate questions beside the note counts the seconds itself. */}
           {isGenerating && !offerGenerate && <span>{`Generating questions... ${generationElapsedSeconds}s`}</span>}
+          {!isGenerating && addedDrafts && hasGeneratedDraft ? (
+            <span role="status">
+              <FontAwesomeIcon icon={faArrowDown} />{' '}
+              {addedDrafts.count === 1 ? '1 question added below.' : `${addedDrafts.count} questions added below.`}
+            </span>
+          ) : null}
           {!isGenerating && noNewQuestions ? (
             <span role="status">
               {offerGenerate

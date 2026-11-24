@@ -781,6 +781,8 @@ describe('SessionListeningPanel', () => {
       delete (globalThis as Partial<typeof globalThis>).IntersectionObserver;
     });
 
+    // While recording, drafts are not scrolled to (Stop stays in view), so the cue offers the way down.
+    const recording = { status: 'recording', isRecording: true };
     it('says how many drafts are new, scrolls to them, and then counts only later ones', async () => {
       const scrollIntoView = jest.fn();
       Element.prototype.scrollIntoView = scrollIntoView;
@@ -788,7 +790,7 @@ describe('SessionListeningPanel', () => {
         .mockResolvedValueOnce(result('What evidence matters?'))
         .mockResolvedValueOnce(result('How should trust be measured?', 'Who may trigger a review?'));
       (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
-        buildRecorder({ transcript: firstTranscript, segments: [firstSegment] }),
+        buildRecorder({ transcript: firstTranscript, segments: [firstSegment], ...recording }),
       );
       const { rerender } = render(
         <SessionListeningPanel sessionConfig={PER_CHUNK} sessionSlug="demo" panelMode="recordGroup" embeddedInModal />,
@@ -805,6 +807,7 @@ describe('SessionListeningPanel', () => {
         buildRecorder({
           transcript: secondTranscript,
           segments: [firstSegment, { id: 's2', index: 1, status: 'complete', text: 'Later.', completedAt: 5 }],
+          ...recording,
         }),
       );
       rerender(
@@ -835,7 +838,9 @@ describe('SessionListeningPanel', () => {
       return observers;
     };
 
-    it('never shows for new drafts already on screen', async () => {
+    it('never shows, or scrolls, for new drafts already on screen', async () => {
+      const scrollIntoView = jest.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
       const observers = observeDrafts([true]);
       mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(result('What evidence matters?'));
       (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
@@ -848,13 +853,29 @@ describe('SessionListeningPanel', () => {
       await nextFrame();
       expect(observers.map((observer) => observer.target)).toEqual([screen.getByText('What evidence matters?')]);
       expect(screen.queryByRole('button', { name: /new draft/ })).not.toBeInTheDocument();
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it('scrolls to the first new draft out of view once recording has stopped, with no cue', async () => {
+      const scrollIntoView = jest.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+      observeDrafts([false]);
+      mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(result('What evidence matters?'));
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript: firstTranscript, segments: [firstSegment] }),
+      );
+      render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+      expect(scrollIntoView.mock.contexts).toEqual([screen.getByText('What evidence matters?')]);
+      expect(screen.queryByRole('button', { name: /new draft/ })).not.toBeInTheDocument();
     });
 
     it('shows once the first new draft is out of view, and goes once it is seen', async () => {
       const observers = observeDrafts([false]);
       mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(result('What evidence matters?'));
       (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
-        buildRecorder({ transcript: firstTranscript, segments: [firstSegment] }),
+        buildRecorder({ transcript: firstTranscript, segments: [firstSegment], ...recording }),
       );
       render(
         <SessionListeningPanel sessionConfig={PER_CHUNK} sessionSlug="demo" panelMode="recordGroup" embeddedInModal />,
@@ -1450,6 +1471,75 @@ describe('SessionListeningPanel', () => {
       expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(2);
     });
 
+    // New drafts landed below the transcript, often out of sight, and the person had to find them.
+    describe('new questions are obvious', () => {
+      const scrollIntoView = jest.fn();
+      beforeEach(() => {
+        scrollIntoView.mockClear();
+        Element.prototype.scrollIntoView = scrollIntoView;
+      });
+      afterEach(() => {
+        delete (Element.prototype as Partial<Element>).scrollIntoView;
+        delete (window as Partial<Window>).matchMedia;
+      });
+      const stopped = { transcript: `${first}\n${second}`, segments: [chunk('s1', 0, first), chunk('s2', 1, second)] };
+
+      it('says how many a draft added and brings the first of them into view, without moving focus', async () => {
+        (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder(stopped));
+        mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(drafts(['A?', 'B?']));
+        render(panel());
+        const focused = document.activeElement;
+        const added = await screen.findByText('2 questions added below.');
+        expect(added).toHaveAttribute('role', 'status');
+        await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+        expect(scrollIntoView.mock.contexts).toEqual([screen.getByText('A?')]);
+        expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+        expect(focused).toHaveFocus();
+      });
+
+      it('drops the count once drafts are removed or uploaded, so it never reads stale', async () => {
+        (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder(stopped));
+        mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(drafts(['A?', 'B?']));
+        render(panel());
+        expect(await screen.findByText('2 questions added below.')).toBeInTheDocument();
+        act(() => mockCreateQuestionsProps.onDraftQuestionsChange(drafts(['B?']).statements));
+        expect(screen.queryByText(/added below/)).toBeNull();
+      });
+
+      it('jumps without motion where motion is reduced, and counts only the drafts added', async () => {
+        window.matchMedia = jest.fn((query: string) => ({ matches: query.includes('reduced-motion') })) as never;
+        (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+          buildRecorder({
+            ...stopped,
+            questionDrafts: { questions: drafts(['A?']).statements, prompts: ['A?'], draftedTranscript: first },
+          }),
+        );
+        mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(drafts(['A?', 'B?']));
+        render(panel());
+        expect(await screen.findByText('1 question added below.')).toBeInTheDocument();
+        await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' }));
+        expect(scrollIntoView.mock.contexts).toEqual([screen.getByText('B?')]);
+      });
+
+      it('leaves the view alone for someone typing', async () => {
+        const field = document.createElement('textarea');
+        document.body.appendChild(field);
+        field.focus();
+        try {
+          (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder(stopped));
+          mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(drafts(['A?']));
+          render(panel());
+          expect(await screen.findByText('1 question added below.')).toBeInTheDocument();
+          await nextFrame();
+          await nextFrame();
+          expect(scrollIntoView).not.toHaveBeenCalled();
+          expect(field).toHaveFocus();
+        } finally {
+          field.remove();
+        }
+      });
+    });
+
     it('offers Generate questions beside the note when the draft after Stop is empty twice', async () => {
       // Drafted before Record more, so the Generate questions below the transcript is hidden.
       (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
@@ -1470,6 +1560,7 @@ describe('SessionListeningPanel', () => {
         'No new questions from this discussion. Press Generate questions to ask again.',
       );
       expect(note).toHaveAttribute('role', 'status');
+      expect(screen.queryByText(/added below/)).toBeNull();
       expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(2);
       const generate = screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE);
       expect(note.parentElement).toContainElement(generate);
@@ -1482,6 +1573,7 @@ describe('SessionListeningPanel', () => {
       await act(async () => answer(drafts(['A?', 'B?'])));
       expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-count', '2');
       expect(screen.queryByText(/No new questions/)).toBeNull();
+      expect(screen.getByText('1 question added below.')).toHaveAttribute('role', 'status');
       expect(screen.queryByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).toBeNull();
     });
 
