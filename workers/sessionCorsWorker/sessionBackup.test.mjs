@@ -1244,19 +1244,22 @@ test('a cached or shared settings view keeps the age of the read that made it', 
   shift(900);
   await markStorageBackupWrite(env, slug);
   assert.deepEqual(calls, ['current', 'backup/write-revision']);
-  // A second write joins a view 1 s after it was asked for; it arrives 1.5 s later.
+  // A second write joins a view 0.6 s after it was asked for; it arrives 0.3 s
+  // later, and both see it as old as the read that made it.
   forgetSessionConfig(env, slug);
   calls.length = 0;
   gate = new Promise((resolve) => { open = resolve; });
-  const asker = markStorageBackupWrite(env, slug);
+  const asked = Date.now();
+  const asker = callSessionConfigCoordinator({ env, slug, path: 'current', cache: true });
   await new Promise((resolve) => setImmediate(resolve));
-  shift(1_000);
-  const joiner = markStorageBackupWrite(env, slug);
+  shift(600);
+  const joiner = callSessionConfigCoordinator({ env, slug, path: 'current', cache: true });
   await new Promise((resolve) => setImmediate(resolve));
-  shift(1_500);
+  shift(300);
   open();
-  await Promise.all([asker, joiner]);
-  assert.deepEqual(calls.sort(), ['backup/write-revision', 'backup/write-revision', 'current']);
+  const views = await Promise.all([asker, joiner]);
+  assert.deepEqual(calls, ['current']);
+  for (const view of views) assert.ok(view.readStartedAt >= asked && view.readStartedAt < asked + 600, String(view.readStartedAt - asked));
 });
 
 test('an export whose lease lapsed between pages restarts, since writes then skip their marks', async (t) => {

@@ -24,10 +24,13 @@ export const assertExpectedSessionAuthority = (authority, expected, slug, { requ
   }
 };
 
-// Concurrent config reads in one isolate share the call already in flight, so a
-// burst sends the session's coordinator one read instead of one per request.
-// A read that never settles (its request was cancelled) is replaced after a
-// wait, not joined forever.
+// Concurrent config reads in one isolate share the read already in flight, so
+// a burst sends the session's coordinator one read instead of one per request,
+// and each gets its answer, as before. A request waits for that answer on its
+// own timer, never on the promise of the request that started the read: the
+// runtime ends a read with its request and fails every other request awaiting
+// it. So a request reads for itself if the read it waits on ends without an
+// answer or is a second old (its request may have been cancelled).
 //
 // Ordinary requests (signed-out reads, and answers and reads by people the
 // config does not name) may also reuse a successful read for up to one second
@@ -35,8 +38,8 @@ export const assertExpectedSessionAuthority = (authority, expected, slug, { requ
 // reaches every request within a second. Admin routes and config changes read
 // fresh, and any change made through this isolate drops its copy at once.
 export const SESSION_CONFIG_CACHE_MS = 1_000;
-const SHARED_READ_JOIN_MS = 10_000;
-const STALLED = Symbol('stalled');
+const SHARED_READ_WAIT_MS = 1_000;
+const SHARED_READ_POLL_MS = 10;
 
 // One kind of coordinator read, shared per isolate by binding and session.
 // `copy` gives each caller its own result, or the shared one when it is frozen.
@@ -46,7 +49,7 @@ const createReadShare = (copy) => {
     let slugs = reads.get(binding);
     if (!slugs) reads.set(binding, slugs = new Map());
     let state = slugs.get(slug);
-    if (!state) slugs.set(slug, state = { generation: 0, cached: null, inFlight: null });
+    if (!state) slugs.set(slug, state = { started: 0, forgotten: 0, cached: null, pending: null });
     return state;
   };
   // When a read was asked: what it saw is no older than this. Not enumerable,
@@ -55,44 +58,38 @@ const createReadShare = (copy) => {
     if (result && typeof result === 'object' && !Object.isFrozen(result)) Object.defineProperty(result, 'readStartedAt', { value: readStartedAt });
     return result;
   };
-  const share = (state, read) => {
-    const joined = state.inFlight;
-    if (!joined) {
-      const generation = state.generation;
-      const startedAt = Date.now();
-      const pending = read().then((result) => {
-        // A read that overlapped a change made here may predate it; never keep it.
-        if (result?.ok && state.generation === generation) {
-          state.cached = { result, startedAt, expiresAt: Date.now() + SESSION_CONFIG_CACHE_MS };
-        }
-        return result;
-      }).finally(() => { if (state.inFlight === pending) state.inFlight = null; });
-      state.inFlight = pending;
-      state.inFlightStartedAt = startedAt;
-      return pending.then((result) => stamp(copy(result), startedAt));
-    }
-    const joinedStartedAt = state.inFlightStartedAt;
-    let timer;
-    const stalled = new Promise((resolve) => { timer = setTimeout(resolve, SHARED_READ_JOIN_MS, STALLED); });
-    return Promise.race([joined, stalled]).finally(() => clearTimeout(timer)).then((result) => {
-      if (result !== STALLED) return stamp(copy(result), joinedStartedAt);
-      // The stalled read may still finish; it must not replace a newer copy.
-      if (state.inFlight === joined) { state.inFlight = null; state.generation += 1; }
-      return share(state, read);
-    });
-  };
   return {
-    read: ({ binding, slug, cache, read }) => {
+    read: async ({ binding, slug, cache, read }) => {
       const state = stateFor(binding, slug);
-      if (cache && state.cached && Date.now() < state.cached.expiresAt) return Promise.resolve(stamp(copy(state.cached.result), state.cached.startedAt));
-      return share(state, read);
+      for (;;) {
+        if (cache && state.cached && Date.now() < state.cached.expiresAt) return stamp(copy(state.cached.result), state.cached.startedAt);
+        const waited = state.pending;
+        if (!waited || Date.now() - waited.startedAt >= SHARED_READ_WAIT_MS) break;
+        await new Promise((resolve) => setTimeout(resolve, SHARED_READ_POLL_MS));
+        // A read that overlapped a change made here may predate it; never pass it on.
+        if (waited.answered && waited.order > state.forgotten) return stamp(copy(waited.result), waited.startedAt);
+      }
+      // Reads are numbered as they start. One is kept only if no change made
+      // here came after it started, and no read that started after it is kept.
+      const mine = { order: state.started += 1, startedAt: Date.now(), answered: false, result: undefined };
+      state.pending = mine;
+      try {
+        mine.result = await read();
+        mine.answered = true;
+      } finally {
+        if (state.pending === mine) state.pending = null;
+      }
+      if (mine.result?.ok && mine.order > state.forgotten && mine.order > (state.cached?.order ?? 0)) {
+        state.cached = { result: mine.result, order: mine.order, startedAt: mine.startedAt, expiresAt: Date.now() + SESSION_CONFIG_CACHE_MS };
+      }
+      return stamp(copy(mine.result), mine.startedAt);
     },
     forget: (binding, slug) => {
       const state = reads.get(binding)?.get(slug);
       if (!state) return;
-      state.generation += 1;
+      state.forgotten = state.started;
       state.cached = null;
-      state.inFlight = null;
+      state.pending = null;
     },
   };
 };

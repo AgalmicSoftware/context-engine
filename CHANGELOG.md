@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Session Worker — needs a Worker update
+
+- **A cancelled request no longer fails the requests waiting on its settings read.** Requests arriving together in one Worker instance share one read of the session's settings, and AI Views viewers one read of the draft. They did so by awaiting the promise of the request that started the read; when that request was cancelled, for example a page dropping its signed-out reads as someone signs in, Cloudflare's runtime rejected every request waiting on it ("This promise was created by a request that has since ended, so it can never settle") and the Worker answered them `503`, seen on `/groups/list`, `/storage/list` and `/storage/read-batch` right after a sign-in. The site does not retry that reply. A waiting request now checks for the shared read's answer on its own timer and never awaits another request's promise; if that read has not answered within a second, the next request reads again. A cancelled read now costs those waiting up to a second instead of a failed request. A burst still sends the coordinator one read, and those waiting still get its answer, including the busy reply the site sends again.
+
 ## [0.9.38] - 2026-11-24
 
 The interview's Submit fills its button, Agree / Unsure / Disagree keep their own colours and one font, multiple choice lists one option per line, a room of more than four letters its speakers part by part and new questions from a recording are easy to find; the report lists choices most chosen first, the interview says who processes it, the Stats panel settles, the Analyze box drops its Text view and the footer credits Agalmic Software. No Worker or MCP change.

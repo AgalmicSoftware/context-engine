@@ -215,6 +215,12 @@ test('concurrent successful finalizations leave matching Lit config and secrets 
   const fixture = createFixture();
   await putSessionSecrets(fixture.env, 'fixture', { openaiKey: 'synthetic-unrelated-secret' });
   await fixture.ensure();
+  // Each call to the session's object crosses the network, as on Cloudflare, so the two overlap.
+  const { get } = fixture.env.CE_SESSION_COORDINATOR;
+  fixture.env.CE_SESSION_COORDINATOR.get = (id) => {
+    const stub = get(id);
+    return { fetch: async (url, init) => { await new Promise((resolve) => setTimeout(resolve, 10)); return stub.fetch(url, init); } };
+  };
   const results = await Promise.all([fixture.finalize('first'), fixture.finalize('second')]);
   // Each request awaits current authority before finalizing; either can win.
   assert.deepEqual(results.map((result) => result.status).sort(), [200, 409]);
