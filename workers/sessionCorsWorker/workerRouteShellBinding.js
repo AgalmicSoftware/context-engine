@@ -967,9 +967,11 @@ export const createWorkerRouteShellWithWorkerDeps = ({
         method,
         error: error?.message || String(error || 'Unknown error'),
       });
-      // The detail is in the log above; the caller gets a fixed message, so an
-      // unhandled error never hands its internals to whoever sent the request.
-      const message = 'Worker request failed.';
+      const message = (
+        typeof deps?.toStr === 'function'
+          ? deps.toStr(error?.message || error)
+          : String(error?.message || error || '')
+      ).trim() || 'Worker request failed.';
       if (typeof deps?.json === 'function') {
         return deps.json({ error: message }, 500, routeBaseHeaders);
       }
