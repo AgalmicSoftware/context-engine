@@ -275,8 +275,6 @@
   "SESSION_RECORDING_ADD_INPUT": "ce-session-recording-add-input",
   "SESSION_RECORDING_AUDIO_FILE": "ce-session-recording-audio-file",
   "SESSION_RECORDING_ONE_VOICE": "ce-session-recording-one-voice",
-  "SESSION_RECORDING_OTHERS_CALL": "ce-session-recording-others-call",
-  "SESSION_RECORDING_OTHERS_ROOM": "ce-session-recording-others-room",
   "SESSION_RECORDING_TRANSCRIPT_FILE": "ce-session-recording-transcript-file",
   "SESSION_LISTENING_START": "ce-session-listening-start",
   "SESSION_LISTENING_STOP": "ce-session-listening-stop",

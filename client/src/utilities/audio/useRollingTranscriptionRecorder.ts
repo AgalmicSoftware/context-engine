@@ -23,7 +23,6 @@ type FinalizeRecordingOptions = {
 };
 
 type RollingRecorderStatus = 'idle' | 'requesting' | 'recording' | 'paused' | 'stopping' | 'error';
-type StartChoice = { recordSpeakerAudio?: boolean };
 
 const pickSupportedMimeType = () => {
   if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
@@ -498,79 +497,73 @@ export const useRollingTranscriptionRecorder = ({
     return () => clearInterval(timer);
   }, [chunkDurationMs, restartCapture, status]);
 
-  // A choice made by the tap that starts recording has not reached this hook's options yet, so it comes along.
-  const startRecording = useCallback(
-    async (choice?: StartChoice) => {
-      if (status === 'recording' || status === 'paused' || status === 'requesting') return;
-      const speakerAudio =
-        typeof choice?.recordSpeakerAudio === 'boolean' ? choice.recordSpeakerAudio : recordSpeakerAudio;
-      // Another account's recording, or another tab, holds this one; its notice says what to do.
-      if (chunks.ownerNotice || chunks.openElsewhereNotice) return;
-      if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-        setErrorMessage('Microphone recording is not available in this browser.');
-        setStatus('error');
+  const startRecording = useCallback(async () => {
+    if (status === 'recording' || status === 'paused' || status === 'requesting') return;
+    // Another account's recording, or another tab, holds this one; its notice says what to do.
+    if (chunks.ownerNotice || chunks.openElsewhereNotice) return;
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setErrorMessage('Microphone recording is not available in this browser.');
+      setStatus('error');
+      return;
+    }
+    if (typeof MediaRecorder === 'undefined') {
+      setErrorMessage('MediaRecorder is not available in this browser.');
+      setStatus('error');
+      return;
+    }
+
+    const requestGeneration = ++requestGenerationRef.current;
+    // Still inside the tap: the alarm's sound needs it.
+    primeRecordingAlarm();
+    fragmentsFlowingRef.current = false;
+    recoveredCaptureRef.current = false;
+    setStatus('requesting');
+    setErrorMessage('');
+
+    try {
+      await prepare();
+      if (!mountedRef.current || requestGeneration !== requestGenerationRef.current) return;
+      const stream = await requestPreferredSpeechMicrophone(navigator.mediaDevices, {
+        echoCancellation: !recordSpeakerAudio,
+      });
+      if (!mountedRef.current || requestGeneration !== requestGenerationRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
         return;
       }
-      if (typeof MediaRecorder === 'undefined') {
-        setErrorMessage('MediaRecorder is not available in this browser.');
-        setStatus('error');
-        return;
-      }
-
-      const requestGeneration = ++requestGenerationRef.current;
-      // Still inside the tap: the alarm's sound needs it.
-      primeRecordingAlarm();
-      fragmentsFlowingRef.current = false;
-      recoveredCaptureRef.current = false;
-      setStatus('requesting');
-      setErrorMessage('');
-
-      try {
-        await prepare();
-        if (!mountedRef.current || requestGeneration !== requestGenerationRef.current) return;
-        const stream = await requestPreferredSpeechMicrophone(navigator.mediaDevices, {
-          echoCancellation: !speakerAudio,
-        });
-        if (!mountedRef.current || requestGeneration !== requestGenerationRef.current) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-        streamRef.current = stream;
-        watchMicrophone(stream);
-        recordingActiveRef.current = true;
-        const recorder = createRecorder(stream);
-        mediaRecorderRef.current = recorder;
-        setElapsedSeconds(0);
-        startElapsedTimer();
-        startRotationTimer();
-        setStatus('recording');
-      } catch (error) {
-        if (!mountedRef.current || requestGeneration !== requestGenerationRef.current) return;
-        recordingActiveRef.current = false;
-        clearRotationTimer();
-        stopTimer();
-        stopTracks();
-        setErrorMessage(
-          `Could not start recording. Check microphone permission and recording support, then try again. ${describeError(error)}`,
-        );
-        setStatus('error');
-      }
-    },
-    [
-      clearRotationTimer,
-      createRecorder,
-      recordSpeakerAudio,
-      prepare,
-      startElapsedTimer,
-      startRotationTimer,
-      status,
-      stopTimer,
-      stopTracks,
-      watchMicrophone,
-      chunks.ownerNotice,
-      chunks.openElsewhereNotice,
-    ],
-  );
+      streamRef.current = stream;
+      watchMicrophone(stream);
+      recordingActiveRef.current = true;
+      const recorder = createRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      setElapsedSeconds(0);
+      startElapsedTimer();
+      startRotationTimer();
+      setStatus('recording');
+    } catch (error) {
+      if (!mountedRef.current || requestGeneration !== requestGenerationRef.current) return;
+      recordingActiveRef.current = false;
+      clearRotationTimer();
+      stopTimer();
+      stopTracks();
+      setErrorMessage(
+        `Could not start recording. Check microphone permission and recording support, then try again. ${describeError(error)}`,
+      );
+      setStatus('error');
+    }
+  }, [
+    clearRotationTimer,
+    createRecorder,
+    recordSpeakerAudio,
+    prepare,
+    startElapsedTimer,
+    startRotationTimer,
+    status,
+    stopTimer,
+    stopTracks,
+    watchMicrophone,
+    chunks.ownerNotice,
+    chunks.openElsewhereNotice,
+  ]);
 
   const pauseRecording = useCallback(() => {
     if (status !== 'recording') return;

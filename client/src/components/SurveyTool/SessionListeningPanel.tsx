@@ -169,22 +169,6 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       return false;
     }
   });
-  const chooseSpeakerAudio = (checked: boolean) => {
-    setRecordSpeakerAudio(checked);
-    try {
-      window.localStorage.setItem(SPEAKER_AUDIO_KEY, String(checked));
-    } catch {
-      /* The option still works when browser storage is unavailable. */
-    }
-  };
-  // Echo cancellation keeps the voices of a call played through this device out of the recording, and nobody
-  // recording a breakout can be expected to know it: a new group recording first asks where the others are. The
-  // answer sets the box below, kept on this device; it is the tap that starts recording.
-  const [askWhereOthers, setAskWhereOthers] = useState(false);
-  const whereOthersRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (askWhereOthers) whereOthersRef.current?.querySelector('button')?.focus();
-  }, [askWhereOthers]);
   // More voices than speaker labels keep apart: each part of the recording letters its own speakers, with no voice
   // samples and no part for each person. Ticked until this device chooses otherwise, since a breakout room is
   // usually larger than four; the choice is kept on the device, so a recording reopened in the same room stays as it
@@ -433,15 +417,6 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             : `Stop, tick “${SPEAKER_AUDIO_LABEL}”, play the call through speakers, not headphones, then Record more.`
         }`;
   const isPreparingRecording = panelMode === 'recordGroup' && speakerLabelsSupported === null;
-  const recordDisabled =
-    isClosing ||
-    recorder.isBusy ||
-    isPreparingRecording ||
-    Boolean(recorder.ownerNotice) ||
-    Boolean(recorder.openElsewhere) ||
-    Boolean(recorder.importing);
-  // Nothing recorded or transcribed yet: Record more, and Record after a reload with audio kept, ask nothing.
-  const isNewRecording = !hasTranscript && !recorder.segments.length;
   const recordButtonLabel = isRecorderSessionActive
     ? recorder.isStopping
       ? 'Stopping'
@@ -729,131 +704,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       ) : null}
 
       {panelMode !== 'recordGroup' ? <p>Record, upload audio, or add a transcript.</p> : null}
-      <div className={styles.sessionListeningRecordWrap}>
-        {isRecorderSessionActive ? (
-          <div className={styles.sessionListeningActiveRecorder}>
-            <div className={styles.sessionListeningWaveformShell}>
-              <SessionListeningWaveform
-                key={recorder.captureRestarts}
-                streamRef={recorder.mediaStreamRef}
-                isActive={isRecorderSessionActive}
-                isPaused={recorder.isPaused}
-              />
-              <div className={styles.sessionListeningWaveformTimer} aria-live="polite" aria-atomic="true">
-                <FontAwesomeIcon
-                  icon={faCircle}
-                  className={
-                    recorder.isPaused || recorder.microphonePaused
-                      ? styles.sessionListeningTimerDotPaused
-                      : styles.sessionListeningTimerDot
-                  }
-                />
-                <span>{recorder.microphonePaused ? 'Mic paused' : recorder.isPaused ? 'Paused' : 'Recording'}</span>
-                <span>{formatSessionRecordingElapsed(recorder.elapsedSeconds)}</span>
-              </div>
-            </div>
-            <div className={styles.sessionListeningButtonColumn} role="group" aria-label="Recording controls">
-              <button
-                type="button"
-                className={[styles.sessionListeningAudioButton, styles.sessionListeningStopButton].join(' ')}
-                onClick={() => {
-                  void recorder.stopRecording();
-                }}
-                disabled={recorder.isStopping}
-                aria-label="Stop recording"
-                title="Stop recording"
-                data-testid={E2E_TESTIDS.SESSION_LISTENING_STOP}
-              >
-                <FontAwesomeIcon icon={recorder.isStopping ? faSpinner : faStop} spin={recorder.isStopping} />
-                <span className={styles.sessionListeningSrOnly}>Stop</span>
-              </button>
-              <button
-                type="button"
-                className={styles.sessionListeningAudioButton}
-                onClick={recorder.isPaused ? recorder.resumeRecording : recorder.pauseRecording}
-                disabled={recorder.isStopping}
-                aria-label={recorder.isPaused ? 'Resume recording' : 'Pause recording'}
-                title={recorder.isPaused ? 'Resume recording' : 'Pause recording'}
-              >
-                <FontAwesomeIcon icon={recorder.isPaused ? faPlay : faPause} />
-                <span className={styles.sessionListeningSrOnly}>{recorder.isPaused ? 'Resume' : 'Pause'}</span>
-              </button>
-            </div>
-          </div>
-        ) : askWhereOthers ? (
-          <div
-            ref={whereOthersRef}
-            className={styles.sessionRecordingWhere}
-            role="group"
-            aria-labelledby={`${speakerHelpId}-where`}
-          >
-            <strong id={`${speakerHelpId}-where`}>Where are the others?</strong>
-            {[
-              { onCall: false, label: 'In this room', testId: E2E_TESTIDS.SESSION_RECORDING_OTHERS_ROOM },
-              {
-                onCall: true,
-                label: 'On a call through this device',
-                testId: E2E_TESTIDS.SESSION_RECORDING_OTHERS_CALL,
-              },
-            ].map(({ onCall, label, testId }) => (
-              <Button
-                key={label}
-                type="button"
-                className={styles.sessionRecordingButton}
-                disabled={recordDisabled}
-                data-testid={testId}
-                onClick={() => {
-                  chooseSpeakerAudio(onCall);
-                  setAskWhereOthers(false);
-                  recordPressedRef.current = true;
-                  void recorder.startRecording({ recordSpeakerAudio: onCall });
-                }}
-              >
-                {label}
-                {onCall ? <small>Use speakers, not headphones</small> : null}
-              </Button>
-            ))}
-          </div>
-        ) : (
-          <Button
-            type="button"
-            // In the dialog it is a round microphone, as in the voice interview; elsewhere a filled button.
-            color={embeddedInModal ? 'link' : 'secondary'}
-            className={styles.sessionListeningRecordButton}
-            onClick={() => {
-              if (panelMode === 'recordGroup' && isNewRecording) {
-                setAskWhereOthers(true);
-                return;
-              }
-              recordPressedRef.current = true;
-              void recorder.startRecording();
-            }}
-            disabled={recordDisabled}
-            data-testid={E2E_TESTIDS.SESSION_LISTENING_START}
-          >
-            <span className={styles.sessionListeningRecordIcon} aria-hidden="true">
-              <FontAwesomeIcon icon={recordButtonIcon} spin={isRecordButtonSpinning} />
-            </span>
-            <span className={styles.sessionListeningRecordText}>{recordButtonLabel}</span>
-          </Button>
-        )}
-        <SessionRecordingInput
-          disabled={
-            isRecorderSessionActive ||
-            isClosing ||
-            recorder.isBusy ||
-            Boolean(recorder.ownerNotice) ||
-            Boolean(recorder.openElsewhere)
-          }
-          onAudio={recorder.addAudio}
-          onTranscript={async (text) => {
-            await recorder.addTranscript(text);
-            setIsTranscriptOpen(true);
-          }}
-          triggerSlot={headerActionsSlot}
-        />
-      </div>
-
+      {/* Above Record, so the room's settings are seen before recording starts. */}
       {panelMode === 'recordGroup' ? (
         <div className={styles.sessionRecordingOptions}>
           <span className={styles.sessionRecordingOption}>
@@ -862,7 +713,14 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
                 type="checkbox"
                 checked={recordSpeakerAudio}
                 disabled={isRecorderSessionActive || recorder.isBusy}
-                onChange={(event) => chooseSpeakerAudio(event.target.checked)}
+                onChange={(event) => {
+                  setRecordSpeakerAudio(event.target.checked);
+                  try {
+                    window.localStorage.setItem(SPEAKER_AUDIO_KEY, String(event.target.checked));
+                  } catch {
+                    /* The option still works when browser storage is unavailable. */
+                  }
+                }}
               />{' '}
               {SPEAKER_AUDIO_LABEL}
             </label>
@@ -917,6 +775,100 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           ) : null}
         </div>
       ) : null}
+
+      <div className={styles.sessionListeningRecordWrap}>
+        {isRecorderSessionActive ? (
+          <div className={styles.sessionListeningActiveRecorder}>
+            <div className={styles.sessionListeningWaveformShell}>
+              <SessionListeningWaveform
+                key={recorder.captureRestarts}
+                streamRef={recorder.mediaStreamRef}
+                isActive={isRecorderSessionActive}
+                isPaused={recorder.isPaused}
+              />
+              <div className={styles.sessionListeningWaveformTimer} aria-live="polite" aria-atomic="true">
+                <FontAwesomeIcon
+                  icon={faCircle}
+                  className={
+                    recorder.isPaused || recorder.microphonePaused
+                      ? styles.sessionListeningTimerDotPaused
+                      : styles.sessionListeningTimerDot
+                  }
+                />
+                <span>{recorder.microphonePaused ? 'Mic paused' : recorder.isPaused ? 'Paused' : 'Recording'}</span>
+                <span>{formatSessionRecordingElapsed(recorder.elapsedSeconds)}</span>
+              </div>
+            </div>
+            <div className={styles.sessionListeningButtonColumn} role="group" aria-label="Recording controls">
+              <button
+                type="button"
+                className={[styles.sessionListeningAudioButton, styles.sessionListeningStopButton].join(' ')}
+                onClick={() => {
+                  void recorder.stopRecording();
+                }}
+                disabled={recorder.isStopping}
+                aria-label="Stop recording"
+                title="Stop recording"
+                data-testid={E2E_TESTIDS.SESSION_LISTENING_STOP}
+              >
+                <FontAwesomeIcon icon={recorder.isStopping ? faSpinner : faStop} spin={recorder.isStopping} />
+                <span className={styles.sessionListeningSrOnly}>Stop</span>
+              </button>
+              <button
+                type="button"
+                className={styles.sessionListeningAudioButton}
+                onClick={recorder.isPaused ? recorder.resumeRecording : recorder.pauseRecording}
+                disabled={recorder.isStopping}
+                aria-label={recorder.isPaused ? 'Resume recording' : 'Pause recording'}
+                title={recorder.isPaused ? 'Resume recording' : 'Pause recording'}
+              >
+                <FontAwesomeIcon icon={recorder.isPaused ? faPlay : faPause} />
+                <span className={styles.sessionListeningSrOnly}>{recorder.isPaused ? 'Resume' : 'Pause'}</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            // In the dialog it is a round microphone, as in the voice interview; elsewhere a filled button.
+            color={embeddedInModal ? 'link' : 'secondary'}
+            className={styles.sessionListeningRecordButton}
+            onClick={() => {
+              recordPressedRef.current = true;
+              void recorder.startRecording();
+            }}
+            disabled={
+              isClosing ||
+              recorder.isBusy ||
+              isPreparingRecording ||
+              Boolean(recorder.ownerNotice) ||
+              recorder.openElsewhere ||
+              recorder.importing
+            }
+            data-testid={E2E_TESTIDS.SESSION_LISTENING_START}
+          >
+            <span className={styles.sessionListeningRecordIcon} aria-hidden="true">
+              <FontAwesomeIcon icon={recordButtonIcon} spin={isRecordButtonSpinning} />
+            </span>
+            <span className={styles.sessionListeningRecordText}>{recordButtonLabel}</span>
+          </Button>
+        )}
+        <SessionRecordingInput
+          disabled={
+            isRecorderSessionActive ||
+            isClosing ||
+            recorder.isBusy ||
+            Boolean(recorder.ownerNotice) ||
+            Boolean(recorder.openElsewhere)
+          }
+          onAudio={recorder.addAudio}
+          onTranscript={async (text) => {
+            await recorder.addTranscript(text);
+            setIsTranscriptOpen(true);
+          }}
+          triggerSlot={headerActionsSlot}
+        />
+      </div>
 
       {shouldShowMeta && (
         <div className={styles.sessionListeningMeta} aria-live="polite">

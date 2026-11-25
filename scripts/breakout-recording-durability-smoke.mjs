@@ -433,9 +433,6 @@ try {
   const record = async (page) => {
     const before = ledger.recorders.length;
     await page.getByTestId('ce-session-listening-start').click();
-    // A new recording first asks where the others are; Record more does not.
-    const inRoom = page.getByTestId('ce-session-recording-others-room');
-    if (await inRoom.isVisible()) await inRoom.click();
     await page.getByRole('button', { name: 'Stop recording' }).waitFor();
     await until('a new recorder', () => ledger.recorders.length > before);
     return ledger.recorders.at(-1).startedAt;

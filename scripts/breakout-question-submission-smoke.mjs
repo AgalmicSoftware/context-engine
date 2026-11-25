@@ -110,8 +110,6 @@ try {
   await page.getByRole('checkbox', { name: 'More than 4 people in the room' }).waitFor();
   assert.equal(await page.getByRole('checkbox', { name: 'More than 4 people in the room' }).isChecked(), true, 'A room starts with per-part speaker letters');
   await page.getByTestId('ce-session-listening-start').click();
-  // A new recording first asks where the others are; the answer starts it.
-  await page.getByTestId('ce-session-recording-others-room').click();
   await page.getByRole('button', { name: 'Stop recording' }).click();
   await page.getByTestId('ce-session-listening-suggestions').waitFor({ timeout: 30000 });
   assert.equal(uploads.length, 0, 'Generated questions remain reviewable before explicit submission');

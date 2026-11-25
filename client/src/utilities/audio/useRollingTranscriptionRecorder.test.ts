@@ -324,33 +324,6 @@ describe('useRollingTranscriptionRecorder', () => {
     }
   });
 
-  // "Where are the others?" sets the option in the tap that starts recording, before the hook sees it.
-  it('starts with the speaker-audio choice given by the starting tap, or else its option', async () => {
-    const echo = () =>
-      (jest.mocked(navigator.mediaDevices.getUserMedia).mock.calls.at(-1)?.[0]?.audio as MediaTrackConstraints)
-        ?.echoCancellation;
-    for (const [option, choice, expected] of [
-      [false, true, false],
-      [true, false, true],
-      [false, undefined, true],
-      [true, undefined, false],
-    ] as const) {
-      const { result, unmount } = renderHook(() =>
-        useRollingTranscriptionRecorder({ sessionSlug: 'where-others', recordSpeakerAudio: option }),
-      );
-      await act(async () => {
-        await result.current.startRecording(choice === undefined ? undefined : { recordSpeakerAudio: choice });
-      });
-      expect(result.current.status).toBe('recording');
-      expect(echo()).toBe(expected);
-      await act(async () => {
-        await result.current.stopRecording();
-        await flushPromises();
-      });
-      unmount();
-    }
-  });
-
   it('a failed recorder start leaves no empty recording chunk and can be retried', async () => {
     const { result } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'failed-start' }));
     MockMediaRecorder.failNextStart = true;
