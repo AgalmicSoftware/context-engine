@@ -311,7 +311,10 @@ const PROXIES = { anthropic: 'proxyAnthropic', openai: 'proxyOpenAI', openrouter
 const DIRECT_PROXIES = { 'workers-ai': proxyWorkersAi };
 
 const sessionAgentRequest = ({ messages, config, deps }) => (deps.normalizeAiRequestPayload || normalizeAiRequestPayload)({
-  payload: { taskType: 'session-agent', messages, max_tokens: 3000, max_output_tokens: 3000 },
+  payload: {
+    taskType: 'session-agent', messages,
+    max_tokens: SESSION_AGENT_LIMITS.answerTokens, max_output_tokens: SESSION_AGENT_LIMITS.answerTokens,
+  },
   config,
 });
 

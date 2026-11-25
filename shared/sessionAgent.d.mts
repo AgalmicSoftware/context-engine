@@ -55,6 +55,7 @@ export const SESSION_AGENT_LIMITS: Readonly<{
   nameChars: number;
   answerWords: number;
   answerChars: number;
+  answerTokens: number;
   contextChars: number;
   contextItemChars: number;
   contextItems: number;

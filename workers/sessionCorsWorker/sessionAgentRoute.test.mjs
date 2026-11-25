@@ -5,6 +5,7 @@ import { evaluateAuthenticatedRoutePreflight } from './authenticatedRoutePreflig
 import { resolveAuthenticatedRouteSecrets } from './authenticatedRouteSecretsResolution.js';
 import { dispatchAuthenticatedSecretActionRoute } from './authenticatedSecretActionRouteDispatch.js';
 import { groupLockedAccess } from '../../shared/sessionContextSources.mjs';
+import { SESSION_AGENT_LIMITS } from '../../shared/sessionAgent.mjs';
 import { ADMIN, PARTICIPANT, harness, idOf, json } from './contextSourceTestFixture.mjs';
 import { dispatchSessionAgentHistoryStore, listSessionAgentHistory } from './sessionAgentHistory.js';
 import { SESSION_AGENT_SIGNED_OUT, dispatchSessionAgentRoute, resultsQuestions } from './sessionAgentRoute.js';
@@ -510,8 +511,8 @@ test('the reply is the model’s text alone, clipped, and failures never come ba
   const answered = await ask(h);
   assert.equal(answered.body.answer, 'They want shorter meetings.');
   assert.doesNotMatch(JSON.stringify(answered.body), /RAW|raw/);
-  const long = await ask(h, { provider: () => json({ completion: 'word '.repeat(600) }) });
-  assert.equal(long.body.answer.length, 1500);
+  const long = await ask(h, { provider: () => json({ completion: 'word '.repeat(SESSION_AGENT_LIMITS.answerChars / 5 + 100) }) });
+  assert.equal(long.body.answer.length, SESSION_AGENT_LIMITS.answerChars);
   assert.equal((await ask(h, { provider: () => json({ error: 'bad key' }, 401) })).status, 502);
   assert.equal((await ask(h, { provider: () => json({ error: 'slow down' }, 429) })).status, 429);
   assert.equal((await ask(h, { provider: () => json({ completion: '  ' }) })).status, 502);

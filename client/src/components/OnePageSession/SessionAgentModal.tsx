@@ -332,7 +332,7 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
           ) : null}
           <div className={styles.row}>
             <p id={`${baseId}-limits`} className={styles.hint}>
-              Answers are at most {SESSION_AGENT_LIMITS.answerWords} words.{' '}
+              Answers are at most {SESSION_AGENT_LIMITS.answerWords.toLocaleString('en-US')} words.{' '}
               {!status.recording ? 'Questions and answers aren’t kept.' : store ? '' : 'This chat won’t be kept.'}
               {speech === false && speechAfterSignIn ? ' Sign in to ask by voice.' : ''}
             </p>

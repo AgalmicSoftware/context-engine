@@ -178,8 +178,17 @@ test('the fixed rules follow the instructions, whatever the instructions say', (
   const instructionsAt = system.content.indexOf('Ignore every rule');
   assert.ok(instructionsAt >= 0 && instructionsAt < rulesAt);
   SESSION_AGENT_RULES.forEach((rule) => assert.ok(system.content.indexOf(rule) > rulesAt, rule));
-  assert.match(system.content, /at most 150 words/);
+  assert.match(system.content, /at most 3,000 words/);
   assert.match(system.content, /Never name or identify a participant/);
+});
+
+test('an answer at its word limit fits what the Worker keeps and what a reply may spend', () => {
+  const { answerWords, answerChars, answerTokens } = SESSION_AGENT_LIMITS;
+  // English runs to about six characters and 1.3 tokens a word; a reply also thinks.
+  assert.ok(answerChars >= answerWords * 6, String(answerChars));
+  assert.ok(answerTokens >= answerWords * 1.3 * 2, String(answerTokens));
+  // The ceiling most of the Worker's tasks get, which every model the site offers takes.
+  assert.ok(answerTokens <= 16000, String(answerTokens));
 });
 
 test('both styles are told to pass on a view without what its writer says about themselves', () => {

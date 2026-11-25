@@ -1880,7 +1880,12 @@ test('a chat is stored through the real Worker only when its asker says so, with
   assert.equal(seen.sessionAgent.recording, true);
   assert.match(seen.sessionAgent.note, /can be recorded when the session’s recording setting is on\. It is on here/);
   const stored = async () => (await callSessionConfigCoordinator({ env, slug: SLUG, path: 'session-agent-history/all' })).body.entries;
+  // A long answer takes a minute or more to write, so the ask waits two minutes, not an ordinary request's 20 seconds.
+  const timeout = AbortSignal.timeout;
+  const waits = [];
+  t.mock.method(AbortSignal, 'timeout', (ms) => { waits.push(ms); return timeout.call(AbortSignal, ms); });
   const first = await alice.participant.askSessionAgent({ question: '  Asked through the MCP?  ' });
+  assert.equal(waits.at(-1), 120_000);
   assert.deepEqual([first.answer, first.answers, first.recording, first.stored], ['Most agree.', 'general', true, true]);
   // And in a sentence, for an agent that passes the answer on to a person.
   assert.equal(first.chat, 'This question and its answer were stored for the session’s organisers, who may export them, without your address.');

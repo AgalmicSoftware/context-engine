@@ -154,6 +154,8 @@ const ANALYSIS_CARD_AI_TOKENS = 16000;
 const AGENT_REFUSALS = new Set(['agent_participation_off', 'agent_access_cancelled']);
 const ANALYSIS_CARD_AI_TIMEOUT_MS = 120_000;
 const ANALYSIS_CARD_PICTURE_TIMEOUT_MS = 150_000;
+// A long Session Agent answer takes the session's AI a minute or more to write, past an ordinary request's wait.
+const SESSION_AGENT_TIMEOUT_MS = 120_000;
 const ANALYSIS_CARD_PICTURE_NOTES = {
   figure_not_recognised: 'The session’s AI didn’t recognise the matched figure well enough to draw them, so the card has no picture.',
   picture_refused: 'The picture of the matched figure was refused by the image model, so the card has no picture.',
@@ -2408,7 +2410,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
         ? { store: store !== false, attribution: attribution || 'anonymous', ...(trim(name) ? { name: trim(name) } : {}) }
         : {};
       const reply = await ctx.client.request('/session-agent/ask', {
-        method: 'POST', auth: true, signal, body: { question: asked, ...keep },
+        method: 'POST', auth: true, signal, timeoutMs: SESSION_AGENT_TIMEOUT_MS, body: { question: asked, ...keep },
       });
       const recording = typeof reply?.stored === 'boolean';
       const stored = reply?.stored === true;

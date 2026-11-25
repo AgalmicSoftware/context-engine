@@ -1,5 +1,6 @@
 import { DEFAULT_AI_MODEL, GROUP_TRANSCRIPTION_MODEL, TRANSCRIPTION_FALLBACK_MODEL } from '../../shared/aiDefaults.mjs';
 import { interviewMapOutputTokens } from '../../shared/aiModelFamily.mjs';
+import { SESSION_AGENT_LIMITS } from '../../shared/sessionAgent.mjs';
 import { isChatReasoningModel, usesOpenAiResponsesApi } from './aiModelParams.js';
 
 const trim = (value) => typeof value === 'string' ? value.trim() : '';
@@ -64,8 +65,8 @@ const operationCeilings = Object.freeze({
   'context-read': 8000,
   // A context source's card: a summary, tags and names, thinking included.
   'context-card': 1500,
-  // One Session Agent answer of at most 150 words, thinking included.
-  'session-agent': 3000,
+  // One Session Agent answer at its longest, thinking included.
+  'session-agent': SESSION_AGENT_LIMITS.answerTokens,
 });
 const tokenFields = ['max_tokens', 'max_completion_tokens', 'max_output_tokens', 'max_tokens_to_sample', 'maxTokens'];
 const effortOrder = ['none', 'minimal', 'low', 'medium', 'high'];

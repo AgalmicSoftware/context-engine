@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.43] - 2026-11-25
+
+A Worker updated to this release keeps a long AI reply's connection busy, so a phone no longer drops "Analyze user" as idle, and lets the Session Agent answer in up to 3,000 words. The site asks for the keep-alive and gives the new limit; MCP 0.9.43 gives it too and waits two minutes for the agent's answer.
+
+### Session Worker — needs a Worker update
+
+- **A long AI reply is no longer cut as idle on a phone.** The full "Analyze user" reply can take a minute or more, and the Worker sent nothing until it was done, so a phone's browser could drop the silent connection and show "Unable to reach the AI service" after the first read had arrived. When the site asks for it, the Worker now answers at once and sends a space every 10 seconds until the reply is ready; a failure then comes in the reply's body with its status, whether the AI provider gave it or the Worker refused before calling it (no AI key, a model the session doesn't allow), and refusals before that (sign-in, limits) keep their own status. Cloudflare's analytics count such a failure as a `200`. The reply is marked `no-transform`, so nothing on the way compresses it and holds the spaces back. The site asks on every AI request; an older Worker ignores the request and answers as before, and the MCP and other callers are unchanged. A locked screen still ends the request. A reply lost while it was being read is no longer sent again, since it had reached the provider.
+- **The Session Agent answers in up to 3,000 words.** It was told to answer in at most 150 words, and the Worker cut an answer at 1,500 characters and let the model spend 3,000 tokens on it, which left little room for a question about a whole session. The agent is now told at most 3,000 words; the Worker keeps up to 30,000 characters of an answer, ten a word as before, and lets the model spend up to 16,000 tokens on it, thinking included, the ceiling most of its tasks get. 3,000 English words are about 4,000 tokens; other scripts take more, so the longest answers in them may be cut. A long answer takes the model longer to write and costs more: at the default model's $5 per million tokens written, 3,000 words cost about 2 cents and a reply at the full 16,000 tokens 8 cents, beside about 6 cents to read a full question's 60,000 tokens of material, as before. Until a session's Worker is updated, its agent answers in 150 words.
+
+### Site — available when the site deploys
+
+- **The Session Agent's dialog says "Answers are at most 3,000 words."** So do the AI setting's help on the agent's instructions and the Docs page's Session Agent section, all from the same limit as the agent's rule.
+- **Deploy helper.** It deploys the 0.9.42 Worker bundles. A Worker updated from the site gets this release's.
+
+### Local tooling
+
+- **The publication smoke waits for a saved answer after a reload.** It read the answer once, as soon as the question showed, but a session's saved answers load after its questions, so a slow run could find it blank; it now waits until the answer is checked.
+
+### MCP 0.9.43 — ships by an npm publish
+
+- **`ask_session_agent` says 3,000 words and waits up to two minutes.** Its description gives the new limit, and it waits up to 120 seconds for the answer, where an ordinary request waits 20. A reply at the full 16,000 tokens can take longer, and a host that ends a tool call sooner still ends it then.
+
 ## [0.9.42] - 2026-11-25
 
 Results' report folds each question to one line and lists participants by when they first answered, and Atlas lists positions most widely held first. Session Agent answers keep their lists and line breaks; Group Conversation's recording options sit above Record, with a note when the last two parts each held one voice; rating answers say their number once; and no empty band stays above the question after a submit. Site only: the Session Worker's code is unchanged and MCP stays 0.9.35.
