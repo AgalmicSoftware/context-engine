@@ -394,9 +394,16 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
               {reply.questions.length ? (
                 <div className={styles.sources} data-testid="ce-session-agent-questions">
                   <p className={styles.hint}>
-                    {reply.questionsFrom === 'results'
-                      ? 'Questions the session’s results cite that are closest to yours:'
-                      : 'Questions whose answers it read that are closest to yours:'}
+                    Session questions related to what you asked:
+                    <Help
+                      id={`${baseId}-questions-help`}
+                      label="Where these questions come from"
+                      text={
+                        reply.questionsFrom === 'results'
+                          ? 'The session’s questions, among those the session’s results cite, most related to your question.'
+                          : 'The session’s questions, among those whose answers the Session Agent read, most related to your question.'
+                      }
+                    />
                   </p>
                   <ul>
                     {reply.questions.map(({ id, question: prompt }) => (

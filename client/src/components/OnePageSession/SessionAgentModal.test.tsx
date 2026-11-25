@@ -150,7 +150,11 @@ describe('SessionAgentModal', () => {
     });
     askQuestion(dialog, 'Why?');
     const questions = within(await dialog.findByTestId('ce-session-agent-questions'));
-    expect(questions.getByText('Questions whose answers it read that are closest to yours:')).toBeInTheDocument();
+    const where = (scope: typeof questions) => scope.getByRole('button', { name: 'Where these questions come from' });
+    expect(questions.getByText('Session questions related to what you asked:')).toBeInTheDocument();
+    expect(where(questions)).toHaveAccessibleDescription(
+      'The session’s questions, among those whose answers the Session Agent read, most related to your question.',
+    );
     const link = questions.getByRole('link', { name: 'Should meetings be shorter?' });
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     const address = new URL(link.getAttribute('href') || '', 'https://site.example');
@@ -171,7 +175,11 @@ describe('SessionAgentModal', () => {
     });
     fireEvent.click(dialog.getByRole('button', { name: 'Ask' }));
     await dialog.findByText('Another answer.');
-    expect(dialog.getByText('Questions the session’s results cite that are closest to yours:')).toBeInTheDocument();
+    const cited = within(dialog.getByTestId('ce-session-agent-questions'));
+    expect(cited.getByText('Session questions related to what you asked:')).toBeInTheDocument();
+    expect(where(cited)).toHaveAccessibleDescription(
+      'The session’s questions, among those the session’s results cite, most related to your question.',
+    );
     expect(dialog.queryByRole('button', { name: 'Open Results' })).not.toBeInTheDocument();
   });
 
