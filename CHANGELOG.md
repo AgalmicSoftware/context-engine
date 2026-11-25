@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.9.42] - 2026-11-25
+
+Results' report folds each question to one line and lists participants by when they first answered, and Atlas lists positions most widely held first. Session Agent answers keep their lists and line breaks; Group Conversation's recording options sit above Record, with a note when the last two parts each held one voice; rating answers say their number once; and no empty band stays above the question after a submit. Site only: the Session Worker's code is unchanged and MCP stays 0.9.35.
 
 ### Site — available when the site deploys
 
@@ -13,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - **The report's questions fold.** Each written, rating, multiple-choice and quadratic question starts as one line, with its prompt, how many answered and its answer in short (the start of the first written answer, the average, the option chosen most, or the highest net), and opens with a click or the keyboard; Open all and Fold all do so for a section. Multiple-choice options sit closer together when open. The report's Expand All and Collapse All open and fold them too, and the PDF export shows each open, then leaves each as it was; agree/disagree statements, already a line each, are unchanged.
 - **The report lists participants by when they first answered.** The List of Participants starts with whoever answered first, going by the earliest time on each person's answers in the report (the time an answer was last saved). Anyone whose answers carry no time, as some agents' do, follows in the previous order.
 - **Positions, most widely held first.** In Results' Atlas, each topic's positions (and a question's categories of answer) are listed by how many participants hold them, most first; positions held by the same number keep their order.
+- **Deploy helper.** It deploys the 0.9.41 Worker bundles. A Worker updated from the site gets this release's.
 
 ## [0.9.41] - 2026-11-24
 
