@@ -181,3 +181,20 @@ test('optional field encryption leaves public storage unchanged and enforces own
   delete f.config.responseFieldEncryption;
   assert.equal(resolveResponseFieldPolicy(f.config).enabled, false);
 });
+
+test('a field key wrap binds this exact serialised policy, so stored wraps stay readable', async () => {
+  const f = fixture(true);
+  const recipient = await f.wrap('session');
+  // The bound data is the policy as JSON.stringify writes it, keys in the order the wrap route builds them.
+  // Stored wraps carry that order: a reorder in the route or in the wrap's prefix would make every one unreadable.
+  const policyJson = `{"sessionSlug":"example","sessionId":"0x${'55'.repeat(16)}","owner":"${owner}","audience":"session","context":"${context}"}`;
+  assert.equal(JSON.stringify(recipient.policy), policyJson);
+  const wrappingKey = await crypto.subtle.importKey('raw',
+    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(f.env.CE_STORAGE_ENVELOPE_KEK)), 'AES-GCM', false, ['decrypt']);
+  const keyBytes = await crypto.subtle.decrypt({
+    name: 'AES-GCM',
+    iv: Buffer.from(recipient.wrapped.iv, 'base64url'),
+    additionalData: new TextEncoder().encode(`ce-response-field-key-v1:${policyJson}`),
+  }, wrappingKey, Buffer.from(recipient.wrapped.wrappedKey, 'base64url'));
+  assert.equal(Buffer.from(keyBytes).toString('base64url'), key);
+});
