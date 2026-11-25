@@ -127,6 +127,10 @@ export async function handleAgentOnlyWrappedImageViewRequest({ env = {}, imageVi
       'content-type': result.image_content_type || 'image/png',
       'cache-control': 'private, max-age=3600',
       'content-disposition': `inline; filename="session-wrapped.${lower(result.image_content_type).includes('svg') ? 'svg' : 'png'}"`,
+      // As a storage read: no sniffing, and an opaque sandbox with no script. The SVG form
+      // draws its story from an embedded PNG, so data: images stay allowed.
+      'x-content-type-options': 'nosniff',
+      'content-security-policy': "sandbox; default-src 'none'; img-src data:",
       'x-agent-only-image-id': result.image_id || '',
       'x-agent-only-image-view-id': result.image_view_id || '',
     },
