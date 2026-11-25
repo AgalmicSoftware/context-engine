@@ -35,6 +35,7 @@ type UserPageAnalysisModalProps = {
   analysisCardPicture?: UserPageAnalysisCardPicture | null;
   analysisCardPublish?: UserPageAnalysisCardPublish | null;
   analysisCardSavedAt?: number | null;
+  analysisCardStartedAt?: number | null;
   analysisDetails?: React.ReactNode;
   analysisElapsedMs?: number;
   analysisError?: React.ReactNode;
@@ -83,6 +84,7 @@ const UserPageAnalysisModal = ({
   analysisCardPicture = null,
   analysisCardPublish = null,
   analysisCardSavedAt = null,
+  analysisCardStartedAt = null,
   analysisDetails,
   analysisElapsedMs = 0,
   analysisError,
@@ -187,6 +189,7 @@ const UserPageAnalysisModal = ({
             analysisCardPicture={analysisCardPicture}
             analysisCardPublish={analysisCardPublish}
             analysisCardSavedAt={analysisCardSavedAt}
+            analysisCardStartedAt={analysisCardStartedAt}
             analysisDetails={analysisDetails}
             analysisGeneration={analysisGeneration}
             analysisHistoricalFigure={analysisHistoricalFigure}

@@ -743,6 +743,8 @@ describe('UserPage analysis cache and routing', () => {
     expect(instance.state.analyzing).toBe(false);
     expect(instance.state.analysisCard).toBeNull();
     expect(instance.state.analysisCardPending).toBe(true);
+    // When they were asked for, which the Card view counts its wait from.
+    expect(instance.state.analysisCardStartedAt).toEqual(expect.any(Number));
     await waitFor(() => expect(analyzeUserCard).toHaveBeenCalledTimes(1));
     expect(fetchAnalysisCardPicture).toHaveBeenCalledTimes(1);
     expect(instance.state.analysisCardPending).toBe(true);

@@ -23,17 +23,14 @@
   container-type: inline-size;
 }
 
-// What is happening, read out in place of the outline, which screen readers skip.
+// What is happening, and for how long, above the outline; screen readers hear it in place of the outline,
+// which they skip, and not the count, which moves every second.
 .skeletonStatus {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
+  width: min(100%, 440px);
+  margin: 0 auto 8px;
+  font-size: 0.9rem;
+  text-align: center;
+  color: var(--ce-document-text);
 }
 
 .skeletonPage {

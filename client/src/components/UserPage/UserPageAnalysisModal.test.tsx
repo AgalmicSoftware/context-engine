@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 
 import UserPageAnalysisModal from './UserPageAnalysisModal';
 
@@ -34,8 +34,16 @@ jest.mock('utilities/analysisCard/analysisCardSaved', () => ({
 
 jest.mock('./UserPageAnalysisCard', () => ({
   __esModule: true,
-  default: ({ card, picture }: { card: { title: string }; picture: { status: string } | null }) => (
-    <div data-testid="analysis-card">
+  default: ({
+    card,
+    picture,
+    waitingSince,
+  }: {
+    card: { title: string };
+    picture: { status: string } | null;
+    waitingSince?: number | null;
+  }) => (
+    <div data-testid="analysis-card" data-waiting-since={waitingSince ?? ''}>
       {card.title} / {picture?.status || 'no picture yet'}
     </div>
   ),
@@ -147,7 +155,7 @@ describe('UserPageAnalysisModal', () => {
     expect(screen.getByText('Profile synthesis')).toBeTruthy();
     expect(screen.queryByRole('status')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Card' }));
-    expect(screen.getByRole('status').textContent).toBe('Making the card…');
+    expect(screen.getByRole('status').textContent).toMatch(/^Making the card… · \d+s$/);
     // In outline, with every heading a card can have, until the card says which guesses it has.
     expect(screen.getByText('Historical match').closest('[aria-hidden="true"]')).toBeTruthy();
     expect(screen.getAllByText(/ guess$/).map((node) => node.textContent)).toEqual([
@@ -192,6 +200,37 @@ describe('UserPageAnalysisModal', () => {
     expect(screen.queryByRole('button', { name: 'Card' })).toBeNull();
   });
 
+  it('counts how long the card has been on its way from when it was asked for, through a switch of view', () => {
+    jest.useFakeTimers();
+    try {
+      jest.setSystemTime(100_000);
+      const { rerender } = render(
+        <UserPageAnalysisModal {...createProps({ analysisCardPending: true, analysisCardStartedAt: 80_000 })} />,
+      );
+      // Asked for 20 seconds before the Card view was opened: the count says so, not 0.
+      fireEvent.click(screen.getByRole('button', { name: 'Card' }));
+      expect(screen.getByRole('status')).toHaveTextContent('Making the card… · 20s');
+      fireEvent.click(screen.getByRole('button', { name: 'Breakdown' }));
+      act(() => {
+        jest.advanceTimersByTime(5_000);
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Card' }));
+      expect(screen.getByRole('status')).toHaveTextContent('Making the card… · 25s');
+      // Its words arrive: the wait for the picture counts on from the same start.
+      rerender(
+        <UserPageAnalysisModal
+          {...createProps({
+            analysisCard: { title: 'Wants AI doing paperwork' } as never,
+            analysisCardPicture: { status: 'loading' },
+            analysisCardStartedAt: 80_000,
+          })}
+        />,
+      );
+      expect(screen.getByTestId('analysis-card')).toHaveAttribute('data-waiting-since', '80000');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
   it('on my own page puts a "Show this card on my page" box under the card; on another page, their date', () => {
     const card = {
       own: true,
