@@ -721,6 +721,22 @@ test('a backup carries which passkey is attached and whose agent is cancelled, a
   assert.equal((await call('code-create', { address: account, codeHash: 'cd'.repeat(32), origin: APP_ORIGIN, expiresAt: now + 1000, now })).reason, 'agent_access_cancelled');
   // What is already there is the newer word, and stays.
   assert.deepEqual(await restoreAgentLinks(storage, rows), { written: 0, skipped: 2 });
+
+  // An earlier restore cut off between its two writes left one half of a pair: the next run finishes it, from
+  // either side, and keeps the half that is there. A half that names someone else is not this row's, and stays.
+  for (const half of ['account', 'passkey']) {
+    values.clear();
+    if (half === 'account') values.set(`agent-link:v1:account:${account}`, { passkey, linkedAt: rows[0].linkedAt, agentAccess: 'cancelled' });
+    else values.set(`agent-link:v1:passkey:${passkey}`, { account });
+    assert.deepEqual(await restoreAgentLinks(storage, rows.slice(0, 1)), { written: 1, skipped: 0 }, half);
+    assert.equal((await call('state', { address: account })).asAccount.agentAccess, 'cancelled', half);
+    assert.deepEqual((await call('state', { address: passkey })).asPasskey, { account }, half);
+  }
+  values.clear();
+  values.set(`agent-link:v1:account:${account}`, { passkey: otherKey, linkedAt: null, agentAccess: 'active' });
+  assert.deepEqual(await restoreAgentLinks(storage, rows.slice(0, 1)), { written: 0, skipped: 1 });
+  assert.equal((await call('state', { address: account })).asAccount.passkey, otherKey);
+  assert.equal((await call('state', { address: passkey })).asPasskey, null);
 });
 
 test('sign-in links are off until a session’s admin turns them on, which signs nobody out; an attached passkey keeps working after they go off', async () => {

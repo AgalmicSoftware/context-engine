@@ -244,6 +244,35 @@ test('a restore puts back the mark beside each attached passkey, so a cancelled 
   assert.equal([...plain.kv.values.keys()].some((key) => key.startsWith('agentLinkAccount:')), false);
 });
 
+// A coordinator whose storage fails once, at the first write of a passkey's lookup: a restore cut off there.
+class CutAtPasskeyWrite extends SessionWriteCoordinator {
+  constructor(state, env) {
+    let cut = false;
+    const guard = (put) => async (key, value) => {
+      if (!cut && key.startsWith('agent-link:v1:passkey:')) { cut = true; throw new Error('Restore cut off.'); }
+      return put(key, value);
+    };
+    const { storage } = state;
+    super({ storage: { ...storage, put: guard(storage.put), transaction: (run) => storage.transaction((txn) => run({ ...txn, put: guard(txn.put) })) } }, env);
+  }
+}
+
+test('a restore cut off while putting back a passkey, then resumed from the same archive, leaves both lookups working', async () => {
+  const source = fixture();
+  const [account, passkey] = ['a1', 'b2'].map((byte) => `0x${byte.repeat(20)}`);
+  const store = (env, operation, payload) => callSessionConfigCoordinator({ env, slug, path: `agent-sign-in/${operation}`, ...payload });
+  assert.equal((await store(source.env, 'attach', { address: account, passkey, now: Date.parse('2026-11-20T10:00:00Z') })).body.ok, true);
+  const [page] = await allPages(source.env);
+
+  const target = fixture(CutAtPasskeyWrite);
+  target.kv.values.delete(`session:${slug}:config`);
+  assert.notEqual((await importPage(target.env, page)).body?.complete, true, 'the first try is cut off');
+  const resumed = await importPage(target.env, page);
+  assert.equal(resumed.body.complete, true, JSON.stringify(resumed));
+  assert.equal((await store(target.env, 'state', { address: account })).body.asAccount.passkey, passkey);
+  assert.deepEqual((await store(target.env, 'state', { address: passkey })).body.asPasskey, { account });
+});
+
 // A session whose Session Agent records chats: its coordinator stores one only while that setting is on.
 const recordingFixture = () => {
   const made = fixture();
