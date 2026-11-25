@@ -1117,6 +1117,8 @@ export class SurveySelector extends Component<any, any> {
   savedAnswersFailed = (): boolean => {
     const { props } = this;
     if (!props.loginComplete || !props.account || props.isResponsesCacheReady) return false;
+    // The Report on the same page says so with its own Retry; one per page.
+    if (props.answersRetryInResults) return false;
     const slug = resolveEffectiveSlug(props);
     return !!slug && savedAnswersLoadFailed(props.sessionConfig, slug);
   };

@@ -1,6 +1,6 @@
 /** @file PolisReport.tsx */
 import { withWorkerHintForSession } from '../../utilities/ui/currentWorkerHint';
-import React, { useEffect, useState, useRef, useMemo, useCallback, useId } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback, useId } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faQuestionCircle,
@@ -219,6 +219,7 @@ export default function PolisReport({
   cacheInitializationError = false,
   onRetryLoad,
   onRequestLogin,
+  onAnswersRetryShown,
   // Optional: given these, the Report's Filter opens Raw Results' filter panel.
   onFilterChange,
   defaultTags,
@@ -2600,6 +2601,17 @@ export default function PolisReport({
   const loginRequired = loadFailed && !(loginComplete && account) && sessionAnswersRequireLogin(sessionConfig);
   // A session holding more answers than one load reads loads in parts, slowly; say so, and that a retry may take minutes.
   const overReadLimit = loadFailed && pendingReportData.workerResponseOverReadLimit;
+  // The page's own "did not load… Retry" steps aside while this one shows, so the page has one Retry;
+  // told before paint, so the two never show together.
+  const showsAnswersRetry =
+    !(groupResolution.cohort.active && groupResolution.cohort.status !== 'ready') &&
+    ((loadFailed && !loginRequired) ||
+      (isRefreshing && hasRenderableReport && responsesLoadFailed && typeof onRetryLoad === 'function'));
+  useLayoutEffect(() => {
+    if (!onAnswersRetryShown) return undefined;
+    onAnswersRetryShown(showsAnswersRetry);
+    return () => onAnswersRetryShown(false);
+  }, [onAnswersRetryShown, showsAnswersRetry]);
   const retryLoad = async () => {
     if (retryingLoad || typeof onRetryLoad !== 'function') return;
     setRetryingLoad(true);

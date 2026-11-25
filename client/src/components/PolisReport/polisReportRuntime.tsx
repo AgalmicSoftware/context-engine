@@ -169,6 +169,8 @@ export type PolisAgentDetail = { model?: string; source?: string };
 export interface PolisReportProps {
   [key: string]: unknown;
   onRequestLogin?: () => void;
+  /** Told whether the Report shows its own Retry for answers that did not load. */
+  onAnswersRetryShown?: (shown: boolean) => void;
   onFilterChange?: (filterState: unknown) => void;
   questionResponses?: PolisQuestionResponses | UnknownRecord | null;
   network?: UnknownRecord | null;

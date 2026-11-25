@@ -485,6 +485,8 @@ export default function OnePageSessionStandardShell({
   const viewerAccount = loginComplete && typeof account === 'string' ? account : '';
   const showSessionAgent = sessionAgentOn && (!!viewerAccount || sessionAgentOpenToAnyone(sessionAgentSetting));
   const [sessionAgentOpen, setSessionAgentOpen] = React.useState(false);
+  // While the Report shows its own Retry for answers that did not load, the questions do not repeat it.
+  const [answersRetryInResults, setAnswersRetryInResults] = React.useState(false);
   // Signing out or switching account closes the dialog, so it never shows one
   // person's answer to another, or opens again by itself at the next sign-in.
   React.useEffect(() => {
@@ -653,6 +655,7 @@ export default function OnePageSessionStandardShell({
               blockLimits={blockLimits}
               networkChainId={networkChainId}
               litHooks={litHooks}
+              answersRetryInResults={answersRetryInResults}
             />
           </Suspense>
         )}
@@ -666,6 +669,7 @@ export default function OnePageSessionStandardShell({
             <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
               <MemoSurveyPage
                 miniMode={true}
+                answersRetryInResults={answersRetryInResults}
                 hideEmbeddedDebugUi={true}
                 questionCountTarget={questionCountTarget}
                 account={account}
@@ -1060,6 +1064,7 @@ export default function OnePageSessionStandardShell({
                           : undefined
                       }
                       onRequestLogin={typeof toggleLoginModal === 'function' ? () => toggleLoginModal(true) : undefined}
+                      onAnswersRetryShown={setAnswersRetryInResults}
                       questionScanProgress={questionScanProgress}
                       questionResponsesNonce={questionResponsesNonce}
                       sessionSlug={displaySessionSlug}

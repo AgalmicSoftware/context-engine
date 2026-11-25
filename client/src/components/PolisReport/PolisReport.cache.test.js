@@ -1281,12 +1281,14 @@ describe('PolisReport cache read options', () => {
         : {},
     );
     const onRetryLoad = jest.fn(async () => {});
+    const onAnswersRetryShown = jest.fn();
     const props = {
       ...baseReportProps,
       slug: sessionConfig.slug,
       sessionConfig,
       isResponsesCacheReady: false,
       onRetryLoad,
+      onAnswersRetryShown,
     };
     const questionsShown = () =>
       within(screen.getByText(/^Questions/, { selector: 'span' }).closest('div')).getByText(/^\d+$/).textContent;
@@ -1330,8 +1332,10 @@ describe('PolisReport cache read options', () => {
 
     // The load fails: what landed stays, with a retry instead of a spinner that never ends.
     node = { workerResponseHydrationStatus: 'failed' };
+    expect(onAnswersRetryShown).toHaveBeenLastCalledWith(false);
     rerender(<PolisReport {...props} questionResponses={updated} questionResponsesNonce={3} />);
     expect(screen.getByRole('alert')).toHaveTextContent('Not all answers loaded');
+    expect(onAnswersRetryShown).toHaveBeenLastCalledWith(true);
     expect(questionsShown()).toBe('2');
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(onRetryLoad).toHaveBeenCalledTimes(1));
@@ -1374,6 +1378,28 @@ describe('PolisReport cache read options', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(onRetryLoad).toHaveBeenCalledTimes(1));
+  });
+
+  // The session page's questions leave out their own "did not load… Retry" only while this one shows.
+  it('tells the page while it shows its own Retry for answers that did not load', () => {
+    const onAnswersRetryShown = jest.fn();
+    const props = {
+      ...baseReportProps,
+      slug: 'edge',
+      isResponsesCacheReady: false,
+      onRetryLoad: jest.fn(async () => {}),
+      onAnswersRetryShown,
+    };
+    const { rerender, unmount } = render(<PolisReport {...props} />);
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+    expect(onAnswersRetryShown).toHaveBeenLastCalledWith(false);
+
+    rerender(<PolisReport {...props} cacheInitializationError />);
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(onAnswersRetryShown).toHaveBeenLastCalledWith(true);
+
+    unmount();
+    expect(onAnswersRetryShown).toHaveBeenLastCalledWith(false);
   });
 
   it('offers a retry instead of loading forever when the session load failed', async () => {

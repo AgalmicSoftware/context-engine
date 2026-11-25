@@ -257,7 +257,7 @@ const fixture = async ({
     await settle();
   };
   // The All-questions page, with the props its route passes: no cache error for a failed answer list.
-  const mountList = async () => {
+  const mountList = async (props = {}) => {
     view = renderSurveySelector(
       {
         account: OWNER,
@@ -277,6 +277,7 @@ const fixture = async ({
         sessionConfig: CONFIG,
         refreshQuestionResponses: (ids, opts) => controller.refreshQuestionResponses(ids, opts),
         toggleLoginModal: jest.fn(),
+        ...props,
       },
       { route: `/session/${SLUG}/questions` },
     );
@@ -507,6 +508,20 @@ it('says saved answers did not load on the All-questions list, and retries them 
   await waitFor(() => expect(h.state.isResponsesCacheReady).toBe(true));
   await settle();
   expect(screen.queryByText(/your saved answers did not load/i)).not.toBeInTheDocument();
+});
+
+// The Report open on the same page says so with its own Retry, so the page shows one.
+it.each([
+  ['form', (h) => h.mount({ cacheInitializationError: false, answersRetryInResults: true })],
+  ['All-questions list', (h) => h.mountList({ answersRetryInResults: true })],
+])('leaves a failed answer list to the Report beside the %s', async (_where, mount) => {
+  const h = await fixture({ failGlobal: () => true });
+  h.add('responses', SAVED);
+  await initializeSessionThroughMainSite(h);
+  expect(h.state.isResponsesCacheReady).toBe(false);
+  await mount(h);
+  expect(screen.queryByText(/your saved answers did not load/i)).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
 });
 
 it('tells the responder saved answers did not load and retries the load', async () => {
