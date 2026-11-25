@@ -880,7 +880,7 @@ test('createWorkerRouteShellWithWorkerDeps preserves authenticated fallback afte
   assert.equal(result, response);
 });
 
-test('createWorkerRouteShellWithWorkerDeps converts unhandled route errors into CORS-safe JSON failures', async () => {
+test('createWorkerRouteShellWithWorkerDeps converts unhandled route errors into CORS-safe JSON failures with a fixed message', async () => {
   const request = createRequest('/admin/set-config');
   const env = { GROUP_KV: { id: 'kv' } };
   const baseHeaders = { 'Access-Control-Allow-Origin': 'https://allowed.example' };
@@ -909,7 +909,7 @@ test('createWorkerRouteShellWithWorkerDeps converts unhandled route errors into 
 
   assert.equal(result.status, 500);
   assert.equal(result.headers.get('Access-Control-Allow-Origin'), 'https://allowed.example');
-  assert.deepEqual(await result.json(), { error: 'Simulated admin crash' });
+  assert.deepEqual(await result.json(), { error: 'Worker request failed.' });
   assert.deepEqual(errors, [[
     '[worker] unhandled route error',
     {
