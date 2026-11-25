@@ -244,6 +244,17 @@ reports "Agent state is busy", stop every server using that directory before
 removing its empty `state.lock` directory and restarting. Keep the key and
 `state.json` files.
 
+## Upgrading to 0.9.43
+
+No tool is added or removed.
+
+- `ask_session_agent` says the Session Agent answers in at most 3,000 words,
+  where it said 150, and waits up to two minutes for the answer, where an
+  ordinary request waits 20 seconds. A reply at the full 16,000 tokens can
+  take longer, and a host that ends a tool call sooner still ends it then. A
+  session whose Worker is older than 0.9.43 still answers in at most 150
+  words.
+
 ## Upgrading to 0.9.35
 
 No tool changes: the wording an agent reads. From this release the package

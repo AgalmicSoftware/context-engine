@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.9.43] - 2026-11-25
+
+A Worker updated to this release keeps a long AI reply's connection busy, so a phone no longer drops "Analyze user" as idle, and lets the Session Agent answer in up to 3,000 words. The site asks for the keep-alive and gives the new limit; MCP 0.9.43 gives it too and waits two minutes for the agent's answer.
 
 ### Session Worker — needs a Worker update
 
@@ -12,8 +14,9 @@ All notable changes to this project will be documented in this file.
 ### Site — available when the site deploys
 
 - **The Session Agent's dialog says "Answers are at most 3,000 words."** So do the AI setting's help on the agent's instructions and the Docs page's Session Agent section, all from the same limit as the agent's rule.
+- **Deploy helper.** It deploys the 0.9.42 Worker bundles. A Worker updated from the site gets this release's.
 
-### MCP — ships by an npm publish
+### MCP 0.9.43 — ships by an npm publish
 
 - **`ask_session_agent` says 3,000 words and waits up to two minutes.** Its description gives the new limit, and it waits up to 120 seconds for the answer, where an ordinary request waits 20. A reply at the full 16,000 tokens can take longer, and a host that ends a tool call sooner still ends it then.
 
