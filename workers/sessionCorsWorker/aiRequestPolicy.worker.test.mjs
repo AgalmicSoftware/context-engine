@@ -108,16 +108,14 @@ for (const target of ['http://redirect.example.test/chat', `https://user:passwor
   });
 }
 
-test('authenticated custom AI follows a public HTTPS redirect without forwarding credentials', async () => {
+test('authenticated custom AI does not follow a redirect, so the prompt reaches only the configured host', async () => {
   const target = 'https://redirect.example.test/chat';
   const f = await fixture({ outbound: async url => String(url) === target
     ? Response.json({ choices: [{ message: { content: 'Synthetic redirected output' } }] })
     : new Response(null, { status: 307, headers: { location: target } }) });
   const response = await f.request('/ai', { provider: 'custom', rpcUrl: 'https://provider.example.test/chat',
     apiKey: 'synthetic-custom-key', prompt: 'Synthetic private prompt' }, true);
-  assert.equal(response.status, 200, await response.clone().text());
-  assert.equal((await response.json()).completion, 'Synthetic redirected output');
-  assert.equal(f.calls.length, 2);
-  assert.equal(new Headers(f.calls[1].headers).get('authorization'), null);
-  assert.deepEqual(f.calls[1].body, f.calls[0].body);
+  assert.equal(response.status, 403, await response.clone().text());
+  assert.deepEqual(await response.json(), { error: 'Redirect not followed for a request with a body' });
+  assert.deepEqual(f.calls.map((call) => String(call.url)), ['https://provider.example.test/chat']);
 });
