@@ -43,6 +43,7 @@ export const createWorkerExecutionServicesWithWorkerDeps = ({
     json: deps?.json,
     safeFetch: deps?.safeFetch,
     isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
+    log: workerLog,
   };
   const aiProxies = {
     proxyAnthropic: async (value = {}) => proxyAnthropicBoundary({
