@@ -11,6 +11,8 @@ import { SESSION_AGENT_README_URL } from './SessionAgentNotice';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import SessionDictation from './SessionDictation';
+import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
+import { useWaitSeconds } from '../SurveyTool/useWaitSeconds';
 import { sessionAgentFullerAnswersNote } from './sessionAgentWording';
 import {
   askSessionAgent,
@@ -54,6 +56,19 @@ const errorText = (error: unknown) => (error instanceof Error && error.message) 
 
 const count = (value: number, one: string, many: string) =>
   `${value.toLocaleString('en-US')} ${value === 1 ? one : many}`;
+
+const SECONDS_PER_MINUTE = 60;
+// How often a screen reader hears that an answer is still coming; the count on screen moves every second.
+const SAY_WAIT_EVERY_SECONDS = 30;
+
+// The wait in words, for a screen reader, which would read the button's "1:30" as a time of day.
+const waitWords = (seconds: number) => {
+  const minutes = Math.floor(seconds / SECONDS_PER_MINUTE);
+  const rest = seconds % SECONDS_PER_MINUTE;
+  return [minutes ? count(minutes, 'minute', 'minutes') : '', rest ? count(rest, 'second', 'seconds') : '']
+    .filter(Boolean)
+    .join(' ');
+};
 
 // What the Worker read for the answer, so a reader can tell General from Detailed.
 const drewOn = ({ context, results, answers }: SessionAgentReply['read']) => {
@@ -105,6 +120,9 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
   const [asking, setAsking] = useState(false);
   const [reply, setReply] = useState<SessionAgentReply | null>(null);
   const [askError, setAskError] = useState('');
+  // How long the answer being asked for has taken; 0 when none is.
+  const waited = useWaitSeconds(asking ? 'answer' : '');
+  const said = waited - (waited % SAY_WAIT_EVERY_SECONDS);
   const [store, setStore] = useState(STORE_TO_START);
   const [withAddress, setWithAddress] = useState(ADDRESS_TO_START);
   // Whether the session writes this person's speech down, as for an answer: asked once they may ask.
@@ -342,10 +360,14 @@ export default function SessionAgentModal({ sessionSlug, sessionConfig, account,
               disabled={asking || listening || !question.trim()}
               data-testid="ce-session-agent-ask"
             >
-              {asking ? 'Asking…' : 'Ask'}
+              {/* The count is seen, not heard: the button keeps its name, and the status below speaks now and then. */}
+              {asking ? <ElapsedLoadingLabel label="Asking…" /> : 'Ask'}
             </button>
           </div>
         </form>
+        <p className={styles.srOnly} role="status">
+          {asking && said ? `Still waiting for the answer: ${waitWords(said)}.` : ''}
+        </p>
         {askError ? (
           <p className={styles.error} role="alert">
             {askError}

@@ -137,6 +137,19 @@
   }
 }
 
+// Heard by screen readers, not seen.
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 // The microphone beside the question box; an error from it takes its own line under them.
 .questionRow {
   display: flex;

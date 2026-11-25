@@ -380,6 +380,47 @@ describe('SessionAgentModal', () => {
     expect(dialog.getByLabelText('Your question')).toHaveValue('Who agreed?');
   });
 
+  it('counts how long an answer takes beside Asking…, says so now and then, and stops when it comes', async () => {
+    const { dialog } = await renderModal(member);
+    jest.useFakeTimers();
+    try {
+      let answer: (value: SessionAgentReply) => void = () => {};
+      ask.mockReturnValueOnce(new Promise<SessionAgentReply>((resolve) => (answer = resolve)));
+      askQuestion(dialog, 'Who agreed?');
+      // The count is seen, not part of the button's name; a screen reader hears it in the status, not each second.
+      const button = dialog.getByRole('button', { name: 'Asking…' });
+      const status = dialog.getByRole('status');
+      expect(button).toHaveTextContent('Asking… · 0s');
+      act(() => jest.advanceTimersByTime(12_000));
+      expect(button).toHaveTextContent('Asking… · 12s');
+      expect(status).toBeEmptyDOMElement();
+      act(() => jest.advanceTimersByTime(18_000));
+      expect(status).toHaveTextContent('Still waiting for the answer: 30 seconds.');
+      act(() => jest.advanceTimersByTime(29_000));
+      expect(button).toHaveTextContent('Asking… · 59s');
+      expect(status).toHaveTextContent('Still waiting for the answer: 30 seconds.');
+      act(() => jest.advanceTimersByTime(31_000));
+      expect(button).toHaveTextContent('Asking… · 1:30');
+      expect(status).toHaveTextContent('Still waiting for the answer: 1 minute 30 seconds.');
+
+      await act(async () => answer(reply('An answer.')));
+      expect(dialog.getByText('An answer.')).toBeInTheDocument();
+      expect(dialog.getByRole('button', { name: 'Ask' })).toHaveTextContent(/^Ask$/);
+      expect(status).toBeEmptyDOMElement();
+
+      // The next question counts from 0, and closing the dialog mid-wait stops its timer.
+      ask.mockReturnValueOnce(new Promise<SessionAgentReply>(() => {}));
+      fireEvent.click(dialog.getByRole('button', { name: 'Ask' }));
+      expect(dialog.getByRole('button', { name: 'Asking…' })).toHaveTextContent('Asking… · 0s');
+      act(() => jest.advanceTimersByTime(5_000));
+      expect(dialog.getByRole('button', { name: 'Asking…' })).toHaveTextContent('Asking… · 5s');
+      cleanup();
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('tells an admin they get Detailed answers, and what those draw on', async () => {
     const { dialog } = await renderModal({ ...member, answers: 'detailed', audience: 'admin' });
     expect(dialog.getByText('As an admin, you get Detailed answers.')).toBeInTheDocument();
