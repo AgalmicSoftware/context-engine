@@ -1516,6 +1516,52 @@ test('completed restores clear transient state and cannot replay after KV loss',
   assertCompletedRestoreClean(target, pages[0].archiveId);
 });
 
+// A deleted group's id is never used again, so nothing replays a join left pending in it. The delete leaves the
+// seat and its marker exactly as sessions holding one from earlier releases have them.
+test('a join left pending in a group since deleted ends as not joined, and backups and restores go on', async () => {
+  const source = fixture();
+  source.env.CE_WORKER_GROUPS_BOOTSTRAP = 'fresh-template-v2';
+  const member = { kind: 'evm_address', address: `0x${'7'.repeat(40)}` };
+  const adminPrincipal = { kind: 'evm_address', address: admin };
+  const mutate = (operation, principal, extra = {}) => executeCoordinatedWorkerGroupMutation({
+    env: source.env, slug, sessionId, expectedAuthority, operation, groupId: 'open', principal, actorPrincipal: principal, ...extra,
+  });
+  assert.equal((await mutate('create', adminPrincipal, { input: { groupId: 'open', label: 'Open', joinMode: 'open' } })).ok, true);
+  const put = source.kv.put;
+  let interrupt = true;
+  source.kv.put = async (key, value, options) => {
+    await put(key, value, options);
+    if (interrupt && key.startsWith('ce-worker-group-member:')) { interrupt = false; throw new Error('Lost membership write reply'); }
+  };
+  assert.equal((await mutate('join', member)).reason, 'worker_group_mutation_ambiguous');
+  assert.equal((await mutate('delete', adminPrincipal)).ok, true);
+  const storeOf = (env) => [...env.__coordinatorInstances.values()].find(({ store }) => store.has('worker-group-capacity-meta-v3')).store;
+  const seats = (store) => [...store].filter(([key]) => key.startsWith('worker-group-capacity-member-v3:open:')).map(([, value]) => value.state);
+  const markers = (store) => [...store.keys()].filter((key) => key.startsWith('worker-group-backup-pending:'));
+  // The membership row the cut-off join wrote stays, as every deleted group's rows do, and is restored as it was.
+  const memberRows = (kv) => [...kv.values].filter(([key]) => key.startsWith(`ce-worker-group-member:${slug}:`));
+  const groupStore = storeOf(source.env);
+  assert.deepEqual(seats(groupStore), ['reserved']);
+  assert.equal(markers(groupStore).length, 1);
+  assert.equal(memberRows(source.kv).length, 1);
+
+  const pages = await allPages(source.env);
+  assert.equal(pages.at(-1).manifest.complete, true);
+  assert.deepEqual(seats(groupStore), ['removed'], 'The pending join ends as not joined');
+  assert.deepEqual(markers(groupStore), []);
+  assert.equal((await mutate('join', member)).ok, false, 'The deleted group still turns the member away');
+
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  for (const page of pages) assert.equal((await importPage(target.env, page)).ok, true);
+  assertCompletedRestoreClean(target, pages[0].archiveId);
+  const restored = storeOf(target.env);
+  assert.equal(restored.get('worker-group-capacity-group-v3:open').phase, 'deleted');
+  assert.deepEqual(seats(restored), ['removed']);
+  assert.deepEqual(markers(restored), []);
+  assert.deepEqual(memberRows(target.kv), memberRows(source.kv));
+});
+
 test('completion cleanup resumes after lost session or group journal deletion replies', async () => {
   const { pages } = await completedRestoreSource();
   for (const kind of ['index', 'group']) {

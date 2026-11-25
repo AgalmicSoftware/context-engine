@@ -2007,6 +2007,34 @@ export class SessionWriteCoordinator {
     return { ok: true, replayed };
   }
 
+  // A deleted group's id is never used again, so a join or removal left pending in it can never replay, and its
+  // marker would refuse every backup. Each such seat ends as not joined. The member rows KV may hold for it stay,
+  // as every deleted group's do: the group's deleted state here is what refuses them. Runs alone, with backups.
+  async settleDeletedWorkerGroupMembers() {
+    const { storage } = this.state;
+    const prefix = `${WORKER_GROUP_BACKUP_PENDING_PREFIX}${encodeURIComponent(WORKER_GROUP_CAPACITY_MEMBER_PREFIX)}`;
+    let after = '';
+    for (;;) {
+      const page = [...await storage.list({ prefix, startAfter: after, limit: 100 })];
+      for (const [markerKey] of page) {
+        const memberKey = decodeURIComponent(markerKey.slice(WORKER_GROUP_BACKUP_PENDING_PREFIX.length));
+        const groupId = decodeURIComponent(memberKey.slice(WORKER_GROUP_CAPACITY_MEMBER_PREFIX.length).split(':')[0]);
+        if ((await storage.get(workerGroupCapacityGroupKey(groupId)))?.phase !== 'deleted') continue;
+        // Counted first, as a settled reservation is: a snapshot begun before the change can no longer finish.
+        await bumpStorageBackupRevision(storage);
+        await storage.transaction(async (transaction) => {
+          const member = await transaction.get(memberKey);
+          if (PENDING_WORKER_GROUP_MEMBER_OPERATIONS[member?.state]) {
+            await transaction.put(memberKey, { version: 2, state: 'removed' });
+          }
+          await transaction.delete(markerKey);
+        });
+      }
+      if (page.length < 100) break;
+      after = page.at(-1)[0];
+    }
+  }
+
   async executeWorkerGroupReady(payload) {
     const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
     const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
