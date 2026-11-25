@@ -487,7 +487,6 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
             loginInProgress={host.props.loginInProgress}
             network={resolvedDetailNetwork}
             chains={host.props.wagmiChainOptions}
-            blockNumber={host.props.wagmiBlocknumber}
             isSBTCacheReady={host.state.isSBTCacheReady}
             sbtCacheRevision={host.state.sbtCacheRevision}
             sessionSlug={resolvedDetailSlug}

@@ -11,6 +11,7 @@ import { logoutPasskeyWallet } from '../../wallet/passkeyWallet.js';
 
 const mockUseAccount = jest.fn();
 const mockUseBalance = jest.fn();
+// The bridge must never call this; it is here so a test can say so.
 const mockUseBlockNumber = jest.fn();
 const mockUseNetwork = jest.fn();
 const mockUseProvider = jest.fn();
@@ -267,6 +268,25 @@ describe('WagmiHooksHOC explicit disconnect flag handling', () => {
     expect(mockUseProvider).toHaveBeenCalledWith({ chainId: 11155420 });
     expect(injectedProps.wagmiProvider).toBe(provider);
     expect(injectedProps.wagmiWsProvider).toBe(provider);
+  });
+
+  it('never asks wagmi for a block number, which no page reads, whatever component it wraps', async () => {
+    configureWagmiMocks({ address: '0x0000000000000000000000000000000000000007' });
+    // Named as the page that once turned the request on.
+    const MainSite = Object.assign(
+      jest.fn((_props: any) => null),
+      { displayName: 'MainSite' },
+    );
+    const Wrapped = WagmiHooksHOC(MainSite);
+    render(<Wrapped {...buildProps()} />);
+
+    await waitFor(() => {
+      expect(MainSite).toHaveBeenCalled();
+    });
+    expect(mockUseBlockNumber).not.toHaveBeenCalled();
+    const injectedProps = MainSite.mock.calls[0]?.[0];
+    expect(injectedProps).not.toHaveProperty('wagmiBlocknumber');
+    expect(injectedProps).not.toHaveProperty('examplePropFunc');
   });
 
   it('reclaims bridge ownership after the original owner unmounts', async () => {
