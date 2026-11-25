@@ -376,8 +376,8 @@ try {
   await page.getByTestId('ce-survey-submitted-indicator').first().waitFor();
   console.log('Fresh participant submitted an answer through the browser.');
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.getByRole('radio', { name: answer, exact: true }).waitFor();
-  assert.equal(await page.getByRole('radio', { name: answer, exact: true }).isChecked(), true);
+  // The question shows before the saved answer loads: wait until the answer is checked, not only shown.
+  await page.getByRole('radio', { name: answer, exact: true, checked: true }).waitFor();
   console.log('The participant answer survived reload.');
   await page.getByTestId('ce-session-results-toggle').click();
   await page.getByRole('button', { name: /Raw Results/i }).click();
@@ -582,8 +582,8 @@ try {
     await page.reload({ waitUntil: 'domcontentloaded' });
     for (const entry of questions.slice(0, 2)) {
       const card = await showQuestion(page, entry, questions.length);
-      assert.equal(await card.getByRole('radio', { name: answer, exact: true }).isChecked(), true,
-        `${mode}: saved answers and unsaved drafts survive reload`);
+      await card.getByRole('radio', { name: answer, exact: true, checked: true }).waitFor()
+        .catch(() => assert.fail(`${mode}: saved answers and unsaved drafts survive reload`));
     }
     if (mode === 'lost') {
       await page.getByTestId('ce-survey-submit').waitFor({ state: 'hidden' });

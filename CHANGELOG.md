@@ -16,6 +16,10 @@ A Worker updated to this release keeps a long AI reply's connection busy, so a p
 - **The Session Agent's dialog says "Answers are at most 3,000 words."** So do the AI setting's help on the agent's instructions and the Docs page's Session Agent section, all from the same limit as the agent's rule.
 - **Deploy helper.** It deploys the 0.9.42 Worker bundles. A Worker updated from the site gets this release's.
 
+### Local tooling
+
+- **The publication smoke waits for a saved answer after a reload.** It read the answer once, as soon as the question showed, but a session's saved answers load after its questions, so a slow run could find it blank; it now waits until the answer is checked.
+
 ### MCP 0.9.43 — ships by an npm publish
 
 - **`ask_session_agent` says 3,000 words and waits up to two minutes.** Its description gives the new limit, and it waits up to 120 seconds for the answer, where an ordinary request waits 20. A reply at the full 16,000 tokens can take longer, and a host that ends a tool call sooner still ends it then.
