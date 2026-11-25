@@ -10,7 +10,7 @@ The Session Worker has four distinct surfaces:
 | `workers/sessionCorsWorker/` | Canonical editable Worker source, isolated dependencies, and tests |
 | `dist/sessionCorsWorker.bundle.js` | Generated, untracked local bundle used for verification and manual upload fallback |
 | `deploy/cloudflare/session-worker/` | Checked-in Cloudflare-native deployment package consumed from an immutable public commit |
-| GitHub Worker-bundle releases | Immutable CI-built bundles and their provenance manifest; a separately approved promotion moves the `latest` channel |
+| GitHub Worker-bundle releases | Immutable CI-built bundles and their provenance manifest; a successful CI run on the default branch moves the `latest` channel after verification, and the Promote Worker Bundles workflow moves it by hand to another verified run |
 
 The Cloudflare deployment package includes more than a release bundle: it also
 contains the Wrangler configuration, bindings, package metadata, setup

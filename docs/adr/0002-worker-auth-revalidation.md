@@ -15,8 +15,8 @@ token record after login. That left stale scopes usable until token expiration
 when gates changed or a token needed to be revoked.
 
 The later auth-state amendment also moved nonce issue/consume and route counters
-behind the existing `CE_SESSION_COORDINATOR` Durable Object. KV markers remain
-diagnostic mirrors rather than the consume or counter authority.
+behind the existing `CE_SESSION_COORDINATOR` Durable Object, which now keeps
+nonces alone: no nonce or used-nonce marker is written to KV.
 
 ## Decision
 

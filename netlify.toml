@@ -25,7 +25,8 @@
   to = "/404.html"
   status = 404
 
-# Agents probe /.well-known/ addresses; none exist, so don't answer with the app.
+# Agents probe /.well-known/ addresses. Only security.txt exists, and Netlify serves a
+# file that exists before this rule; anything else gets a 404, not the app.
 [[redirects]]
   from = "/.well-known/*"
   to = "/404.html"

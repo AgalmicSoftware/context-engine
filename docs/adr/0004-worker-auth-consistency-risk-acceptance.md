@@ -44,8 +44,8 @@ Outside native Cloudflare runtime, forwarded IP headers are ignored and the
 shared-network bucket falls back to the bounded `anon:unknown` identity. Object
 identity is a SHA-256 digest of the session, route, and principal boundary;
 persisted counter records do not contain the slug, wallet, anonymous identifier,
-IP address, or route name. KV nonce/used markers remain diagnostic compatibility
-mirrors and are not authorization authority.
+IP address, or route name. Nonces are kept in the Durable Object alone; no nonce
+or used-nonce marker is written to KV.
 
 Missing or unreachable coordination fails closed. One-click deploys already
 install the binding and migration; manual deploys must bind

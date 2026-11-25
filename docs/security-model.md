@@ -142,8 +142,9 @@ and update that exception. The app entry has no executable inline script:
 its JSON-LD is data, and the theme bootstrap and module entry are local files.
 No remote scripts, eval, or arbitrary inline scripts are permitted.
 
-The remaining CSP directives stay report-only, including the existing Google
-Fonts, image, media, frame and connection sources. Font Awesome is bundled.
+The remaining CSP directives stay report-only, including the existing font
+(`'self'` and `data:`), image, media, frame and connection sources. Font Awesome
+and every font the app uses are bundled.
 The browser smoke applies the actual `_headers` to local app documents because
 Vite preview does not serve it. Any enforced or report-only violation fails
 normal navigation and publication journeys, including passkey login, wallet
