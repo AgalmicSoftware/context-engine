@@ -115580,7 +115580,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
         method,
         error: error?.message || String(error || "Unknown error")
       });
-      const message = "Worker request failed.";
+      const message = (typeof deps?.toStr === "function" ? deps.toStr(error?.message || error) : String(error?.message || error || "")).trim() || "Worker request failed.";
       if (typeof deps?.json === "function") {
         return deps.json({ error: message }, 500, routeBaseHeaders);
       }
