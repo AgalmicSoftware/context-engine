@@ -72,6 +72,9 @@ try {
     // This run follows speaker labels, as a host of four or fewer chooses them.
     await manyVoices.uncheck();
     await readable(speaker.locator('..'));
+    // Both boxes sit above Record, so they are seen before recording starts.
+    const recordTop = (await page.getByTestId('ce-session-listening-start').boundingBox()).y;
+    for (const box of [speaker, manyVoices]) assert((await box.boundingBox()).y < recordTop, 'The recording boxes sit above Record');
     await page.waitForFunction(() => [...document.querySelectorAll('.modal, .modal-dialog')].every(element => getComputedStyle(element).opacity === '1'));
     await page.getByTestId('ce-session-listening-panel').screenshot({ path: path.join(output, `setup-${theme}-${width}.png`) });
     await page.getByTestId('ce-session-listening-start').click();

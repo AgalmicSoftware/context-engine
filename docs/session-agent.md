@@ -609,4 +609,13 @@ answered, asks one question at a time, and shows only the latest answer, with
 what it drew on. Errors say what went wrong. A chat is kept only as
 [Recorded chats](#recorded-chats) says.
 
+The answer is shown with the light formatting models write even when asked
+for plain text: its line breaks, "- ", "*" and "•" bullets, numbered steps
+("1." or "1)", each keeping its own number, blank lines between them allowed),
+short `#` headings, quotes, `---` rules, **bold** and inline code. Every piece is
+a text child, so HTML, a link or an image shows as written and nothing is
+fetched from an answer. Admins' list of stored chats shows answers the same
+way. Only the view changes: stored chats and exports keep the answer's text as
+it came.
+
 Not yet: letting participants decide an audience's `match`.

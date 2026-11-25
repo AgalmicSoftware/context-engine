@@ -1,0 +1,46 @@
+/* @file SessionAgentAnswer.module.scss: a Session Agent answer's paragraphs, lists and headings. */
+
+// Close together, as one answer, in whatever surface holds it.
+.answer {
+  overflow-wrap: anywhere;
+
+  p,
+  ul,
+  ol,
+  blockquote,
+  pre {
+    margin: 0 0 0.6em;
+  }
+
+  > :last-child {
+    margin-bottom: 0;
+  }
+
+  // A line break in an answer stays one.
+  p,
+  blockquote {
+    white-space: pre-line;
+  }
+
+  ul,
+  ol {
+    padding-left: 1.4em;
+  }
+
+  li + li {
+    margin-top: 0.2em;
+  }
+
+  blockquote {
+    padding-left: 0.8em;
+    border-left: 3px solid currentColor;
+  }
+
+  pre {
+    white-space: pre-wrap;
+  }
+}
+
+.heading {
+  font-weight: 700;
+}

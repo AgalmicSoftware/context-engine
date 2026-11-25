@@ -95,6 +95,16 @@ describe('SessionAgentModal', () => {
     jest.resetAllMocks();
   });
 
+  it('shows an answer’s bullets as a list', async () => {
+    const { dialog } = await renderModal(member);
+    ask.mockResolvedValueOnce(reply('Members raised:\n- Cost\n- **Safety**'));
+    askQuestion(dialog, 'What came up?');
+    const answer = within(await dialog.findByTestId('ce-session-agent-answer'));
+    expect(answer.getByText('Members raised:').tagName).toBe('P');
+    expect(answer.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Cost', 'Safety']);
+    expect(answer.getByText('Safety').tagName).toBe('STRONG');
+  });
+
   it('lists the context an answer read for someone the Worker lists it for, and only the count otherwise', async () => {
     const { dialog } = await renderModal(member);
     ask.mockResolvedValueOnce({

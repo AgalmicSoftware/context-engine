@@ -1967,6 +1967,90 @@ describe('SessionListeningPanel', () => {
   });
 });
 
+// A call through this device is lost with echo cancellation on, so the room's settings sit above Record, seen first.
+it('shows both group recording boxes above Record, which starts on one tap', async () => {
+  const startRecording = jest.fn();
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ startRecording }));
+  render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+  const start = screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_START);
+  await waitFor(() => expect(start).toBeEnabled());
+  for (const name of ['Recording voices coming from this device', 'More than 4 people in the room']) {
+    const box = screen.getByRole('checkbox', { name });
+    expect(box.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  }
+  fireEvent.click(start);
+  expect(startRecording).toHaveBeenCalledTimes(1);
+  expect(startRecording).toHaveBeenCalledWith();
+});
+
+it('warns when the latest finished parts each hold one voice, and never touches the recording', () => {
+  const part = (index: number, speakers: string[], status = 'complete') => ({
+    id: `s${index}`,
+    index,
+    status,
+    text: speakers.join(' '),
+    startedAt: index,
+    speakerTurns: speakers.map((speaker) => ({ speaker, text: `${speaker} spoke.` })),
+  });
+  const startRecording = jest.fn();
+  const stopRecording = jest.fn();
+  const pauseRecording = jest.fn();
+  const show = (segments: unknown[], speakerAudio = false, isRecording = true) => {
+    window.localStorage.setItem('ce:record-speaker-audio:v1', String(speakerAudio));
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        status: isRecording ? 'recording' : 'idle',
+        isRecording,
+        transcript: 'Talk.',
+        segments,
+        startRecording,
+        stopRecording,
+        pauseRecording,
+      }),
+    );
+    return render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+  };
+  try {
+    // Two voices, then one part of one: not yet.
+    let view = show([part(0, ['Person 1', 'Person 2']), part(1, ['Person 1'])]);
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_RECORDING_ONE_VOICE)).not.toBeInTheDocument();
+    view.unmount();
+    // Two in a row, past a failed part and the one still recording: the box and the headphones are named.
+    view = show([
+      part(0, ['Person 1', 'Person 2']),
+      part(1, ['Person 1']),
+      part(2, [], 'failed'),
+      part(3, ['Person 1']),
+      part(4, [], 'recording'),
+    ]);
+    const warning = screen.getByTestId(E2E_TESTIDS.SESSION_RECORDING_ONE_VOICE);
+    expect(warning).toHaveAttribute('role', 'status');
+    expect(warning).toHaveTextContent(
+      'Only one voice in the last 2 parts. If others are on a call through this device, Stop, tick “Recording voices coming from this device”, play the call through speakers, not headphones, then Record more.',
+    );
+    view.unmount();
+    // Ticked already: only the headphones.
+    view = show([part(0, ['Speaker A']), part(1, ['Speaker A']), part(2, ['Speaker A'])], true);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_RECORDING_ONE_VOICE)).toHaveTextContent(
+      'Only one voice in the last 3 parts. If others are on a call through this device, play it through speakers, not headphones.',
+    );
+    view.unmount();
+    // Parts without speaker labels say nothing about voices.
+    view = show([0, 1, 2].map((index) => ({ ...part(index, []), text: 'Plain words.' })));
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_RECORDING_ONE_VOICE)).not.toBeInTheDocument();
+    view.unmount();
+    // Once stopped, or for an uploaded file, the same parts say nothing: there is no recording to change.
+    view = show([part(0, ['Speaker A']), part(1, ['Speaker A'])], false, false);
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_RECORDING_ONE_VOICE)).not.toBeInTheDocument();
+    view.unmount();
+    expect(startRecording).not.toHaveBeenCalled();
+    expect(stopRecording).not.toHaveBeenCalled();
+    expect(pauseRecording).not.toHaveBeenCalled();
+  } finally {
+    window.localStorage.removeItem('ce:record-speaker-audio:v1');
+  }
+});
+
 it('remembers the optional speaker-audio setting and locks it while recording', () => {
   window.localStorage.removeItem('ce:record-speaker-audio:v1');
   (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());

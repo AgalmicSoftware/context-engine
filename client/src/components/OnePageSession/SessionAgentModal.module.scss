@@ -189,11 +189,6 @@
   border-radius: var(--ce-radius-8, 8px);
 }
 
-.answerText {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
 // What the answer read. Its links keep the dialog's own text colour, underlined: the page's link colour is
 // for another surface.
 .sources {

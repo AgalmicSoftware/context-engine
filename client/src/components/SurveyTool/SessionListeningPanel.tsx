@@ -26,7 +26,12 @@ import SessionTranscriptClaimShare from './SessionTranscriptClaimShare';
 import SessionTranscriptContextOption from './SessionTranscriptContextOption';
 import { useTranscriptContextUpload } from './useTranscriptContextUpload';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
-import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS, transcriptSpeech } from '../../utilities/audio/rollingTranscription';
+import {
+  DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
+  ONE_VOICE_PARTS_BEFORE_WARNING,
+  oneVoicePartsInARow,
+  transcriptSpeech,
+} from '../../utilities/audio/rollingTranscription';
 import { applySpeakerMerges } from '../../utilities/audio/speakerMerges';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SessionListeningWaveform } from './SessionListeningWaveform';
@@ -101,6 +106,8 @@ export { formatSessionRecordingElapsed };
 const KEEP_AUDIO_HELP =
   'Closes without waiting for transcription. Audio still waiting for it stays on this device and resumes uploading when you reopen this recording.';
 const MANY_VOICES_KEY = 'ce:record-more-than-four:v1';
+const SPEAKER_AUDIO_KEY = 'ce:record-speaker-audio:v1';
+const SPEAKER_AUDIO_LABEL = 'Recording voices coming from this device';
 const MANY_VOICES_HELP =
   'Ticked, speakers are labelled Speaker A, B… within each part of the recording only, so a letter may be someone else in the next part. Unticked, up to four voices keep a Person number throughout.';
 
@@ -157,7 +164,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   }, [sessionSlug, sessionConfig]);
   const [recordSpeakerAudio, setRecordSpeakerAudio] = useState(() => {
     try {
-      return window.localStorage.getItem('ce:record-speaker-audio:v1') === 'true';
+      return window.localStorage.getItem(SPEAKER_AUDIO_KEY) === 'true';
     } catch {
       return false;
     }
@@ -394,6 +401,21 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     '';
   const gapWarning =
     failedCount > 0 ? "Some audio couldn't be transcribed. Retry transcription or download the audio below." : '';
+  // Only labelled parts can say how many voices they hold, so this needs speaker labels on. It is about the
+  // recording in progress, so it goes on Stop and never shows for an uploaded file.
+  const isRecordingNow = recorder.isRecording || recorder.isPaused;
+  const oneVoiceParts = useMemo(
+    () => (panelMode === 'recordGroup' && isRecordingNow ? oneVoicePartsInARow(recorder.segments) : 0),
+    [panelMode, isRecordingNow, recorder.segments],
+  );
+  const oneVoiceWarning =
+    oneVoiceParts < ONE_VOICE_PARTS_BEFORE_WARNING
+      ? ''
+      : `Only one voice in the last ${oneVoiceParts} parts. If others are on a call through this device, ${
+          recordSpeakerAudio
+            ? 'play it through speakers, not headphones.'
+            : `Stop, tick “${SPEAKER_AUDIO_LABEL}”, play the call through speakers, not headphones, then Record more.`
+        }`;
   const isPreparingRecording = panelMode === 'recordGroup' && speakerLabelsSupported === null;
   const recordButtonLabel = isRecorderSessionActive
     ? recorder.isStopping
@@ -682,6 +704,78 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       ) : null}
 
       {panelMode !== 'recordGroup' ? <p>Record, upload audio, or add a transcript.</p> : null}
+      {/* Above Record, so the room's settings are seen before recording starts. */}
+      {panelMode === 'recordGroup' ? (
+        <div className={styles.sessionRecordingOptions}>
+          <span className={styles.sessionRecordingOption}>
+            <label>
+              <input
+                type="checkbox"
+                checked={recordSpeakerAudio}
+                disabled={isRecorderSessionActive || recorder.isBusy}
+                onChange={(event) => {
+                  setRecordSpeakerAudio(event.target.checked);
+                  try {
+                    window.localStorage.setItem(SPEAKER_AUDIO_KEY, String(event.target.checked));
+                  } catch {
+                    /* The option still works when browser storage is unavailable. */
+                  }
+                }}
+              />{' '}
+              {SPEAKER_AUDIO_LABEL}
+            </label>
+            <button
+              type="button"
+              id={speakerHelpId}
+              className={styles.sessionInterviewHeaderButton}
+              aria-label="About recording voices coming from this device"
+            >
+              <FontAwesomeIcon icon={faQuestionCircle} />
+            </button>
+            <UncontrolledTooltip target={speakerHelpId} trigger="hover focus" autohide={false}>
+              Turns off echo cancellation so the mic also records people heard through this device&apos;s speakers. Use
+              speakers, not headphones.
+            </UncontrolledTooltip>
+          </span>
+          {speakerLabelsSupported ? (
+            <span className={styles.sessionRecordingOption}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={manyVoices}
+                  aria-describedby={`${manyVoicesHelpId}-about`}
+                  disabled={isRecorderSessionActive || recorder.isBusy || Boolean(recorder.labelsUnavailableReason)}
+                  onChange={(event) => {
+                    setManyVoices(event.target.checked);
+                    try {
+                      window.localStorage.setItem(MANY_VOICES_KEY, String(event.target.checked));
+                    } catch {
+                      /* The option still works when browser storage is unavailable. */
+                    }
+                  }}
+                />{' '}
+                More than 4 people in the room
+              </label>
+              <button
+                type="button"
+                id={manyVoicesHelpId}
+                className={styles.sessionInterviewHeaderButton}
+                aria-label="About more than 4 people in the room"
+                aria-describedby={`${manyVoicesHelpId}-about`}
+              >
+                <FontAwesomeIcon icon={faQuestionCircle} />
+              </button>
+              <span id={`${manyVoicesHelpId}-about`} hidden>
+                {MANY_VOICES_HELP}
+              </span>
+              <UncontrolledTooltip target={manyVoicesHelpId} trigger="hover focus" autohide={false}>
+                {MANY_VOICES_HELP}
+              </UncontrolledTooltip>
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className={styles.sessionListeningRecordWrap}>
         {isRecorderSessionActive ? (
           <div className={styles.sessionListeningActiveRecorder}>
@@ -776,77 +870,6 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         />
       </div>
 
-      {panelMode === 'recordGroup' ? (
-        <div className={styles.sessionRecordingOptions}>
-          <span className={styles.sessionRecordingOption}>
-            <label>
-              <input
-                type="checkbox"
-                checked={recordSpeakerAudio}
-                disabled={isRecorderSessionActive || recorder.isBusy}
-                onChange={(event) => {
-                  setRecordSpeakerAudio(event.target.checked);
-                  try {
-                    window.localStorage.setItem('ce:record-speaker-audio:v1', String(event.target.checked));
-                  } catch {
-                    /* The option still works when browser storage is unavailable. */
-                  }
-                }}
-              />{' '}
-              Recording voices coming from this device
-            </label>
-            <button
-              type="button"
-              id={speakerHelpId}
-              className={styles.sessionInterviewHeaderButton}
-              aria-label="About recording voices coming from this device"
-            >
-              <FontAwesomeIcon icon={faQuestionCircle} />
-            </button>
-            <UncontrolledTooltip target={speakerHelpId} trigger="hover focus" autohide={false}>
-              Turns off echo cancellation so the mic also records people heard through this device&apos;s speakers. Use
-              speakers, not headphones.
-            </UncontrolledTooltip>
-          </span>
-          {speakerLabelsSupported ? (
-            <span className={styles.sessionRecordingOption}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={manyVoices}
-                  aria-describedby={`${manyVoicesHelpId}-about`}
-                  disabled={isRecorderSessionActive || recorder.isBusy || Boolean(recorder.labelsUnavailableReason)}
-                  onChange={(event) => {
-                    setManyVoices(event.target.checked);
-                    try {
-                      window.localStorage.setItem(MANY_VOICES_KEY, String(event.target.checked));
-                    } catch {
-                      /* The option still works when browser storage is unavailable. */
-                    }
-                  }}
-                />{' '}
-                More than 4 people in the room
-              </label>
-              <button
-                type="button"
-                id={manyVoicesHelpId}
-                className={styles.sessionInterviewHeaderButton}
-                aria-label="About more than 4 people in the room"
-                aria-describedby={`${manyVoicesHelpId}-about`}
-              >
-                <FontAwesomeIcon icon={faQuestionCircle} />
-              </button>
-              <span id={`${manyVoicesHelpId}-about`} hidden>
-                {MANY_VOICES_HELP}
-              </span>
-              <UncontrolledTooltip target={manyVoicesHelpId} trigger="hover focus" autohide={false}>
-                {MANY_VOICES_HELP}
-              </UncontrolledTooltip>
-            </span>
-          ) : null}
-        </div>
-      ) : null}
-
       {shouldShowMeta && (
         <div className={styles.sessionListeningMeta} aria-live="polite">
           {statusLabel && <span>{statusLabel}</span>}
@@ -891,6 +914,15 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       )}
 
       {gapWarning ? <div role="status">{gapWarning}</div> : null}
+      {oneVoiceWarning ? (
+        <div
+          className={styles.sessionRecordingWakeNotice}
+          role="status"
+          data-testid={E2E_TESTIDS.SESSION_RECORDING_ONE_VOICE}
+        >
+          {oneVoiceWarning}
+        </div>
+      ) : null}
       {/* One tap must not end capture: Stop first, then close without waiting for uploads. */}
       {!isCapturing && (hasPendingTranscription || failedCount > 0 || isClosing) && onClose ? (
         <span className={styles.sessionRecordingOption}>

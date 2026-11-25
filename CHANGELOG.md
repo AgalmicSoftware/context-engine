@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.42] - 2026-11-25
+
+Results' report folds each question to one line and lists participants by when they first answered, and Atlas lists positions most widely held first. Session Agent answers keep their lists and line breaks; Group Conversation's recording options sit above Record, with a note when the last two parts each held one voice; rating answers say their number once; and no empty band stays above the question after a submit. Site only: the Session Worker's code is unchanged and MCP stays 0.9.35.
+
+### Site — available when the site deploys
+
+- **No empty band above the question after a submit.** On a wide screen the session's title moves up to make room for Submit above the question card, and the green **Submitted** that replaces it hides after ten seconds; the title used to stay up over the empty space. It now comes back down once nothing shows there. The card itself does not move, and phones are unchanged.
+- **Session Agent answers keep their lists.** An answer's "- " and "•" bullets, numbered steps (each keeping its own number), short headings and bold now show as such in the dialog and in admins' list of stored chats, and its line breaks stay. HTML, links and images in an answer show as text, as written, and nothing is drawn or fetched from it; stored chats keep the text as it came.
+- **Group recording options sit above Record.** "Recording voices coming from this device" and "More than 4 people in the room" now come before Record in Group Conversation, so they are seen before a recording starts; Record still starts on one tap. While recording, a note says when the last two finished parts each held only one voice, and points at that option and at headphones; it never stops or changes the recording, goes when the recording stops, and needs speaker labels.
+- **Rating answers say their number once.** An answer card shows "8/10" without the bare "0" and "10" beside it; worded scale ends, and a lowest point other than 0, still show.
+- **The report's questions fold.** Each written, rating, multiple-choice and quadratic question starts as one line, with its prompt, how many answered and its answer in short (the start of the first written answer, the average, the option chosen most, or the highest net), and opens with a click or the keyboard; Open all and Fold all do so for a section. Multiple-choice options sit closer together when open. The report's Expand All and Collapse All open and fold them too, and the PDF export shows each open, then leaves each as it was; agree/disagree statements, already a line each, are unchanged.
+- **The report lists participants by when they first answered.** The List of Participants starts with whoever answered first, going by the earliest time on each person's answers in the report (the time an answer was last saved). Anyone whose answers carry no time, as some agents' do, follows in the previous order.
+- **Positions, most widely held first.** In Results' Atlas, each topic's positions (and a question's categories of answer) are listed by how many participants hold them, most first; positions held by the same number keep their order.
+- **Deploy helper.** It deploys the 0.9.41 Worker bundles. A Worker updated from the site gets this release's.
+
 ## [0.9.41] - 2026-11-24
 
 Group Conversation drafts each multiple-choice question as pick one or pick any, an added transcript shows in the session's context at once, and who can read the transcript has room on a phone. Stats shows its counts without waiting for its block check, and a passkey sign-in's spinner has Cancel. Site only: the Session Worker's code is unchanged and MCP stays 0.9.35.

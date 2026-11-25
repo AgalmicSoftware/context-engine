@@ -1,6 +1,6 @@
 import React from 'react';
-import { render, screen, fireEvent, within } from '@testing-library/react';
-import PolisAnswerSections, { writtenAnswerPreview } from './PolisAnswerSections';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
+import PolisAnswerSections, { foldedLine, mostChosenLine, writtenAnswerPreview } from './PolisAnswerSections';
 import { buildReportAnswerQuestions } from './polisReportAnswers';
 import { choiceKindLabel } from '../SurveyTool/MultichoiceQuestionInput';
 
@@ -66,7 +66,12 @@ it('reveals hidden written answers and questions together with one View more con
   fireEvent.click(screen.getByRole('button', { name: 'View more (3)' }));
   expect(screen.getByText('Fourth response')).toBeInTheDocument();
   expect(screen.getByText('Last response')).toBeInTheDocument();
-  expect(screen.getAllByRole('button')).toHaveLength(2); // Section header and one expansion control.
+  // Section header, Open all for the questions now showing, and one expansion control.
+  expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+    '▾Freeform',
+    'Open all',
+    'View less',
+  ]);
   fireEvent.click(screen.getByRole('button', { name: 'View less' }));
   expect(screen.queryByText('Fourth response')).not.toBeInTheDocument();
   rerender(<PolisAnswerSections questions={[written[0]]} />);
@@ -138,6 +143,139 @@ it('lists multiple choice options most chosen first, for Pick one and Pick any, 
   expect(any).toEqual(['Library3/4', 'Garden2/4', 'Bus1/4', 'Paths1/4']);
   // Only the display is sorted: the summaries keep the question's order.
   ranked.forEach((question) => expect(question.options.map((option) => option.label)).toEqual(options));
+});
+
+// A long list of questions took a lot of scrolling: each kind now folds to one line, in one shared way.
+it('folds every kind of question to its prompt and a line of its answer, and opens it on request', () => {
+  const picks = (values: unknown[]) =>
+    values.map((value, index) => ({ responder: `p${index}`, response: { type: 'multichoice', answer: { value } } }));
+  const folded = buildReportAnswerQuestions(
+    {
+      poll: picks(['Bus', 'Garden', 'Bus']),
+      rated: [{ responder: 'a', response: { type: 'rating', answer: { value: 3 } } }],
+      wrote: [{ responder: 'a', response: { type: 'freeform', answer: { value: 'More benches by the river' } } }],
+      split: [{ responder: 'a', response: { type: 'quadratic', answer: { value: [4, -1] } } }],
+    },
+    {
+      poll: { type: 'multichoice', prompt: 'How do you travel?', options: ['Garden', 'Bus'], singleSelect: true },
+      rated: { type: 'rating', prompt: 'How was it?' },
+      wrote: { type: 'freeform', prompt: 'What would help?' },
+      split: { type: 'quadratic', prompt: 'Projects', options: ['Garden', 'Bus'] },
+    },
+  );
+  render(
+    <PolisAnswerSections
+      questions={folded}
+      openSections={{ multichoice: true, rating: true, freeform: true, quadratic: true }}
+    />,
+  );
+  const summaries = Object.fromEntries(
+    ['multichoice', 'rating', 'freeform', 'quadratic'].map((type) => {
+      const details = screen.getByTestId(`ce-polis-answers-${type}`).querySelector('details') as HTMLDetailsElement;
+      expect(details.open).toBe(false);
+      return [type, details.querySelector('summary')?.textContent];
+    }),
+  );
+  expect(summaries).toEqual({
+    multichoice: 'How do you travel?Pick one3 responsesMost chosen: Bus · 2/3',
+    rating: 'How was it?1 responseAverage 3.0 / 10',
+    freeform: 'What would help?1 response“More benches by the river”',
+    quadratic: 'Projects1 responseHighest net: Garden · +4',
+  });
+  const details = screen.getByTestId('ce-polis-answers-multichoice').querySelector('details') as HTMLDetailsElement;
+  fireEvent.click(details.querySelector('summary') as HTMLElement);
+  expect(details.open).toBe(true);
+  expect(
+    within(details)
+      .getAllByRole('listitem')
+      .map((row) => row.textContent),
+  ).toEqual(['Bus2/3', 'Garden1/3']);
+});
+
+it('opens and folds every question showing in a section at once', async () => {
+  const many = buildReportAnswerQuestions(
+    Object.fromEntries(
+      ['One', 'Two', 'Three'].map((prompt) => [
+        prompt,
+        [{ responder: 'a', response: { type: 'rating', prompt, answer: { value: 5 } } }],
+      ]),
+    ),
+  );
+  render(<PolisAnswerSections questions={many} openSections={{ rating: true }} />);
+  const section = screen.getByTestId('ce-polis-answers-rating');
+  // One question in the preview needs no such control.
+  expect(within(section).queryByRole('button', { name: 'Open all' })).not.toBeInTheDocument();
+  fireEvent.click(within(section).getByRole('button', { name: 'View more (2)' }));
+  const folds = () => [...section.querySelectorAll('details')].map((details) => details.open);
+  expect(folds()).toEqual([false, false, false]);
+  fireEvent.click(within(section).getByRole('button', { name: 'Open all' }));
+  expect(folds()).toEqual([true, true, true]);
+  fireEvent.click(within(section).getByRole('button', { name: 'Fold all' }));
+  expect(folds()).toEqual([false, false, false]);
+  // Questions opened from their own lines count too: with all three open, the control folds them.
+  for (const summary of section.querySelectorAll('summary')) {
+    fireEvent.click(summary);
+    // The browser says a details element opened on a later task.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  }
+  expect(folds()).toEqual([true, true, true]);
+  fireEvent.click(within(section).getByRole('button', { name: 'Fold all' }));
+  expect(folds()).toEqual([false, false, false]);
+});
+
+it('shortens a long first written answer on its folded line at a word', () => {
+  const [long] = buildReportAnswerQuestions({
+    wrote: [
+      {
+        responder: 'a',
+        response: { type: 'freeform', prompt: 'Long', answer: { value: `${'word '.repeat(30)}end` } },
+      },
+    ],
+  });
+  const line = foldedLine(long);
+  expect(line).toMatch(/^“(word )+word…”$/);
+  expect(line.length).toBeLessThanOrEqual(93);
+  expect(foldedLine({ ...long, texts: [] })).toBe('No written answers');
+});
+
+it('names every option tied for most chosen, and says when none was', () => {
+  const [tied] = buildReportAnswerQuestions(
+    {
+      tied: ['a', 'b'].map((responder) => ({
+        responder,
+        response: { type: 'multichoice', answer: { value: ['Bus', 'Garden'] } },
+      })),
+    },
+    { tied: { type: 'multichoice', prompt: 'Tied', options: ['Garden', 'Bus', 'Paths'] } },
+  );
+  expect(mostChosenLine(tied)).toBe('Most chosen: Garden, Bus · 2/2 each');
+  const none = { ...tied, options: tied.options.map((option) => ({ ...option, count: 0 })) };
+  expect(mostChosenLine(none)).toBe('No option chosen');
+});
+
+it('puts each question back as the reader left it after the export', async () => {
+  const { rerender } = render(<PolisAnswerSections questions={questions} openSections={{ rating: true }} />);
+  const section = screen.getByTestId('ce-polis-answers-rating');
+  fireEvent.click(within(section).getByRole('button', { name: 'View more (1)' }));
+  const folds = () => [...section.querySelectorAll('details')].map((details) => details.open);
+  fireEvent.click(section.querySelector('summary') as HTMLElement);
+  // The browser says a details element opened or closed on a later task.
+  const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  await settle();
+  expect(folds()).toEqual([true, false]);
+  rerender(<PolisAnswerSections questions={questions} openSections={{ rating: true }} pdfMode />);
+  await settle();
+  expect(folds()).toEqual([true, true]);
+  rerender(<PolisAnswerSections questions={questions} openSections={{ rating: true }} />);
+  await settle();
+  expect(folds()).toEqual([true, false]);
+});
+
+it('shows every question open in the export', () => {
+  render(<PolisAnswerSections questions={questions} pdfMode />);
+  const folds = [...screen.getByTestId('ce-polis-answer-sections').querySelectorAll('details')];
+  expect(folds).toHaveLength(3);
+  folds.forEach((details) => expect(details.open).toBe(true));
 });
 
 it('keeps binary independent, includes it in PDF, and restores its collapsed state', () => {

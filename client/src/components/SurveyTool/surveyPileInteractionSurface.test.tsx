@@ -493,6 +493,25 @@ describe('the check after a submit', () => {
     });
     expect(check).toHaveClass('pileSubmitDone', 'pileSubmitDoneGone');
   });
+
+  it('says it is shown until it hides or goes', () => {
+    jest.useFakeTimers();
+    const onShown = jest.fn();
+    const { rerender, unmount } = render(<PileSubmittedCheck onShown={onShown} />);
+    expect(onShown.mock.calls).toEqual([[true]]);
+    // The page passes a new copy of its handler each render: that alone says nothing new.
+    rerender(<PileSubmittedCheck onShown={(shown) => onShown(shown)} />);
+    expect(onShown.mock.calls).toEqual([[true]]);
+    act(() => {
+      jest.advanceTimersByTime(10_000);
+    });
+    expect(onShown.mock.calls).toEqual([[true], [false]]);
+    unmount();
+    expect(onShown).toHaveBeenCalledTimes(2);
+    const early = jest.fn();
+    render(<PileSubmittedCheck onShown={early} />).unmount();
+    expect(early.mock.calls).toEqual([[true], [false]]);
+  });
 });
 
 it('pulses Next only while it is the step to take, keeping its name', () => {

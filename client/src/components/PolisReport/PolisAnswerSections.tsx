@@ -167,6 +167,33 @@ function AnswerChart({
   );
 }
 
+// A folded multiple choice question's line: the option chosen most (or those tied for it), with its count.
+export const mostChosenLine = (question: ReportAnswerQuestion): string => {
+  const top = Math.max(0, ...question.options.map((option) => option.count));
+  if (!top) return 'No option chosen';
+  const leaders = question.options.filter((option) => option.count === top).map((option) => option.label);
+  return `Most chosen: ${leaders.join(', ')} · ${top}/${question.count}${leaders.length > 1 ? ' each' : ''}`;
+};
+
+// A folded written answer shows about this much of itself.
+const FOLDED_ANSWER_CHARS = 90;
+
+// A folded question's line: its answer in short, so a list of folded questions can be read down.
+export const foldedLine = (question: ReportAnswerQuestion): string => {
+  if (question.type === 'multichoice') return mostChosenLine(question);
+  if (question.type === 'rating') return `Average ${question.average.toFixed(1)} / ${question.max}`;
+  if (question.type === 'quadratic') {
+    if (!question.options.length) return 'No allocations';
+    const top = Math.max(...question.options.map((option) => option.net));
+    const leaders = question.options.filter((option) => option.net === top).map((option) => option.label);
+    return `Highest net: ${leaders.join(', ')} · ${signed(top)}${leaders.length > 1 ? ' each' : ''}`;
+  }
+  const text = question.texts[0] || '';
+  if (text.length <= FOLDED_ANSWER_CHARS) return text ? `“${text}”` : 'No written answers';
+  const cut = text.slice(0, FOLDED_ANSWER_CHARS + 1).search(/\s\S*$/);
+  return `“${text.slice(0, cut > 0 ? cut : FOLDED_ANSWER_CHARS).trimEnd()}…”`;
+};
+
 type AnswerSectionType = AnswerType | 'binary';
 const sectionTitles = { binary: 'Binary', ...answerTypeTitles };
 export type AnswerSectionsOpen = Partial<Record<AnswerSectionType, boolean>>;
@@ -176,6 +203,8 @@ export default function PolisAnswerSections({
   pdfMode = false,
   openSections,
   onToggleSection,
+  openQuestions: shownOpenQuestions,
+  onOpenQuestionsChange,
   renderBinaryQuestions,
   binaryQuestionCount = 0,
 }: {
@@ -183,12 +212,24 @@ export default function PolisAnswerSections({
   pdfMode?: boolean;
   openSections?: AnswerSectionsOpen;
   onToggleSection?: (type: AnswerSectionType) => void;
+  openQuestions?: ReadonlySet<string>;
+  onOpenQuestionsChange?: React.Dispatch<React.SetStateAction<ReadonlySet<string>>>;
   renderBinaryQuestions?: (heading: React.ReactNode, limit?: number) => React.ReactNode;
   binaryQuestionCount?: number;
 }) {
   const id = useId();
   const [localOpen, setLocalOpen] = useState<AnswerSectionsOpen>({});
   const [expanded, setExpanded] = useState<AnswerSectionsOpen>({});
+  // Questions opened from their folded line, by id; the export shows every one open.
+  const [localOpenQuestions, setLocalOpenQuestions] = useState<ReadonlySet<string>>(() => new Set());
+  const openQuestions = shownOpenQuestions || localOpenQuestions;
+  const setQuestionsOpen = (ids: string[], isOpen: boolean) =>
+    (onOpenQuestionsChange || setLocalOpenQuestions)((prev) => {
+      if (ids.every((questionId) => prev.has(questionId) === isOpen)) return prev;
+      const next = new Set(prev);
+      ids.forEach((questionId) => (isOpen ? next.add(questionId) : next.delete(questionId)));
+      return next;
+    });
   const toggleSection =
     onToggleSection || ((type: AnswerSectionType) => setLocalOpen((prev) => ({ ...prev, [type]: !prev[type] })));
   return (
@@ -209,6 +250,8 @@ export default function PolisAnswerSections({
               ? items.reduce((sum, question) => sum + question.texts.length, 0) - Math.min(3, items[0].texts.length)
               : Math.max(0, items.length - 1);
         const bodyId = `${id}-${type}`;
+        const shown = type === 'binary' ? [] : showAll ? items : items.slice(0, 1);
+        const allOpen = shown.every((question) => openQuestions.has(question.id));
         return (
           <section key={type} aria-label={sectionTitles[type]} data-testid={`ce-polis-answers-${type}`}>
             {!pdfMode && (
@@ -231,9 +274,8 @@ export default function PolisAnswerSections({
               <div id={bodyId} className={styles.sectionContent}>
                 {type === 'binary'
                   ? renderBinaryQuestions?.(pdfMode ? <h3>{sectionTitles.binary}</h3> : null, showAll ? undefined : 5)
-                  : (showAll ? items : items.slice(0, 1)).map((question, index) => (
-                      <article key={question.id} data-pdf-keep-together className={styles.question}>
-                        {pdfMode && index === 0 && <h3>{sectionTitles[type]}</h3>}
+                  : shown.map((question, index) => {
+                      const heading = (
                         <div className={styles.questionHeading} data-pdf-keep-together>
                           <h4>
                             {question.prompt}
@@ -243,9 +285,42 @@ export default function PolisAnswerSections({
                             {question.count} {question.count === 1 ? 'response' : 'responses'}
                           </span>
                         </div>
-                        <AnswerChart question={question} showAll={showAll} pdfMode={pdfMode} />
-                      </article>
-                    ))}
+                      );
+                      return (
+                        <article key={question.id} data-pdf-keep-together className={styles.question}>
+                          {pdfMode && index === 0 && <h3>{sectionTitles[type]}</h3>}
+                          {/* Folded to its line, so a long list of questions can be read down. */}
+                          <details
+                            className={styles.questionFold}
+                            open={pdfMode || openQuestions.has(question.id)}
+                            // The export's opening is not the reader's, so the folds come back after it.
+                            onToggle={(event) => {
+                              if (!pdfMode) setQuestionsOpen([question.id], event.currentTarget.open);
+                            }}
+                          >
+                            <summary>
+                              {heading}
+                              <span className={styles.foldLine}>{foldedLine(question)}</span>
+                            </summary>
+                            <AnswerChart question={question} showAll={showAll} pdfMode={pdfMode} />
+                          </details>
+                        </article>
+                      );
+                    })}
+                {!pdfMode && shown.length > 1 && (
+                  <button
+                    type="button"
+                    className={styles.more}
+                    onClick={() =>
+                      setQuestionsOpen(
+                        shown.map((question) => question.id),
+                        !allOpen,
+                      )
+                    }
+                  >
+                    {allOpen ? 'Fold all' : 'Open all'}
+                  </button>
+                )}
                 {!pdfMode && remaining > 0 && (
                   <button
                     type="button"

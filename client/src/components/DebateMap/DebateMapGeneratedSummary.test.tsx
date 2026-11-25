@@ -95,6 +95,29 @@ it('leads with the short summary and shows every position without asking', () =>
   expect(within(positions).getAllByRole('listitem')).toHaveLength(2);
 });
 
+it('lists the most widely held position first, keeping the given order among ties', () => {
+  render(
+    <DebateMapGeneratedSummary
+      entries={[
+        { id: 's', comment: first },
+        { id: 'p1', label: 'Few', comment: '', participantCount: 1, participantTotal: 13 },
+        { id: 'p2', label: 'Most', comment: '', participantCount: 9, participantTotal: 13 },
+        { id: 'p3', label: 'Some, first', comment: '', participantCount: 3, participantTotal: 13 },
+        { id: 'p4', label: 'Uncounted', comment: '' },
+        { id: 'p5', label: 'Some, second', comment: '', participantCount: 3, participantTotal: 13 },
+      ]}
+    />,
+  );
+  const items = within(screen.getByRole('region', { name: 'Positions' })).getAllByRole('listitem');
+  expect(items.map((item) => item.querySelector('strong')?.textContent)).toEqual([
+    'Most',
+    'Some, first',
+    'Some, second',
+    'Few',
+    'Uncounted',
+  ]);
+});
+
 it('offers no toggle for a short summary, and shows positions that come without one', () => {
   render(
     <DebateMapGeneratedSummary
