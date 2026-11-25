@@ -685,7 +685,7 @@ export async function inspectRiskMatrix(page, { screenshotDir = '', tag = '' } =
 export async function inspectBuildStatus(page, { kind, name, prompt }, { screenshotDir = '', tag = '' } = {}) {
   const status = page.getByTestId(`ce-session-${kind}-status`);
   await step(`${name} build status`, async () => {
-    await status.getByText(new RegExp(`Building the ${name} · \\d+s`)).waitFor({ timeout: 60000 });
+    await status.getByText(new RegExp(`Building the ${name} · (\\d+s|\\d+:\\d\\d)`)).waitFor({ timeout: 60000 });
     await status.getByText('AI model: fixture-model').waitFor();
     await assertReadable(status);
   });

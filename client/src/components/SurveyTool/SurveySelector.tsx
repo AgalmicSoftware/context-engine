@@ -25,6 +25,8 @@ import QuestionFilter from './QuestionFilter';
 import type { QuestionFilterHandle } from './QuestionFilter';
 import LazyFallback from '../Shared/LazyFallback';
 import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
+import { savedAnswersLoadFailed } from '../MainSite/SavedAnswersNotice';
+import SavedAnswersFailedNotice from './SavedAnswersFailedNotice';
 import { HeaderSubmittedCheck } from './SubmittedMarks';
 import { SubmitCountLabel } from './SubmitCountLabel';
 
@@ -356,6 +358,7 @@ export class SurveySelector extends Component<any, any> {
       selectorDropdownOpen: false,
       pendingSubmitStats: getDefaultSurveySelectorPendingSubmitStats(),
       headerSubmitFailure: '',
+      savedAnswersRetrying: false,
     };
     this.questionFilterRef = React.createRef();
     this.surveyQuestionsRef = React.createRef();
@@ -1110,6 +1113,26 @@ export class SurveySelector extends Component<any, any> {
     );
   };
 
+  // The page's notice steps aside once the answer list has failed; the list says so here, as the form does.
+  savedAnswersFailed = (): boolean => {
+    const { props } = this;
+    if (!props.loginComplete || !props.account || props.isResponsesCacheReady) return false;
+    const slug = resolveEffectiveSlug(props);
+    return !!slug && savedAnswersLoadFailed(props.sessionConfig, slug);
+  };
+
+  retrySavedAnswers = async (): Promise<void> => {
+    if (this.state.savedAnswersRetrying || typeof this.props.refreshQuestionResponses !== 'function') return;
+    this.setState({ savedAnswersRetrying: true });
+    try {
+      await this.props.refreshQuestionResponses(null, { slug: resolveEffectiveSlug(this.props) });
+    } catch (e) {
+      surveyLog.warn('SurveySelector: saved answers are still unavailable', e);
+    } finally {
+      if (this._isMounted) this.setState({ savedAnswersRetrying: false });
+    }
+  };
+
   render() {
     const {
       surveys,
@@ -1452,6 +1475,12 @@ export class SurveySelector extends Component<any, any> {
             this.props.questionCountTarget,
           )}
         {this.props.toolbarTarget ? createPortal(toolbar, this.props.toolbarTarget) : toolbar}
+        {this.savedAnswersFailed() && (
+          <SavedAnswersFailedNotice
+            retrying={!!this.state.savedAnswersRetrying}
+            onRetry={() => void this.retrySavedAnswers()}
+          />
+        )}
 
         {/* Create survey */}
         {createSurveyMode && (

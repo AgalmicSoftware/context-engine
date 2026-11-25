@@ -14,6 +14,7 @@ import type { RenderResult } from '@testing-library/react';
 import { setWorkerCanonicalCacheReader } from '../../utilities/survey/workerCanonicalCacheReader';
 import { SurveyQuestions } from './SurveyQuestions';
 import { PileViewMode } from './SurveyPileViewMode';
+import { SurveySelector } from './SurveySelector';
 import type { SurveyQuestionsProps } from './surveyQuestionsTypes';
 
 export type SurveyQuestionsHarnessStoreState = {
@@ -134,3 +135,9 @@ export const renderSurveyPileViewMode = (
   props: SurveyQuestionsProps = {},
   options: RenderSurveyQuestionsOptions = {},
 ): SurveyQuestionsHarness => createHarness(PileViewMode, props, options);
+
+/** The All-questions page: the selector, its filter and the question list. */
+export const renderSurveySelector = (
+  props: SurveyQuestionsProps = {},
+  options: RenderSurveyQuestionsOptions = {},
+): SurveyQuestionsHarness => createHarness(SurveySelector, props, options);

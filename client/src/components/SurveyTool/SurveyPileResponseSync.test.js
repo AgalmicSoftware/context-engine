@@ -1,5 +1,5 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
-import { renderSurveyPileViewMode, renderSurveyQuestions } from './surveyQuestionsTestHarness';
+import { renderSurveyPileViewMode, renderSurveyQuestions, renderSurveySelector } from './surveyQuestionsTestHarness';
 import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
@@ -256,6 +256,32 @@ const fixture = async ({
     });
     await settle();
   };
+  // The All-questions page, with the props its route passes: no cache error for a failed answer list.
+  const mountList = async () => {
+    view = renderSurveySelector(
+      {
+        account: OWNER,
+        loginComplete: true,
+        provider: { request: jest.fn() },
+        network: { id: 11155420 },
+        networkChainId: 11155420,
+        filterState: {},
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+        isResponsesCacheReady: state.isResponsesCacheReady,
+        questionResponsesNonce: state.questionResponsesNonce,
+        questionsCacheNonce: state.questionResponsesNonce,
+        sessionSlug: SLUG,
+        activeSessionSlug: SLUG,
+        sessionSlugPinned: true,
+        sessionConfig: CONFIG,
+        refreshQuestionResponses: (ids, opts) => controller.refreshQuestionResponses(ids, opts),
+        toggleLoginModal: jest.fn(),
+      },
+      { route: `/session/${SLUG}/questions` },
+    );
+    await settle();
+  };
   return {
     add,
     state,
@@ -263,6 +289,7 @@ const fixture = async ({
     sync,
     mount,
     mountEditor,
+    mountList,
     click,
     submitResponses,
     listPage,
@@ -463,6 +490,23 @@ it('says saved answers did not load when only the answer list failed, and retrie
   await settle();
   expect(screen.queryByText(/your saved answers did not load/i)).not.toBeInTheDocument();
   expect(h.engine().state.surveysResponseState[0].additionalComments[QID].value).toBe('Saved comment');
+});
+
+// The page's notice steps aside for a failed answer list, so the All-questions list must say so itself.
+it('says saved answers did not load on the All-questions list, and retries them there', async () => {
+  let failGlobal = true;
+  const h = await fixture({ failGlobal: () => failGlobal });
+  h.add('responses', SAVED);
+  await initializeSessionThroughMainSite(h);
+  expect(h.state.isResponsesCacheReady).toBe(false);
+  await h.mountList();
+  expect(screen.getByText(/your saved answers did not load/i)).toBeInTheDocument();
+
+  failGlobal = false;
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Retry' })));
+  await waitFor(() => expect(h.state.isResponsesCacheReady).toBe(true));
+  await settle();
+  expect(screen.queryByText(/your saved answers did not load/i)).not.toBeInTheDocument();
 });
 
 it('tells the responder saved answers did not load and retries the load', async () => {
