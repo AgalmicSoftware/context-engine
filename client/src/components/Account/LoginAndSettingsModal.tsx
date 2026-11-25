@@ -134,6 +134,7 @@ import {
   LOGIN_FILE_NOT_MADE_TEXT,
   createLoginPasskeyActions,
   restorePasskeyLoginPassively,
+  takePasskeyStatusForNextOpening,
 } from './loginAndSettingsPasskeyActions';
 import type { LoginPasskeyNetwork, PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
 
@@ -438,6 +439,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   handlePasskeyWalletCreateOnAnotherDevice = this._passkeyActions.handlePasskeyWalletCreateOnAnotherDevice;
   handlePasskeyWalletSignIn = this._passkeyActions.handlePasskeyWalletSignIn;
   handleLoginFileSignIn = this._passkeyActions.handleLoginFileSignIn;
+  handlePasskeyWalletCancel = () => {
+    this._passkeyActions.cancelPasskeyWalletAction();
+    this._purposefulPasskeyActionId = null;
+  };
   // Makes a login file and saves it to the person's downloads. It signs no one in: choosing the file does.
   // Without a password nothing is awaited before the save, so the download stays inside the tap.
   handleLoginFileCreate = async (password?: string) => {
@@ -630,6 +635,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   async componentDidMount() {
     this._isMounted = true;
+    const carriedStatus = takePasskeyStatusForNextOpening();
+    if (carriedStatus) this.setState({ passkeyWalletStatusMessage: carriedStatus, passkeyWalletStatusTone: '' });
     window.addEventListener(CLIENT_AUTH_LOGOUT_EVENT, this.resetClientAuthState);
     this.applyLoginModalFocus(this.props.loginModalFocus);
     this.checkAndSendTestFundsIfNeeded();
@@ -669,6 +676,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   componentWillUnmount() {
     window.removeEventListener(CLIENT_AUTH_LOGOUT_EVENT, this.resetClientAuthState);
     this._isMounted = false;
+    // Closed on its spinner: the passkey action stops as on Cancel, so the next opening isn't left on the spinner.
+    if (this.props.loginInProgress && this.props.provider === 'passkey_eoa') {
+      this._passkeyActions.cancelPasskeyWalletAction({ closing: true });
+    }
     this._sponsoredReqId += 1;
     this._testFundsRequestId += 1;
     this._purposefulPasskeyActionId = null;
@@ -2649,6 +2660,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       handlePasskeyWalletCreate: this.handlePasskeyWalletCreate,
       handlePasskeyWalletCreateOnAnotherDevice: this.handlePasskeyWalletCreateOnAnotherDevice,
       handlePasskeyWalletSignIn: this.handlePasskeyWalletSignIn,
+      handlePasskeyWalletCancel: this.handlePasskeyWalletCancel,
       handleLoginFileChosen: this.handleLoginFileChosen,
       handleLoginFilePassword: this.handleLoginFilePassword,
       handleLoginFileCreate: this.handleLoginFileCreate,

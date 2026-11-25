@@ -7,7 +7,11 @@ import {
   type ContextSource,
   type ContextSourceOptions,
 } from './contextSources';
-import { useSessionContextPrompt, useSessionContextSources } from './useSessionContextSources';
+import {
+  announceContextSourcesChanged,
+  useSessionContextPrompt,
+  useSessionContextSources,
+} from './useSessionContextSources';
 
 const mockRequests: Array<{ options: ContextSourceOptions; resolve: (sources: ContextSource[]) => void }> = [];
 
@@ -292,6 +296,19 @@ describe('useSessionContextSources', () => {
 
     act(() => result.current.reload());
     expect(result.current).toEqual(expect.objectContaining({ loading: true, sources: [source('kept')] }));
+  });
+
+  it('lists again when a source is added to its own session elsewhere on the page', async () => {
+    mount(ADMIN);
+    await resolveLatest([]);
+    const before = mockRequests.length;
+
+    act(() => announceContextSourcesChanged('another-session'));
+    expect(mockRequests).toHaveLength(before);
+
+    act(() => announceContextSourcesChanged(' salon '));
+    expect(mockRequests).toHaveLength(before + 1);
+    await resolveLatest([source('transcript')]);
   });
 });
 

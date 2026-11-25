@@ -49,27 +49,39 @@ List options only for multichoice and quadratic questions, and set voiceCredits 
 
 const QUESTION_TYPES = ['binary', 'rating', 'multichoice', 'freeform', 'quadratic'];
 
-// The shape above as a strict schema, which OpenAI and Claude enforce.
-export const GENERATED_QUESTIONS_RESPONSE_FORMAT = jsonSchemaResponseFormat('generated_questions', {
-  type: 'object',
-  properties: {
-    surveyTitle: { type: 'string' },
-    questions: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          prompt: { type: 'string' },
-          questionType: { type: 'string', enum: QUESTION_TYPES },
-          options: { type: 'array', items: { type: 'string' } },
-          voiceCredits: { anyOf: [{ type: 'integer' }, { type: 'null' }] },
-          tags: { type: 'array', items: { type: 'string' } },
-        },
-        required: ['prompt', 'questionType', 'options', 'voiceCredits', 'tags'],
-        additionalProperties: false,
+// The shape above as a strict schema, which OpenAI and Claude enforce; `extra` adds fields to each question.
+const generatedQuestionsSchema = (extra: Record<string, unknown> = {}) => {
+  const properties = {
+    prompt: { type: 'string' },
+    questionType: { type: 'string', enum: QUESTION_TYPES },
+    options: { type: 'array', items: { type: 'string' } },
+    voiceCredits: { anyOf: [{ type: 'integer' }, { type: 'null' }] },
+    tags: { type: 'array', items: { type: 'string' } },
+    ...extra,
+  };
+  return {
+    type: 'object',
+    properties: {
+      surveyTitle: { type: 'string' },
+      questions: {
+        type: 'array',
+        items: { type: 'object', properties, required: Object.keys(properties), additionalProperties: false },
       },
     },
-  },
-  required: ['surveyTitle', 'questions'],
-  additionalProperties: false,
-});
+    required: ['surveyTitle', 'questions'],
+    additionalProperties: false,
+  };
+};
+
+export const GENERATED_QUESTIONS_RESPONSE_FORMAT = jsonSchemaResponseFormat(
+  'generated_questions',
+  generatedQuestionsSchema(),
+);
+
+/** Group Conversation's drafts also say whether a multichoice question takes one answer or several. */
+export const CHOICE_MODE_INSTRUCTION =
+  'Give each question a "singleSelect" too: for multichoice, true when each person should pick only one option, as when the options exclude one another, and false when they may pick every option that applies; null for the other types.';
+export const LISTENING_QUESTIONS_RESPONSE_FORMAT = jsonSchemaResponseFormat(
+  'generated_questions',
+  generatedQuestionsSchema({ singleSelect: { anyOf: [{ type: 'boolean' }, { type: 'null' }] } }),
+);

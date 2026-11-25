@@ -755,7 +755,8 @@ describe('CommunityTab helpers', () => {
     check.mockResolvedValue(true);
     await instance._runStatsRefreshCycle({ force: true });
     expect(check).toHaveBeenCalledTimes(2);
-    expect(instance.state.initialLoadDone).toBe(true);
+    // The check runs beside the refresh, not inside it, so its answer lands a moment later.
+    await waitFor(() => expect(instance.state.initialLoadDone).toBe(true));
     expect(instance._computeFallbackPollDelayMs()).toBe(60000);
   });
 
@@ -1059,7 +1060,8 @@ describe('CommunityTab helpers', () => {
     expect(tile('questions').props['aria-busy']).toBe(true);
     instance.checkIfInitialLoadDone.mockResolvedValue(true);
     await instance._runStatsRefreshCycle({ force: true });
-    expect(collectNodeText(tile('questions'))).toBe('0Questions');
+    // The readiness check runs beside the refresh, so its answer lands a moment after it.
+    await waitFor(() => expect(collectNodeText(tile('questions'))).toBe('0Questions'));
     instance.state.stats = instance._buildStatsArray(instance.state.stats, {
       users: 7,
       questions: 9,
@@ -1073,7 +1075,7 @@ describe('CommunityTab helpers', () => {
     expect(collectNodeText(tile('questions'))).toBe('Questions');
     instance.checkIfInitialLoadDone.mockResolvedValue(true);
     await instance._runStatsRefreshCycle({ force: true });
-    expect(collectNodeText(tile('questions'))).toBe('0Questions');
+    await waitFor(() => expect(collectNodeText(tile('questions'))).toBe('0Questions'));
   });
 
   it('counts a Worker session from its own listings, whichever session the app has loaded', async () => {
@@ -1301,6 +1303,46 @@ describe('CommunityTab helpers', () => {
         if (counts instanceof Error) throw counts;
         return counts || { questions: 0, surveys: 0, responders: [] };
       });
+    }
+  });
+
+  // The readiness check reads each chain session's latest block, one at a time and with retries, so in the ALL
+  // view it can take minutes. A refresh that waited on it held every later refresh of the same choice, and the
+  // counts that came in meanwhile stayed on spinners until it was done.
+  it('shows the counts that come in while the readiness check is still out', async () => {
+    const selection = { primarySessionSlug: 'one', selectedSessionScope: 'active', selectedSessionSlugs: [] };
+    const instance = attachMutableSetState(new CommunityTab({ globalSessionSelection: selection }));
+    const tile = (label) =>
+      collectTreeNodes(instance.render(), (node) => node.props?.['data-testid'] === `ce-community-stat-${label}`)[0];
+    let answerListing;
+    const { loadWorkerListingCounts } = jest.requireMock('./communityWorkerListingCounts');
+    loadWorkerListingCounts.mockImplementationOnce(() => new Promise((resolve) => (answerListing = resolve)));
+    jest.spyOn(instance, '_iterScopeCaches').mockReturnValue([
+      {
+        slug: 'one',
+        isWorkerCanonical: true,
+        sessionConfig: { slug: 'one', corsWorkerUrl: 'https://one.example.workers.dev' },
+        workerGroupsStatus: 'ready',
+        questionsCache: {},
+        surveysCache: {},
+      },
+    ]);
+    jest.spyOn(instance, '_buildCommunityBeeswarmPoints').mockReturnValue([]);
+    const check = jest.spyOn(instance, 'checkIfInitialLoadDone').mockReturnValue(new Promise(() => {}));
+    try {
+      void instance._refreshCommunityStats({ force: true });
+      await waitFor(() => expect(check).toHaveBeenCalled());
+      expect(tile('questions').props['aria-busy']).toBe(true);
+      // The listing answers once the check is out.
+      answerListing({ questions: 3, surveys: 0, responders: ['0x0000000000000000000000000000000000000001'] });
+      await waitFor(() => expect(collectNodeText(tile('questions'))).toBe('3Questions'));
+      expect(collectNodeText(tile('users'))).toBe('1Users');
+      expect(tile('questions').props['aria-busy']).toBe(false);
+      // One check at a time for a choice, however many refreshes run meanwhile.
+      expect(check).toHaveBeenCalledTimes(1);
+    } finally {
+      instance._isUnmounted = true;
+      instance._clearStatsPollTimer();
     }
   });
 
@@ -3134,12 +3176,12 @@ describe('CommunityTab helpers', () => {
       expect(instance.state.uniqueUsers).toEqual(['0xbbb']);
       expect(instance._latestCacheSignature).toBe(latestSignature);
       expect(instance._beeswarmPoints).toBe(latestPoints);
-      expect(instance._statsRefreshInFlight).toBe(true);
-      expect(instance.state.initialLoadDone).toBe(false);
-      releaseGeneralReadiness(true);
+      // The current refresh is done; only its readiness check is still out, and holds no later refresh.
       await currentRefresh;
       expect(instance._statsRefreshInFlight).toBe(false);
-      expect(instance.state.initialLoadDone).toBe(true);
+      expect(instance.state.initialLoadDone).toBe(false);
+      releaseGeneralReadiness(true);
+      await waitFor(() => expect(instance.state.initialLoadDone).toBe(true));
     } finally {
       releaseOldHydration();
       releaseGeneralReadiness(true);

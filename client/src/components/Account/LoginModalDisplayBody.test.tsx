@@ -46,6 +46,20 @@ const renderBody = (props: Partial<Props>) => {
   return renderAgentHandoffPanel;
 };
 
+it('gives the passkey spinner a way out', () => {
+  const handlePasskeyWalletCancel = jest.fn();
+  renderBody({ loginInProgress: true, provider: 'passkey_eoa', passkeyMode: 'create', handlePasskeyWalletCancel });
+  expect(screen.getByText('creating passkey...')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(handlePasskeyWalletCancel).toHaveBeenCalledTimes(1);
+});
+
+it('shows no Cancel on a wallet extension’s spinner', () => {
+  renderBody({ loginInProgress: true, provider: 'wagmi' });
+  expect(screen.getByText('logging in...')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
+});
+
 it('offers Your AI agent only once someone is signed in', () => {
   expect(renderBody({ loginComplete: false })).not.toHaveBeenCalled();
   expect(screen.queryByTestId('agent-box')).not.toBeInTheDocument();

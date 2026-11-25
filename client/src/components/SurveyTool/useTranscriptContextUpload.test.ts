@@ -6,6 +6,7 @@ import {
   workerAcceptsParticipantContext,
   workerSupportsContextSources,
 } from '../../utilities/docLibrary/contextSources';
+import { announceContextSourcesChanged } from '../../utilities/docLibrary/useSessionContextSources';
 
 jest.mock('../../utilities/docLibrary/contextSources', () => ({
   removeContextSource: jest.fn(async () => undefined),
@@ -16,7 +17,10 @@ jest.mock('../../utilities/docLibrary/contextSources', () => ({
 jest.mock('../../utilities/docLibrary/useContextGroups', () => ({
   useContextGroups: ({ enabled }: { enabled: boolean }) => (enabled ? [{ groupId: 'salon', label: 'Salon' }] : []),
 }));
-jest.mock('../../utilities/docLibrary/useSessionContextSources', () => ({ supportsContextSources: () => true }));
+jest.mock('../../utilities/docLibrary/useSessionContextSources', () => ({
+  announceContextSourcesChanged: jest.fn(),
+  supportsContextSources: () => true,
+}));
 
 const ME = '0xaaaa000000000000000000000000000000000001';
 const OTHER = '0xbbbb000000000000000000000000000000000002';
@@ -110,6 +114,8 @@ describe('adding a transcript to context', () => {
     expect(text).toBe('Person 1: Words.');
     expect(options).toMatchObject({ sessionSlug: 'salon', context: { account: ME } });
     expect(result.current.status).toBe('Transcript added to context.');
+    // The session's context list, open on the same page, reads itself again.
+    expect(announceContextSourcesChanged).toHaveBeenCalledWith('salon');
   });
 
   it('leaves it for the session when there’s no linked group, or when chosen', async () => {
@@ -170,6 +176,7 @@ describe('adding a transcript to context', () => {
     await act(() => result.current.upload('Person 1: Words.'));
     expect(result.current.failed).toBe(true);
     expect(result.current.status).toContain('Worker said no');
+    expect(announceContextSourcesChanged).not.toHaveBeenCalled();
     let finish = (_id: string) => {};
     jest.mocked(uploadContextFile).mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
     let settled = false;

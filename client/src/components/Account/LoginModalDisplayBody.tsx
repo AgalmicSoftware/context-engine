@@ -234,6 +234,7 @@ type LoginModalDisplayBodyProps = {
   handlePasskeyWalletCreate: () => void;
   handlePasskeyWalletCreateOnAnotherDevice: () => void;
   handlePasskeyWalletSignIn: () => void;
+  handlePasskeyWalletCancel: () => void;
   handleLoginFileChosen: (file: ChosenLoginFile) => void;
   handleLoginFilePassword: (password: string) => void;
   handleLoginFileCreate: (password?: string) => void | Promise<void>;
@@ -283,6 +284,7 @@ const LoginModalDisplayBody = ({
   handlePasskeyWalletCreate,
   handlePasskeyWalletCreateOnAnotherDevice,
   handlePasskeyWalletSignIn,
+  handlePasskeyWalletCancel,
   handleLoginFileChosen,
   handleLoginFilePassword,
   handleLoginFileCreate,
@@ -474,6 +476,19 @@ const LoginModalDisplayBody = ({
           <h3 id={styles.verifyingText}>{progressLabel}</h3>
           <FontAwesomeIcon icon={faSpinner} pulse id={styles.verifyingTXloadingIcon} />
         </div>
+        {/* A passkey step can wait with nothing on screen (its prompt hidden, or the page waiting for focus). */}
+        {provider === 'passkey_eoa' ? (
+          <div className="text-center">
+            <Button
+              color="secondary"
+              outline
+              onClick={handlePasskeyWalletCancel}
+              data-testid="ce-passkey-wallet-cancel"
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : null}
       </CardBody>
     );
   }

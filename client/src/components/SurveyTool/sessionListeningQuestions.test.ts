@@ -7,6 +7,11 @@ import {
   parseListeningQuestionResponse,
 } from './sessionListeningQuestions';
 import { generateQuestionId } from '../../utilities/shared/questionUtils.mjs';
+import {
+  CHOICE_MODE_INSTRUCTION,
+  GENERATED_QUESTIONS_RESPONSE_FORMAT,
+  LISTENING_QUESTIONS_RESPONSE_FORMAT,
+} from '../../prompts/seedGenPrompt';
 
 jest.mock('../../utilities/ai/aiClient.js', () => ({
   callAI: jest.fn(),
@@ -141,7 +146,21 @@ describe('sessionListeningQuestions', () => {
       });
     mockCallAI
       .mockResolvedValueOnce(reply(['Early step?', 'Early trade-off?', 'Early pilot?']))
-      .mockResolvedValueOnce(reply(['Late step?', 'Late trade-off?', 'Late pilot?']))
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          surveyTitle: 'Breakout',
+          questions: [
+            ...JSON.parse(reply(['Late step?', 'Late trade-off?'])).questions,
+            {
+              prompt: 'Late pilot?',
+              questionType: 'multichoice',
+              options: ['Now', 'Later'],
+              singleSelect: true,
+              tags: [],
+            },
+          ],
+        }),
+      )
       .mockResolvedValueOnce(reply(['Final one?', 'Final two?', 'Final three?']));
     // Three quarters of a part each, so the whole needs two.
     const talk = (said: string) =>
@@ -163,7 +182,8 @@ describe('sessionListeningQuestions', () => {
     // The last pass reads every part's candidates, not the transcript, and asks for the set number.
     expect(prompts[2]).toContain('Source type: candidate questions from one recorded discussion.');
     expect(prompts[2]).toContain('1. (binary) Early step?');
-    expect(prompts[2]).toContain('6. (binary) Late pilot?');
+    // Each candidate keeps its choice mode for the last pass.
+    expect(prompts[2]).toContain('6. (multichoice, pick one: Now / Later) Late pilot?');
     expect(prompts[2]).toContain('Choose and merge them into the strongest questions for the whole discussion');
     expect(prompts[2]).toContain('Write at most 3 questions');
     expect(prompts[2]).not.toContain('Pay a resident panel.');
@@ -189,6 +209,60 @@ describe('sessionListeningQuestions', () => {
     });
     expect(callAI).toHaveBeenCalledTimes(1);
     expect(String(mockCallAI.mock.calls[0][0])).toContain('Source type: transcript.');
+  });
+
+  it('asks for each multichoice draft’s choice mode, leaving the session’s own instructions as written', async () => {
+    const own = 'Write only about the park. Return JSON with "questions" only.';
+    const prompt = buildListeningQuestionPrompt('Person 1: The park needs lights.', { sessionInstructions: own });
+    expect(prompt).toContain(own);
+    expect(prompt.trimEnd().endsWith(CHOICE_MODE_INSTRUCTION)).toBe(true);
+    mockCallAI.mockResolvedValueOnce(JSON.stringify({ surveyTitle: '', questions: [] }));
+    await generateQuestionsFromListeningTranscript(
+      'Person 1: The park needs lights before winter, says everyone here.',
+      {
+        sessionInstructions: own,
+      },
+    );
+    expect(mockCallAI.mock.calls[0][0]).toContain(own);
+    expect(mockCallAI.mock.calls[0][1]).toMatchObject({ response_format: LISTENING_QUESTIONS_RESPONSE_FORMAT });
+    const item = (format: typeof GENERATED_QUESTIONS_RESPONSE_FORMAT) =>
+      (format.json_schema.schema as { properties: { questions: { items: { required: string[] } } } }).properties
+        .questions.items;
+    expect(item(LISTENING_QUESTIONS_RESPONSE_FORMAT).required).toContain('singleSelect');
+    // Other question generators ask for no choice mode.
+    expect(item(GENERATED_QUESTIONS_RESPONSE_FORMAT).required).not.toContain('singleSelect');
+  });
+
+  it('makes a multichoice draft pick one only on a strict true, with an id that says so', () => {
+    const options = ['Cost', 'Timing'];
+    const multichoice = (prompt: string, singleSelect?: unknown) => ({
+      prompt,
+      questionType: 'multichoice',
+      options,
+      ...(singleSelect === undefined ? {} : { singleSelect }),
+      tags: [],
+    });
+    const { statements } = buildListeningQuestionStatements(
+      {
+        questions: [
+          multichoice('Which comes first?', true),
+          multichoice('Which matter?', false),
+          multichoice('Which are funded?', 'true'),
+          multichoice('Which are late?', null),
+          multichoice('Which are new?'),
+          { prompt: 'Lights help.', questionType: 'binary', singleSelect: true, tags: [] },
+        ],
+      },
+      { count: 6 },
+    );
+    expect(statements[0]).toMatchObject({
+      singleSelect: true,
+      id: generateQuestionId('multichoice', 'Which comes first?', options, true),
+    });
+    for (const statement of statements.slice(1)) {
+      expect(statement).not.toHaveProperty('singleSelect');
+      expect(statement.id).toBe(generateQuestionId(statement.type, statement.prompt, statement.options || []));
+    }
   });
 
   it('parses AI JSON and builds reviewable question statements', () => {

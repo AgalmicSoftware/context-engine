@@ -40,6 +40,14 @@ it('gives the interview dialog the whole visible screen on a phone', () => {
 
 // Every phone question card shares one height: the small viewport (steady while Safari's bars move) below the card's
 // measured top, less the controls row, so the row sits in view without scrolling and the arrows never shift.
+// Group Conversation's choice of who can read the transcript was squeezed into the line of the box beside Submit,
+// about 200px on a phone; there it takes the whole row below the box and the button.
+it('gives who can read the transcript the whole row below Submit on a phone', () => {
+  expect(css).toMatch(
+    /@media \(max-width: 480px\)\s*\{\s*\.sessionTranscriptContext\s*\{\s*display: contents;\s*\}\s*\.sessionTranscriptContext \.sessionTranscriptContextAccess\s*\{\s*order: 1;\s*flex: 1 0 100%;/,
+  );
+});
+
 it('gives every phone question card one height that leaves the controls row in view', () => {
   const unit = css.match(/\.pileInteractionUnit\s*\{([^{}]*--pile-phone-card-height[^{}]*)\}/)?.[1] || '';
   const values = [...unit.matchAll(/--pile-phone-card-height:\s*([^;]+);/g)].map(([, value]) => value);

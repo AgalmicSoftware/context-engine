@@ -136,7 +136,11 @@ available at unlock time.
 3. When registration returns WebAuthn PRF output, the app uses it directly.
    Authenticating the new credential is a compatibility fallback only when the
    registration result omits PRF output; it is not an unconditional second
-   sign-in prompt.
+   sign-in prompt. That prompt waits for the page to be in front, and a
+   password manager can hold it out of sight, so the dialog's spinner has
+   **Cancel**. Cancel, or closing the dialog on the spinner, stops the step:
+   nothing more is saved and no one is signed in, and the dialog says to
+   choose **Login** and pick the passkey just made.
 4. The app derives the EOA private key with HKDF-SHA256 over PRF output,
    configured RP ID, configured derivation namespace, and versioned derivation
    labels.

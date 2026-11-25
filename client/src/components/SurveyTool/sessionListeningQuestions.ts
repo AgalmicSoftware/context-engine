@@ -1,5 +1,9 @@
 import { callAI } from '../../utilities/ai/aiClient.js';
-import { GENERATED_QUESTIONS_RESPONSE_FORMAT, seedGenPrompt } from '../../prompts/seedGenPrompt.js';
+import {
+  CHOICE_MODE_INSTRUCTION,
+  LISTENING_QUESTIONS_RESPONSE_FORMAT,
+  seedGenPrompt,
+} from '../../prompts/seedGenPrompt.js';
 import { generateQuestionId as generateSharedQuestionId } from '../../utilities/shared/questionUtils.mjs';
 import {
   buildGeneratedSurveyStatements,
@@ -114,7 +118,8 @@ export const buildListeningQuestionPrompt = (
     .filter(Boolean)
     .join('\n\n');
 
-  return buildSingleGenerationPrompt({
+  // The choice mode follows the template's own JSON lines, outside the session's instructions, which stay as written.
+  const prompt = buildSingleGenerationPrompt({
     promptTemplate: seedGenPrompt,
     sourceDocContent: transcript,
     count,
@@ -127,6 +132,7 @@ export const buildListeningQuestionPrompt = (
     },
     sessionInstructions: listeningInstructions,
   });
+  return `${prompt.trimEnd()}\n${CHOICE_MODE_INSTRUCTION}\n`;
 };
 
 export const parseListeningQuestionResponse = (raw: unknown): GeneratedAiQuestionPayload => {
@@ -174,7 +180,7 @@ const draftListeningQuestions = async (
     workerUrl: opts.workerUrl,
     taskType: 'generate',
     thinking: true,
-    response_format: GENERATED_QUESTIONS_RESPONSE_FORMAT,
+    response_format: LISTENING_QUESTIONS_RESPONSE_FORMAT,
   });
   const raw = parseListeningQuestionResponse(rawOutput);
   const { statements, surveyTitle } = buildListeningQuestionStatements(raw, opts);
@@ -223,7 +229,7 @@ export const generateQuestionsFromListeningTranscript = async (
   const candidates = found
     .map(
       (statement, index) =>
-        `${index + 1}. (${statement.type}${statement.options?.length ? `: ${statement.options.join(' / ')}` : ''}) ${statement.prompt}`,
+        `${index + 1}. (${statement.type}${statement.type === 'multichoice' ? (statement.singleSelect ? ', pick one' : ', pick any') : ''}${statement.options?.length ? `: ${statement.options.join(' / ')}` : ''}) ${statement.prompt}`,
     )
     .join('\n');
   return draftListeningQuestions(candidates, {

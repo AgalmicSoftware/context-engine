@@ -22,6 +22,8 @@ export {
 } from '../../utilities/session/loginFileTexts';
 /** Shown after "Create failed: " where a login file with a password could not be made. */
 export const LOGIN_FILE_NOT_MADE_TEXT = 'The login file could not be made.';
+/** After Cancel on the spinner, or closing the dialog on it: a passkey made before that still signs in. */
+export const PASSKEY_STOPPED_MESSAGE = 'Stopped. If you just made a passkey, choose Login and pick it.';
 /** The status after a Create whose passkey has no PRF: the login then offers to keep the passkey on a phone. */
 export const PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE = `Create failed: ${PASSKEY_PRF_UNSUPPORTED_TEXT}`;
 
@@ -34,6 +36,7 @@ export type LoginPasskeyNetwork = Record<string, unknown> & {
 export type PasskeyWalletActionMode = '' | 'create' | 'sign-in';
 
 export type LoginPasskeyWalletPort = {
+  cancelPasskeyWalletOperation?: () => void;
   createPasskeyWallet: (options?: { anotherDevice?: boolean }) => Promise<unknown>;
   signInWithLoginFile: (text: string, password?: string) => Promise<unknown>;
   getPasskeyWalletChain?: () => unknown;
@@ -63,6 +66,8 @@ export type LoginPasskeyActionsDeps = {
 
 export type LoginPasskeyActions = {
   _finalizePasskeyWalletLogin: (address: unknown, targetNetwork?: unknown) => void;
+  /** Ends the action under way, if any; on closing, the status is kept for the dialog's next opening. */
+  cancelPasskeyWalletAction: (options?: { closing?: boolean }) => void;
   getPasskeyWalletNetwork: (targetNetwork?: unknown) => unknown;
   // Each resolves to whether it signed the person in.
   handlePasskeyWalletCreate: () => Promise<boolean>;
@@ -70,6 +75,15 @@ export type LoginPasskeyActions = {
   handlePasskeyWalletSignIn: () => Promise<boolean>;
   handleLoginFileSignIn: (text: string, password?: string) => Promise<boolean>;
   syncPasskeyWalletChain: (targetNetwork?: unknown) => unknown;
+};
+
+// The dialog closes by unmounting, so what it said on closing waits here for its next opening.
+let statusForNextOpening = '';
+/** The status to open with, once: the dialog was closed on its spinner. */
+export const takePasskeyStatusForNextOpening = (): string => {
+  const status = statusForNextOpening;
+  statusForNextOpening = '';
+  return status;
 };
 
 export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginPasskeyActions => {
@@ -129,6 +143,8 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
       provider: 'passkey_eoa',
     });
 
+    // An action that is no longer current leaves the sign-in state alone: whatever ended it (a newer action, Cancel,
+    // closing the dialog, signing out) has set it.
     try {
       const passkeyNetwork = getPasskeyWalletNetwork();
       const address = await action();
@@ -137,7 +153,15 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
       deps.setActionMode('');
       return true;
     } catch (error) {
-      if (deps.passkeyWallet.isPasskeyWalletOperationCancelledError?.(error)) return false;
+      if (deps.passkeyWallet.isPasskeyWalletOperationCancelledError?.(error)) {
+        // Cancelled by a wallet operation from outside this dialog, such as a login file's window: no newer action
+        // here has taken over, so the spinner ends here.
+        if (deps.isCurrentAction(passkeyActionId)) {
+          deps.setActionMode('');
+          deps.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
+        }
+        return false;
+      }
       deps.accountLogError(mode === 'create' ? 'Passkey wallet create error:' : 'Passkey wallet sign-in error:', error);
       if (!deps.isCurrentAction(passkeyActionId)) return false;
       const isMissingWallet = mode === 'sign-in' && deps.passkeyWallet.isMissingPasskeyWalletRecordError?.(error);
@@ -164,8 +188,21 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
     }
   };
 
+  // Cancel on the spinner, or closing the dialog on it, as where the passkey step after Create never ends (its
+  // prompt hidden, or the page waiting for focus). The wallet goes no further, and a late end of the action changes
+  // nothing here, as a new action id makes it no longer current.
+  const cancelPasskeyWalletAction = ({ closing = false }: { closing?: boolean } = {}): void => {
+    deps.startAction();
+    deps.passkeyWallet.cancelPasskeyWalletOperation?.();
+    deps.setActionMode('');
+    if (closing) statusForNextOpening = PASSKEY_STOPPED_MESSAGE;
+    else deps.setStatus({ passkeyWalletStatusMessage: PASSKEY_STOPPED_MESSAGE, passkeyWalletStatusTone: '' });
+    deps.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
+  };
+
   return {
     _finalizePasskeyWalletLogin,
+    cancelPasskeyWalletAction,
     getPasskeyWalletNetwork,
     handlePasskeyWalletCreate: () =>
       runPasskeyWalletAction({
