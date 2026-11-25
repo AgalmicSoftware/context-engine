@@ -976,7 +976,12 @@ export class SessionWriteCoordinator {
 
   async scheduleResultsAnalysisAlarm(delayMs = 1_000) {
     if (typeof this.state.storage?.setAlarm !== 'function') return false;
-    await this.state.storage.setAlarm(Math.min((Number(this.now()) || Date.now()) + Math.max(0, Number(delayMs) || 0), await nextAgentSubmitProjectionAt(this), await nextResultsJobAt(this)));
+    const nowMs = Number(this.now()) || Date.now();
+    const at = Math.min(nowMs + Math.max(0, Number(delayMs) || 0), await nextAgentSubmitProjectionAt(this), await nextResultsJobAt(this));
+    // Keep an earlier alarm another queue set, such as upload-receipt cleanup, while it is still ahead,
+    // as scheduleUploadReceiptCleanup does; one already due is the alarm running now.
+    const scheduled = await this.state.storage.getAlarm?.();
+    if (!(scheduled > nowMs && scheduled <= at)) await this.state.storage.setAlarm(at);
     return true;
   }
 
