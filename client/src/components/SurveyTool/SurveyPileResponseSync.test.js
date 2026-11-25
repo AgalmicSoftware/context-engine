@@ -446,6 +446,25 @@ it('reads own answers before uploading after the MainSite Worker load fails', as
   expect(h.submitResponses.mock.calls[0][2][0]).toMatchObject({ ...SAVED, additional: { value: 'New comment' } });
 });
 
+// A cut or refused answer list fails only the answers: the route passes no cache error, so the form must learn of
+// the failure from the load itself, not wait on answers that will never come.
+it('says saved answers did not load when only the answer list failed, and retries it', async () => {
+  let failGlobal = true;
+  const h = await fixture({ failGlobal: () => failGlobal });
+  h.add('responses', SAVED);
+  await initializeSessionThroughMainSite(h);
+  expect(h.state.isResponsesCacheReady).toBe(false);
+  await h.mount({ cacheInitializationError: false });
+  expect(screen.getByText(/your saved answers did not load/i)).toBeInTheDocument();
+
+  failGlobal = false;
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Retry' })));
+  await waitFor(() => expect(h.state.isResponsesCacheReady).toBe(true));
+  await settle();
+  expect(screen.queryByText(/your saved answers did not load/i)).not.toBeInTheDocument();
+  expect(h.engine().state.surveysResponseState[0].additionalComments[QID].value).toBe('Saved comment');
+});
+
 it('tells the responder saved answers did not load and retries the load', async () => {
   let failGlobal = true;
   const h = await fixture({ failGlobal: () => failGlobal });

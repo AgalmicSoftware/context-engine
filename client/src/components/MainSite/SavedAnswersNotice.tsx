@@ -17,20 +17,30 @@ export const isSavedAnswersRoute = (path: string): boolean => {
   return root === 'session' && (section === '' || (section === 'questions' && ['', 'results'].includes(sub)));
 };
 
-/** How much of the session's answer list has been read, as Results counts it; null before the first rows land. */
-export const readSavedAnswersProgress = (
-  sessionConfig: unknown,
-  sessionSlug: string,
-): WorkerResponseLoadProgress | null => {
-  const node = readSurveyToolScopedCacheNode({
+const readWorkerAnswersNode = (sessionConfig: unknown, sessionSlug: string) =>
+  readSurveyToolScopedCacheNode({
     cache: peekCacheSync('questionsCache', sessionSlug, { clone: false }),
     cacheScope: WORKER_CANONICAL_CACHE_SCOPE_KEY,
     sessionConfig,
     sessionSlug,
   });
-  const progress = node?.workerResponseLoadProgress as WorkerResponseLoadProgress | undefined;
+
+/** How much of the session's answer list has been read, as Results counts it; null before the first rows land. */
+export const readSavedAnswersProgress = (
+  sessionConfig: unknown,
+  sessionSlug: string,
+): WorkerResponseLoadProgress | null => {
+  const progress = readWorkerAnswersNode(sessionConfig, sessionSlug)?.workerResponseLoadProgress as
+    WorkerResponseLoadProgress | undefined;
   return progress && Number.isFinite(progress.loaded) && Number.isFinite(progress.listed) ? progress : null;
 };
+
+/**
+ * Whether the session's answer list failed to load, as a cut or refused request leaves it. Only that load knows:
+ * the page's own load error covers questions and surveys, so without this a failed list reads as one still loading.
+ */
+export const savedAnswersLoadFailed = (sessionConfig: unknown, sessionSlug: string): boolean =>
+  readWorkerAnswersNode(sessionConfig, sessionSlug)?.workerResponseHydrationStatus === 'failed';
 
 /**
  * " (1,200 of 2,000+ session answers read)": a person's answers are found only by reading everyone's,
@@ -89,8 +99,14 @@ export default function SavedAnswersNotice({
       partial = false;
     }
   }
-  // A partial load has its own notice and never becomes ready.
-  const loading = workerSession && signedIn && !answersReady && !partial && !answersFailed;
+  // A partial load has its own notice and never becomes ready; a failed one, the form's message with its retry.
+  const loading =
+    workerSession &&
+    signedIn &&
+    !answersReady &&
+    !partial &&
+    !answersFailed &&
+    !savedAnswersLoadFailed(sessionConfig, sessionSlug);
   const slow = useHeldFor(loading, SAVED_ANSWERS_SLOW_MS);
   if (!loading) return null;
   // Read on each render: the page renders again as each batch of answers lands.

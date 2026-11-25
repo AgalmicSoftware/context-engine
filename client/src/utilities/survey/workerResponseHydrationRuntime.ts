@@ -113,6 +113,8 @@ export const hydrateWorkerCanonicalResponses = async ({
     .toLowerCase();
   const readsAllWhole = workerHydration.readsResearchMaterial(sessionConfig, reader);
   let strippedRefIds = new Set<string>();
+  // A failure an earlier load left in the cache, even one from a visit before, which this load now replaces.
+  let clearedFailure = false;
   const initializedQuestions = await updateQuestionsCacheAtomic((current) => {
     const merged = targetIsCurrent()
       ? workerHydration.mergeWorkerQuestionResponses(current, [], sessionSlug, run.identity)
@@ -120,6 +122,7 @@ export const hydrateWorkerCanonicalResponses = async ({
     // Only reuse refs after the merge has checked the exact Worker/session identity.
     const worker = (merged as CacheRecord).worker as CacheRecord | undefined;
     if (targetIsCurrent() && worker) {
+      clearedFailure = worker.workerResponseHydrationStatus === 'failed';
       worker.workerResponseHydrationStatus = 'loading';
       delete worker.workerResponseLoadProgress;
       // Each run consumes the continuation a capped run saved, so a failed
@@ -155,6 +158,8 @@ export const hydrateWorkerCanonicalResponses = async ({
     throw createPersistenceError(`Failed to initialize Worker questions cache for ${sessionSlug}`);
   }
   if (shouldStop()) return;
+  // The page reads the failure to say saved answers did not load: it shows the load again now, not at its first rows.
+  if (clearedFailure) markProgress?.();
 
   const initializedUsers = await updateUserCacheAtomic((current) =>
     targetIsCurrent() ? workerHydration.mergeWorkerUserResponses(current, cachedRows, run.identity) : current || {},

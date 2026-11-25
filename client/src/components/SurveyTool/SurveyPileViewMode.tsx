@@ -115,6 +115,7 @@ import {
   shouldInitializePileResponses,
 } from './surveyPileResponseController';
 import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheIsolation';
+import { savedAnswersLoadFailed } from '../MainSite/SavedAnswersNotice';
 import PileEndOfSetCard from './PileEndOfSetCard';
 import {
   buildClearedTransientSubmitFeedbackState,
@@ -2695,12 +2696,15 @@ const getSessionInterviewResponseReadinessToken = (engine: PileViewModeEngine, b
   return engine._sessionInterviewResponseReadyToken === activeToken ? activeToken : '';
 };
 
-// A failed session load leaves saved answers unknown; Submit stays gated by the
-// own-answer read, and this notice lets the responder reload them before editing.
+// A failed session load, or a failed answer list on its own, leaves saved answers unknown; Submit stays gated by
+// the own-answer read, and this notice lets the responder reload them before editing.
 const buildSavedAnswersNotice = (engine: PileViewModeEngine, hasQuestions: boolean) => {
   const { props } = engine;
-  if (!props.cacheInitializationError || !props.loginComplete || !props.account || !hasQuestions) return null;
+  if (!props.loginComplete || !props.account || !hasQuestions) return null;
   if (props.isResponsesCacheReady || engine._savedAnswersSeenReady) return null;
+  // The cache is read last, only once the notice could show.
+  if (!props.cacheInitializationError && !savedAnswersLoadFailed(props.sessionConfig, resolveEffectiveSlug(props)))
+    return null;
   return { retrying: !!engine.state.savedAnswersRetrying, onRetry: () => void retrySavedAnswersLoad(engine) };
 };
 
