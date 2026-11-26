@@ -1031,7 +1031,11 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(screen.getByRole('button', { name: 'Other options' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Login with file' })).not.toBeInTheDocument();
 
-    await subject.handleLoginFileSignIn('the file text');
+    const signingIn = subject.handleLoginFileSignIn('the file text');
+    // Its own step: the spinner then speaks of no passkey window.
+    expect(subject.state.passkeyMode).toBe('file');
+    await signingIn;
+    expect(subject.state.passkeyMode).toBe('');
     expect(mockedPasskeyWallet.signInWithLoginFile).toHaveBeenLastCalledWith('the file text', undefined);
     expect(subject.props.changeAccount).toHaveBeenCalledWith(
       expect.objectContaining({ account: '0x2222222222222222222222222222222222222222', provider: 'passkey_eoa' }),

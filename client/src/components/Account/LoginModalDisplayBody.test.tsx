@@ -65,6 +65,15 @@ it.each([
   expect(handlePasskeyWalletCancel).toHaveBeenCalledTimes(1);
 });
 
+it('gives a login file’s sign-in a way out, and no word of a passkey window', () => {
+  const handlePasskeyWalletCancel = jest.fn();
+  renderBody({ loginInProgress: true, provider: '', passkeyMode: 'file', handlePasskeyWalletCancel } as Partial<Props>);
+  expect(screen.getByRole('heading', { name: 'logging in...' })).toBeInTheDocument();
+  expect(screen.queryByText(/no passkey window/)).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(handlePasskeyWalletCancel).toHaveBeenCalledTimes(1);
+});
+
 it('shows no Cancel on a wallet extension’s spinner', () => {
   renderBody({ loginInProgress: true, provider: 'wagmi' });
   expect(screen.getByText('logging in...')).toBeInTheDocument();
