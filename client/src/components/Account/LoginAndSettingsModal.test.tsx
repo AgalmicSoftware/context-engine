@@ -7,14 +7,15 @@ import {
 } from '../../utilities/session/agentClientLogin';
 import { cacheAgentClientLoginEnvelope } from '../OnePageSession/onePageSessionAgentController';
 import { ethers } from 'ethers';
-import { Provider } from 'react-redux';
+import { useEffect } from 'react';
+import { Provider, useDispatch, useSelector } from 'react-redux';
 import { applyMiddleware, combineReducers, createStore } from 'redux';
 import thunk from 'redux-thunk';
 import { LoginAndSettingsModal } from './LoginAndSettingsModal';
 import LoginButton from './LoginButton';
 import { PASSKEY_STOPPED_MESSAGE } from './loginAndSettingsPasskeyActions';
 import sessionStateReducer from '../../reducers/sessionStateReducer';
-import { updateLoginInfo } from '../../actions/sessionStateActions';
+import { toggleLoginModal, updateLoginInfo } from '../../actions/sessionStateActions';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
@@ -314,6 +315,71 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       });
     },
   );
+
+  // The interview panel closes the dialog from an effect once the person is signed in (SessionInterviewPanel.tsx),
+  // and the navbar renders it only while the store says it is open, with the store's sign-in flags. So the dialog has
+  // the finished step before it goes: closing it then must neither stop the wallet nor undo the sign-in.
+  it('keeps a passkey sign-in whose dialog is closed as soon as it ends', async () => {
+    let answer!: (address: string) => void;
+    mockedPasskeyWallet.unlockPasskeyWallet.mockImplementationOnce(
+      () => new Promise<string>((resolve) => (answer = resolve)),
+    );
+    const store = createStore(combineReducers({ sessionState: sessionStateReducer }), applyMiddleware(thunk));
+    store.dispatch(toggleLoginModal(true) as any);
+    const props = buildProps({
+      provider: null,
+      updateLoginInfo: (payload: unknown) => store.dispatch(updateLoginInfo(payload) as any),
+    });
+    // The dialog's own mounting, props, state and unmounting, without its markup, whose other parts need the app's
+    // session data.
+    const DialogWithoutMarkup: any = class extends LoginAndSettingsModalSubject {
+      render() {
+        return null;
+      }
+    };
+    let dialog: any = null;
+    const DialogWhileOpen = () => {
+      const { loginModalToggled, loginInProgress, loginComplete } = useSelector((state: any) => state.sessionState);
+      const dispatch = useDispatch();
+      useEffect(() => {
+        if (loginComplete && loginModalToggled) dispatch(toggleLoginModal(false) as any);
+      }, [dispatch, loginComplete, loginModalToggled]);
+      return loginModalToggled ? (
+        <DialogWithoutMarkup
+          {...props}
+          loginModalToggled
+          loginInProgress={loginInProgress}
+          loginComplete={loginComplete}
+          ref={(instance: unknown) => {
+            if (instance) dialog = instance;
+          }}
+        />
+      ) : null;
+    };
+    render(
+      <Provider store={store}>
+        <DialogWhileOpen />
+      </Provider>,
+    );
+    let step!: Promise<boolean>;
+    act(() => {
+      step = dialog.handlePasskeyWalletSignIn();
+    });
+    expect(store.getState().sessionState.loginInProgress).toBe(true);
+    await act(async () => {
+      answer(PASSKEY_ADDRESS);
+      await step;
+    });
+    await expect(step).resolves.toBe(true);
+    expect(dialog._isMounted).toBe(false);
+    expect(mockedPasskeyWallet.cancelPasskeyWalletOperation).not.toHaveBeenCalled();
+    expect(store.getState().sessionState).toMatchObject({
+      loginModalToggled: false,
+      loginInProgress: false,
+      loginComplete: true,
+    });
+    expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({ account: PASSKEY_ADDRESS }));
+  });
 
   // Signed out while a passkey step waits, then another kind of sign-in in the same open dialog: that one is not
   // a passkey step, so closing the dialog on its spinner leaves it running.
