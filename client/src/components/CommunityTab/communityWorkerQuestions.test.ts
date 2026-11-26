@@ -52,11 +52,15 @@ describe('loadCommunityWorkerQuestions', () => {
   it('reads questions and public answers signed out, onto what this browser holds', async () => {
     const result = await loadCommunityWorkerQuestions({ sessionSlug: 'wk', sessionConfig: publicAnswers });
 
-    expect(loadWorkerCanonicalQuestions).toHaveBeenCalledWith({
-      sessionSlug: 'wk',
-      sessionConfig: publicAnswers,
-      account: '',
-    });
+    // Read through readers that stay signed out: communityWorkerQuestions.storage.test.ts checks them.
+    expect(loadWorkerCanonicalQuestions).toHaveBeenCalledWith(
+      { sessionSlug: 'wk', sessionConfig: publicAnswers, account: '' },
+      {
+        listSessionStorageRefsPage: expect.any(Function),
+        readSessionStorageBlob: expect.any(Function),
+        readSessionStorageBatch: expect.any(Function),
+      },
+    );
     // Read as anyone would: the cache node it lands on is the signed-out reader's.
     expect(resolveWorkerCanonicalCacheIdentity).toHaveBeenCalledWith({
       sessionConfig: publicAnswers,

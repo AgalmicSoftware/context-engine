@@ -5,6 +5,11 @@ import {
 } from '../../domains/surveys/workerCanonicalMetadataHydrationPort';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts';
 import {
+  listSessionStorageRefsPage,
+  readSessionStorageBatch,
+  readSessionStorageBlob,
+} from '../../utilities/storage/storageClient';
+import {
   WORKER_CANONICAL_CACHE_SCOPE_KEY,
   resolveWorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
@@ -21,6 +26,20 @@ export type CommunityWorkerQuestions = {
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
+// An empty account is not enough: a refused read would sign in as whoever is signed in to the app, which can open a
+// wallet or passkey window. These readers keep every question read signed out, and a refusal stays a refusal.
+const signedOutReaders = {
+  listSessionStorageRefsPage: (options: Record<string, unknown>) =>
+    listSessionStorageRefsPage({
+      ...(options as Parameters<typeof listSessionStorageRefsPage>[0]),
+      anonymousOnly: true,
+    }),
+  readSessionStorageBlob: (options: Record<string, unknown>) =>
+    readSessionStorageBlob({ ...(options as Parameters<typeof readSessionStorageBlob>[0]), anonymousOnly: true }),
+  readSessionStorageBatch: (options: Record<string, unknown> & { ids: string[] }) =>
+    readSessionStorageBatch({ ...(options as Parameters<typeof readSessionStorageBatch>[0]), anonymousOnly: true }),
+};
+
 /**
  * Reads a session as anyone would, asking for no sign-in: its questions, and its answers where the session shows
  * them to everyone. What this browser already holds is read again only where it is not the session's latest; nothing
@@ -36,7 +55,7 @@ export const loadCommunityWorkerQuestions = async ({
   signal?: AbortSignal;
 }): Promise<CommunityWorkerQuestions> => {
   const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug, reader: '' });
-  const listing = await loadWorkerCanonicalQuestions({ sessionSlug, sessionConfig, account: '' });
+  const listing = await loadWorkerCanonicalQuestions({ sessionSlug, sessionConfig, account: '' }, signedOutReaders);
   let record = mergeWorkerCanonicalQuestionMetadata(
     peekCacheSync('questionsCache', sessionSlug, { clone: false }),
     listing,
