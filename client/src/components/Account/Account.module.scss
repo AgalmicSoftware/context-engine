@@ -2329,11 +2329,6 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// The line above another line with a button: apart enough that the two buttons' 44px tap areas do not meet.
-.passkeyAnotherDevice {
-  margin-bottom: 14px;
-}
-
 // "Create login file or Login with file": tall lines, so that where the two buttons wrap onto two lines their
 // 44px tap areas do not meet.
 .loginFilePair {

@@ -603,21 +603,6 @@ describe('PasskeyEoaWalletClient', () => {
     await expect(client.unlockWallet({ selectCredential: true })).resolves.toBe(DERIVED_ADDRESS);
   });
 
-  it('makes the passkey on another device when asked, and derives the wallet the same way', async () => {
-    const credentials = makeCredentials();
-    const client = new PasskeyEoaWalletClient({
-      config: derivedConfig,
-      storage: createMemoryWalletStorage(),
-      credentials,
-      sessionClient: makeSessionClient(),
-    });
-
-    await expect(client.createWallet({ anotherDevice: true })).resolves.toBe(DERIVED_ADDRESS);
-    const [[options]] = (credentials.create as jest.Mock<unknown, [CredentialCreationOptions]>).mock.calls;
-    expect(options.publicKey?.authenticatorSelection?.authenticatorAttachment).toBe('cross-platform');
-    await client.lock();
-  });
-
   // Every passkey already made must keep opening the same wallet: the salt asked of the passkey, the labels and
   // the derivation are pinned here, for the live site's RP ID. A change to any of these values loses accounts.
   it('pins the PRF salt, the PRF label and the wallet derived from a known PRF output', async () => {

@@ -964,32 +964,27 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       expect(status).toHaveTextContent(`${word} failed: This passkey can't be used here.`);
       expect(status).not.toHaveTextContent('WebAuthn');
       expect(await screen.findByRole('button', { name: 'Copy this link' })).toBeInTheDocument();
-      // Only a Create can be made again on a phone; a Login's passkey already exists.
-      expect(screen.queryAllByRole('button', { name: 'Scan QR with phone' })).toHaveLength(word === 'Create' ? 1 : 0);
+      // No phone offer: a login file is the other way in.
+      expect(screen.queryByRole('button', { name: 'Scan QR with phone' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Create login file' })).toBeInTheDocument();
       sessionStorage.clear();
     },
   );
 
-  it('makes the passkey on a phone after a Create without PRF, and signs in', async () => {
+  it('offers a login file, and no phone, after a Create without PRF', async () => {
     mockedPasskeyWallet.createPasskeyWallet.mockRejectedValueOnce(
       new Error('This passkey does not advertise WebAuthn PRF support.'),
     );
     const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
     await subject.handlePasskeyWalletCreate();
     expect(mockedPasskeyWallet.createPasskeyWallet).toHaveBeenLastCalledWith();
-    const view = render(subject.getModalDisplay());
-    // The offer comes before the copy line, which is the last resort.
-    expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
-      "Create failed: This passkey can't be used here.Scan QR with phone to login",
+    render(subject.getModalDisplay());
+    const status = screen.getByTestId('ce-passkey-wallet-status');
+    expect(status).toHaveTextContent(
+      /^Create failed: This passkey can't be used here\.Create login file or Login with file ?to login without a passkey\./,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Scan QR with phone' }));
-    await act(async () => {});
-    expect(mockedPasskeyWallet.createPasskeyWallet).toHaveBeenLastCalledWith({ anotherDevice: true });
-    expect(subject.props.changeAccount).toHaveBeenCalledWith(
-      expect.objectContaining({ account: '0x1111111111111111111111111111111111111111', provider: 'passkey_eoa' }),
-    );
-    view.rerender(subject.getModalDisplay());
-    expect(screen.queryByTestId('ce-passkey-wallet-status')).not.toBeInTheDocument();
+    expect(status).not.toHaveTextContent(/QR|phone/);
+    expect(subject).not.toHaveProperty('handlePasskeyWalletCreateOnAnotherDevice');
   });
 
   it('signs in from a login file as a passkey account does, and says so when the file is not one', async () => {
@@ -1211,7 +1206,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(screen.getByRole('button', { name: 'Login with file' })).toBeInTheDocument();
   });
 
-  it('offers a login file under a failed passkey, after the phone and before the copy link', async () => {
+  it('offers a login file under a failed passkey, before the copy link', async () => {
     sessionStorage.setItem(
       'dg:surveyDraft:meadow-forum:84532:anon:all',
       JSON.stringify({ answers: { q1: { value: 'Agree' } } }),
@@ -1230,15 +1225,13 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       await subject.handlePasskeyWalletCreate();
       const view = render(subject.getModalDisplay());
       await screen.findByRole('button', { name: 'Copy this link' });
-      // Three ways out, in this order, an "or" between them.
+      // Two ways out, in this order, an "or" between them.
       const status = screen.getByTestId('ce-passkey-wallet-status');
       expect(
         within(status)
           .getAllByRole('button')
           .map((button) => button.textContent?.trim() || button.getAttribute('aria-label')),
       ).toEqual([
-        'Scan QR with phone',
-        'About scanning with your phone',
         'Create login file',
         'Login with file',
         "About a login file's password",
@@ -1246,10 +1239,10 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
         'About copying your answers',
       ]);
       expect(screen.getByTestId('ce-passkey-login-file')).toHaveTextContent(
-        /^orCreate login file or Login with file ?to login without a passkeyAdd a password/,
+        /^Create login file or Login with file ?to login without a passkeyAdd a password/,
       );
       expect(screen.getByTestId('ce-passkey-copy-answers')).toHaveTextContent(
-        /^orCopy this link to paste your responses on a different device\./,
+        /^orCopy this link and open it on another device to recover and submit responses\./,
       );
       // This box is the other options: no "Other options" button beside it.
       expect(screen.queryByRole('button', { name: 'Other options' })).not.toBeInTheDocument();
@@ -1266,18 +1259,17 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       );
       expect(screen.getByRole('button', { name: 'Login with file' })).toBeInTheDocument();
       expect(screen.queryByTestId('ce-passkey-wallet-status')).not.toBeInTheDocument();
-      for (const gone of ['Scan QR with phone', 'Create login file', 'Copy this link', 'Other options']) {
+      for (const gone of ['Create login file', 'Copy this link', 'Other options']) {
         expect(screen.queryByRole('button', { name: gone })).not.toBeInTheDocument();
       }
 
-      // Back returns to the failed passkey's three ways out.
+      // Back returns to the failed passkey's two ways out.
       fireEvent.click(screen.getByRole('button', { name: 'Back' }));
       view.rerender(subject.getModalDisplay());
       expect(screen.queryByTestId('ce-login-file-saved')).not.toBeInTheDocument();
       expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
         "Create failed: This passkey can't be used here.",
       );
-      expect(screen.getByRole('button', { name: 'Scan QR with phone' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Create login file' })).toBeInTheDocument();
       expect(await screen.findByRole('button', { name: 'Copy this link' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Other options' })).not.toBeInTheDocument();
@@ -1297,35 +1289,9 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     await subject.handlePasskeyWalletCreate();
     render(subject.getModalDisplay());
     expect(screen.getByTestId('ce-passkey-login-file')).toHaveTextContent(
-      /^orCreate login file or Login with file ?to login without a passkey\.Add a password/,
+      /^Create login file or Login with file ?to login without a passkey\.Add a password/,
     );
     expect(screen.queryByRole('button', { name: 'Copy this link' })).not.toBeInTheDocument();
-  });
-
-  it('keeps the phone offer and the copy line when the try on the phone fails or is closed', async () => {
-    sessionStorage.setItem(
-      'dg:surveyDraft:meadow-forum:84532:anon:all',
-      JSON.stringify({ answers: { q1: { value: 'Agree' } } }),
-    );
-    mockedPasskeyWallet.createPasskeyWallet
-      .mockRejectedValueOnce(new Error('This passkey does not advertise WebAuthn PRF support.'))
-      .mockRejectedValueOnce(new Error('Passkey prompt closed or timed out. Try again.'));
-    const subject = mountClassSubject(
-      new LoginAndSettingsModalSubject(buildProps({ activeSessionSlug: 'meadow-forum' })),
-    );
-    await subject.handlePasskeyWalletCreate();
-    await subject.handlePasskeyWalletCreateOnAnotherDevice();
-    render(subject.getModalDisplay());
-    expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent(
-      "Create failed: This passkey can't be used here.",
-    );
-    expect(screen.getByRole('button', { name: 'Scan QR with phone' })).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: 'Copy this link' })).toBeInTheDocument();
-    expect(screen.getByTestId('ce-passkey-another-device')).toHaveTextContent(/^Scan QR with phone to login/);
-    expect(screen.getByTestId('ce-passkey-copy-answers')).toHaveTextContent(
-      /^orCopy this link to paste your responses on a different device\./,
-    );
-    sessionStorage.clear();
   });
 
   it('sends someone in a browser without passkeys to Safari or Chrome, with the link to copy', async () => {

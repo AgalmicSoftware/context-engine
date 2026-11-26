@@ -20,7 +20,6 @@ const renderBody = (props: Partial<Props>) => {
         account: '',
         handleLogout: jest.fn(),
         handlePasskeyWalletCreate: jest.fn(),
-        handlePasskeyWalletCreateOnAnotherDevice: jest.fn(),
         handleLoginFileChosen: jest.fn(),
         handleLoginFilePassword: jest.fn(),
         loginFileProtectedName: '',
@@ -137,7 +136,7 @@ describe('Copy my answers after a failed sign-in', () => {
       /^Create login file or Login with file ?to login without a passkeyAdd a password/,
     );
     expect(line).toHaveTextContent(
-      /^orCopy this link and open it on your phone to recover and submit responses\.(?: |$)/,
+      /^orCopy this link and open it on another device to recover and submit responses\.(?: |$)/,
     );
     expect(screen.getByRole('button', { name: 'About copying your answers' })).toHaveAccessibleDescription(
       /not sent to us/,
@@ -174,7 +173,7 @@ describe('Copy my answers after a failed sign-in', () => {
       expect(screen.getByRole('button', { name: 'Copy this link' })).toBe(button);
       expect(button.querySelector('[data-icon="check"]')).not.toBeNull();
       expect(screen.getByTestId('ce-passkey-copy-answers')).toHaveTextContent(
-        /^orCopy this link and open it on your phone to recover and submit responses\.(?: |$)/,
+        /^orCopy this link and open it on another device to recover and submit responses\.(?: |$)/,
       );
       expect(within(screen.getByRole('status')).getByText('Link copied.')).toBeInTheDocument();
     } finally {

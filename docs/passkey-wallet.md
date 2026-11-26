@@ -253,30 +253,27 @@ update of 24H2 and 25H2. On Windows 10, an older Windows 11 or an older browser,
 Windows Hello saves the passkey and the site cannot use it. A passkey app
 without PRF, set as a phone's passkey provider, ends the same way.
 
-After such a Create, the status under the buttons offers "**Scan QR with phone**
-to login", then a login file (below), then, where the browser holds unsaved
-answers, "**Copy this link** to paste your responses on a different device."
-The first button runs Create again with `authenticatorAttachment: 'cross-platform'`
-and `hints: ['hybrid']`, so the browser shows a QR code to scan with a phone.
-Everything else in the request, the PRF salt included, is unchanged, and the
-wallet is derived the same way. The passkey then lives on the phone: each later
-sign-in on that computer asks for the phone again. A try that fails, or a prompt
-that is closed, returns to the same message, so the offer stays.
+After such a Create, the status under the buttons offers a login file (below)
+and, where the browser holds unsaved answers, "**Copy this link** and open it on
+another device to recover and submit responses." The site does not offer to make
+the passkey on a phone instead; the login file is the other way in.
 
 - The passkey the failed Create saved stays on the device. The site cannot remove
   it (Chrome does not pass the WebAuthn Signal API on to Windows Hello by
   default); Login offers it and fails with it. It can be deleted in the device's
   passkey settings.
-- A phone may return no PRF output when the passkey is made, and the site then
-  asks for it once more: a second prompt on the phone.
+- A device may return no PRF output when the passkey is made, and the site then
+  asks for it once more: a second prompt.
+- A passkey already kept on a phone still signs in. Login names no kind of
+  device, and asks for a saved passkey with the `internal` and `hybrid`
+  transports, so on a computer the browser's own prompt offers to use a phone (a
+  QR code), and on the phone itself the passkey is used directly.
 - A phone's passkey may return a different PRF output through a QR code than on
-  the phone itself (reported for some iPhone versions). The account made through
-  the QR code is then reached only that way, from a computer; Login on the phone
-  itself would open a different, empty account.
-- A security key is not offered. The browser's sheet may list one, but later
-  sign-ins name the saved passkey with the `internal` and `hybrid` transports
-  only, so a key may not be asked for.
-- The copy line below stays as the last resort.
+  the phone itself (reported for some iPhone versions). An account made through
+  a QR code, as earlier versions offered after such a Create, is then reached
+  only that way, from a computer; Login on the phone itself would open a
+  different, empty account.
+- The copy line stays as the last resort.
 
 ### Login file: sign-in without a passkey
 
@@ -288,11 +285,9 @@ After any sign-in that failed there (a passkey without PRF, a prompt that was
 closed or timed out, a browser without passkeys, a file that is not a login
 file), the status box is itself the list of other ways in, so "Other options" is
 not shown beside it. The box adds "**Create login file** or **Login with file**
-to login without a passkey". After a Create whose passkey has no PRF that sits
-between the phone and the copy link, an "or" between the three: "Scan QR with
-phone to login", the login file, "Copy this link to paste your responses on a
-different device." In a browser without passkeys, the link to another browser
-stays first.
+to login without a passkey", then, where answers wait unsaved, an "or" and the
+copy line. In a browser without passkeys, the link to another browser stays
+first.
 
 - The file is named as a passkey is, with the device's date and time, for
   example `ContextEngine-Login-November23-2026-1003PM.json` (letters, digits and
@@ -408,8 +403,8 @@ Forbidden fallback behavior:
 A failed sign-in changes nothing about sign-in itself. When the passkey itself is
 the problem and the browser holds unsaved answers (typed on the page, or drafted
 in an interview), the status under the buttons adds one sentence that starts with a
-**Copy this link** button: "Copy this link and open it on your phone to recover and
-submit responses." (In a browser without passkeys it names Safari or Chrome
+**Copy this link** button: "Copy this link and open it on another device to recover
+and submit responses." (In a browser without passkeys it names Safari or Chrome
 instead.) A copy that worked puts a check on the button.
 
 A passkey problem is: no passkeys in this browser, no PRF support, or any other

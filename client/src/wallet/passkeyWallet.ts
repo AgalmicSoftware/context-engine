@@ -83,11 +83,6 @@ type RestoreOptions = {
   requireSigner?: boolean;
 };
 
-type CreateOptions = {
-  /** Keeps the new passkey on a phone, reached by QR code, not on this device. */
-  anotherDevice?: boolean;
-};
-
 type UnlockOptions = {
   selectCredential?: boolean;
   // Background re-unlocks must restore this account or fail; they never
@@ -314,7 +309,7 @@ export class PasskeyEoaWalletClient {
     return this.activeAddress;
   }
 
-  async createWallet({ anotherDevice = false }: CreateOptions = {}): Promise<HexString> {
+  async createWallet(): Promise<HexString> {
     const generation = ++this.operationGeneration;
     this.transitionInProgress = true;
     let privateKey: HexString | null = null;
@@ -330,7 +325,6 @@ export class PasskeyEoaWalletClient {
           config: this.config,
           salt: saltBytes,
           credentials: this.credentials,
-          anotherDevice,
         });
         this.assertCurrentOperation(generation);
         const credentialId = bufferToBase64URL(credential.rawId);
@@ -371,7 +365,6 @@ export class PasskeyEoaWalletClient {
         salt: saltBytes,
         credentials: this.credentials,
         excludeCredentialIds: savedRecord?.rpId === this.config.rpId ? [savedRecord.credentialId] : [],
-        anotherDevice,
       });
       this.assertCurrentOperation(generation);
       const credentialId = bufferToBase64URL(credential.rawId);
@@ -1067,8 +1060,7 @@ export const getPasskeyWalletClient = (): PasskeyEoaWalletClient => {
 
 export const setPasskeyWalletChain = (chainOrId: unknown): ChainLike => getPasskeyWalletClient().setChain(chainOrId);
 export const getPasskeyWalletChain = (): ChainLike => getPasskeyWalletClient().getChain();
-export const createPasskeyWallet = (options: CreateOptions = {}): Promise<HexString> =>
-  getPasskeyWalletClient().createWallet(options);
+export const createPasskeyWallet = (): Promise<HexString> => getPasskeyWalletClient().createWallet();
 export const unlockPasskeyWallet = (options: UnlockOptions = {}): Promise<HexString> =>
   getPasskeyWalletClient().unlockWallet(options);
 export const signInWithLoginFile = (
