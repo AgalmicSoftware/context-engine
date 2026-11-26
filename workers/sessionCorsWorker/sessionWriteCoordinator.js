@@ -976,7 +976,12 @@ export class SessionWriteCoordinator {
 
   async scheduleResultsAnalysisAlarm(delayMs = 1_000) {
     if (typeof this.state.storage?.setAlarm !== 'function') return false;
-    await this.state.storage.setAlarm(Math.min((Number(this.now()) || Date.now()) + Math.max(0, Number(delayMs) || 0), await nextAgentSubmitProjectionAt(this), await nextResultsJobAt(this)));
+    const nowMs = Number(this.now()) || Date.now();
+    const at = Math.min(nowMs + Math.max(0, Number(delayMs) || 0), await nextAgentSubmitProjectionAt(this), await nextResultsJobAt(this));
+    // Keep an earlier alarm another queue set, such as upload-receipt cleanup, while it is still ahead,
+    // as scheduleUploadReceiptCleanup does; one already due is the alarm running now.
+    const scheduled = await this.state.storage.getAlarm?.();
+    if (!(scheduled > nowMs && scheduled <= at)) await this.state.storage.setAlarm(at);
     return true;
   }
 
@@ -2000,6 +2005,34 @@ export class SessionWriteCoordinator {
       replayed.push({ ...settled.replayed, principalKey: principal.key });
     }
     return { ok: true, replayed };
+  }
+
+  // A deleted group's id is never used again, so a join or removal left pending in it can never replay, and its
+  // marker would refuse every backup. Each such seat ends as not joined. The member rows KV may hold for it stay,
+  // as every deleted group's do: the group's deleted state here is what refuses them. Runs alone, with backups.
+  async settleDeletedWorkerGroupMembers() {
+    const { storage } = this.state;
+    const prefix = `${WORKER_GROUP_BACKUP_PENDING_PREFIX}${encodeURIComponent(WORKER_GROUP_CAPACITY_MEMBER_PREFIX)}`;
+    let after = '';
+    for (;;) {
+      const page = [...await storage.list({ prefix, startAfter: after, limit: 100 })];
+      for (const [markerKey] of page) {
+        const memberKey = decodeURIComponent(markerKey.slice(WORKER_GROUP_BACKUP_PENDING_PREFIX.length));
+        const groupId = decodeURIComponent(memberKey.slice(WORKER_GROUP_CAPACITY_MEMBER_PREFIX.length).split(':')[0]);
+        if ((await storage.get(workerGroupCapacityGroupKey(groupId)))?.phase !== 'deleted') continue;
+        // Counted first, as a settled reservation is: a snapshot begun before the change can no longer finish.
+        await bumpStorageBackupRevision(storage);
+        await storage.transaction(async (transaction) => {
+          const member = await transaction.get(memberKey);
+          if (PENDING_WORKER_GROUP_MEMBER_OPERATIONS[member?.state]) {
+            await transaction.put(memberKey, { version: 2, state: 'removed' });
+          }
+          await transaction.delete(markerKey);
+        });
+      }
+      if (page.length < 100) break;
+      after = page.at(-1)[0];
+    }
   }
 
   async executeWorkerGroupReady(payload) {

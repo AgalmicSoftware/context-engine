@@ -189,3 +189,16 @@ test('a run again whose build fails reports the build its stopped run kept meanw
   const first = await RESULTS_JOB_RUNNERS['debate-atlas'].run({ coordinator, job: { ...job, runs: 1, attemptId: (await post('debate-atlas/reserve', { builder: BUILDER })).body.attemptId } });
   assert.deepEqual([first.ok, first.status], [false, 403]);
 });
+
+test('queuing an automatic analysis keeps an earlier alarm another queue set, and brings a later one forward', async () => {
+  const { coordinator, storage, clock } = createCoordinator();
+  // Upload-receipt cleanup, say, is due before the analysis's one second.
+  await storage.setAlarm(clock.ms + 500);
+  const queued = await coordinator.enqueueResultsAnalysisAutoJob({ slug: 'session-a', requestId: 'auto-first' });
+  assert.equal(queued.ok, true, JSON.stringify(queued));
+  assert.equal(storage.alarm, clock.ms + 500);
+
+  await storage.setAlarm(clock.ms + 60_000);
+  assert.equal(await coordinator.scheduleResultsAnalysisAlarm(1_000), true);
+  assert.equal(storage.alarm, clock.ms + 1_000);
+});

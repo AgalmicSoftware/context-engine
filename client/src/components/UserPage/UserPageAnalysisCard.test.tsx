@@ -48,6 +48,9 @@ const card = {
   answers: { yesNo: null, ownWords: null, vote: null },
 };
 
+// The words, and how long the card has been on its way, which only the eye gets.
+const DRAWING = /^Drawing the card… · \d+s$/;
+
 describe('UserPageAnalysisCard', () => {
   let drawImage: jest.Mock;
 
@@ -141,7 +144,7 @@ describe('UserPageAnalysisCard', () => {
     // Until the pages are redrawn with the picture the card is not shown, so nothing can be saved from it.
     expect(screen.queryByText('Download')).toBeNull();
     expect(screen.queryByRole('img')).toBeNull();
-    expect(screen.getByRole('status').textContent).toBe('Drawing the card…');
+    expect(screen.getByRole('status').textContent).toMatch(DRAWING);
     await waitFor(() => expect((screen.getByText('Download') as HTMLButtonElement).disabled).toBe(false));
     expect(mockDraw).toHaveBeenLastCalledWith(card, { image: expect.anything(), accentHex: '#aa3311' }, null);
   });
@@ -153,7 +156,7 @@ describe('UserPageAnalysisCard', () => {
     const { rerender } = render(<UserPageAnalysisCard card={card} picture={null} />);
     // The line that says the card is being drawn then says the fault: a line put in its place may go unheard.
     const status = screen.getByRole('status');
-    expect(status.textContent).toBe('Drawing the card…');
+    expect(status.textContent).toMatch(DRAWING);
 
     await waitFor(() => expect(status.textContent).toBe('The card could not be drawn in this browser.'));
     expect(screen.getByRole('status')).toBe(status);
@@ -174,11 +177,28 @@ describe('UserPageAnalysisCard', () => {
     );
   });
 
+  it('counts the wait for its picture on from when the card was asked for, seen and not heard', async () => {
+    jest.useFakeTimers();
+    try {
+      jest.setSystemTime(100_000);
+      render(<UserPageAnalysisCard card={card} picture={{ status: 'loading' }} waitingSince={80_000} />);
+      const count = screen.getByText(/· 20s/);
+      expect(screen.getByRole('status')).toHaveTextContent('Drawing the card… · 20s');
+      expect(count.closest('[aria-hidden="true"]')).toBe(count);
+      act(() => {
+        jest.advanceTimersByTime(70_000);
+      });
+      expect(screen.getByRole('status')).toHaveTextContent('Drawing the card… · 1:30');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('shows the card in outline, not half-made, until the picture has arrived or is known to be absent', async () => {
     const { rerender } = render(<UserPageAnalysisCard card={card} picture={{ status: 'loading' }} />);
     await waitFor(() => expect(mockDraw).toHaveBeenCalled());
 
-    expect(screen.getByRole('status').textContent).toBe('Drawing the card…');
+    expect(screen.getByRole('status').textContent).toMatch(DRAWING);
     // The outline has the card's headings, read out as the words above instead.
     expect(screen.getByText('Historical match').closest('[aria-hidden="true"]')).toBeTruthy();
     expect(screen.queryByText(/ guess$/)).toBeNull();

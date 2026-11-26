@@ -1,7 +1,7 @@
 /** @file withWagmiBridge.tsx */
 import React, { useEffect, useRef } from 'react';
 
-import { useAccount, useBalance, useBlockNumber, useClient, useNetwork, useProvider, useDisconnect } from 'wagmi';
+import { useAccount, useBalance, useClient, useNetwork, useProvider, useDisconnect } from 'wagmi';
 import { useConnectModal, useAccountModal, useChainModal } from '../../app/runtime/walletUiRuntime.js';
 import { base, baseSepolia } from '../../variables/chains.js';
 import { getSessionNetwork } from '../../utilities/web3/chainGateway.js';
@@ -21,18 +21,15 @@ export interface WagmiInjectedProps {
   wagmiChainOptions: ReturnType<typeof useNetwork>['chains'];
   wagmiAddress: ReturnType<typeof useAccount>['address'];
   wagmiBalance: ReturnType<typeof useBalance>;
-  wagmiBlocknumber: ReturnType<typeof useBlockNumber>['data'];
   wagmiDisconnect: ReturnType<typeof useDisconnect>['disconnect'];
   openConnectModal: ReturnType<typeof useConnectModal>['openConnectModal'];
   openAccountModal: ReturnType<typeof useAccountModal>['openAccountModal'];
   openChainModal: ReturnType<typeof useChainModal>['openChainModal'];
-  examplePropFunc: (args: unknown) => void;
 }
 
 type WagmiManagedPropKeys = keyof WagmiInjectedProps;
 
 type WagmiBridgeRuntimeProps = {
-  __ceRequireWagmiBlockNumber?: boolean;
   activeSessionSlug?: string;
   changeAccount?: (payload: Record<string, unknown>) => void;
   updateLoginInfo?: (payload: Record<string, unknown>) => void;
@@ -67,19 +64,6 @@ export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P
       address: address,
     });
 
-    const componentName = String(Component?.displayName || Component?.name || '');
-    const needsBlockNumber =
-      componentName === 'AppShell' ||
-      componentName === 'AppShellWithWagmiHooks' ||
-      componentName === 'MainSite' ||
-      componentName === 'MainSiteWithWagmiHooks' ||
-      props.__ceRequireWagmiBlockNumber === true;
-    // Only components that consume the value should subscribe/fetch.
-    const { data: blockNumber } = useBlockNumber({
-      watch: false,
-      cacheTime: 30_000,
-      enabled: needsBlockNumber,
-    });
     const { chain, chains } = useNetwork();
 
     // Derive desired chain from activeSessionSlug; fall back gently if absent
@@ -107,10 +91,6 @@ export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P
     const { openConnectModal } = useConnectModal();
     const { openAccountModal } = useAccountModal();
     const { openChainModal } = useChainModal();
-
-    const examplePropFunc = (args: unknown) => {
-      accountLog.log('Footer-HooksHOC – callback working: ' + args);
-    };
 
     // --- NEW: ensure only ONE Wagmi->Redux bridge instance runs (HOC wraps multiple components) ---
     const bridgeIdRef = useRef(Math.random().toString(36).slice(2));
@@ -279,12 +259,10 @@ export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P
       wagmiChainOptions: chains,
       wagmiAddress: address,
       wagmiBalance: balance,
-      wagmiBlocknumber: blockNumber,
       wagmiDisconnect: disconnect,
       openConnectModal,
       openAccountModal,
       openChainModal,
-      examplePropFunc,
     } satisfies WagmiInjectedProps;
 
     const componentProps = { ...props, ...injectedProps } as P;

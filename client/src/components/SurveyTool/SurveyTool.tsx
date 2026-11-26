@@ -336,6 +336,7 @@ const renderSurveyToolContent = ({
         isResponsesCacheReady={props.isResponsesCacheReady}
         isSurveyCacheReady={props.isSurveyCacheReady}
         isSBTCacheReady={props.isSBTCacheReady}
+        answersRetryInResults={props.answersRetryInResults}
         networkLatestBlock={props.networkLatestBlock}
         questionScanProgress={props.questionScanProgress}
         questionPool={props.questionPool}

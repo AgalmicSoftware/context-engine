@@ -36,3 +36,22 @@ it('counts from the start it is given, for a task that began before it appeared'
     jest.useRealTimers();
   }
 });
+
+it('counts in minutes and seconds from a minute on', () => {
+  jest.useFakeTimers();
+  try {
+    jest.setSystemTime(100_000);
+    render(<ElapsedLoadingLabel label="Asking…" since={41_000} />);
+    expect(screen.getByText(/· 59s/)).toBeInTheDocument();
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+    expect(screen.getByText(/· 1:00/)).toBeInTheDocument();
+    act(() => {
+      jest.advanceTimersByTime(90_000);
+    });
+    expect(screen.getByText(/· 2:30/)).toBeInTheDocument();
+  } finally {
+    jest.useRealTimers();
+  }
+});

@@ -3938,6 +3938,7 @@ class UserPage extends Component<any, any> {
           analysisCardPicture={this.state.analysisCardPicture}
           analysisCardPublish={this.state.analysisCardPublish}
           analysisCardSavedAt={this.state.analysisCardSavedAt}
+          analysisCardStartedAt={this.state.analysisCardStartedAt}
           analysisDetails={analysisDetails}
           analysisElapsedMs={analysisElapsedMs}
           analysisError={analysisError}

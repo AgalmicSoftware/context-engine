@@ -28,7 +28,6 @@ export type MainSiteProps = {
   loginInProgress?: boolean;
   activeSessionSlug?: string;
   wagmiChainOptions?: unknown[];
-  wagmiBlocknumber?: number;
   path?: string;
   urlPath?: string;
   search?: string;

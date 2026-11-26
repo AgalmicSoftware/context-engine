@@ -209,3 +209,28 @@ test('safeFetch strict HTTPS policy rejects insecure and credential-bearing redi
     assert.equal(callCount, 1);
   }
 });
+
+test('safeFetch never follows a redirect for a request with a body, and still follows one for a GET', async () => {
+  const calls = [];
+  const { safeFetch } = createOutboundUrlSafetyHelpersWithWorkerDeps({
+    deps: {
+      fetch: async (url, options) => {
+        calls.push([url, options?.method || 'GET']);
+        return url.startsWith('https://first.example.com/')
+          ? new Response(null, { status: 307, headers: { location: 'https://second.example.com/collect' } })
+          : new Response('done', { status: 200 });
+      },
+    },
+  });
+
+  assert.deepEqual(
+    await safeFetch('https://first.example.com/v1/chat', { method: 'POST', body: '{"prompt":"answers"}' }),
+    { ok: false, error: 'Redirect not followed for a request with a body', status: 403 },
+  );
+  assert.deepEqual(calls, [['https://first.example.com/v1/chat', 'POST']], 'the second host receives nothing');
+
+  calls.length = 0;
+  const followed = await safeFetch('https://first.example.com/file');
+  assert.equal(await followed.text(), 'done');
+  assert.deepEqual(calls, [['https://first.example.com/file', 'GET'], ['https://second.example.com/collect', 'GET']]);
+});

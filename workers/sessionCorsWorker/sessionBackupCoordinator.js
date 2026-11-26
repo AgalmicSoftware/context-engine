@@ -80,6 +80,7 @@ export const exportWorkerGroupBackup = async (coordinator, payload) => {
   if (!slug || !sessionId) fail('Invalid backup group identity.', 400);
   const kv = resolveWorkerGroupsKv(coordinator.env);
   if (!kv?.list || !kv?.get) fail('Worker group storage is unavailable.');
+  await coordinator.settleDeletedWorkerGroupMembers();
   return json(await readBackupGroupSnapshot({ coordinator, payload: { ...payload, slug, sessionId, kv },
     prefixes: groupPrefixes(slug), scopeRecords: scopedGroupRecords,
     validateDurable: (key, value) => {

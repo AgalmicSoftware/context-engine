@@ -13,6 +13,7 @@ import viewStyles from './UserPageAnalysisViews.module.scss';
 import UserPageAnalysisCard, { type UserPageAnalysisCardPicture } from './UserPageAnalysisCard';
 import UserPageAnalysisCardSkeleton from './UserPageAnalysisCardSkeleton';
 import type { UserAnalysisGeneration } from './userPageAnalysisStateHelpers';
+import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
 
 // On my own page: whether my card is shown on it, while a change is being saved, and why one failed.
 export type UserPageAnalysisCardPublish = { shown: boolean; saving: boolean; note: string };
@@ -25,6 +26,8 @@ export type UserPageAnalysisViewsProps = {
   analysisCardPicture?: UserPageAnalysisCardPicture | null;
   analysisCardPublish?: UserPageAnalysisCardPublish | null;
   analysisCardSavedAt?: number | null;
+  // When the card's words and picture were asked for, so its wait counts on through both and across views.
+  analysisCardStartedAt?: number | null;
   analysisDetails?: React.ReactNode;
   analysisGeneration?: UserAnalysisGeneration | null;
   analysisHistoricalFigure?: React.ReactNode;
@@ -67,6 +70,7 @@ const UserPageAnalysisViews = ({
   analysisCardPicture = null,
   analysisCardPublish = null,
   analysisCardSavedAt = null,
+  analysisCardStartedAt = null,
   analysisDetails,
   analysisGeneration,
   analysisHistoricalFigure,
@@ -131,7 +135,11 @@ const UserPageAnalysisViews = ({
           saved card its picture, and that must not wait for the Card button to be pressed. */}
       {analysisCard ? (
         <div hidden={view !== 'card'}>
-          <UserPageAnalysisCard card={analysisCard} picture={analysisCardPicture} />
+          <UserPageAnalysisCard
+            card={analysisCard}
+            picture={analysisCardPicture}
+            waitingSince={analysisCardStartedAt}
+          />
           {analysisCardSavedAt ? (
             <p className={styles.placeholderNote}>
               Their saved card, from {formatSavedAnalysisCardDate(analysisCardSavedAt)}
@@ -172,7 +180,7 @@ const UserPageAnalysisViews = ({
       ) : view === 'card' ? (
         <>
           <p className={cardStyles.skeletonStatus} role="status">
-            Making the card…
+            <ElapsedLoadingLabel label="Making the card…" since={analysisCardStartedAt} />
           </p>
           <UserPageAnalysisCardSkeleton />
         </>

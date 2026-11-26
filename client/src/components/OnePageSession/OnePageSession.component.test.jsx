@@ -940,6 +940,33 @@ describe('OnePageSession view gating', () => {
     expect(refreshQuestionResponses).toHaveBeenCalledWith(null, { slug: 'edge' });
   });
 
+  // The questions and the Report read the same failed load: while the Report offers its Retry, they do not.
+  it('tells both embedded SurveyPage modes while the report shows its own Retry', async () => {
+    render(<OnePageSession {...buildProps()} cacheInitializationError />);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+    await waitFor(() => {
+      expect(screen.getByTestId('polis-report')).toBeInTheDocument();
+    });
+    const latest = (match) =>
+      mockSurveyPage.mock.calls
+        .map((args) => args[0])
+        .filter(match)
+        .at(-1);
+    const reportSays = (shown) => act(() => mockPolisReport.mock.calls.at(-1)[0].onAnswersRetryShown(shown));
+    expect(latest((childProps) => childProps?.minifiedMode === 'pile').answersRetryInResults).toBe(false);
+
+    reportSays(true);
+    expect(latest((childProps) => childProps?.minifiedMode === 'pile').answersRetryInResults).toBe(true);
+    fireEvent.click(screen.getByTestId('pile-view-all'));
+    await waitFor(() => {
+      expect(screen.getByTestId('survey-page-full')).toBeInTheDocument();
+    });
+    expect(latest((childProps) => childProps?.miniMode === true).answersRetryInResults).toBe(true);
+
+    reportSays(false);
+    expect(latest((childProps) => childProps?.miniMode === true).answersRetryInResults).toBe(false);
+  });
+
   it('lets the embedded report open the login dialog', async () => {
     const toggleLoginModal = jest.fn();
     render(<OnePageSession {...buildProps()} toggleLoginModal={toggleLoginModal} />);

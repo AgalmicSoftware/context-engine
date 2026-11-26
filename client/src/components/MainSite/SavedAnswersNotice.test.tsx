@@ -78,6 +78,26 @@ it('leaves a failed load, or a partial load of this session, to their own messag
   expect(screen.getByRole('status')).toHaveTextContent('Loading your saved answers');
 });
 
+it('stops saying the answers are loading once their list has failed, as a cut request leaves it', () => {
+  const status = (workerResponseHydrationStatus: string) =>
+    jest.mocked(readSurveyToolScopedCacheNode).mockReturnValue({ workerResponseHydrationStatus });
+  status('loading');
+  const { rerender } = render(notice({}));
+  act(() => {
+    jest.advanceTimersByTime(SAVED_ANSWERS_SLOW_MS);
+  });
+  expect(screen.getByRole('status')).toHaveTextContent('still loading');
+  // The route's own load error stays false: only the answer list failed, and the form says so with a retry.
+  status('failed');
+  rerender(notice({ answersFailed: false }));
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  // A retry loads again, and says so again.
+  status('loading');
+  rerender(notice({}));
+  expect(screen.getByRole('status')).toHaveTextContent('Loading your saved answers');
+  jest.mocked(readSurveyToolScopedCacheNode).mockReturnValue(null);
+});
+
 it('says nothing to a signed-out person, and counts their saved answers once they log in', () => {
   const { container, rerender } = render(notice({ signedIn: false }));
   act(() => {

@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.44] - 2026-11-25
+
+A Worker updated to this release no longer sends a request's body on through a redirect, so a custom AI or transcription endpoint that answers with one now fails with `403`, and it closes five smaller gaps: in logging, the Wrapped image, the analysis alarm, restores, and backups after a group is deleted. The site counts the wait for the Session Agent and for an analysis card, and says when saved answers did not load. No MCP change.
+
+### Session Worker — needs a Worker update
+
+- **A request with a body is not sent on through a redirect.** The Worker followed a redirect by sending the same body to the new address, so a custom AI endpoint could pass a prompt holding participants' answers on to another host. A request with a body now stops at a redirect with `403` "Redirect not followed for a request with a body"; a `GET` still follows one. **A custom AI or custom transcription endpoint that answers with a redirect now fails, even a redirect to the same host (a moved path, a missing trailing slash): enter its final address.** Calls to OpenAI, Anthropic and OpenRouter do not go through this path, and the default transcription address does not redirect.
+- **Custom AI requests are logged only with debug logs on.** Each request to a custom AI provider wrote the caller's wallet address and the provider's host to the Worker's log, with debug logs on or off; the line now goes only through the Worker's debug log.
+- **The Wrapped image is served like a stored read.** Its view now sends `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox; default-src 'none'; img-src data:`, so the image link opened as a page runs nothing; the SVG form still shows its embedded picture.
+- **Queuing an analysis keeps an earlier alarm.** Queuing an automatic analysis set the session's one alarm without reading it, so it could move an earlier one, such as the cleanup of upload receipts, later. It now keeps an alarm that is still ahead and no later than its own, and otherwise sets its own.
+- **A restore writes a passkey's two lookups together.** A restore wrote them one at a time, and a resumed restore skipped a row that had either, so a restore cut off between the two left a passkey that could not sign in. They are now written in one transaction, and a resumed restore finishes a half that an older Worker left. A half left by a restore that already finished stays; the admin can clear that passkey for the person to attach again.
+- **A deleted group no longer blocks every backup.** A join or removal cut off before its group was deleted left a pending marker that nothing could replay, so every later backup of the session was refused with "A group mutation is pending. Retry the backup after it settles." A backup now ends each such seat as not joined and drops its marker, and markers already stranded clear the same way at the next backup. A pending seat in a group that still exists waits, as before, for that person's next request.
+
+### Site — available when the site deploys
+
+- **"Asking…" counts the wait for the Session Agent.** The Ask button reads "Asking… · 12s", then "Asking… · 1:30", since a long answer can take about two minutes; a screen reader hears the wait every 30 seconds rather than each second. Every label that counts a wait, such as the save button's and Results builds', now reads minutes and seconds past a minute.
+- **The Session Agent's related questions are named plainly.** The line above the question links under an answer now reads "Session questions related to what you asked:"; which questions they are, those the session's results cite or those whose answers the Session Agent read, moves to a "?" beside it.
+- **An analysis card counts while it is made.** In Analyze user, the Card view shows "Making the card… · 42s", then "Drawing the card… · 1:05", counting from when the card was asked for, so it is right when the view is opened late or switched. These lines were hidden before; the line goes when the card is ready.
+- **Saved answers that did not load say so.** When the read of a person's saved answers was cut off, "Your saved answers are still loading" stayed up for good. The one-question form and the All-questions list now say "Your saved answers did not load, so answers you saved earlier may be missing." with Retry, and the next load clears it at once. While Results on the same page shows its own Retry for that read, they leave the message to it, so the page offers one Retry.
+- **No block-number read.** The site asked the chain for its block number when it loaded, and nothing used it.
+- **Deploy helper.** It deploys the 0.9.43 Worker bundles. A Worker updated from the site gets this release's.
+
+### Local tooling
+
+- **The Results builds theme smoke reads a count past a minute.** It waited for "Building the … · 42s"; the count now reads minutes and seconds from one minute, so it accepts "1:05" too.
+
+### Documentation
+
+- **Six statements now match the code.** CONTRIBUTING says a Lit usage API key alone cannot request a key, since the Lit Action needs a Worker-signed authorization; the auth ADRs say nonces are kept in the Durable Object alone, with nothing written to KV; the storage ADR lists `/storage/read-batch` and the draft-text routes; the deploy README says a successful run on the default branch moves the `latest` Worker bundles; the security model names the CSP's local fonts in place of Google Fonts; and the `netlify.toml` comment says `security.txt` is the one `.well-known` file.
+
 ## [0.9.43] - 2026-11-25
 
 A Worker updated to this release keeps a long AI reply's connection busy, so a phone no longer drops "Analyze user" as idle, and lets the Session Agent answer in up to 3,000 words. The site asks for the keep-alive and gives the new limit; MCP 0.9.43 gives it too and waits two minutes for the agent's answer.

@@ -176,6 +176,9 @@ export const createOutboundUrlSafetyHelpersWithWorkerDeps = ({
       if (response.status < 300 || response.status >= 400) return response;
       // Release redirect bodies; their content is never an artifact or response.
       await response.body?.cancel?.();
+      // A body goes only to the host it was sent to: a redirect could carry a
+      // prompt holding participants' answers to another host.
+      if (requestOptions.body != null) return { ok: false, error: 'Redirect not followed for a request with a body', status: 403 };
       if (redirects >= maxRedirects) return { ok: false, error: 'Too many redirects', status: 403 };
       const location = toStr(response.headers.get('location'), deps).trim();
       let redirectUrl = '';

@@ -150,7 +150,11 @@ describe('SessionAgentModal', () => {
     });
     askQuestion(dialog, 'Why?');
     const questions = within(await dialog.findByTestId('ce-session-agent-questions'));
-    expect(questions.getByText('Questions whose answers it read that are closest to yours:')).toBeInTheDocument();
+    const where = (scope: typeof questions) => scope.getByRole('button', { name: 'Where these questions come from' });
+    expect(questions.getByText('Session questions related to what you asked:')).toBeInTheDocument();
+    expect(where(questions)).toHaveAccessibleDescription(
+      'The session’s questions, among those whose answers the Session Agent read, most related to your question.',
+    );
     const link = questions.getByRole('link', { name: 'Should meetings be shorter?' });
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     const address = new URL(link.getAttribute('href') || '', 'https://site.example');
@@ -171,7 +175,11 @@ describe('SessionAgentModal', () => {
     });
     fireEvent.click(dialog.getByRole('button', { name: 'Ask' }));
     await dialog.findByText('Another answer.');
-    expect(dialog.getByText('Questions the session’s results cite that are closest to yours:')).toBeInTheDocument();
+    const cited = within(dialog.getByTestId('ce-session-agent-questions'));
+    expect(cited.getByText('Session questions related to what you asked:')).toBeInTheDocument();
+    expect(where(cited)).toHaveAccessibleDescription(
+      'The session’s questions, among those the session’s results cite, most related to your question.',
+    );
     expect(dialog.queryByRole('button', { name: 'Open Results' })).not.toBeInTheDocument();
   });
 
@@ -378,6 +386,47 @@ describe('SessionAgentModal', () => {
     expect(await dialog.findByRole('alert')).toHaveTextContent('The session’s AI is busy. Try again shortly.');
     expect(dialog.queryByText('An answer.')).not.toBeInTheDocument();
     expect(dialog.getByLabelText('Your question')).toHaveValue('Who agreed?');
+  });
+
+  it('counts how long an answer takes beside Asking…, says so now and then, and stops when it comes', async () => {
+    const { dialog } = await renderModal(member);
+    jest.useFakeTimers();
+    try {
+      let answer: (value: SessionAgentReply) => void = () => {};
+      ask.mockReturnValueOnce(new Promise<SessionAgentReply>((resolve) => (answer = resolve)));
+      askQuestion(dialog, 'Who agreed?');
+      // The count is seen, not part of the button's name; a screen reader hears it in the status, not each second.
+      const button = dialog.getByRole('button', { name: 'Asking…' });
+      const status = dialog.getByRole('status');
+      expect(button).toHaveTextContent('Asking… · 0s');
+      act(() => jest.advanceTimersByTime(12_000));
+      expect(button).toHaveTextContent('Asking… · 12s');
+      expect(status).toBeEmptyDOMElement();
+      act(() => jest.advanceTimersByTime(18_000));
+      expect(status).toHaveTextContent('Still waiting for the answer: 30 seconds.');
+      act(() => jest.advanceTimersByTime(29_000));
+      expect(button).toHaveTextContent('Asking… · 59s');
+      expect(status).toHaveTextContent('Still waiting for the answer: 30 seconds.');
+      act(() => jest.advanceTimersByTime(31_000));
+      expect(button).toHaveTextContent('Asking… · 1:30');
+      expect(status).toHaveTextContent('Still waiting for the answer: 1 minute 30 seconds.');
+
+      await act(async () => answer(reply('An answer.')));
+      expect(dialog.getByText('An answer.')).toBeInTheDocument();
+      expect(dialog.getByRole('button', { name: 'Ask' })).toHaveTextContent(/^Ask$/);
+      expect(status).toBeEmptyDOMElement();
+
+      // The next question counts from 0, and closing the dialog mid-wait stops its timer.
+      ask.mockReturnValueOnce(new Promise<SessionAgentReply>(() => {}));
+      fireEvent.click(dialog.getByRole('button', { name: 'Ask' }));
+      expect(dialog.getByRole('button', { name: 'Asking…' })).toHaveTextContent('Asking… · 0s');
+      act(() => jest.advanceTimersByTime(5_000));
+      expect(dialog.getByRole('button', { name: 'Asking…' })).toHaveTextContent('Asking… · 5s');
+      cleanup();
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('tells an admin they get Detailed answers, and what those draw on', async () => {

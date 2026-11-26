@@ -18,6 +18,7 @@ import { analysisCardVideoType } from 'utilities/analysisCard/analysisCardVideoT
 
 import styles from './UserPageAnalysisCard.module.scss';
 import UserPageAnalysisCardSkeleton from './UserPageAnalysisCardSkeleton';
+import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
 
 // The illustration of the matched figure: asked for when the analysis arrives, and absent ("none") when the
 // session cannot make one. The card is complete without it.
@@ -30,6 +31,8 @@ export type UserPageAnalysisCardPicture = {
 type UserPageAnalysisCardProps = {
   card: AnalysisCard;
   picture?: UserPageAnalysisCardPicture | null;
+  // When the card was asked for, so the wait for its picture counts on from the wait for its words.
+  waitingSince?: number | null;
 };
 
 const loadImage = (source: string): Promise<HTMLImageElement> =>
@@ -40,7 +43,11 @@ const loadImage = (source: string): Promise<HTMLImageElement> =>
     image.src = source;
   });
 
-const UserPageAnalysisCard = ({ card, picture = null }: UserPageAnalysisCardProps): React.ReactElement => {
+const UserPageAnalysisCard = ({
+  card,
+  picture = null,
+  waitingSince = null,
+}: UserPageAnalysisCardProps): React.ReactElement => {
   const preview = useRef<HTMLCanvasElement>(null);
   // The drawn pages, with the picture they were drawn with: a file is saved only from pages that are current.
   const [drawn, setDrawn] = useState<{ pages: AnalysisCardPages; card: AnalysisCard; pictureUrl: string } | null>(null);
@@ -130,7 +137,7 @@ const UserPageAnalysisCard = ({ card, picture = null }: UserPageAnalysisCardProp
           Until then one status line, kept from drawing to any fault, so a screen reader hears the fault too. */}
       {ready ? null : (
         <p className={error ? styles.drawing : styles.skeletonStatus} role="status">
-          {error || 'Drawing the card…'}
+          {error || <ElapsedLoadingLabel label="Drawing the card…" since={waitingSince} />}
         </p>
       )}
       {ready || error ? null : (

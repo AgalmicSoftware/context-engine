@@ -244,6 +244,35 @@ test('a restore puts back the mark beside each attached passkey, so a cancelled 
   assert.equal([...plain.kv.values.keys()].some((key) => key.startsWith('agentLinkAccount:')), false);
 });
 
+// A coordinator whose storage fails once, at the first write of a passkey's lookup: a restore cut off there.
+class CutAtPasskeyWrite extends SessionWriteCoordinator {
+  constructor(state, env) {
+    let cut = false;
+    const guard = (put) => async (key, value) => {
+      if (!cut && key.startsWith('agent-link:v1:passkey:')) { cut = true; throw new Error('Restore cut off.'); }
+      return put(key, value);
+    };
+    const { storage } = state;
+    super({ storage: { ...storage, put: guard(storage.put), transaction: (run) => storage.transaction((txn) => run({ ...txn, put: guard(txn.put) })) } }, env);
+  }
+}
+
+test('a restore cut off while putting back a passkey, then resumed from the same archive, leaves both lookups working', async () => {
+  const source = fixture();
+  const [account, passkey] = ['a1', 'b2'].map((byte) => `0x${byte.repeat(20)}`);
+  const store = (env, operation, payload) => callSessionConfigCoordinator({ env, slug, path: `agent-sign-in/${operation}`, ...payload });
+  assert.equal((await store(source.env, 'attach', { address: account, passkey, now: Date.parse('2026-11-20T10:00:00Z') })).body.ok, true);
+  const [page] = await allPages(source.env);
+
+  const target = fixture(CutAtPasskeyWrite);
+  target.kv.values.delete(`session:${slug}:config`);
+  assert.notEqual((await importPage(target.env, page)).body?.complete, true, 'the first try is cut off');
+  const resumed = await importPage(target.env, page);
+  assert.equal(resumed.body.complete, true, JSON.stringify(resumed));
+  assert.equal((await store(target.env, 'state', { address: account })).body.asAccount.passkey, passkey);
+  assert.deepEqual((await store(target.env, 'state', { address: passkey })).body.asPasskey, { account });
+});
+
 // A session whose Session Agent records chats: its coordinator stores one only while that setting is on.
 const recordingFixture = () => {
   const made = fixture();
@@ -1485,6 +1514,52 @@ test('completed restores clear transient state and cannot replay after KV loss',
   for (const page of pages) assert.equal((await importPage(target.env, page)).ok, true);
   assert.equal([...target.kv.values.keys()].filter((key) => key.startsWith(`ce-storage:${slug}:responses:`)).length, 120);
   assertCompletedRestoreClean(target, pages[0].archiveId);
+});
+
+// A deleted group's id is never used again, so nothing replays a join left pending in it. The delete leaves the
+// seat and its marker exactly as sessions holding one from earlier releases have them.
+test('a join left pending in a group since deleted ends as not joined, and backups and restores go on', async () => {
+  const source = fixture();
+  source.env.CE_WORKER_GROUPS_BOOTSTRAP = 'fresh-template-v2';
+  const member = { kind: 'evm_address', address: `0x${'7'.repeat(40)}` };
+  const adminPrincipal = { kind: 'evm_address', address: admin };
+  const mutate = (operation, principal, extra = {}) => executeCoordinatedWorkerGroupMutation({
+    env: source.env, slug, sessionId, expectedAuthority, operation, groupId: 'open', principal, actorPrincipal: principal, ...extra,
+  });
+  assert.equal((await mutate('create', adminPrincipal, { input: { groupId: 'open', label: 'Open', joinMode: 'open' } })).ok, true);
+  const put = source.kv.put;
+  let interrupt = true;
+  source.kv.put = async (key, value, options) => {
+    await put(key, value, options);
+    if (interrupt && key.startsWith('ce-worker-group-member:')) { interrupt = false; throw new Error('Lost membership write reply'); }
+  };
+  assert.equal((await mutate('join', member)).reason, 'worker_group_mutation_ambiguous');
+  assert.equal((await mutate('delete', adminPrincipal)).ok, true);
+  const storeOf = (env) => [...env.__coordinatorInstances.values()].find(({ store }) => store.has('worker-group-capacity-meta-v3')).store;
+  const seats = (store) => [...store].filter(([key]) => key.startsWith('worker-group-capacity-member-v3:open:')).map(([, value]) => value.state);
+  const markers = (store) => [...store.keys()].filter((key) => key.startsWith('worker-group-backup-pending:'));
+  // The membership row the cut-off join wrote stays, as every deleted group's rows do, and is restored as it was.
+  const memberRows = (kv) => [...kv.values].filter(([key]) => key.startsWith(`ce-worker-group-member:${slug}:`));
+  const groupStore = storeOf(source.env);
+  assert.deepEqual(seats(groupStore), ['reserved']);
+  assert.equal(markers(groupStore).length, 1);
+  assert.equal(memberRows(source.kv).length, 1);
+
+  const pages = await allPages(source.env);
+  assert.equal(pages.at(-1).manifest.complete, true);
+  assert.deepEqual(seats(groupStore), ['removed'], 'The pending join ends as not joined');
+  assert.deepEqual(markers(groupStore), []);
+  assert.equal((await mutate('join', member)).ok, false, 'The deleted group still turns the member away');
+
+  const target = fixture();
+  target.kv.values.delete(`session:${slug}:config`);
+  for (const page of pages) assert.equal((await importPage(target.env, page)).ok, true);
+  assertCompletedRestoreClean(target, pages[0].archiveId);
+  const restored = storeOf(target.env);
+  assert.equal(restored.get('worker-group-capacity-group-v3:open').phase, 'deleted');
+  assert.deepEqual(seats(restored), ['removed']);
+  assert.deepEqual(markers(restored), []);
+  assert.deepEqual(memberRows(target.kv), memberRows(source.kv));
 });
 
 test('completion cleanup resumes after lost session or group journal deletion replies', async () => {

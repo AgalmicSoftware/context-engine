@@ -175,6 +175,8 @@ const runSalon = async (engineName) => {
     assert.equal(await page.getByTestId('ce-polis-all-questions').count(), 0, 'No partial Report is shown as if it were whole');
     const retry = page.getByRole('button', { name: 'Retry', exact: true });
     await retry.waitFor();
+    assert.equal(await retry.count(), 1, 'The page offers one Retry for the failed read');
+    assert.equal(await page.getByText(/Your saved answers did not load/).count(), 0, 'The questions leave the failed read to Results');
     net.failing = false;
     await retry.click();
     await assertReportCountsEveryAnswer(page, 'After Retry');

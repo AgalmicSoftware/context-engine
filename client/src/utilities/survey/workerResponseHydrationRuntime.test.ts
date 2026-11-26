@@ -156,3 +156,57 @@ describe('a load whose reader or page has gone', () => {
     expect(worker().workerResponseHydrationStatus).toBe('failed');
   });
 });
+
+// The page tells someone their saved answers did not load from the failure left in the cache, which outlasts a
+// reload. The next load clears it at once, so the page says the answers are loading, not failed, while it reads.
+it('has the page shown again as soon as a load replaces a failure left by an earlier one', async () => {
+  let questions: any = {};
+  const markProgress = jest.fn();
+  const start = (loader: any) =>
+    hydrateWorkerCanonicalResponses({
+      sessionSlug: 'demo-sh',
+      sessionConfig: workerConfig,
+      run: resolveWorkerResponseHydrationRun({ sessionConfig: workerConfig, sessionSlug: 'demo-sh', reader: '' })!,
+      loadWorkerResponses: loader,
+      getAccount: () => '',
+      getProviderLike: () => null,
+      getCurrentSessionConfig: () => workerConfig,
+      shouldAbort: () => false,
+      markLoading: () => {},
+      markReady: () => {},
+      markProgress,
+      createPersistenceError: (message) => new Error(message),
+      updateQuestionsCacheAtomic: async (update) => {
+        questions = update(questions);
+        return true;
+      },
+      updateUserCacheAtomic: async () => true,
+    });
+  await expect(
+    start(async () => {
+      throw new TypeError('Failed to fetch');
+    }),
+  ).rejects.toThrow('Failed to fetch');
+  expect(questions.worker.workerResponseHydrationStatus).toBe('failed');
+  markProgress.mockClear();
+
+  // The retry's listing is held open, as a slow answer list is, until the page has been told.
+  let listed: (() => void) | null = null;
+  const retried = start(() => new Promise((resolve) => (listed = () => resolve([]))));
+  await waitForListing(() => listed !== null);
+  expect(questions.worker.workerResponseHydrationStatus).toBe('loading');
+  expect(markProgress).toHaveBeenCalledTimes(1);
+  listed!();
+  await retried;
+  expect(questions.worker.workerResponseHydrationStatus).toBe('complete');
+
+  // A load with no failure to replace waits for its rows, as before.
+  markProgress.mockClear();
+  await start(async () => []);
+  expect(markProgress).not.toHaveBeenCalled();
+});
+
+const waitForListing = async (ready: () => boolean) => {
+  for (let tick = 0; tick < 50 && !ready(); tick += 1) await Promise.resolve();
+  expect(ready()).toBe(true);
+};

@@ -164,12 +164,19 @@ export const restoreAgentLinks = async (storage, rows, journal = async () => {})
   let written = 0;
   let skipped = 0;
   for (const { account, passkey, linkedAt, agentAccess } of rows) {
-    const taken = await Promise.all([accountKey(account), passkeyKey(passkey), accountKey(passkey), passkeyKey(account)].map((key) => storage.get(key)));
-    if (taken.some((value) => value != null)) { skipped += 1; continue; }
+    const [asAccount, asPasskey, ...crossed] = await Promise.all([accountKey(account), passkeyKey(passkey), accountKey(passkey), passkeyKey(account)].map((key) => storage.get(key)));
+    // One half of this very pair, and nothing else, is what an earlier restore cut off between its two writes
+    // left behind: finish it. Anything else already there is the newer word, and stays.
+    const half = crossed.every((value) => value == null) && (asAccount == null) !== (asPasskey == null) &&
+      (asAccount == null || linkOf(asAccount)?.passkey === passkey) && (asPasskey == null || asPasskey.account === account);
+    if (!half && [asAccount, asPasskey, ...crossed].some((value) => value != null)) { skipped += 1; continue; }
     await journal(accountKey(account));
-    await storage.put(accountKey(account), { passkey, linkedAt, agentAccess });
     await journal(passkeyKey(passkey));
-    await storage.put(passkeyKey(passkey), { account });
+    // Both halves in one transaction, as an attachment is made: a restore cut off here leaves neither.
+    await storage.transaction(async (txn) => {
+      if (asAccount == null) await txn.put(accountKey(account), { passkey, linkedAt, agentAccess });
+      if (asPasskey == null) await txn.put(passkeyKey(passkey), { account });
+    });
     written += 1;
   }
   return { written, skipped };

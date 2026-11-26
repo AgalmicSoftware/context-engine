@@ -25036,6 +25036,7 @@ var init_outboundUrlSafetyBinding = __esm({
           const response3 = await fetchImpl(target, requestOptions);
           if (response3.status < 300 || response3.status >= 400) return response3;
           await response3.body?.cancel?.();
+          if (requestOptions.body != null) return { ok: false, error: "Redirect not followed for a request with a body", status: 403 };
           if (redirects >= maxRedirects) return { ok: false, error: "Too many redirects", status: 403 };
           const location2 = toStr4(response3.headers.get("location"), deps).trim();
           let redirectUrl = "";
@@ -72246,7 +72247,7 @@ var init_aiProviderExecution = __esm({
         return json12({ error: "Custom RPC requires authentication" }, 403, baseHeaders);
       }
       const walletAddress = toStr6(auth?.address || auth?.walletAddress || auth?.sub).trim().toLowerCase();
-      (typeof deps?.log === "function" ? deps.log : console.log)("[ai] custom rpc request", {
+      if (typeof deps?.log === "function") deps.log("[ai] custom rpc request", {
         walletAddress: walletAddress || null,
         rpcDomain: parsedRpcUrl.hostname
       });
@@ -77707,15 +77708,18 @@ var init_agentSignInStore = __esm({
       let written = 0;
       let skipped = 0;
       for (const { account, passkey, linkedAt, agentAccess } of rows) {
-        const taken = await Promise.all([accountKey(account), passkeyKey(passkey), accountKey(passkey), passkeyKey(account)].map((key) => storage.get(key)));
-        if (taken.some((value) => value != null)) {
+        const [asAccount, asPasskey, ...crossed] = await Promise.all([accountKey(account), passkeyKey(passkey), accountKey(passkey), passkeyKey(account)].map((key) => storage.get(key)));
+        const half = crossed.every((value) => value == null) && asAccount == null !== (asPasskey == null) && (asAccount == null || linkOf(asAccount)?.passkey === passkey) && (asPasskey == null || asPasskey.account === account);
+        if (!half && [asAccount, asPasskey, ...crossed].some((value) => value != null)) {
           skipped += 1;
           continue;
         }
         await journal(accountKey(account));
-        await storage.put(accountKey(account), { passkey, linkedAt, agentAccess });
         await journal(passkeyKey(passkey));
-        await storage.put(passkeyKey(passkey), { account });
+        await storage.transaction(async (txn) => {
+          if (asAccount == null) await txn.put(accountKey(account), { passkey, linkedAt, agentAccess });
+          if (asPasskey == null) await txn.put(passkeyKey(passkey), { account });
+        });
         written += 1;
       }
       return { written, skipped };
@@ -77828,6 +77832,7 @@ var init_sessionBackupCoordinator = __esm({
       if (!slug || !sessionId) fail10("Invalid backup group identity.", 400);
       const kv = resolveWorkerGroupsKv(coordinator.env);
       if (!kv?.list || !kv?.get) fail10("Worker group storage is unavailable.");
+      await coordinator.settleDeletedWorkerGroupMembers();
       return json7(await readBackupGroupSnapshot({
         coordinator,
         payload: { ...payload, slug, sessionId, kv },
@@ -85097,7 +85102,10 @@ ${expiry}`);
       }
       async scheduleResultsAnalysisAlarm(delayMs = 1e3) {
         if (typeof this.state.storage?.setAlarm !== "function") return false;
-        await this.state.storage.setAlarm(Math.min((Number(this.now()) || Date.now()) + Math.max(0, Number(delayMs) || 0), await nextAgentSubmitProjectionAt(this), await nextResultsJobAt(this)));
+        const nowMs2 = Number(this.now()) || Date.now();
+        const at = Math.min(nowMs2 + Math.max(0, Number(delayMs) || 0), await nextAgentSubmitProjectionAt(this), await nextResultsJobAt(this));
+        const scheduled = await this.state.storage.getAlarm?.();
+        if (!(scheduled > nowMs2 && scheduled <= at)) await this.state.storage.setAlarm(at);
         return true;
       }
       async enqueueResultsAnalysisAutoJob(payload = {}) {
@@ -86000,6 +86008,32 @@ ${expiry}`);
           replayed.push({ ...settled2.replayed, principalKey: principal.key });
         }
         return { ok: true, replayed };
+      }
+      // A deleted group's id is never used again, so a join or removal left pending in it can never replay, and its
+      // marker would refuse every backup. Each such seat ends as not joined. The member rows KV may hold for it stay,
+      // as every deleted group's do: the group's deleted state here is what refuses them. Runs alone, with backups.
+      async settleDeletedWorkerGroupMembers() {
+        const { storage } = this.state;
+        const prefix = `${WORKER_GROUP_BACKUP_PENDING_PREFIX}${encodeURIComponent(WORKER_GROUP_CAPACITY_MEMBER_PREFIX)}`;
+        let after = "";
+        for (; ; ) {
+          const page = [...await storage.list({ prefix, startAfter: after, limit: 100 })];
+          for (const [markerKey] of page) {
+            const memberKey2 = decodeURIComponent(markerKey.slice(WORKER_GROUP_BACKUP_PENDING_PREFIX.length));
+            const groupId = decodeURIComponent(memberKey2.slice(WORKER_GROUP_CAPACITY_MEMBER_PREFIX.length).split(":")[0]);
+            if ((await storage.get(workerGroupCapacityGroupKey(groupId)))?.phase !== "deleted") continue;
+            await bumpStorageBackupRevision(storage);
+            await storage.transaction(async (transaction) => {
+              const member = await transaction.get(memberKey2);
+              if (PENDING_WORKER_GROUP_MEMBER_OPERATIONS[member?.state]) {
+                await transaction.put(memberKey2, { version: 2, state: "removed" });
+              }
+              await transaction.delete(markerKey);
+            });
+          }
+          if (page.length < 100) break;
+          after = page.at(-1)[0];
+        }
       }
       async executeWorkerGroupReady(payload) {
         const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
@@ -96737,7 +96771,8 @@ var createWorkerExecutionServicesWithWorkerDeps = ({
     fetch: deps?.fetch,
     json: deps?.json,
     safeFetch: deps?.safeFetch,
-    isBlockedOutboundUrl: deps?.isBlockedOutboundUrl
+    isBlockedOutboundUrl: deps?.isBlockedOutboundUrl,
+    log: workerLog
   };
   const aiProxies = {
     proxyAnthropic: async (value = {}) => proxyAnthropic({
@@ -106216,6 +106251,10 @@ async function handleAgentOnlyWrappedImageViewRequest({ env = {}, imageViewId = 
       "content-type": result.image_content_type || "image/png",
       "cache-control": "private, max-age=3600",
       "content-disposition": `inline; filename="session-wrapped.${lower2(result.image_content_type).includes("svg") ? "svg" : "png"}"`,
+      // As a storage read: no sniffing, and an opaque sandbox with no script. The SVG form
+      // draws its story from an embedded PNG, so data: images stay allowed.
+      "x-content-type-options": "nosniff",
+      "content-security-policy": "sandbox; default-src 'none'; img-src data:",
       "x-agent-only-image-id": result.image_id || "",
       "x-agent-only-image-view-id": result.image_view_id || ""
     }
@@ -108619,7 +108658,7 @@ var FEATURES = Object.freeze([
   "worker_groups"
 ]);
 var WORKERS_AI_FEATURE = "workers_ai_v1";
-var workerRelease = () => "0.9.43" ? "0.9.43" : null;
+var workerRelease = () => "0.9.44" ? "0.9.44" : null;
 var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 = {} }) => {
   const deployed = FEATURES.filter((feature) => feature !== WORKER_GROUP_READ_CODE_FEATURE || workerGroupCodeReadsOn(env));
   const body = {

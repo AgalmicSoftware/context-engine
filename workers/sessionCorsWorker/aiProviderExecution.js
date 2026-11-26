@@ -490,7 +490,8 @@ export const proxyCustomRPC = async ({
     return json({ error: 'Custom RPC requires authentication' }, 403, baseHeaders);
   }
   const walletAddress = toStr(auth?.address || auth?.walletAddress || auth?.sub).trim().toLowerCase();
-  (typeof deps?.log === 'function' ? deps.log : console.log)('[ai] custom rpc request', {
+  // A debug line: written only when the Worker's debug logs are on, never by default.
+  if (typeof deps?.log === 'function') deps.log('[ai] custom rpc request', {
     walletAddress: walletAddress || null,
     rpcDomain: parsedRpcUrl.hostname,
   });

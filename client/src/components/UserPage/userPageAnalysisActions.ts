@@ -349,6 +349,8 @@ export async function analyzeUser(this: UserPage, forceRefresh = false): Promise
             analysisCard: null,
             analysisCardPending: true,
             analysisCardPicture: { status: 'loading' },
+            // The card's words and picture are asked for now: the Card view counts its wait from here.
+            analysisCardStartedAt: Date.now(),
             analysisCardPublish: null,
             analysisCardSavedAt: null,
           }

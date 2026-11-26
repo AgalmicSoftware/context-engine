@@ -1662,7 +1662,7 @@ describe('OnePageSession results routing', () => {
       });
       renderSession('edge');
       const status = screen.getByTestId('ce-session-debate-atlas-status');
-      expect(within(status).getByRole('status')).toHaveTextContent(/Building the atlas · 6[5-7]s/);
+      expect(within(status).getByRole('status')).toHaveTextContent(/Building the atlas · 1:0[5-7]/);
       expect(status).toHaveTextContent('AI model: deep-model');
       fireEvent.click(within(status).getByRole('button', { name: /Show AI prompt/ }));
       expect(within(status).getByRole('region', { name: 'Planning prompt' })).toHaveTextContent('Plan <Questions>');
@@ -1860,7 +1860,7 @@ describe('OnePageSession results routing', () => {
       expect(screen.getByTestId('ce-session-risk-matrix-build')).toBeDisabled();
       expect(screen.queryByTestId('ce-session-debate-atlas-status')).not.toBeInTheDocument();
       const status = screen.getByTestId('ce-session-risk-matrix-status');
-      expect(within(status).getByRole('status')).toHaveTextContent(/Building the risk matrix · 6[5-7]s/);
+      expect(within(status).getByRole('status')).toHaveTextContent(/Building the risk matrix · 1:0[5-7]/);
       fireEvent.click(within(status).getByRole('button', { name: /Show AI prompt/ }));
       expect(within(status).getByRole('region', { name: 'Building prompt' })).toHaveTextContent('Build <Responses>');
     });

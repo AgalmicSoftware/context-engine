@@ -171,3 +171,47 @@ test('createWorkerExecutionServicesWithWorkerDeps directly imports pure request 
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), { error: 'Invalid URL' });
 });
+
+test('a custom-provider request logs only through the Worker log, so nothing with debug logs off', async () => {
+  const consoleLines = [];
+  const realConsoleLog = console.log;
+  console.log = (...args) => consoleLines.push(args);
+  try {
+    for (const workerLog of [undefined, () => {}]) {
+      const services = createWorkerExecutionServicesWithWorkerDeps({
+        deps: {
+          // The Worker's own log, with debug logs off: it writes nothing.
+          ...(workerLog ? { log: workerLog } : {}),
+          json: (body, status) => Response.json(body, { status }),
+          isBlockedOutboundUrl: () => false,
+          safeFetch: async () => Response.json({ content: [{ text: 'pong' }] }),
+        },
+      });
+      const response = await services.proxyCustomRPC({
+        payload: { apiKey: 'sk-request', rpcUrl: 'https://rpc.example.test/v1', prompt: 'ping' },
+        secrets: {},
+        auth: { address: `0x${'ab'.repeat(20)}`, scopes: { ai: true } },
+      });
+      assert.equal(response.status, 200);
+    }
+  } finally {
+    console.log = realConsoleLog;
+  }
+  assert.deepEqual(consoleLines, []);
+
+  const logged = [];
+  const services = createWorkerExecutionServicesWithWorkerDeps({
+    deps: {
+      log: (...args) => logged.push(args),
+      json: (body, status) => Response.json(body, { status }),
+      isBlockedOutboundUrl: () => false,
+      safeFetch: async () => Response.json({ content: [{ text: 'pong' }] }),
+    },
+  });
+  await services.proxyCustomRPC({
+    payload: { apiKey: 'sk-request', rpcUrl: 'https://rpc.example.test/v1', prompt: 'ping' },
+    secrets: {},
+    auth: { address: `0x${'ab'.repeat(20)}`, scopes: { ai: true } },
+  });
+  assert.deepEqual(logged.map(([line]) => line), ['[ai] custom rpc request']);
+});

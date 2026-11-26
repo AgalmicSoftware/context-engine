@@ -21,6 +21,7 @@ import {
 
 import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
 import PileQuestionActionMenu from './PileQuestionActionMenu';
+import SavedAnswersFailedNotice from './SavedAnswersFailedNotice';
 import { SubmitCountLabel } from './SubmitCountLabel';
 import { submittingLabel } from './surveyToolDraftState';
 import styles from './SurveyTool.module.scss';
@@ -782,20 +783,7 @@ export const renderPileInteractionSurface = ({
       </div>
     )}
 
-    {savedAnswersNotice && (
-      <p className={styles.pileSubmitError} role="status">
-        Your saved answers did not load, so answers you saved earlier may be missing.{' '}
-        <Button
-          color="link"
-          size="sm"
-          className="p-0 align-baseline"
-          onClick={savedAnswersNotice.onRetry}
-          disabled={savedAnswersNotice.retrying}
-        >
-          {savedAnswersNotice.retrying ? 'Retrying…' : 'Retry'}
-        </Button>
-      </p>
-    )}
+    {savedAnswersNotice && <SavedAnswersFailedNotice {...savedAnswersNotice} />}
 
     <div className={styles.pileCardContainer}>
       {pileQuestions.length === 0 ? (
