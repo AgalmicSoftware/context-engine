@@ -345,8 +345,9 @@ first.
     saved answers that comes before a pile Submit. Anything else that needs a
     signature past the 6 hours (joining a group, for one) fails with the same
     message and no window.
-- **A password, if asked for.** "Add a password", under "Create login file",
-  takes a password, and the file made then (version 2) holds its 12 words
+- **A password, if asked for.** "Add a password", behind the caret on "Create
+  login file" (closed at first; while it is ticked it stays open and Create shows
+  a lock), takes a password, and the file made then (version 2) holds its 12 words
   encrypted: PBKDF2-SHA256 with 600,000 iterations and a random 16-byte salt
   stretches the password into an AES-GCM-256 key, used with a random 12-byte IV.
   The password is taken as UTF-8 after Unicode NFKC normalisation; the cipher's

@@ -1,7 +1,14 @@
-import React, { useRef, useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import { Button, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faDownload, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import {
+  faArrowLeft,
+  faCaretDown,
+  faCaretUp,
+  faDownload,
+  faLock,
+  faQuestionCircle,
+} from '@fortawesome/free-solid-svg-icons';
 import styles from './Account.module.scss';
 
 const LOGIN_FILE_HELP =
@@ -113,13 +120,32 @@ export const PasswordField = ({
   );
 };
 
-// "Add a password", under "Create login file". Unticked, a file is made as before. Ticked, the file's words are
-// encrypted under the password typed here, and Create waits for one.
+// "Add a password", behind the caret on "Create login file" and closed at first: Create alone makes a file as before.
+// Ticked, the file's words are encrypted under the password typed here, and Create waits for one. While it is ticked
+// the choice stays open and Create shows a lock, so no file is made with, or without, a password unawares.
 const useNewFilePassword = () => {
+  const optionsId = useId();
+  const [open, setOpen] = useState(false);
   const [wanted, setWanted] = useState(false);
   const input = useRef<HTMLInputElement>(null);
-  const choice = (
-    <div className={styles.loginFilePassword} data-testid="ce-login-file-password">
+  const caret = (
+    <Button
+      type="button"
+      size="sm"
+      color="primary"
+      className={`${styles.passkeyCopyAnswersButton} ${styles.loginFileCaret}`}
+      aria-label="Login file options"
+      aria-expanded={open}
+      aria-controls={open ? optionsId : undefined}
+      disabled={wanted}
+      data-testid="ce-login-file-options"
+      onClick={() => setOpen((wasOpen) => !wasOpen)}
+    >
+      <FontAwesomeIcon icon={open ? faCaretUp : faCaretDown} />
+    </Button>
+  );
+  const choice = open ? (
+    <div id={optionsId} className={styles.loginFilePassword} data-testid="ce-login-file-password">
       <span className={styles.passkeyCopyAnswersUnbroken}>
         <label className={styles.loginFilePasswordCheck}>
           <input
@@ -139,7 +165,7 @@ const useNewFilePassword = () => {
         </>
       ) : null}
     </div>
-  );
+  ) : null;
   // The password for the file about to be made: none where the box is unticked, and `null` where it is ticked
   // with nothing typed, which points at the box instead of making a file.
   const read = (): string | undefined | null => {
@@ -149,7 +175,7 @@ const useNewFilePassword = () => {
     input.current?.focus();
     return null;
   };
-  return { choice, read };
+  return { caret, choice, read, wanted };
 };
 
 type CreateLoginFile = (password?: string) => void | Promise<void>;
@@ -160,10 +186,12 @@ const CreateLoginFileButton = ({
   onCreate,
   readPassword,
   testId,
+  withPassword,
 }: {
   onCreate: CreateLoginFile;
   readPassword: () => string | undefined | null;
   testId: string;
+  withPassword: boolean;
 }) => {
   const [busy, setBusy] = useState(false);
   return (
@@ -185,20 +213,35 @@ const CreateLoginFileButton = ({
       }}
     >
       Create login file
+      {withPassword ? (
+        <>
+          <FontAwesomeIcon icon={faLock} className={styles.loginFileLock} />
+          <span className={styles.srOnly}> with a password</span>
+        </>
+      ) : null}
     </Button>
   );
 };
 
 /**
- * "Create login file to login without a passkey", with "Add a password" under it. `help` is a (?) at the
- * sentence's end.
+ * "Create login file to login without a passkey", with "Add a password" behind Create's caret. `help` is a (?) at
+ * the sentence's end.
  */
 const CreateLoginFileLine = ({ onCreate, help }: { onCreate: CreateLoginFile; help: React.ReactNode }) => {
-  const { choice, read } = useNewFilePassword();
+  const { caret, choice, read, wanted } = useNewFilePassword();
   return (
     <div className={styles.passkeyCopyAnswers} data-testid="ce-login-file-create">
       <span className={styles.passkeyCopyAnswersUnbroken}>
-        <CreateLoginFileButton onCreate={onCreate} readPassword={read} testId="ce-login-file-create-button" /> to
+        <span className={styles.loginFileSplit}>
+          <CreateLoginFileButton
+            onCreate={onCreate}
+            readPassword={read}
+            testId="ce-login-file-create-button"
+            withPassword={wanted}
+          />
+          {caret}
+        </span>{' '}
+        to
       </span>{' '}
       login without a <span className={styles.passkeyCopyAnswersUnbroken}>passkey {help}</span>
       {choice}
@@ -264,7 +307,7 @@ export const LoginWithFileButton = ({
 
 /**
  * Under a sign-in that failed: "Create login file or Login with file to login without a passkey", with "Add a
- * password" under it. `withOr` puts an "or" above it; `last` ends the sentence where nothing follows.
+ * password" behind Create's caret. `withOr` puts an "or" above it; `last` ends the sentence where nothing follows.
  */
 export const LoginFilePairLine = ({
   onCreate,
@@ -277,13 +320,21 @@ export const LoginFilePairLine = ({
   withOr: boolean;
   last: boolean;
 }) => {
-  const { choice, read } = useNewFilePassword();
+  const { caret, choice, read, wanted } = useNewFilePassword();
   return (
     <div className={styles.passkeyCopyAnswers} data-testid="ce-passkey-login-file">
       {withOr ? <OrLine /> : null}
       {/* Its own line height: where the two buttons wrap, their 44px tap areas do not meet. */}
       <div className={styles.loginFilePair}>
-        <CreateLoginFileButton onCreate={onCreate} readPassword={read} testId="ce-passkey-create-login-file-button" />{' '}
+        <span className={styles.loginFileSplit}>
+          <CreateLoginFileButton
+            onCreate={onCreate}
+            readPassword={read}
+            testId="ce-passkey-create-login-file-button"
+            withPassword={wanted}
+          />
+          {caret}
+        </span>{' '}
         <span className={styles.passkeyCopyAnswersUnbroken}>
           or{' '}
           <LoginWithFileButton

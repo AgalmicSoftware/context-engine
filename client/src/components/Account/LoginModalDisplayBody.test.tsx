@@ -145,7 +145,7 @@ describe('Copy my answers after a failed sign-in', () => {
     // After the login file's line and an "or", its button leads its sentence.
     expect(line.querySelector('button')).toBe(button);
     expect(screen.getByTestId('ce-passkey-login-file')).toHaveTextContent(
-      /^Create login file or Login with file ?to login without a passkeyAdd a password/,
+      /^Create login file or Login with file ?to login without a passkey$/,
     );
     expect(line).toHaveTextContent(
       /^orCopy this link and open it on another device to recover and submit responses\.(?: |$)/,
@@ -246,7 +246,7 @@ describe('Copy my answers after a failed sign-in', () => {
     renderBody({ passkeyWalletStatusMessage: closed, passkeyWalletStatusTone: 'error' });
     const status = screen.getByTestId('ce-passkey-wallet-status');
     expect(status).toHaveTextContent(
-      /^Login failed: Passkey prompt closed or timed out\. Try again\.Create login file or Login with file ?to login without a passkey\.Add a password/,
+      /^Login failed: Passkey prompt closed or timed out\. Try again\.Create login file or Login with file ?to login without a passkey\.$/,
     );
     expect(screen.queryByRole('button', { name: 'Scan QR with phone' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Other options' })).not.toBeInTheDocument();
@@ -261,7 +261,7 @@ describe('Copy my answers after a failed sign-in', () => {
       within(screen.getByTestId('ce-passkey-wallet-status'))
         .getAllByRole('button')
         .map((button) => button.textContent?.trim() || button.getAttribute('aria-label')),
-    ).toEqual(['Copy link', 'Create login file', 'Login with file', "About a login file's password"]);
+    ).toEqual(['Copy link', 'Create login file', 'Login file options', 'Login with file']);
   });
 
   it('shows "Other options" where no sign-in failed, and for a status that is not a failed sign-in', () => {

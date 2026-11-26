@@ -1270,13 +1270,14 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
           .map((button) => button.textContent?.trim() || button.getAttribute('aria-label')),
       ).toEqual([
         'Create login file',
+        'Login file options',
         'Login with file',
-        "About a login file's password",
         'Copy this link',
         'About copying your answers',
       ]);
+      // "Add a password" waits behind Create's caret.
       expect(screen.getByTestId('ce-passkey-login-file')).toHaveTextContent(
-        /^Create login file or Login with file ?to login without a passkeyAdd a password/,
+        /^Create login file or Login with file ?to login without a passkey$/,
       );
       expect(screen.getByTestId('ce-passkey-copy-answers')).toHaveTextContent(
         /^orCopy this link and open it on another device to recover and submit responses\./,
@@ -1326,7 +1327,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     await subject.handlePasskeyWalletCreate();
     render(subject.getModalDisplay());
     expect(screen.getByTestId('ce-passkey-login-file')).toHaveTextContent(
-      /^Create login file or Login with file ?to login without a passkey\.Add a password/,
+      /^Create login file or Login with file ?to login without a passkey\.$/,
     );
     expect(screen.queryByRole('button', { name: 'Copy this link' })).not.toBeInTheDocument();
   });

@@ -1,6 +1,11 @@
 import React from 'react';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import LoginFileAccess, { saveLoginFile } from './LoginFileAccess';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import LoginFileAccess, { saveLoginFile, type ChosenLoginFile } from './LoginFileAccess';
+import { createProtectedLoginFile, isLoginFileProtected } from '../../wallet/keystore/loginFile.js';
+import { PasskeyEoaWalletClient } from '../../wallet/passkeyWallet.js';
+import { createMemoryWalletStorage } from '../../wallet/keystore/storage.js';
+import { createInMemorySoftSessionClient } from '../../wallet/session/sessionWorkerClient.js';
+import type { PasskeyWalletConfig } from '../../wallet/types.js';
 
 const file = { name: 'ContextEngine-Login-November23-2026-1003PM.json', text: '{"type":"context-engine-login-file"}' };
 
@@ -58,15 +63,15 @@ describe('LoginFileAccess', () => {
     expect(screen.getByTestId('ce-login-file-create')).toHaveTextContent(
       /^Create login file to login without a passkey/,
     );
-    // The choices in order: create, its (?), then the file to sign in with, after an "or".
+    // The choices in order: create and its caret, its (?), then the file to sign in with, after an "or".
     expect(
       within(screen.getByTestId('ce-login-file'))
         .getAllByRole('button')
         .map((button) => button.textContent?.trim() || button.getAttribute('aria-label')),
-    ).toEqual(['Create login file', 'About login files', "About a login file's password", 'Login with file']);
+    ).toEqual(['Create login file', 'Login file options', 'About login files', 'Login with file']);
     expect(screen.getByTestId('ce-login-file')).toHaveTextContent(/orLogin with file if you have one\.$/);
-    // No password unless asked for: the file is made as before.
-    expect(screen.getByRole('checkbox', { name: 'Add a password' })).not.toBeChecked();
+    // No password unless asked for, behind the caret: the file is made as before.
+    expect(screen.queryByRole('checkbox', { name: 'Add a password' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Create login file' }));
     expect(onCreate).toHaveBeenCalledTimes(1);
@@ -74,9 +79,46 @@ describe('LoginFileAccess', () => {
     expect(screen.queryByTestId('ce-login-file-saved')).not.toBeInTheDocument();
   });
 
+  // Create's caret: a second button, closed at first, that shows and hides "Add a password". Create itself still makes
+  // a file at once. Ticked, the choice cannot be closed and Create carries a lock, so the state is always in view.
+  it('opens "Add a password" from Create\u2019s caret, and keeps it open and marked while a password is wanted', () => {
+    const { onCreate } = renderAccess();
+    fireEvent.click(screen.getByRole('button', { name: 'Other options' }));
+    const caret = screen.getByRole('button', { name: 'Login file options' });
+    caret.focus();
+    expect(caret).toHaveFocus();
+    expect(caret).toHaveAttribute('aria-expanded', 'false');
+    expect(caret.querySelector('svg')).toHaveAttribute('data-icon', 'caret-down');
+    fireEvent.click(caret);
+    expect(caret).toHaveAttribute('aria-expanded', 'true');
+    expect(caret.querySelector('svg')).toHaveAttribute('data-icon', 'caret-up');
+    expect(caret).toHaveAttribute('aria-controls', screen.getByTestId('ce-login-file-password').id);
+    const tick = screen.getByRole('checkbox', { name: 'Add a password' });
+    expect(tick).not.toBeChecked();
+    expect(screen.getByRole('button', { name: "About a login file's password" })).toBeInTheDocument();
+    fireEvent.click(caret);
+    expect(screen.queryByRole('checkbox', { name: 'Add a password' })).not.toBeInTheDocument();
+    expect(caret).not.toHaveAttribute('aria-controls');
+
+    fireEvent.click(caret);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Add a password' }));
+    expect(screen.getByRole('button', { name: 'Create login file with a password' })).toBe(
+      screen.getByTestId('ce-login-file-create-button'),
+    );
+    expect(caret).toBeDisabled();
+    expect(caret).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Add a password' }));
+    expect(caret).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create login file' })).toBe(
+      screen.getByTestId('ce-login-file-create-button'),
+    );
+    expect(onCreate).not.toHaveBeenCalled();
+  });
+
   it('takes a password for a new file once "Add a password" is ticked, and waits for one', async () => {
     const { onCreate } = renderAccess();
     fireEvent.click(screen.getByRole('button', { name: 'Other options' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Login file options' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Add a password' }));
     const password = screen.getByLabelText('Password');
     expect(password).toHaveAttribute('type', 'password');
@@ -87,7 +129,7 @@ describe('LoginFileAccess', () => {
       /never stored or sent\. It cannot be recovered/,
     );
     // With nothing typed, Create makes no file and points at the box.
-    const create = screen.getByRole('button', { name: 'Create login file' });
+    const create = screen.getByTestId('ce-login-file-create-button');
     expect(password).toBeRequired();
     (document.activeElement as HTMLElement | null)?.blur();
     fireEvent.click(create);
@@ -259,4 +301,69 @@ describe('LoginFileAccess', () => {
     expect(onChoose).not.toHaveBeenCalled();
     expect(screen.getByTestId('ce-login-file')).toHaveTextContent('That file could not be read.');
   });
+});
+
+// The password path from end to end, with the wallet's own file and sign-in: made behind Create's caret with a
+// password, chosen again with Login with file, asked for its password, then signed in as the account it names.
+describe('a login file made with a password', () => {
+  const PASSWORD = 'correct horse battery';
+  const config = {
+    rpId: 'localhost',
+    rpName: 'Context Engine',
+    appOrigin: 'http://localhost:3000',
+    accountOrigin: 'http://localhost:3000',
+    walletMode: 'passkey-eoa',
+    walletKeyMode: 'passkey-derived',
+    sessionMode: 'soft',
+    unlockTtlSeconds: 3600,
+    allowPreviewRpId: false,
+    storageMode: 'indexeddb',
+    derivationNamespace: 'context-engine',
+  } as PasskeyWalletConfig;
+
+  it('is made behind the caret, chosen again, and signs in with that password', async () => {
+    const made: Array<Awaited<ReturnType<typeof createProtectedLoginFile>>> = [];
+    const chosen: ChosenLoginFile[] = [];
+    const tries: string[] = [];
+    const box = (protectedName = '') => (
+      <LoginFileAccess
+        onCreate={async (password) => {
+          made.push(await createProtectedLoginFile(password as string));
+        }}
+        onChoose={(file) => chosen.push(file)}
+        onPassword={(password) => tries.push(password)}
+        onBack={jest.fn()}
+        savedName=""
+        protectedName={protectedName}
+        passwordRefusedBy=""
+      />
+    );
+    const view = render(box());
+    fireEvent.click(screen.getByRole('button', { name: 'Other options' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Login file options' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Add a password' }));
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: PASSWORD } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create login file with a password' }));
+    await waitFor(() => expect(made).toHaveLength(1), { timeout: 15000 });
+    expect(isLoginFileProtected(made[0].text)).toBe(true);
+    expect(made[0].text).not.toContain(PASSWORD);
+
+    const again = new File([made[0].text], made[0].name, { type: 'application/json' });
+    // jsdom's File has no text().
+    Object.defineProperty(again, 'text', { value: async () => made[0].text });
+    await choose(again);
+    expect(chosen).toEqual([{ name: made[0].name, text: made[0].text }]);
+    // A file with a password: the dialog asks for it, as LoginAndSettingsModal does.
+    view.rerender(box(chosen[0].name));
+    fireEvent.change(screen.getByTestId('ce-login-file-password-input'), { target: { value: PASSWORD } });
+    fireEvent.click(screen.getByTestId('ce-login-file-password-submit'));
+    expect(tries).toEqual([PASSWORD]);
+    const client = new PasskeyEoaWalletClient({
+      config,
+      storage: createMemoryWalletStorage(),
+      sessionClientFactory: createInMemorySoftSessionClient,
+    });
+    await expect(client.signInWithLoginFile(chosen[0].text, tries[0])).resolves.toBe(made[0].address);
+    await client.lock();
+  }, 30000);
 });

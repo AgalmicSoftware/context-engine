@@ -2349,8 +2349,37 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   line-height: 46px;
 }
 
-// "Add a password" under "Create login file", and the box a password is typed in. The text and the box's line
-// take the colour of the box they sit in, so they read in every theme.
+// "Create login file" and its caret, one control in two parts: the caret opens the file's options.
+.loginFileSplit {
+  display: inline-flex;
+  vertical-align: baseline;
+
+  > .passkeyCopyAnswersButton:first-child {
+    border-start-end-radius: 0;
+    border-end-end-radius: 0;
+  }
+
+  > .loginFileCaret {
+    min-width: 2.25em;
+    margin-inline-start: 1px;
+    border-start-start-radius: 0;
+    border-end-start-radius: 0;
+  }
+
+  // The caret's tap area reaches to 44px past its free side, clear of Create.
+  > .loginFileCaret::after {
+    right: auto;
+    width: max(100%, 44px);
+  }
+}
+
+// On Create while the file will have a password.
+.loginFileLock {
+  margin-inline-start: 0.4em;
+}
+
+// "Add a password", behind Create's caret, and the box a password is typed in. The text and the box's line take the
+// colour of the box they sit in, so they read in every theme.
 .loginFilePassword {
   margin-top: 4px;
 }
