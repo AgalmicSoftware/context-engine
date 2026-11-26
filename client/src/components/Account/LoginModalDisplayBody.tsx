@@ -421,11 +421,14 @@ const LoginModalDisplayBody = ({
           <FontAwesomeIcon icon={faSpinner} pulse id={styles.verifyingTXloadingIcon} />
         </div>
         {/* A passkey step can wait with nothing on screen (its prompt hidden, or the page waiting for focus). */}
-        {provider === 'passkey_eoa' ? (
-          <div className="text-center">
+        {passkeyMode ? (
+          <div className={styles.passkeyProgressHint}>
+            <p>If no passkey window opens, look behind this window, or press Cancel to try again.</p>
+            {/* The Login button's colours, which hold in every theme; a plain outline button was white on white. */}
             <Button
               color="secondary"
               outline
+              className={styles.passkeyButtonOutline}
               onClick={handlePasskeyWalletCancel}
               data-testid="ce-passkey-wallet-cancel"
             >

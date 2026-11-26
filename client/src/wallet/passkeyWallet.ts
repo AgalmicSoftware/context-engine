@@ -221,12 +221,14 @@ const resolveCreatedCredentialPrfOutput = async ({
   credentialId,
   credentials,
   salt,
+  signal,
 }: {
   config: PasskeyWalletConfig;
   credential: PublicKeyCredential;
   credentialId: string;
   credentials?: PasskeyCredentialClient;
   salt: Uint8Array;
+  signal?: AbortSignal;
 }): Promise<ArrayBuffer> => {
   const registrationOutput = getOptionalCredentialPrfOutput(credential);
   if (registrationOutput) return registrationOutput;
@@ -235,6 +237,7 @@ const resolveCreatedCredentialPrfOutput = async ({
     credentialId,
     salt,
     credentials,
+    signal,
   });
   return assertion.prfOutput;
 };
@@ -259,6 +262,8 @@ export class PasskeyEoaWalletClient {
   // Bumped on every chain change; a request that sees it move never retries.
   private chainEpoch = 0;
   private operationGeneration = 0;
+  // Every passkey prompt carries its signal, so stopping an operation also closes a prompt still open for it.
+  private promptAbort = new AbortController();
   private mutationTail: Promise<void> = Promise.resolve();
   // Sessions a chain change replaced; each locks once its requests settle.
   private readonly retiringSessions = new Set<SoftSessionClient>();
@@ -325,6 +330,7 @@ export class PasskeyEoaWalletClient {
           config: this.config,
           salt: saltBytes,
           credentials: this.credentials,
+          signal: this.promptAbort.signal,
         });
         this.assertCurrentOperation(generation);
         const credentialId = bufferToBase64URL(credential.rawId);
@@ -334,6 +340,7 @@ export class PasskeyEoaWalletClient {
           credentialId,
           salt: saltBytes,
           credentials: this.credentials,
+          signal: this.promptAbort.signal,
         });
         this.assertCurrentOperation(generation);
         privateKey = await deriveEoaPrivateKeyFromPrf({ prfOutput, config: this.config });
@@ -365,6 +372,7 @@ export class PasskeyEoaWalletClient {
         salt: saltBytes,
         credentials: this.credentials,
         excludeCredentialIds: savedRecord?.rpId === this.config.rpId ? [savedRecord.credentialId] : [],
+        signal: this.promptAbort.signal,
       });
       this.assertCurrentOperation(generation);
       const credentialId = bufferToBase64URL(credential.rawId);
@@ -374,6 +382,7 @@ export class PasskeyEoaWalletClient {
         credentialId,
         salt: saltBytes,
         credentials: this.credentials,
+        signal: this.promptAbort.signal,
       });
       this.assertCurrentOperation(generation);
       const aesKey = await deriveAesGcmKeyFromPrf(prfOutput, salt);
@@ -452,6 +461,7 @@ export class PasskeyEoaWalletClient {
           credentialId: selectCredential ? undefined : storedRecord?.credentialId,
           salt: saltBytes,
           credentials: this.credentials,
+          signal: this.promptAbort.signal,
         });
         this.assertCurrentOperation(generation);
         const credentialId = bufferToBase64URL(credential.rawId);
@@ -496,6 +506,7 @@ export class PasskeyEoaWalletClient {
         credentialId: record.credentialId,
         salt: saltBytes,
         credentials: this.credentials,
+        signal: this.promptAbort.signal,
       });
       this.assertCurrentOperation(generation);
       const aesKey = await deriveAesGcmKeyFromPrf(prfOutput, record.salt);
@@ -724,6 +735,12 @@ export class PasskeyEoaWalletClient {
   cancelPendingOperation(): void {
     this.operationGeneration += 1;
     this.transitionInProgress = false;
+    this.closePrompts();
+  }
+
+  private closePrompts(): void {
+    this.promptAbort.abort();
+    this.promptAbort = new AbortController();
   }
 
   async deleteWallet(): Promise<void> {
@@ -733,6 +750,7 @@ export class PasskeyEoaWalletClient {
   private async endWallet(deleteRecord: boolean): Promise<void> {
     this.operationGeneration += 1;
     this.transitionInProgress = false;
+    this.closePrompts();
     this.activeAddress = null;
     await this.mutateWallet(async () => {
       await this.lock();

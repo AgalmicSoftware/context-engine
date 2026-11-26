@@ -7,8 +7,14 @@ import {
 } from '../../utilities/session/agentClientLogin';
 import { cacheAgentClientLoginEnvelope } from '../OnePageSession/onePageSessionAgentController';
 import { ethers } from 'ethers';
+import { Provider } from 'react-redux';
+import { applyMiddleware, combineReducers, createStore } from 'redux';
+import thunk from 'redux-thunk';
 import { LoginAndSettingsModal } from './LoginAndSettingsModal';
+import LoginButton from './LoginButton';
 import { PASSKEY_STOPPED_MESSAGE } from './loginAndSettingsPasskeyActions';
+import sessionStateReducer from '../../reducers/sessionStateReducer';
+import { updateLoginInfo } from '../../actions/sessionStateActions';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
@@ -258,25 +264,56 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(setStateSpy).not.toHaveBeenCalled();
   });
 
-  it('stops a passkey action left on its spinner when the dialog closes, and opens next with how to finish', async () => {
-    const props = buildProps({ provider: 'passkey_eoa', loginInProgress: true });
-    mountClassSubject(new LoginAndSettingsModalSubject(props)).componentWillUnmount();
-    expect(mockedPasskeyWallet.cancelPasskeyWalletOperation).toHaveBeenCalledTimes(1);
-    expect(props.updateLoginInfo).toHaveBeenLastCalledWith({
-      loginInProgress: false,
-      loginComplete: false,
-      provider: null,
-    });
-    const reopened = new LoginAndSettingsModalSubject(buildProps());
-    const setState = jest.fn();
-    reopened.setState = setState;
-    await reopened.componentDidMount();
-    reopened.componentWillUnmount();
-    expect(setState).toHaveBeenCalledWith({
-      passkeyWalletStatusMessage: PASSKEY_STOPPED_MESSAGE,
-      passkeyWalletStatusTone: '',
-    });
-  });
+  // Closed with its X on "creating passkey..." or "logging in..." by someone not yet signed in, so the store names
+  // no provider: the step stops, the navbar's LOG IN works again, a late answer signs no one in, and the dialog opens
+  // next with how to finish. The store and LOG IN are the app's own.
+  it.each([
+    ['create', 'handlePasskeyWalletCreate', 'createPasskeyWallet'],
+    ['sign-in', 'handlePasskeyWalletSignIn', 'unlockPasskeyWallet'],
+  ])(
+    'stops a passkey %s left on its spinner when the dialog closes, and gives LOG IN back',
+    async (mode, handler, call) => {
+      let answer!: (address: string) => void;
+      mockedPasskeyWallet[call].mockImplementationOnce(() => new Promise<string>((resolve) => (answer = resolve)));
+      const store = createStore(combineReducers({ sessionState: sessionStateReducer }), applyMiddleware(thunk));
+      render(
+        <Provider store={store}>
+          <LoginButton launchAccountModal={jest.fn()} />
+        </Provider>,
+      );
+      const logIn = screen.getByTestId('ce-account-login-button');
+      const props = buildProps({
+        provider: null,
+        updateLoginInfo: (payload: unknown) => store.dispatch(updateLoginInfo(payload) as any),
+      });
+      const subject = mountClassSubject(new LoginAndSettingsModalSubject(props));
+      let step!: Promise<boolean>;
+      act(() => {
+        step = subject[handler]();
+      });
+      expect(subject.state.passkeyMode).toBe(mode);
+      expect(logIn).toBeDisabled();
+      // As react-redux passes it after the dispatch.
+      subject.props = { ...props, loginInProgress: store.getState().sessionState.loginInProgress };
+      act(() => subject.componentWillUnmount());
+      expect(mockedPasskeyWallet.cancelPasskeyWalletOperation).toHaveBeenCalledTimes(1);
+      expect(logIn).toBeEnabled();
+      expect(logIn).toHaveTextContent('LOG IN');
+      answer(PASSKEY_ADDRESS);
+      await expect(step).resolves.toBe(false);
+      expect(props.changeAccount).not.toHaveBeenCalled();
+      expect(store.getState().sessionState).toMatchObject({ loginInProgress: false, loginComplete: false });
+      const reopened = new LoginAndSettingsModalSubject(buildProps());
+      const setState = jest.fn();
+      reopened.setState = setState;
+      await reopened.componentDidMount();
+      reopened.componentWillUnmount();
+      expect(setState).toHaveBeenCalledWith({
+        passkeyWalletStatusMessage: PASSKEY_STOPPED_MESSAGE,
+        passkeyWalletStatusTone: '',
+      });
+    },
+  );
 
   it('leaves another wallet’s sign-in running when the dialog closes', () => {
     const props = buildProps({ provider: 'wagmi', loginInProgress: true });

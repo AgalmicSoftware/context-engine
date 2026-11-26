@@ -675,8 +675,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   componentWillUnmount() {
     window.removeEventListener(CLIENT_AUTH_LOGOUT_EVENT, this.resetClientAuthState);
     this._isMounted = false;
-    // Closed on its spinner: the passkey action stops as on Cancel, so the next opening isn't left on the spinner.
-    if (this.props.loginInProgress && this.props.provider === 'passkey_eoa') {
+    // Closed on its spinner: the passkey action stops as on Cancel, so neither the next opening nor the navbar's LOG IN
+    // is left on the spinner. The dialog's own mode says a passkey step is under way: the store keeps no provider
+    // until someone is signed in.
+    if (this.props.loginInProgress && this.state.passkeyMode) {
       this._passkeyActions.cancelPasskeyWalletAction({ closing: true });
     }
     this._sponsoredReqId += 1;

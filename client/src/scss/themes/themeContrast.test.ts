@@ -341,7 +341,7 @@ describe('bundled app-theme contrast', () => {
   // "creating passkey..." or "logging in...", and its spinner, on the log-in dialog's surface while a passkey step
   // runs. White text and an overlay-coloured spinner were invisible there on Minimal's white dialog.
   test.each(registry.themes.map(({ id, layoutProfile }) => [id, layoutProfile]))(
-    '%s keeps the log-in progress text and spinner readable',
+    '%s keeps the log-in progress text, spinner and hint readable',
     (themeId, layoutProfile) => {
       const values = themeValues(css, themeId);
       const paint = painter(values);
@@ -355,6 +355,7 @@ describe('bundled app-theme contrast', () => {
       };
       expect(ratio('#loadingIconContainer h3')).toBeGreaterThanOrEqual(4.5);
       expect(ratio('#loadingIconContainer #verifyingTXloadingIcon')).toBeGreaterThanOrEqual(3);
+      expect(ratio('.passkeyProgressHint')).toBeGreaterThanOrEqual(4.5);
     },
   );
 

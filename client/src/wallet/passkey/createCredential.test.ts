@@ -32,6 +32,17 @@ describe('createPasskeyCredential', () => {
     delete (globalThis as any).PublicKeyCredential;
   });
 
+  it('hands the browser the signal that closes its prompt', async () => {
+    const credential = {
+      rawId: new Uint8Array([1, 2, 3]).buffer,
+      getClientExtensionResults: () => ({ prf: { enabled: true } }),
+    } as unknown as PublicKeyCredential;
+    const credentials: PasskeyCredentialClient = { create: jest.fn(async () => credential), get: jest.fn() };
+    const { signal } = new AbortController();
+    await createPasskeyCredential({ config, salt: new Uint8Array(32), credentials, signal });
+    expect(credentials.create).toHaveBeenCalledWith(expect.objectContaining({ signal }));
+  });
+
   it('advertises both WebAuthn default algorithms for platform compatibility', async () => {
     const credential = {
       rawId: new Uint8Array([1, 2, 3]).buffer,

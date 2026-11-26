@@ -346,6 +346,20 @@ h1 {
   }
 }
 
+// Under the spinner: what to do when the browser's passkey window does not show, then Cancel. It centres itself: the
+// app loads no Bootstrap utilities, so a `text-center` class does nothing.
+.passkeyProgressHint {
+  max-width: 32em;
+  margin: 0 auto;
+  color: var(--ce-panel-text-muted);
+  font-size: 0.95rem;
+  text-align: center;
+
+  p {
+    margin: 0 0 12px;
+  }
+}
+
 .copyButton {
   background: none;
   border: none;

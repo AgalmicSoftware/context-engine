@@ -45,12 +45,23 @@ const renderBody = (props: Partial<Props>) => {
   return renderAgentHandoffPanel;
 };
 
-it('gives the passkey spinner a way out', () => {
+// Before anyone is signed in the store names no provider: the dialog's own passkey step decides.
+it.each([
+  ['create', 'creating passkey...'],
+  ['sign-in', 'logging in...'],
+])('gives a passkey %s spinner a way out and says where to look, before anyone is signed in', (passkeyMode, label) => {
   const handlePasskeyWalletCancel = jest.fn();
-  renderBody({ loginInProgress: true, provider: 'passkey_eoa', passkeyMode: 'create', handlePasskeyWalletCancel });
+  renderBody({ loginInProgress: true, provider: '', passkeyMode, handlePasskeyWalletCancel } as Partial<Props>);
   // Its colour is `#loadingIconContainer h3`'s, which themeContrast.test.ts checks: an id or class could outrank it.
-  expect(screen.getByRole('heading', { name: 'creating passkey...' }).attributes).toHaveLength(0);
-  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(screen.getByRole('heading', { name: label }).attributes).toHaveLength(0);
+  const hint = screen.getByText('If no passkey window opens, look behind this window, or press Cancel to try again.');
+  // The block that centres the hint and Cancel, with the text colour themeContrast.test.ts checks.
+  expect(hint.parentElement).toHaveClass('passkeyProgressHint');
+  const cancel = screen.getByRole('button', { name: 'Cancel' });
+  // The Login button's colours, checked in every theme by themeContrast.test.ts.
+  expect(cancel).toHaveClass('passkeyButtonOutline');
+  expect(hint.parentElement).toContainElement(cancel);
+  fireEvent.click(cancel);
   expect(handlePasskeyWalletCancel).toHaveBeenCalledTimes(1);
 });
 
@@ -58,6 +69,7 @@ it('shows no Cancel on a wallet extension’s spinner', () => {
   renderBody({ loginInProgress: true, provider: 'wagmi' });
   expect(screen.getByText('logging in...')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
+  expect(screen.queryByText(/no passkey window/)).toBeNull();
 });
 
 it('offers Your AI agent only once someone is signed in', () => {

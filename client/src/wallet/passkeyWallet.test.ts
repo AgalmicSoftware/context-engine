@@ -603,6 +603,40 @@ describe('PasskeyEoaWalletClient', () => {
     await expect(client.unlockWallet({ selectCredential: true })).resolves.toBe(DERIVED_ADDRESS);
   });
 
+  // Cancel, or closing the dialog, on "creating passkey..." or "logging in...": the browser's prompt closes with it,
+  // so nothing is left open to make a passkey behind a closed dialog.
+  it.each([
+    ['a create', 'create' as const, (client: PasskeyEoaWalletClient) => client.createWallet()],
+    ['a login', 'get' as const, (client: PasskeyEoaWalletClient) => client.unlockWallet({ selectCredential: true })],
+  ])('closes the passkey prompt of %s when it is stopped', async (_, kind, start) => {
+    const credentials = makeCredentials();
+    const prompted = deferred<AbortSignal>();
+    (credentials[kind] as jest.Mock).mockImplementationOnce(
+      (options: unknown) =>
+        new Promise((resolve, reject) => {
+          const signal = (options as CredentialRequestOptions).signal as AbortSignal;
+          signal.addEventListener('abort', () => reject(new DOMException('Aborted.', 'AbortError')));
+          prompted.resolve(signal);
+        }),
+    );
+    const storage = createMemoryWalletStorage();
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage,
+      credentials,
+      sessionClient: makeSessionClient(),
+    });
+    const outcome = start(client).catch((error: unknown) => error);
+    const signal = await prompted.promise;
+    expect(signal.aborted).toBe(false);
+    client.cancelPendingOperation();
+    expect(signal.aborted).toBe(true);
+    expect(await outcome).toMatchObject({ code: 'CE_PASSKEY_WALLET_OPERATION_CANCELLED' });
+    expect(await storage.read()).toBeNull();
+    // The next prompt has a signal of its own.
+    await expect(client.unlockWallet({ selectCredential: true })).resolves.toBe(DERIVED_ADDRESS);
+  });
+
   // Every passkey already made must keep opening the same wallet: the salt asked of the passkey, the labels and
   // the derivation are pinned here, for the live site's RP ID. A change to any of these values loses accounts.
   it('pins the PRF salt, the PRF label and the wallet derived from a known PRF output', async () => {
