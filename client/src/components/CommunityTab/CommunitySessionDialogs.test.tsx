@@ -210,6 +210,33 @@ describe('CommunityQuestionsSession', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Reading questions…');
   });
 
+  it('starts a read when one becomes needed while the session is shown', () => {
+    // Drawn from a complete cache, which then starts reading again: the dialog reads too, with its limit.
+    const view = render(<CommunityQuestionsSession {...props} />);
+    const onOpen = jest.fn();
+    view.rerender(<CommunityQuestionsSession {...props} state="loading" onOpen={onOpen} />);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    const again = jest.fn();
+    view.rerender(<CommunityQuestionsSession {...props} state="loading" onOpen={again} />);
+    expect(again).not.toHaveBeenCalled();
+  });
+
+  it('counts the questions it lists once they are in hand, and the tile’s count until then', () => {
+    const listed = { ...props, session: session('alpha', 40) };
+    const view = render(<CommunityQuestionsSession {...listed} />);
+    expect(screen.getByRole('heading', { name: 'ALPHA: 2 questions' })).toBeInTheDocument();
+    view.rerender(<CommunityQuestionsSession {...listed} state="failed" />);
+    expect(screen.getByRole('heading', { name: 'ALPHA: 40 questions' })).toBeInTheDocument();
+  });
+
+  it('gives the chart one real link to the results, for a keyboard or a screen reader', () => {
+    render(<CommunityQuestionsSession {...props} points={[point('q1'), point('q2'), point('q3')]} />);
+    expect(screen.getByRole('link', { name: /Open this session’s results/ })).toHaveAttribute(
+      'href',
+      '/session/alpha#report',
+    );
+  });
+
   it('offers Try again where the read is slow or failed', () => {
     const onRetry = jest.fn();
     const view = render(<CommunityQuestionsSession {...props} state="slow" onRetry={onRetry} />);

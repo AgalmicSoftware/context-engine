@@ -2867,7 +2867,9 @@ export class CommunityTab extends Component<any, any> {
         // A Worker session never opened here has no identity: its groups are not read, nor counted.
         if (!scopeEntry.workerCanonicalIdentity) return;
         const status = scopeEntry.workerGroupsStatus;
-        if (status !== 'ready') {
+        // A failed re-read keeps the groups it last had, and the tile still counts them: so does the dialog.
+        const heldThroughError = status === 'error' && scopeEntry.workerGroups.length > 0;
+        if (status !== 'ready' && !heldThroughError) {
           const state = status === 'unavailable' ? 'private' : status === 'error' ? 'unread' : 'loading';
           sessions.push({ slug, name, count: 0, state });
           return;

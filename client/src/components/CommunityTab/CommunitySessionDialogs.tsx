@@ -274,7 +274,9 @@ export const CommunityQuestionsSession = ({
   const [plotRef, plotWidth] = useBoxWidth();
   const opened = useRef(onOpen);
   opened.current = onOpen;
-  useEffect(() => opened.current?.(), [session.slug]);
+  // Also when a read becomes needed while the session is shown: the cache it was drawn from can start reading again.
+  const wantsRead = !!onOpen;
+  useEffect(() => opened.current?.(), [session.slug, wantsRead]);
   // Until a view is picked, the default follows what has been read.
   const view = picked || (points.length >= CHART_FIRST_MIN_QUESTIONS ? 'chart' : 'list');
 
@@ -338,6 +340,10 @@ export const CommunityQuestionsSession = ({
               onClick={onOpenResults}
             />
             <p className={styles.dialogNote}>Click a dot to open its results.</p>
+            {/* The dots are no links to a keyboard or a screen reader, and all lead here. */}
+            <a className={styles.dialogMore} href={href}>
+              Open this session’s results <FontAwesomeIcon icon={faArrowRight} />
+            </a>
           </div>
         ) : (
           <ul className={styles.sessionList}>
@@ -358,7 +364,8 @@ export const CommunityQuestionsSession = ({
   return (
     <>
       <h6 className={styles.dialogHeading}>
-        {session.name}: {countOf(session.count, 'question')}
+        {/* Once its questions are in hand, the heading counts what the list shows. */}
+        {session.name}: {countOf(state === 'ready' ? questions.length : session.count, 'question')}
       </h6>
       {body}
     </>

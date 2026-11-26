@@ -2069,6 +2069,28 @@ describe('CommunityTab helpers', () => {
       }
     });
 
+    it('totals the questions as the Questions tile counts them', () => {
+      const instance = new CommunityTab({});
+      const chain = [
+        chainEntry('alpha', {
+          shared: { prompt: 'Asked in both', type: 'binary' },
+          own: { prompt: 'Alpha only', type: 'rating' },
+        }),
+        chainEntry('beta', { shared: { prompt: 'Asked in both', type: 'binary' } }),
+      ];
+      const entries = [
+        ...chain,
+        workerEntry(instance, 'wk', { questions: 4 }),
+        workerEntry(instance, 'w2', { questions: 7 }),
+      ];
+      renderQuestions(instance, entries);
+
+      // As the tile adds them up: chain sessions from their caches, Worker sessions from their listings.
+      const tile = instance._getQuestionDetailsRows(chain).length + instance._workerListingTotals(entries).questions;
+      const shown = screen.getByTestId('ce-community-questions-dialog').textContent.match(/sessions, (\d+) questions?/);
+      expect(Number(shown?.[1])).toBe(tile);
+    });
+
     it('leaves hidden questions out of the count and the list, as the session page does', () => {
       const instance = new CommunityTab({});
       const entry = chainEntry(
@@ -2403,6 +2425,48 @@ describe('CommunityTab helpers', () => {
         expect.stringMatching(/^slow-wk session.*counting/),
       ]);
       expect(dialog).not.toHaveTextContent('never-opened');
+    });
+
+    it('lists the groups a failed re-read kept, as the tile still counts them', () => {
+      renderGroupsDialog([
+        chainEntry('alpha', { '0xa1': sbt('0xa1', { name: 'Open badge', mintingEndTime: 0 }) }, 'Alpha session'),
+        workerEntry('dead-wk', 'error', [{ groupId: 'g1', label: 'Kept group', open: false }]),
+      ]);
+      expect(screen.getByTestId('ce-community-groups-dialog')).toHaveTextContent('2 sessions, 2 groups');
+      fireEvent.click(screen.getByRole('button', { name: /^dead-wk/ }));
+
+      const opened = screen.getByTestId('ce-community-groups-dialog-session');
+      expect(within(opened).getByRole('heading')).toHaveTextContent('dead-wk session: 1 group');
+      expect(within(opened).getAllByRole('link')[0]).toHaveTextContent('Kept groupClosed');
+    });
+
+    it('totals the groups as the Groups tile counts them', () => {
+      const shared = sbt('0xA1', { name: 'Open badge', mintingEndTime: 0 });
+      const views = [
+        [
+          chainEntry('alpha', { '0xa1': shared, '0xa3': sbt('0xa3', { name: 'Hidden badge', hidden: true }) }),
+          chainEntry('beta', { '0xa1': shared, '0xb1': sbt('0xb1', { name: 'Beta badge' }) }),
+          workerEntry('wk', 'ready', [
+            { groupId: 'g1', label: 'Breakout', open: true },
+            { groupId: 'g2', label: 'Plenary', open: false },
+          ]),
+          workerEntry('dead-wk', 'error', [{ groupId: 'g1', label: 'Kept group', open: true }]),
+          workerEntry('private-wk', 'unavailable'),
+          workerEntry('slow-wk', 'loading'),
+          workerEntry('never-opened', 'idle', [], null),
+        ],
+        [workerEntry('wk', 'ready', [{ groupId: 'g1', label: 'Breakout', open: true }]), workerEntry('w2', 'error')],
+        [chainEntry('alpha', { '0xa1': shared }), chainEntry('beta', { '0xa1': shared })],
+      ];
+      views.forEach((entries) => {
+        const instance = new CommunityTab({});
+        instance._iterScopeCaches = jest.fn(() => entries);
+        const view = render(instance.renderGroupsDialog());
+        const tile = instance._computeStatsSnapshot(entries).sbtsCreatedCount;
+        const shown = screen.getByTestId('ce-community-groups-dialog').textContent.match(/sessions, (\d+) groups?/);
+        expect(Number(shown?.[1])).toBe(tile);
+        view.unmount();
+      });
     });
 
     it('opens an on-chain session to its groups, open or closed, each linking to its page', () => {
