@@ -45,11 +45,31 @@ const renderBody = (props: Partial<Props>) => {
   return renderAgentHandoffPanel;
 };
 
-it('gives the passkey spinner a way out', () => {
+// Before anyone is signed in the store names no provider: the dialog's own passkey step decides.
+it.each([
+  ['create', 'creating passkey...'],
+  ['sign-in', 'logging in...'],
+])('gives a passkey %s spinner a way out and says where to look, before anyone is signed in', (passkeyMode, label) => {
   const handlePasskeyWalletCancel = jest.fn();
-  renderBody({ loginInProgress: true, provider: 'passkey_eoa', passkeyMode: 'create', handlePasskeyWalletCancel });
+  renderBody({ loginInProgress: true, provider: '', passkeyMode, handlePasskeyWalletCancel } as Partial<Props>);
   // Its colour is `#loadingIconContainer h3`'s, which themeContrast.test.ts checks: an id or class could outrank it.
-  expect(screen.getByRole('heading', { name: 'creating passkey...' }).attributes).toHaveLength(0);
+  expect(screen.getByRole('heading', { name: label }).attributes).toHaveLength(0);
+  const hint = screen.getByText('If no passkey window opens, look behind this window, or press Cancel to try again.');
+  // The block that centres the hint and Cancel, with the text colour themeContrast.test.ts checks.
+  expect(hint.parentElement).toHaveClass('passkeyProgressHint');
+  const cancel = screen.getByRole('button', { name: 'Cancel' });
+  // The Login button's colours, checked in every theme by themeContrast.test.ts.
+  expect(cancel).toHaveClass('passkeyButtonOutline');
+  expect(hint.parentElement).toContainElement(cancel);
+  fireEvent.click(cancel);
+  expect(handlePasskeyWalletCancel).toHaveBeenCalledTimes(1);
+});
+
+it('gives a login file’s sign-in a way out, and no word of a passkey window', () => {
+  const handlePasskeyWalletCancel = jest.fn();
+  renderBody({ loginInProgress: true, provider: '', passkeyMode: 'file', handlePasskeyWalletCancel } as Partial<Props>);
+  expect(screen.getByRole('heading', { name: 'logging in...' })).toBeInTheDocument();
+  expect(screen.queryByText(/no passkey window/)).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(handlePasskeyWalletCancel).toHaveBeenCalledTimes(1);
 });
@@ -58,6 +78,7 @@ it('shows no Cancel on a wallet extension’s spinner', () => {
   renderBody({ loginInProgress: true, provider: 'wagmi' });
   expect(screen.getByText('logging in...')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
+  expect(screen.queryByText(/no passkey window/)).toBeNull();
 });
 
 it('offers Your AI agent only once someone is signed in', () => {
@@ -133,7 +154,7 @@ describe('Copy my answers after a failed sign-in', () => {
     // After the login file's line and an "or", its button leads its sentence.
     expect(line.querySelector('button')).toBe(button);
     expect(screen.getByTestId('ce-passkey-login-file')).toHaveTextContent(
-      /^Create login file or Login with file ?to login without a passkeyAdd a password/,
+      /^Create login file or Login with file ?to login without a passkey$/,
     );
     expect(line).toHaveTextContent(
       /^orCopy this link and open it on another device to recover and submit responses\.(?: |$)/,
@@ -234,7 +255,7 @@ describe('Copy my answers after a failed sign-in', () => {
     renderBody({ passkeyWalletStatusMessage: closed, passkeyWalletStatusTone: 'error' });
     const status = screen.getByTestId('ce-passkey-wallet-status');
     expect(status).toHaveTextContent(
-      /^Login failed: Passkey prompt closed or timed out\. Try again\.Create login file or Login with file ?to login without a passkey\.Add a password/,
+      /^Login failed: Passkey prompt closed or timed out\. Try again\.Create login file or Login with file ?to login without a passkey\.$/,
     );
     expect(screen.queryByRole('button', { name: 'Scan QR with phone' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Other options' })).not.toBeInTheDocument();
@@ -249,7 +270,7 @@ describe('Copy my answers after a failed sign-in', () => {
       within(screen.getByTestId('ce-passkey-wallet-status'))
         .getAllByRole('button')
         .map((button) => button.textContent?.trim() || button.getAttribute('aria-label')),
-    ).toEqual(['Copy link', 'Create login file', 'Login with file', "About a login file's password"]);
+    ).toEqual(['Copy link', 'Create login file', 'Login file options', 'Login with file']);
   });
 
   it('shows "Other options" where no sign-in failed, and for a status that is not a failed sign-in', () => {

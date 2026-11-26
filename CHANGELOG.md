@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.46] - 2026-11-26
+
+A sign-in can always be stopped: closing the dialog, Cancel or signing out ends a passkey step and closes the browser's prompt, so LOG IN no longer stays stuck. The login file's password option moves behind a caret. Only the site changes: no Worker update and no MCP change.
+
+### Site — available when the site deploys
+
+- **Closing the dialog stops a sign-in.** Someone not yet signed in who closed the log-in dialog while "creating passkey..." or "logging in..." showed was left with LOG IN disabled and spinning until a reload. Closing the dialog, Cancel and signing out now end the step and close the browser's passkey prompt, and an answer that comes back afterwards signs nobody in. Cancel now shows for everyone, under "If no passkey window opens, look behind this window, or press Cancel to try again."; opening a login file shows Cancel without that line. Reopened after a stop, the dialog says "Stopped. If you just made a passkey, choose Login and pick it."
+- **The login file's password sits behind a caret.** "Create login file" makes a file at once, with no password, as before; the caret beside it opens "Add a password". While that box is ticked it stays open and the button shows a lock, so no file is made with or without a password unawares.
+- **Deploy helper.** It still deploys the 0.9.44 Worker bundles; the Worker code has not changed since. A Worker updated from the site gets this release's.
+
+### Local tooling
+
+- **The main chunk's cap is 526,000 bytes.** The log-in dialog's new classes put the main chunk (AppShell) at 525,019 bytes, 19 over its 525,000-byte cap; the cap is raised, as `docs/bundle-budget.md` states.
+
+### Documentation
+
+- **The passkey guide** says that "Add a password" is now behind the caret on "Create login file".
+
 ## [0.9.45] - 2026-11-26
 
 Sign-in shows its progress in every theme, and where a device's passkeys cannot be used it offers the login file instead of making the passkey on a phone. Only the site changes: no Worker update and no MCP change.

@@ -31,7 +31,8 @@ export type LoginPasskeyNetwork = Record<string, unknown> & {
   name?: unknown;
 };
 
-export type PasskeyWalletActionMode = '' | 'create' | 'sign-in';
+// 'file' is a login file's sign-in: a step like a passkey Login, with no passkey window to look for.
+export type PasskeyWalletActionMode = '' | 'create' | 'sign-in' | 'file';
 
 export type LoginPasskeyWalletPort = {
   cancelPasskeyWalletOperation?: () => void;
@@ -211,7 +212,7 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
     handleLoginFileSignIn: (text: string, password?: string) =>
       runPasskeyWalletAction({
         action: () => deps.passkeyWallet.signInWithLoginFile(text, password),
-        mode: 'sign-in',
+        mode: 'file',
       }),
     syncPasskeyWalletChain,
   };

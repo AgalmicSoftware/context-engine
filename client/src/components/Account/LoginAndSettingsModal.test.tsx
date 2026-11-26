@@ -7,8 +7,15 @@ import {
 } from '../../utilities/session/agentClientLogin';
 import { cacheAgentClientLoginEnvelope } from '../OnePageSession/onePageSessionAgentController';
 import { ethers } from 'ethers';
+import { useEffect } from 'react';
+import { Provider, useDispatch, useSelector } from 'react-redux';
+import { applyMiddleware, combineReducers, createStore } from 'redux';
+import thunk from 'redux-thunk';
 import { LoginAndSettingsModal } from './LoginAndSettingsModal';
+import LoginButton from './LoginButton';
 import { PASSKEY_STOPPED_MESSAGE } from './loginAndSettingsPasskeyActions';
+import sessionStateReducer from '../../reducers/sessionStateReducer';
+import { toggleLoginModal, updateLoginInfo } from '../../actions/sessionStateActions';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
@@ -258,24 +265,135 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(setStateSpy).not.toHaveBeenCalled();
   });
 
-  it('stops a passkey action left on its spinner when the dialog closes, and opens next with how to finish', async () => {
-    const props = buildProps({ provider: 'passkey_eoa', loginInProgress: true });
-    mountClassSubject(new LoginAndSettingsModalSubject(props)).componentWillUnmount();
-    expect(mockedPasskeyWallet.cancelPasskeyWalletOperation).toHaveBeenCalledTimes(1);
-    expect(props.updateLoginInfo).toHaveBeenLastCalledWith({
-      loginInProgress: false,
-      loginComplete: false,
+  // Closed with its X on "creating passkey..." or "logging in..." by someone not yet signed in, so the store names
+  // no provider: the step stops, the navbar's LOG IN works again, a late answer signs no one in, and the dialog opens
+  // next with how to finish. The store and LOG IN are the app's own.
+  it.each([
+    ['create', 'handlePasskeyWalletCreate', 'createPasskeyWallet'],
+    ['sign-in', 'handlePasskeyWalletSignIn', 'unlockPasskeyWallet'],
+  ])(
+    'stops a passkey %s left on its spinner when the dialog closes, and gives LOG IN back',
+    async (mode, handler, call) => {
+      let answer!: (address: string) => void;
+      mockedPasskeyWallet[call].mockImplementationOnce(() => new Promise<string>((resolve) => (answer = resolve)));
+      const store = createStore(combineReducers({ sessionState: sessionStateReducer }), applyMiddleware(thunk));
+      render(
+        <Provider store={store}>
+          <LoginButton launchAccountModal={jest.fn()} />
+        </Provider>,
+      );
+      const logIn = screen.getByTestId('ce-account-login-button');
+      const props = buildProps({
+        provider: null,
+        updateLoginInfo: (payload: unknown) => store.dispatch(updateLoginInfo(payload) as any),
+      });
+      const subject = mountClassSubject(new LoginAndSettingsModalSubject(props));
+      let step!: Promise<boolean>;
+      act(() => {
+        step = subject[handler]();
+      });
+      expect(subject.state.passkeyMode).toBe(mode);
+      expect(logIn).toBeDisabled();
+      // As react-redux passes it after the dispatch.
+      subject.props = { ...props, loginInProgress: store.getState().sessionState.loginInProgress };
+      act(() => subject.componentWillUnmount());
+      expect(mockedPasskeyWallet.cancelPasskeyWalletOperation).toHaveBeenCalledTimes(1);
+      expect(logIn).toBeEnabled();
+      expect(logIn).toHaveTextContent('LOG IN');
+      answer(PASSKEY_ADDRESS);
+      await expect(step).resolves.toBe(false);
+      expect(props.changeAccount).not.toHaveBeenCalled();
+      expect(store.getState().sessionState).toMatchObject({ loginInProgress: false, loginComplete: false });
+      const reopened = new LoginAndSettingsModalSubject(buildProps());
+      const setState = jest.fn();
+      reopened.setState = setState;
+      await reopened.componentDidMount();
+      reopened.componentWillUnmount();
+      expect(setState).toHaveBeenCalledWith({
+        passkeyWalletStatusMessage: PASSKEY_STOPPED_MESSAGE,
+        passkeyWalletStatusTone: '',
+      });
+    },
+  );
+
+  // The interview panel closes the dialog from an effect once the person is signed in (SessionInterviewPanel.tsx),
+  // and the navbar renders it only while the store says it is open, with the store's sign-in flags. So the dialog has
+  // the finished step before it goes: closing it then must neither stop the wallet nor undo the sign-in.
+  it('keeps a passkey sign-in whose dialog is closed as soon as it ends', async () => {
+    let answer!: (address: string) => void;
+    mockedPasskeyWallet.unlockPasskeyWallet.mockImplementationOnce(
+      () => new Promise<string>((resolve) => (answer = resolve)),
+    );
+    const store = createStore(combineReducers({ sessionState: sessionStateReducer }), applyMiddleware(thunk));
+    store.dispatch(toggleLoginModal(true) as any);
+    const props = buildProps({
       provider: null,
+      updateLoginInfo: (payload: unknown) => store.dispatch(updateLoginInfo(payload) as any),
     });
-    const reopened = new LoginAndSettingsModalSubject(buildProps());
-    const setState = jest.fn();
-    reopened.setState = setState;
-    await reopened.componentDidMount();
-    reopened.componentWillUnmount();
-    expect(setState).toHaveBeenCalledWith({
-      passkeyWalletStatusMessage: PASSKEY_STOPPED_MESSAGE,
-      passkeyWalletStatusTone: '',
+    // The dialog's own mounting, props, state and unmounting, without its markup, whose other parts need the app's
+    // session data.
+    const DialogWithoutMarkup: any = class extends LoginAndSettingsModalSubject {
+      render() {
+        return null;
+      }
+    };
+    let dialog: any = null;
+    const DialogWhileOpen = () => {
+      const { loginModalToggled, loginInProgress, loginComplete } = useSelector((state: any) => state.sessionState);
+      const dispatch = useDispatch();
+      useEffect(() => {
+        if (loginComplete && loginModalToggled) dispatch(toggleLoginModal(false) as any);
+      }, [dispatch, loginComplete, loginModalToggled]);
+      return loginModalToggled ? (
+        <DialogWithoutMarkup
+          {...props}
+          loginModalToggled
+          loginInProgress={loginInProgress}
+          loginComplete={loginComplete}
+          ref={(instance: unknown) => {
+            if (instance) dialog = instance;
+          }}
+        />
+      ) : null;
+    };
+    render(
+      <Provider store={store}>
+        <DialogWhileOpen />
+      </Provider>,
+    );
+    let step!: Promise<boolean>;
+    act(() => {
+      step = dialog.handlePasskeyWalletSignIn();
     });
+    expect(store.getState().sessionState.loginInProgress).toBe(true);
+    await act(async () => {
+      answer(PASSKEY_ADDRESS);
+      await step;
+    });
+    await expect(step).resolves.toBe(true);
+    expect(dialog._isMounted).toBe(false);
+    expect(mockedPasskeyWallet.cancelPasskeyWalletOperation).not.toHaveBeenCalled();
+    expect(store.getState().sessionState).toMatchObject({
+      loginModalToggled: false,
+      loginInProgress: false,
+      loginComplete: true,
+    });
+    expect(props.changeAccount).toHaveBeenCalledWith(expect.objectContaining({ account: PASSKEY_ADDRESS }));
+  });
+
+  // Signed out while a passkey step waits, then another kind of sign-in in the same open dialog: that one is not
+  // a passkey step, so closing the dialog on its spinner leaves it running.
+  it('forgets a passkey step at sign-out, so a later wallet sign-in is not stopped by closing the dialog', () => {
+    mockedPasskeyWallet.unlockPasskeyWallet.mockImplementationOnce(() => new Promise(() => {}));
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({ provider: null })));
+    void subject.handlePasskeyWalletSignIn();
+    expect(subject.state.passkeyMode).toBe('sign-in');
+    subject._lastAuthResetGeneration = -1;
+    subject.resetClientAuthState();
+    expect(subject.state.passkeyMode).toBe('');
+    subject.props = { ...subject.props, provider: 'wagmi', loginInProgress: true };
+    subject.componentWillUnmount();
+    expect(mockedPasskeyWallet.cancelPasskeyWalletOperation).not.toHaveBeenCalled();
   });
 
   it('leaves another wallet’s sign-in running when the dialog closes', () => {
@@ -994,7 +1112,11 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(screen.getByRole('button', { name: 'Other options' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Login with file' })).not.toBeInTheDocument();
 
-    await subject.handleLoginFileSignIn('the file text');
+    const signingIn = subject.handleLoginFileSignIn('the file text');
+    // Its own step: the spinner then speaks of no passkey window.
+    expect(subject.state.passkeyMode).toBe('file');
+    await signingIn;
+    expect(subject.state.passkeyMode).toBe('');
     expect(mockedPasskeyWallet.signInWithLoginFile).toHaveBeenLastCalledWith('the file text', undefined);
     expect(subject.props.changeAccount).toHaveBeenCalledWith(
       expect.objectContaining({ account: '0x2222222222222222222222222222222222222222', provider: 'passkey_eoa' }),
@@ -1233,13 +1355,14 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
           .map((button) => button.textContent?.trim() || button.getAttribute('aria-label')),
       ).toEqual([
         'Create login file',
+        'Login file options',
         'Login with file',
-        "About a login file's password",
         'Copy this link',
         'About copying your answers',
       ]);
+      // "Add a password" waits behind Create's caret.
       expect(screen.getByTestId('ce-passkey-login-file')).toHaveTextContent(
-        /^Create login file or Login with file ?to login without a passkeyAdd a password/,
+        /^Create login file or Login with file ?to login without a passkey$/,
       );
       expect(screen.getByTestId('ce-passkey-copy-answers')).toHaveTextContent(
         /^orCopy this link and open it on another device to recover and submit responses\./,
@@ -1289,7 +1412,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     await subject.handlePasskeyWalletCreate();
     render(subject.getModalDisplay());
     expect(screen.getByTestId('ce-passkey-login-file')).toHaveTextContent(
-      /^Create login file or Login with file ?to login without a passkey\.Add a password/,
+      /^Create login file or Login with file ?to login without a passkey\.$/,
     );
     expect(screen.queryByRole('button', { name: 'Copy this link' })).not.toBeInTheDocument();
   });

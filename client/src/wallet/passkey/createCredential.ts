@@ -30,11 +30,14 @@ export const createPasskeyCredential = async ({
   salt,
   credentials = credentialClient(),
   excludeCredentialIds = [],
+  signal,
 }: {
   config: PasskeyWalletConfig;
   salt: Uint8Array;
   credentials?: PasskeyCredentialClient;
   excludeCredentialIds?: string[];
+  /** Aborting it closes the browser's passkey prompt. */
+  signal?: AbortSignal;
 }): Promise<PublicKeyCredential> => {
   if (typeof PublicKeyCredential === 'undefined') {
     throw new PasskeysUnavailableError();
@@ -72,6 +75,7 @@ export const createPasskeyCredential = async ({
         attestation: 'none',
         extensions: buildPrfExtension(salt),
       },
+      ...(signal ? { signal } : {}),
     } as CredentialCreationOptions)) as PublicKeyCredential | null;
   } catch (error) {
     if (excludeCredentials.length && isInvalidStateError(error)) {

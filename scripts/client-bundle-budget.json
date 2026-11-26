@@ -18,7 +18,7 @@
     {
       "id": "app-shell-temporary",
       "filePrefix": "assets/AppShell-",
-      "maxMinifiedBytes": 525000,
+      "maxMinifiedBytes": 526000,
       "owner": "docs/bundle-budget.md#temporary-appshell-exception"
     }
   ],

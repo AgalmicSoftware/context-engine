@@ -28,6 +28,19 @@ describe('authenticatePasskeyCredential with the browser’s passkeys', () => {
     expect(get).toHaveBeenCalledTimes(1);
   });
 
+  it('hands the browser the signal that closes its prompt, and stops waiting for the page once it is aborted', async () => {
+    jest.spyOn(document, 'hasFocus').mockReturnValue(false);
+    const controller = new AbortController();
+    const result = authenticatePasskeyCredential({ config, salt: new Uint8Array(32), signal: controller.signal });
+    await Promise.resolve();
+    expect(get).not.toHaveBeenCalled();
+    controller.abort();
+    await result;
+    // A browser refuses a request whose signal is aborted at once, so no prompt opens.
+    const [[request]] = get.mock.calls as unknown as Array<[CredentialRequestOptions]>;
+    expect(request.signal).toBe(controller.signal);
+  });
+
   it('asks at once when the page is already in front', async () => {
     jest.spyOn(document, 'hasFocus').mockReturnValue(true);
     await authenticatePasskeyCredential({ config, salt: new Uint8Array(32) });
