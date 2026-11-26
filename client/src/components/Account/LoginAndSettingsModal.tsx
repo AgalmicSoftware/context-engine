@@ -935,12 +935,15 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     this._passkeyWalletActionId += 1;
     this._passkeyWalletRestoreReqId += 1;
     this._purposefulPasskeyActionId = null;
+    // The passkey step's mode goes too: a later sign-in of another kind would otherwise show its hint and Cancel,
+    // and closing the dialog on that sign-in's spinner would stop it.
     this.setStateIfMounted({
       agentTokenInput: '',
       agentTokenStatus: '',
       agentTokenError: '',
       loginFileProtected: null,
       loginFileSavedName: '',
+      passkeyMode: '',
     });
     this.props.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
     this.props.changeAccount({});

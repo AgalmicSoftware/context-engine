@@ -315,6 +315,21 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     },
   );
 
+  // Signed out while a passkey step waits, then another kind of sign-in in the same open dialog: that one is not
+  // a passkey step, so closing the dialog on its spinner leaves it running.
+  it('forgets a passkey step at sign-out, so a later wallet sign-in is not stopped by closing the dialog', () => {
+    mockedPasskeyWallet.unlockPasskeyWallet.mockImplementationOnce(() => new Promise(() => {}));
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps({ provider: null })));
+    void subject.handlePasskeyWalletSignIn();
+    expect(subject.state.passkeyMode).toBe('sign-in');
+    subject._lastAuthResetGeneration = -1;
+    subject.resetClientAuthState();
+    expect(subject.state.passkeyMode).toBe('');
+    subject.props = { ...subject.props, provider: 'wagmi', loginInProgress: true };
+    subject.componentWillUnmount();
+    expect(mockedPasskeyWallet.cancelPasskeyWalletOperation).not.toHaveBeenCalled();
+  });
+
   it('leaves another wallet’s sign-in running when the dialog closes', () => {
     const props = buildProps({ provider: 'wagmi', loginInProgress: true });
     mountClassSubject(new LoginAndSettingsModalSubject(props)).componentWillUnmount();
