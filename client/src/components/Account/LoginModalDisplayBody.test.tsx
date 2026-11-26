@@ -49,7 +49,8 @@ const renderBody = (props: Partial<Props>) => {
 it('gives the passkey spinner a way out', () => {
   const handlePasskeyWalletCancel = jest.fn();
   renderBody({ loginInProgress: true, provider: 'passkey_eoa', passkeyMode: 'create', handlePasskeyWalletCancel });
-  expect(screen.getByText('creating passkey...')).toBeInTheDocument();
+  // Its colour is `#loadingIconContainer h3`'s, which themeContrast.test.ts checks: an id or class could outrank it.
+  expect(screen.getByRole('heading', { name: 'creating passkey...' }).attributes).toHaveLength(0);
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(handlePasskeyWalletCancel).toHaveBeenCalledTimes(1);
 });

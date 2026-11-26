@@ -473,7 +473,7 @@ const LoginModalDisplayBody = ({
     return (
       <CardBody>
         <div id={styles.loadingIconContainer}>
-          <h3 id={styles.verifyingText}>{progressLabel}</h3>
+          <h3>{progressLabel}</h3>
           <FontAwesomeIcon icon={faSpinner} pulse id={styles.verifyingTXloadingIcon} />
         </div>
         {/* A passkey step can wait with nothing on screen (its prompt hidden, or the page waiting for focus). */}
