@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.47] - 2026-11-26
+
+On the Stats page, the Groups and Questions dialogs list the sessions in view, and each session opens to its own groups or questions; a session's agree/disagree answers can be seen as a chart. Only the site changes: no Worker update and no MCP change.
+
+### Site — available when the site deploys
+
+- **The Groups dialog lists sessions.** It lists the sessions the Groups tile counts, each with its number of groups, most first; its total is the tile's. A session opens to its groups, each marked "Open to join" or "Closed" and linking to its own page, with "See all of this session's groups" below; "All sessions" goes back to the list. Chain and Worker groups look the same. The dialog no longer shows the whole group list, which could stay on "Loading…" and split the groups into featured, live and expired, with a settings button.
+- **The Questions dialog lists sessions.** The table of every question gives way to the same list of sessions, each with its number of questions; its total is the tile's. A session opens to its questions counted by kind, such as "6 agree/disagree, 1 rating, 1 written", shown as a Chart or a List. The chart, of the agree/disagree questions with answers that can be read, comes first when there are at least three; a choice of view stays while more answers arrive. A dot, a row and "Open this session's results" go to the session's results. Questions hidden in the session's settings are left out. With one session in view, either dialog opens straight to it.
+- **A session's questions are read signed out.** A Worker session whose questions this browser has not read before is read when it is opened, signed out: "Reading questions…", then after 10 seconds "This is taking too long." with Try again; a refused read says "This session's questions can't be read here." with Try again. No wallet or passkey window opens and no sign-in is stored. Answers are read only where the session shows every answer to everyone; elsewhere the List shows, with "Answers to this session are not public." A listed Worker session this browser has never opened says "This session's questions can be read here once it has been opened." with "Open the session".
+- **Deploy helper.** It deploys the 0.9.46 Worker bundles; the Worker code has not changed since 0.9.44 but for its release string. A Worker updated from the site gets this release's.
+
+### Local tooling
+
+- **The theme smokes open a session in each Stats dialog.** `scripts/app-theme-runtime-smoke.js` and `scripts/civic-theme-smoke.mjs` check the question list in place of the old table, and wait for the Groups dialog's session list.
+- **Test ids.** In `client/src/utilities/e2eTestIds.json`, `ce-community-questions-table` is now `ce-community-questions-dialog`, and `ce-community-groups-dialog` is new; each takes the suffix `-session` once a session is opened.
+
 ## [0.9.46] - 2026-11-26
 
 A sign-in can always be stopped: closing the dialog, Cancel or signing out ends a passkey step and closes the browser's prompt, so LOG IN no longer stays stuck. The login file's password option moves behind a caret. Only the site changes: no Worker update and no MCP change.
