@@ -1,10 +1,13 @@
 import React from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import {
   CommunityGroupsSession,
+  CommunityQuestionsSession,
   CommunitySessionDialog,
   countOf,
   dialogSessionList,
+  questionKind,
+  questionKindSummary,
   type CommunityDialogSession,
 } from './CommunitySessionDialogs';
 
@@ -133,4 +136,123 @@ describe('CommunityGroupsSession', () => {
 it('counts in the singular and plural', () => {
   expect(countOf(1, 'group')).toBe('1 group');
   expect(countOf(0, 'group')).toBe('0 groups');
+});
+
+describe('question kinds', () => {
+  it('names each stored type as the dialog does', () => {
+    expect(
+      [
+        'binary',
+        'multichoice',
+        'multiple-choice',
+        'poll',
+        'rating',
+        'freeform',
+        'text',
+        'quadratic',
+        'ranking',
+        '',
+      ].map(questionKind),
+    ).toEqual([
+      'agree/disagree',
+      'choice',
+      'choice',
+      'choice',
+      'rating',
+      'written',
+      'written',
+      'quadratic',
+      'other',
+      'other',
+    ]);
+  });
+
+  it('sums the kinds present in a fixed order', () => {
+    const question = (type: string, key: string) => ({ key, prompt: key, type });
+    expect(
+      questionKindSummary([
+        question('freeform', 'a'),
+        question('binary', 'b'),
+        question('mystery', 'c'),
+        question('binary', 'd'),
+        question('multichoice', 'e'),
+      ]),
+    ).toBe('2 agree/disagree, 1 choice, 1 written, 1 other');
+  });
+});
+
+describe('CommunityQuestionsSession', () => {
+  const props = {
+    session: session('alpha', 2),
+    questions: [
+      { key: 'q1', prompt: 'First', type: 'binary' },
+      { key: 'q2', prompt: 'Second', type: 'rating' },
+    ],
+    points: [],
+    href: '/session/alpha#report',
+    state: 'ready' as const,
+    onOpenResults: jest.fn(),
+  };
+  const point = (questionId: string) => ({
+    questionId,
+    label: questionId,
+    total: 2,
+    agrees: 1,
+    disagrees: 1,
+    value: 1,
+  });
+
+  it('asks for what it lacks once it is shown, not on every render', () => {
+    const onOpen = jest.fn();
+    const view = render(<CommunityQuestionsSession {...props} state="loading" onOpen={onOpen} />);
+    view.rerender(<CommunityQuestionsSession {...props} state="loading" onOpen={jest.fn()} />);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('status')).toHaveTextContent('Reading questions…');
+  });
+
+  it('offers Try again where the read is slow or failed', () => {
+    const onRetry = jest.fn();
+    const view = render(<CommunityQuestionsSession {...props} state="slow" onRetry={onRetry} />);
+    expect(screen.getByRole('status')).toHaveTextContent('This is taking too long.');
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    view.rerender(<CommunityQuestionsSession {...props} state="failed" onRetry={onRetry} />);
+    expect(screen.getByRole('status')).toHaveTextContent('This session’s questions can’t be read here.');
+  });
+
+  it('keeps the view picked as more answers arrive', () => {
+    const view = render(<CommunityQuestionsSession {...props} points={[point('q1')]} />);
+    expect(screen.getByRole('button', { name: 'List' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Chart' }));
+    view.rerender(<CommunityQuestionsSession {...props} points={[point('q1'), point('q2'), point('q3')]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'List' }));
+    view.rerender(
+      <CommunityQuestionsSession {...props} points={[point('q1'), point('q2'), point('q3'), point('q4')]} />,
+    );
+    expect(screen.getByRole('button', { name: 'List' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('draws the chart at the width its box is given, so a phone needs no sideways scroll', () => {
+    let report: (entries: { contentRect: { width: number } }[]) => void = () => {};
+    const disconnect = jest.fn();
+    class MeasuringObserver {
+      constructor(callback: typeof report) {
+        report = callback;
+      }
+      observe() {}
+      disconnect = disconnect;
+    }
+    const scope = window as unknown as { ResizeObserver?: unknown };
+    const original = scope.ResizeObserver;
+    scope.ResizeObserver = MeasuringObserver;
+    try {
+      render(<CommunityQuestionsSession {...props} points={[point('q1'), point('q2'), point('q3')]} />);
+      act(() => report([{ contentRect: { width: 305.6 } }]));
+      expect(screen.getByRole('img', { name: 'Question beeswarm plot' })).toHaveAttribute('viewBox', '0 0 305 200');
+      fireEvent.click(screen.getByRole('button', { name: 'List' }));
+      expect(disconnect).toHaveBeenCalled();
+    } finally {
+      scope.ResizeObserver = original;
+    }
+  });
 });

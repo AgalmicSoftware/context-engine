@@ -1,7 +1,8 @@
 /** @file CommunitySessionDialogs.tsx: the Stats Groups and Questions dialogs, a list of sessions that opens one. */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowRight, faChevronLeft, faChevronRight, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import BeeswarmPlot, { type BeeswarmPoint } from '../Shared/BeeswarmPlot/BeeswarmPlot';
 import { HelpButton } from '../Shared/WorkerGroupJoinChoiceHelp';
 import styles from './CommunityTab.module.scss';
 
@@ -196,3 +197,170 @@ export const CommunityGroupsSession = ({
     </a>
   </>
 );
+
+export type CommunityDialogQuestion = { key: string; prompt: string; type: string };
+
+/** Where an opened session's questions stand: in hand, being read, slow or failed to read, or not readable here. */
+export type CommunityQuestionsState = 'ready' | 'loading' | 'slow' | 'failed' | 'unopened';
+
+const QUESTION_KINDS: [string, string[]][] = [
+  ['agree/disagree', ['binary']],
+  ['choice', ['multichoice', 'multiple-choice', 'poll']],
+  ['rating', ['rating']],
+  ['written', ['freeform', 'text']],
+  ['quadratic', ['quadratic']],
+];
+
+/** What kind of question a stored type is, in the words the dialog uses. */
+export const questionKind = (type: string): string =>
+  QUESTION_KINDS.find(([, types]) => types.includes(type.trim().toLowerCase()))?.[0] || 'other';
+
+/** "31 agree/disagree, 5 choice, 4 written": each kind present, in a fixed order. */
+export const questionKindSummary = (questions: CommunityDialogQuestion[]): string => {
+  const counts = new Map<string, number>();
+  questions.forEach(({ type }) => counts.set(questionKind(type), (counts.get(questionKind(type)) || 0) + 1));
+  return [...QUESTION_KINDS.map(([kind]) => kind), 'other']
+    .filter((kind) => counts.has(kind))
+    .map((kind) => `${counts.get(kind)} ${kind}`)
+    .join(', ');
+};
+
+/** Answered agree/disagree questions it takes for the chart to show first. */
+export const CHART_FIRST_MIN_QUESTIONS = 3;
+
+/** A box's laid-out width, kept current: 0 until measured, and where the browser cannot measure. */
+const useBoxWidth = () => {
+  const [width, setWidth] = useState(0);
+  const observer = useRef<ResizeObserver | null>(null);
+  const ref = useCallback((node: HTMLElement | null) => {
+    observer.current?.disconnect();
+    observer.current = null;
+    if (!node || typeof ResizeObserver === 'undefined') return;
+    observer.current = new ResizeObserver(([entry]) => setWidth(Math.floor(entry.contentRect.width)));
+    observer.current.observe(node);
+  }, []);
+  return [ref, width] as const;
+};
+
+/**
+ * A session's questions as a chart of its answered agree/disagree questions or as a list; a dot or a row opens the
+ * session's results at `href`. `onOpen` runs once the session is shown, to read what this browser does not hold.
+ */
+export const CommunityQuestionsSession = ({
+  session,
+  questions,
+  points,
+  href,
+  state,
+  answersNote = '',
+  onOpen,
+  onRetry,
+  onOpenResults,
+}: {
+  session: CommunityDialogSession;
+  questions: CommunityDialogQuestion[];
+  /** Answered agree/disagree questions only. */
+  points: BeeswarmPoint[];
+  href: string;
+  state: CommunityQuestionsState;
+  answersNote?: string;
+  onOpen?: () => void;
+  onRetry?: () => void;
+  /** Opens `href`, from a dot. */
+  onOpenResults: () => void;
+}) => {
+  const [picked, setPicked] = useState<'chart' | 'list' | null>(null);
+  // The chart is drawn at its box's own width, so a phone shows all of it without scrolling sideways.
+  const [plotRef, plotWidth] = useBoxWidth();
+  const opened = useRef(onOpen);
+  opened.current = onOpen;
+  useEffect(() => opened.current?.(), [session.slug]);
+  // Until a view is picked, the default follows what has been read.
+  const view = picked || (points.length >= CHART_FIRST_MIN_QUESTIONS ? 'chart' : 'list');
+
+  let body: React.ReactNode;
+  if (state === 'unopened') {
+    body = (
+      <>
+        <p className={styles.dialogNote}>This session’s questions can be read here once it has been opened.</p>
+        <a className={styles.dialogMore} href={href}>
+          Open the session <FontAwesomeIcon icon={faArrowRight} />
+        </a>
+      </>
+    );
+  } else if (state === 'loading') {
+    body = (
+      <p className={styles.dialogNote} role="status">
+        <FontAwesomeIcon icon={faSpinner} spin /> Reading questions…
+      </p>
+    );
+  } else if (state === 'slow' || state === 'failed') {
+    body = (
+      <>
+        <p className={styles.dialogNote} role="status">
+          {state === 'slow' ? 'This is taking too long.' : 'This session’s questions can’t be read here.'}
+        </p>
+        <button type="button" className={styles.dialogBack} onClick={onRetry}>
+          Try again
+        </button>
+      </>
+    );
+  } else if (!questions.length) {
+    body = <p className={styles.dialogNote}>No questions in this session yet.</p>;
+  } else {
+    body = (
+      <>
+        <p className={styles.dialogNote}>{questionKindSummary(questions)}</p>
+        {points.length > 0 && (
+          <div className={styles.dialogToggle} role="group" aria-label="Show questions as">
+            {(['chart', 'list'] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                aria-pressed={view === option}
+                className={view === option ? styles.dialogTogglePressed : undefined}
+                onClick={() => setPicked(option)}
+              >
+                {option === 'chart' ? 'Chart' : 'List'}
+              </button>
+            ))}
+          </div>
+        )}
+        {view === 'chart' && points.length > 0 ? (
+          <div className={styles.dialogPlot} ref={plotRef}>
+            <BeeswarmPlot
+              points={points}
+              width={plotWidth || undefined}
+              domain={[0, 1]}
+              height={200}
+              showIdleSummary={false}
+              testIdPrefix="ce-community-questions-plot"
+              onClick={onOpenResults}
+            />
+            <p className={styles.dialogNote}>Click a dot to open its results.</p>
+          </div>
+        ) : (
+          <ul className={styles.sessionList}>
+            {questions.map((question) => (
+              <li key={question.key}>
+                <a className={styles.sessionLink} href={href}>
+                  <strong className={styles.sessionIdentity}>{question.prompt}</strong>
+                  <span className={styles.sessionKind}>{questionKind(question.type)}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+        {answersNote && <p className={styles.dialogNote}>{answersNote}</p>}
+      </>
+    );
+  }
+  return (
+    <>
+      <h6 className={styles.dialogHeading}>
+        {session.name}: {countOf(session.count, 'question')}
+      </h6>
+      {body}
+    </>
+  );
+};
