@@ -1117,6 +1117,66 @@
   font-size: 0.8rem;
 }
 
+// The Groups and Questions dialogs list sessions as the Sessions dialog does; a row that opens one is a button.
+button.sessionLink {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dialogNote,
+.dialogHeading {
+  margin: 0;
+  color: var(--ce-panel-text);
+}
+
+.dialogHeading {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.dialogSession {
+  display: grid;
+  gap: 12px;
+}
+
+.dialogMore {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--ce-link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 3px;
+  }
+}
+
+.dialogBack {
+  justify-self: start;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--ce-input-border);
+  border-radius: var(--ce-radius-6);
+  background: var(--ce-control-face);
+  color: var(--ce-control-text);
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--ce-border-strong);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
 @media (max-width: 420px) {
   .communityTab .statsSection {
     flex: 0 0 auto;

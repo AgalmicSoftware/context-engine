@@ -311,7 +311,6 @@ describe('SBTsList registry refresh coordination', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -368,7 +367,6 @@ describe('SBTsList registry refresh coordination', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -432,7 +430,6 @@ describe('SBTsList registry refresh coordination', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -484,7 +481,6 @@ describe('SBTsList registry refresh coordination', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -525,7 +521,6 @@ describe('SBTsList registry refresh coordination', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -576,7 +571,6 @@ describe('SBTsList registry refresh coordination', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -614,7 +608,6 @@ describe('SBTsList registry refresh coordination', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -657,7 +650,6 @@ describe('SBTsList registry refresh coordination', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -695,7 +687,6 @@ describe('SBTsList registry refresh coordination', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -731,7 +722,6 @@ describe('SBTsList registry refresh coordination', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}

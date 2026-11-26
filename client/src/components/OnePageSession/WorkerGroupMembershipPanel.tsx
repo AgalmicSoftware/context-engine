@@ -20,6 +20,8 @@ import {
   loadPublicWorkerGroups,
   loadWorkerGroupMembers,
   loadWorkerGroupOverview,
+  isWorkerGroupJoinable,
+  workerGroupJoinHasEnded,
   workerGroupMembersMayLeave,
   workerGroupNeedsSecret,
   type WorkerGroup,
@@ -121,11 +123,6 @@ const emptyMemberListState = (targetKey: string, groupId = ''): WorkerGroupMembe
 
 // Pages of only departed members read in one go before "Load more" takes over.
 const MEMBER_PAGES_SKIPPED_MAX = 20;
-
-const groupJoinHasEnded = (group: WorkerGroup): boolean =>
-  Boolean(group.joinEndsAt && Date.parse(group.joinEndsAt) <= Date.now());
-// A person can still join it: by link, or with a password or claim code.
-const groupIsJoinable = (group: WorkerGroup): boolean => group.joinMode !== 'admin_add' && !groupJoinHasEnded(group);
 
 const WorkerGroupMemberCountHelp = () => {
   const id = `worker-group-member-count-${React.useId().replace(/:/g, '')}`;
@@ -895,7 +892,7 @@ const WorkerGroupMembershipPanel = ({
     // Wait for the authenticated membership read, so existing members are never
     // joined again and the intent cannot migrate to another account or Worker.
     const group = availableGroups.find((entry) => entry.groupId === joinAfterSignInGroupId);
-    if (!group || groupJoinHasEnded(group)) return;
+    if (!group || workerGroupJoinHasEnded(group)) return;
     if (group.joinMode === 'open') void handleJoin(group);
     else if (joinAfterSignInToken && workerGroupNeedsSecret(group)) void handleJoin(group, joinAfterSignInToken);
   }, [
@@ -999,7 +996,7 @@ const WorkerGroupMembershipPanel = ({
         </button>
       );
     }
-    const joinEnded = group.joinMode !== 'admin_add' && groupJoinHasEnded(group);
+    const joinEnded = group.joinMode !== 'admin_add' && workerGroupJoinHasEnded(group);
     if (joinEnded) {
       return <span className={styles.workerGroupCardInactiveStatus}>Join period ended</span>;
     }
@@ -1085,7 +1082,7 @@ const WorkerGroupMembershipPanel = ({
             copyGroupLink={copyGroupLink}
             fetchImpl={fetchImpl}
             group={selectedGroup}
-            isActive={groupIsJoinable(selectedGroup)}
+            isActive={isWorkerGroupJoinable(selectedGroup)}
             memberListState={activeMemberListState}
             sessionConfig={sessionConfig}
             sessionName={sessionName.trim()}
@@ -1152,7 +1149,7 @@ const WorkerGroupMembershipPanel = ({
           categories={categories}
           openKeys={openCategoryKeys}
           onToggle={toggleCategory}
-          groupJoinHasEnded={groupJoinHasEnded}
+          groupJoinHasEnded={workerGroupJoinHasEnded}
           imageProps={{ fetchImpl, sessionConfig, sessionSlug, workerToken, workerUrl }}
           onOpenDetails={(groupId) => {
             inlineGroupCategoryKeyRef.current =
@@ -1172,7 +1169,7 @@ const WorkerGroupMembershipPanel = ({
               copyGroupLink={copyGroupLink}
               fetchImpl={fetchImpl}
               group={membership.group}
-              isActive={groupIsJoinable(membership.group)}
+              isActive={isWorkerGroupJoinable(membership.group)}
               onOpenDetails={openGroupDetails}
               showDescription={showDescriptions}
               sessionConfig={sessionConfig}
@@ -1189,7 +1186,7 @@ const WorkerGroupMembershipPanel = ({
               copyGroupLink={copyGroupLink}
               fetchImpl={fetchImpl}
               group={group}
-              isActive={groupIsJoinable(group)}
+              isActive={isWorkerGroupJoinable(group)}
               onOpenDetails={openGroupDetails}
               showDescription={showDescriptions}
               sessionConfig={sessionConfig}

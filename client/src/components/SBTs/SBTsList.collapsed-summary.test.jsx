@@ -296,7 +296,6 @@ describe('SBTsList collapsed session summary', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -337,7 +336,6 @@ describe('SBTsList collapsed session summary', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -379,7 +377,6 @@ describe('SBTsList collapsed session summary', () => {
           account=""
           sessionSlug=""
           loginComplete
-          miniaturized={false}
           toggleLoginModal={jest.fn()}
           sbtCacheRevision={0}
           onRequestSbtCacheRefresh={jest.fn()}
@@ -415,7 +412,6 @@ describe('SBTsList collapsed session summary', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -465,7 +461,6 @@ describe('SBTsList collapsed session summary', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -496,7 +491,6 @@ describe('SBTsList collapsed session summary', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}

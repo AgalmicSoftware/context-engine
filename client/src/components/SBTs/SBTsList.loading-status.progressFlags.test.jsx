@@ -35,7 +35,6 @@ describe('SBTsList progress and scan flag loading status', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -108,7 +107,6 @@ describe('SBTsList progress and scan flag loading status', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -183,7 +181,6 @@ describe('SBTsList progress and scan flag loading status', () => {
         account=""
         sessionSlug="test-4"
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -253,7 +250,6 @@ describe('SBTsList progress and scan flag loading status', () => {
         account=""
         sessionSlug="test-4"
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -317,7 +313,6 @@ describe('SBTsList progress and scan flag loading status', () => {
         account=""
         sessionSlug="edge"
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}

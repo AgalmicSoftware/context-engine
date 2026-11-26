@@ -136,15 +136,12 @@ export type SBTsListProps = {
   account?: unknown;
   litHooks?: unknown;
   allSessionsMode?: boolean;
-  communityTabCompactSettings?: boolean;
   embeddedMode?: boolean;
   ensureLightSbtDiscovery?: (slug: string, options?: SbtLightDiscoveryOptions) => Promise<unknown> | unknown;
   ensureLightSbtUniverse?: (slugs: string[], options?: SbtUniverseDiscoveryOptions) => Promise<unknown> | unknown;
-  interactiveMiniCards?: boolean;
   isSBTCacheReady?: boolean;
   latestBlockNumber?: unknown;
   loginComplete?: unknown;
-  miniaturized?: boolean;
   network?: SbtListNetwork | null;
   onNavigateToSbt?: (sbtAddress: string, href: string) => void;
   onRequestSbtCacheRefresh?: () => void;
@@ -158,5 +155,4 @@ export type SBTsListProps = {
   sessionSlug?: unknown;
   selectedGroupId?: string;
   toggleLoginModal?: unknown;
-  viewMode?: 'standard' | 'modal' | string;
 };

@@ -1,11 +1,7 @@
 import {
   buildSbtListExpandedCardShellClassName,
-  buildSbtListFilterContainerClassName,
-  buildSbtListFilterLabelClassName,
   buildSbtListLoadingGroupStatusClassName,
   buildSbtListLoadingProgressFillClassName,
-  buildSbtListMiniSettingsButtonClassName,
-  buildSbtListRootClassName,
   buildSbtListSessionUniversePanelClassName,
   findSbtListInteractiveAncestor,
   resolveSbtListHeaderBlocksLeftStyle,
@@ -79,39 +75,12 @@ describe('sbtListDisplayHelpers', () => {
       }),
     ).toBe('card');
     expect(
-      buildSbtListRootClassName({
-        baseClassName: 'base',
-        rootClassName: 'root',
-      }),
-    ).toBe('base root');
-    expect(
       buildSbtListSessionUniversePanelClassName({
         baseClassName: 'panel',
         closedClassName: 'panel-closed',
         isClosed: true,
       }),
     ).toBe('panel panel-closed');
-    expect(
-      buildSbtListMiniSettingsButtonClassName({
-        activeClassName: 'settings-active',
-        baseClassName: 'settings',
-        isActive: true,
-      }),
-    ).toBe('settings settings-active');
-    expect(
-      buildSbtListFilterContainerClassName({
-        baseClassName: 'filters',
-        panelClassName: 'filters-panel',
-      }),
-    ).toBe('filters filters-panel');
-    expect(
-      buildSbtListFilterLabelClassName({
-        activeClassName: 'filter-active',
-        baseClassName: 'filter',
-        isActive: true,
-        toggleClassName: 'filter-toggle',
-      }),
-    ).toBe('filter filter-toggle filter-active');
   });
 
   it('finds interactive ancestors only for targets with closest support', () => {

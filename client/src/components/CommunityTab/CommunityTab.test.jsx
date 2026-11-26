@@ -1,7 +1,7 @@
 jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
 import { buildSbtActivityCacheEntry } from '../../utilities/sbt/sbtActivityCacheEntry.js';
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { Provider, connect } from 'react-redux';
 import { applyMiddleware, combineReducers, createStore } from 'redux';
 import thunk from 'redux-thunk';
@@ -59,7 +59,8 @@ const settleListingCounts = async (instance) => {
   await instance._runStatsRefreshCycle({ force: true });
 };
 import BeeswarmPlot from '../Shared/BeeswarmPlot/BeeswarmPlot';
-import SBTsList from '../SBTs/SBTsList';
+import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath';
+import { buildWorkerGroupsPath } from '../../utilities/worker/workerGroupRoutes';
 import SBTFilter from '../SBTs/SBTFilter';
 import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 import demoSessions from '../../variables/demo/demo_sessions.json';
@@ -2225,57 +2226,135 @@ describe('CommunityTab helpers', () => {
     },
   );
 
-  it('opts the CommunityTab SBT modal into compact SBT settings without affecting other SBTsList uses', () => {
-    const instance = new CommunityTab({
-      provider: 'mock-provider',
-      network: { id: 84532, name: 'Base Sepolia' },
-      account: '0xabc',
-      loginComplete: true,
-      toggleLoginModal: jest.fn(),
-      isSBTCacheReady: false,
-      sbtRealtimeCoverageBySlug: { alpha: true },
-      ensureLightSbtDiscovery: jest.fn(),
-      ensureLightSbtUniverse: jest.fn(),
+  describe('Groups dialog', () => {
+    const chainEntry = (slug, sbtList, sessionName = '') => ({
+      slug,
+      netKey: '84532',
+      cacheScope: '84532',
+      isWorkerCanonical: false,
+      sessionConfig: { sessionName },
+      workerCanonicalIdentity: null,
+      workerGroupIds: [],
+      workerGroups: [],
+      workerVisibleUserIds: [],
+      workerGroupsCount: 0,
+      workerGroupsStatus: 'idle',
+      surveysCache: {},
+      questionsCache: {},
+      sbtCache: { sbtList },
     });
-    instance.state = {
-      ...instance.state,
-      modalType: 'sbts',
+    const workerEntry = (slug, status, groups = [], identity = { workerOrigin: 'https://worker.example' }) => ({
+      ...chainEntry(slug, {}, `${slug} session`),
+      netKey: 'worker',
+      cacheScope: 'worker',
+      isWorkerCanonical: true,
+      workerCanonicalIdentity: identity,
+      workerGroupIds: groups.map(({ groupId }) => groupId),
+      workerGroups: groups,
+      workerGroupsCount: groups.length,
+      workerGroupsStatus: status,
+    });
+    const sbt = (address, sbtInfo) => ({ sbtAddress: address, sbtInfo, mintedAddresses: [], burnedAddresses: [] });
+    const renderGroupsDialog = (entries) => {
+      const instance = new CommunityTab({});
+      instance._iterScopeCaches = jest.fn(() => entries);
+      return render(instance.renderGroupsDialog());
     };
 
-    const tree = instance.renderModalContent();
-    const [sbtListNode] = collectTreeNodes(tree, (node) => node?.type === SBTsList);
+    it('lists each session in view with the groups the tile counts, counting shared ones once', () => {
+      const shared = sbt('0xA1', { name: 'Open badge', mintingEndTime: 0 });
+      renderGroupsDialog([
+        chainEntry(
+          'alpha',
+          {
+            '0xa1': shared,
+            '0xa2': sbt('0xa2', { name: 'Closed badge', mintingEndTime: 1 }),
+            '0xa3': sbt('0xa3', { name: 'Hidden badge', hidden: true }),
+          },
+          'Alpha session',
+        ),
+        chainEntry('beta', { '0xa1': shared }, 'Beta session'),
+        workerEntry('wk', 'ready', [{ groupId: 'g1', label: 'Breakout', open: true }]),
+        workerEntry('private-wk', 'unavailable'),
+        workerEntry('slow-wk', 'loading'),
+        workerEntry('dead-wk', 'error'),
+        workerEntry('never-opened', 'idle', [], null),
+      ]);
 
-    expect(sbtListNode).toBeTruthy();
-    expect(sbtListNode.props.communityTabCompactSettings).toBe(true);
-    expect(sbtListNode.props.interactiveMiniCards).toBe(true);
-    expect(sbtListNode.props.miniaturized).toBe(true);
-    expect(sbtListNode.props.viewMode).toBe('modal');
-    expect(sbtListNode.props.sbtRealtimeCoverageBySlug).toEqual({ alpha: true });
-  });
-
-  it('routes the Groups modal through the exact active Worker session', () => {
-    writeGlobalSessionSelection({ selectedSessionScope: 'active', primarySessionSlug: 'demo-sh' });
-    const instance = new CommunityTab({
-      activeSessionSlug: 'demo-sh',
-      sessionConfig: WORKER_SESSION_CONFIG,
-      provider: 'mock-provider',
-      network: { id: 11155420, name: 'OP Sepolia' },
-      account: '',
-      loginComplete: false,
-      toggleLoginModal: jest.fn(),
+      const dialog = screen.getByTestId('ce-community-groups-dialog');
+      expect(dialog).toHaveTextContent('6 sessions, 3 groups');
+      expect(screen.getByRole('button', { name: 'About the group total' })).toBeInTheDocument();
+      expect(
+        within(dialog)
+          .getAllByRole('listitem')
+          .map((row) => row.textContent),
+      ).toEqual([
+        'Alpha session2 groups ',
+        'Beta session1 group ',
+        'wk session1 group ',
+        expect.stringMatching(/^dead-wk sessioncan’t be read here/),
+        expect.stringMatching(/^private-wk sessiongroups not public/),
+        expect.stringMatching(/^slow-wk session.*counting/),
+      ]);
+      expect(dialog).not.toHaveTextContent('never-opened');
     });
-    instance.state = {
-      ...instance.state,
-      modalType: 'groups',
-    };
 
-    const tree = instance.renderModalContent();
-    const [sbtListNode] = collectTreeNodes(tree, (node) => node?.type === SBTsList);
+    it('opens an on-chain session to its groups, open or closed, each linking to its page', () => {
+      renderGroupsDialog([
+        chainEntry('alpha', {
+          '0xa1': sbt('0xa1', { name: 'Open badge', mintingEndTime: 0 }),
+          '0xa2': sbt('0xa2', { name: 'Closed badge', mintingEndTime: 1 }),
+        }),
+        chainEntry('beta', { '0xb1': sbt('0xb1', { name: 'Beta badge' }) }),
+      ]);
+      fireEvent.click(screen.getByRole('button', { name: /^alpha/ }));
 
-    expect(sbtListNode.props.sessionSlug).toBe('demo-sh');
-    expect(sbtListNode.props.sessionConfig).toBe(WORKER_SESSION_CONFIG);
-    expect(sbtListNode.props.embeddedMode).toBe(true);
-    expect(sbtListNode.props.allSessionsMode).toBe(false);
+      const opened = screen.getByTestId('ce-community-groups-dialog-session');
+      expect(within(opened).getByRole('heading')).toHaveTextContent('alpha: 2 groups');
+      const links = within(opened).getAllByRole('link');
+      expect(links.map((link) => [link.textContent.trim(), link.getAttribute('href')])).toEqual([
+        ['Open badgeOpen to join', buildSbtDetailPath('0xa1', 'alpha')],
+        ['Closed badgeClosed', buildSbtDetailPath('0xa2', 'alpha')],
+        ['See all of this session’s groups', '/groups/alpha'],
+      ]);
+      fireEvent.click(within(opened).getByRole('button', { name: 'All sessions' }));
+      expect(screen.getByTestId('ce-community-groups-dialog')).toHaveTextContent('2 sessions, 3 groups');
+    });
+
+    it('opens straight to a lone Worker session, its groups linking through its Worker', () => {
+      renderGroupsDialog([
+        workerEntry('wk', 'ready', [
+          { groupId: 'g1', label: 'Breakout', open: true },
+          { groupId: 'g2', label: '', open: false },
+        ]),
+      ]);
+      const opened = screen.getByTestId('ce-community-groups-dialog-session');
+      expect(within(opened).queryByRole('button', { name: 'All sessions' })).not.toBeInTheDocument();
+      const workerUrl = 'https://worker.example';
+      expect(
+        within(opened)
+          .getAllByRole('link')
+          .map((link) => [link.textContent.trim(), link.getAttribute('href')]),
+      ).toEqual([
+        ['BreakoutOpen to join', buildWorkerGroupsPath({ groupId: 'g1', sessionSlug: 'wk', workerUrl })],
+        ['Unnamed groupClosed', buildWorkerGroupsPath({ groupId: 'g2', sessionSlug: 'wk', workerUrl })],
+        ['See all of this session’s groups', buildWorkerGroupsPath({ sessionSlug: 'wk', workerUrl })],
+      ]);
+    });
+
+    it('says so when no session in view has groups', () => {
+      renderGroupsDialog([chainEntry('alpha', {}), chainEntry('beta', {})]);
+      expect(screen.getByTestId('ce-community-groups-dialog')).toHaveTextContent('No sessions with groups yet.');
+    });
+
+    it('opens in the Sessions dialog panel', () => {
+      const instance = new CommunityTab({});
+      instance.state.showModal = true;
+      instance.state.modalType = 'groups';
+      instance._iterScopeCaches = jest.fn(() => []);
+      const [modal] = collectTreeNodes(instance.render(), (node) => node.type === Modal);
+      expect(modal.props.className).toContain('sessionsModal');
+    });
   });
 
   it('canonicalizes reserved session aliases in modal survey links', () => {
@@ -3240,6 +3319,11 @@ describe('CommunityTab helpers', () => {
       instance._workerGroupCountCache.set(instance._getWorkerGroupCountCacheKey(identity), {
         count: index + 1,
         groupIds: Array.from({ length: index + 1 }, (_, n) => `group-${n}`),
+        groups: Array.from({ length: index + 1 }, (_, n) => ({
+          groupId: `group-${n}`,
+          label: `Group ${n}`,
+          open: true,
+        })),
         visibleUserIds: [],
         status: 'ready',
         updatedAtMs: Date.now(),
@@ -3253,6 +3337,9 @@ describe('CommunityTab helpers', () => {
     expect(instance._iterScopeCaches().map(({ slug }) => slug)).toEqual(expect.arrayContaining(Object.keys(configs)));
     expect(instance.state.uniqueUsers).toEqual(['0x1', '0x2']);
     expect(instance.state.sbtsCreatedCount).toBe(3);
+    const groupsDialog = render(instance.renderGroupsDialog());
+    expect(screen.getByTestId('ce-community-groups-dialog')).toHaveTextContent('2 sessions, 3 groups');
+    groupsDialog.unmount();
     expect(instance.state.stats.find(({ label }) => label === 'Questions').count).toBe(3);
     instance.props = { ...instance.props, globalSessionSelection: { ...all, selectedSessionScope: 'general' } };
     await instance._runStatsRefreshCycle({ force: true });
@@ -3536,5 +3623,9 @@ describe('CommunityTab helpers', () => {
     const stats = instance._computeUniverseStatsSnapshot(entries);
     expect(stats.sbtsCreatedCount).toBe(count);
     expect(stats.uniqueUsers).toEqual(['0x123']);
+    // The Groups dialog's total is the tile's.
+    instance._iterScopeCaches = jest.fn(() => entries);
+    render(instance.renderGroupsDialog());
+    expect(screen.getByTestId('ce-community-groups-dialog')).toHaveTextContent(`2 sessions, ${count} group`);
   });
 });

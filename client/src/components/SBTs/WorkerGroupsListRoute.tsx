@@ -16,7 +16,6 @@ import {
   resolveSessionCapabilityProjection,
 } from '../../utilities/session/sessionCapabilityProjection.js';
 import { stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
-import { buildSbtListRootClassName } from './sbtListHelpers';
 import { isRecord } from './sbtListRuntimeValues';
 import type { SBTsListProps, UnknownRecord } from './sbtListTypes';
 import styles from './SBTsList.module.scss';
@@ -109,16 +108,8 @@ const WorkerGroupsListRoute = ({ props, workerSessionConfig }: WorkerGroupsListR
     );
   }, [sessionName, sessionSlug, selectedGroupId]);
 
-  const rootClassName = props.viewMode === 'modal' ? styles.modalViewContainer : undefined;
-
   return (
-    <div
-      className={buildSbtListRootClassName({
-        baseClassName: styles.standardBase,
-        rootClassName,
-      })}
-      data-testid="ce-worker-groups-list-route"
-    >
+    <div className={styles.standardBase} data-testid="ce-worker-groups-list-route">
       {!props.embeddedMode && !selectedGroupId ? (
         <div className={styles.workerRouteToolbar}>
           <WorkerGroupsSessionSelector

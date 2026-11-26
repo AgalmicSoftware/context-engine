@@ -519,7 +519,8 @@ export async function runSmoke() {
         await page.getByTestId('ce-community-session-select').selectOption({ label: 'ALL' });
         await page.getByTestId('ce-community-stat-groups').click();
         const dialog = page.getByRole('dialog');
-        await dialog.getByRole('heading', { name: 'Featured Groups', exact: true }).waitFor({ state: 'visible' });
+        // The session list, or the one session in view opened straight away.
+        await dialog.locator('[data-testid^="ce-community-groups-dialog"]').first().waitFor({ state: 'visible' });
         await assertReadable(dialog);
         await dialog.getByRole('button', { name: 'Close', exact: true }).click();
         await page.goto(`${baseUrl}/session/new`, { waitUntil: 'domcontentloaded' });

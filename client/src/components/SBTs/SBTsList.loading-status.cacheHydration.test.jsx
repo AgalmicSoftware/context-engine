@@ -62,7 +62,6 @@ describe('SBTsList cache hydration loading status', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -138,7 +137,6 @@ describe('SBTsList cache hydration loading status', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -162,7 +160,6 @@ describe('SBTsList cache hydration loading status', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -231,7 +228,6 @@ describe('SBTsList cache hydration loading status', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -251,7 +247,6 @@ describe('SBTsList cache hydration loading status', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -278,7 +273,6 @@ describe('SBTsList cache hydration loading status', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}

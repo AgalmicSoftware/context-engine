@@ -312,7 +312,6 @@ describe('SBTsList session chip progress display', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -350,7 +349,6 @@ describe('SBTsList session chip progress display', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -383,7 +381,6 @@ describe('SBTsList session chip progress display', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -426,7 +423,6 @@ describe('SBTsList session chip progress display', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -462,7 +458,6 @@ describe('SBTsList session chip progress display', () => {
       account: '',
       sessionSlug: '',
       loginComplete: true,
-      miniaturized: false,
       toggleLoginModal: jest.fn(),
       sbtCacheRevision: 0,
       onRequestSbtCacheRefresh: jest.fn(),
@@ -522,7 +517,6 @@ describe('SBTsList session chip progress display', () => {
       account: '',
       sessionSlug: '',
       loginComplete: true,
-      miniaturized: false,
       toggleLoginModal: jest.fn(),
       sbtCacheRevision: 0,
       onRequestSbtCacheRefresh: jest.fn(),
@@ -577,7 +571,6 @@ describe('SBTsList session chip progress display', () => {
       account: '',
       sessionSlug: '',
       loginComplete: true,
-      miniaturized: false,
       toggleLoginModal: jest.fn(),
       sbtCacheRevision: 0,
       onRequestSbtCacheRefresh: jest.fn(),
@@ -638,7 +631,6 @@ describe('SBTsList session chip progress display', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -690,7 +682,6 @@ describe('SBTsList session chip progress display', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -740,7 +731,6 @@ describe('SBTsList session chip progress display', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -787,7 +777,6 @@ describe('SBTsList session chip progress display', () => {
       account: '',
       sessionSlug: '',
       loginComplete: true,
-      miniaturized: false,
       toggleLoginModal: jest.fn(),
       sbtCacheRevision: 0,
       onRequestSbtCacheRefresh: jest.fn(),
@@ -883,7 +872,6 @@ describe('SBTsList session chip progress display', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}

@@ -39,7 +39,6 @@ const createProps = (
   canShowMoreSessions: false,
   chipLoadingStatusBySlug: {},
   chipProgressVisibilityBySlug: {},
-  hideSessionUniverseSummary: false,
   isOpen: true,
   isUniverseCollapsed: false,
   labelForSessionSlug: (slug) => slug || 'General',

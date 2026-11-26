@@ -22,6 +22,7 @@ import {
   type WorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
 import {
+  isWorkerGroupJoinable,
   loadPublicWorkerGroups,
   loadWorkerGroupOverview,
   type WorkerGroup,
@@ -30,10 +31,14 @@ import {
 import { getWorkerSessionToken, isWorkerSignInNeededError } from '../../utilities/worker/workerAuth';
 import type { WorkerGroupsChangedDetail } from '../../utilities/worker/workerGroupChangeEvents';
 
+/** One of the groups a count counted, as the Stats Groups dialog lists it. */
+export type CommunityWorkerGroupSummary = { groupId: string; label: string; open: boolean };
+
 export type CommunityWorkerGroupCountCacheEntry = {
   count: number;
   groupIds: string[];
   visibleUserIds: string[];
+  groups: CommunityWorkerGroupSummary[];
   status: 'idle' | 'loading' | 'ready' | 'error' | 'unavailable';
   updatedAtMs: number;
   promise?: Promise<void>;
@@ -60,6 +65,14 @@ const WORKER_GROUP_COUNT_TTL_MS = 30000;
 export const WORKER_GROUP_COUNT_WAIT_MS = 250;
 // A count with no answer by then is shown as unread, so one slow or dead Worker does not hold the Groups tile.
 export const WORKER_GROUP_COUNT_TIMEOUT_MS = 15000;
+
+// What a read with no new answer keeps from the last one.
+const heldGroupCount = (existing?: CommunityWorkerGroupCountCacheEntry) => ({
+  count: existing?.count || 0,
+  groupIds: existing?.groupIds || [],
+  visibleUserIds: existing?.visibleUserIds || [],
+  groups: existing?.groups || [],
+});
 
 /**
  * Live group counts are optional: a load can wait on a Worker sign-in that is
@@ -195,6 +208,7 @@ export const getCommunityWorkerGroupCountState = (
   const cached = identity ? cache.get(getCommunityWorkerGroupCountCacheKey(identity, account)) : null;
   return {
     workerGroupIds: Array.isArray(cached?.groupIds) ? cached.groupIds : [],
+    workerGroups: Array.isArray(cached?.groups) ? cached.groups : [],
     workerVisibleUserIds: Array.isArray(cached?.visibleUserIds) ? cached.visibleUserIds : [],
     workerGroupsCount: Number(cached?.count || 0),
     workerGroupsStatus: String((cached?.status === 'loading' && cached.settledStatus) || cached?.status || 'idle'),
@@ -262,9 +276,7 @@ export const loadCommunityWorkerGroupCount = async ({
   const account = String(runtime.account || '').trim();
   if (!account && !sessionModeAllowsAnonymousWorkerGroupDiscovery(sessionConfig.sessionModeProfile)) {
     cache.set(countCacheKey, {
-      count: existing?.count || 0,
-      groupIds: existing?.groupIds || [],
-      visibleUserIds: existing?.visibleUserIds || [],
+      ...heldGroupCount(existing),
       status: 'unavailable',
       updatedAtMs: Date.now(),
     });
@@ -274,9 +286,7 @@ export const loadCommunityWorkerGroupCount = async ({
   const sessionId = resolveWorkerCanonicalSessionIdHex(sessionConfig);
   if (!workerUrl || !sessionId) {
     cache.set(countCacheKey, {
-      count: existing?.count || 0,
-      groupIds: existing?.groupIds || [],
-      visibleUserIds: existing?.visibleUserIds || [],
+      ...heldGroupCount(existing),
       status: 'error',
       updatedAtMs: Date.now(),
     });
@@ -317,15 +327,23 @@ export const loadCommunityWorkerGroupCount = async ({
         // A private session counts nothing for a viewer not signed in to it, as for a signed-out one.
         if (requestIsCurrent())
           cache.set(countCacheKey, {
-            count: existing?.count || 0,
-            groupIds: existing?.groupIds || [],
-            visibleUserIds: existing?.visibleUserIds || [],
+            ...heldGroupCount(existing),
             status: 'unavailable',
             updatedAtMs: Date.now(),
           });
         return;
       }
-      const groupIds = Array.from(new Set(groups.map((group) => String(group?.groupId || '').trim()).filter(Boolean)));
+      const summaries = new Map<string, CommunityWorkerGroupSummary>();
+      groups.forEach((group) => {
+        const groupId = String(group?.groupId || '').trim();
+        if (!groupId || summaries.has(groupId)) return;
+        summaries.set(groupId, {
+          groupId,
+          label: String(group.label || '').trim(),
+          open: isWorkerGroupJoinable(group),
+        });
+      });
+      const groupIds = [...summaries.keys()];
       const visibleUserIds = new Set<string>();
       groups.forEach((group) => {
         const adminAddress = String(group?.adminAddress || '')
@@ -353,6 +371,7 @@ export const loadCommunityWorkerGroupCount = async ({
         count: groupIds.length,
         groupIds,
         visibleUserIds: Array.from(visibleUserIds),
+        groups: [...summaries.values()],
         status: 'ready',
         updatedAtMs: Date.now(),
       });
@@ -360,18 +379,14 @@ export const loadCommunityWorkerGroupCount = async ({
       if (!requestIsCurrent()) return;
       onWarning?.(`CommunityTab: Worker group count unavailable for ${slug}`, error);
       cache.set(countCacheKey, {
-        count: existing?.count || 0,
-        groupIds: existing?.groupIds || [],
-        visibleUserIds: existing?.visibleUserIds || [],
+        ...heldGroupCount(existing),
         status: 'error',
         updatedAtMs: Date.now(),
       });
     }
   })();
   cache.set(countCacheKey, {
-    count: existing?.count || 0,
-    groupIds: existing?.groupIds || [],
-    visibleUserIds: existing?.visibleUserIds || [],
+    ...heldGroupCount(existing),
     status: 'loading',
     settledStatus:
       existing?.status === 'loading'
@@ -388,9 +403,7 @@ export const loadCommunityWorkerGroupCount = async ({
       // An answer that comes later still replaces this.
       if (requestIsCurrent() && cache.get(countCacheKey)?.promise === request) {
         cache.set(countCacheKey, {
-          count: existing?.count || 0,
-          groupIds: existing?.groupIds || [],
-          visibleUserIds: existing?.visibleUserIds || [],
+          ...heldGroupCount(existing),
           status: 'error',
           updatedAtMs: Date.now(),
         });

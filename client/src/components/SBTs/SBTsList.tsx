@@ -18,7 +18,7 @@ import WorkerSessionGroupsPanel from '../OnePageSession/WorkerSessionGroupsPanel
 import TagModal from '../TagPage/TagModal';
 import SbtListSessionUniversePanel from './SbtListSessionUniversePanel';
 import { SbtListDetailsPanel, SbtListMetaRow } from './SbtListCardChrome';
-import { SbtListCompactLinkCard, SbtListStandardCard } from './SbtListDisplayCards';
+import { SbtListStandardCard } from './SbtListDisplayCards';
 import {
   SbtListInitialLoader,
   SbtListSectionBody,
@@ -53,20 +53,15 @@ import {
   buildSbtListExpandedAddressSetToggle,
   buildSbtListExpandedCardShellClassName,
   buildSbtListFeaturedCardModel,
-  buildSbtListFilterContainerClassName,
-  buildSbtListFilterLabelClassName,
   findSbtListInteractiveAncestor,
-  buildSbtListInteractiveMiniCardModel,
   buildSbtListCacheReadPlan,
   buildSbtListChipLoadingStatusBySlug,
   buildSbtListChipProgressDesiredVisibilityBySlug,
   buildSbtListInitialLoaderStatuses,
   buildSbtListMetaRowModel,
-  buildSbtListMiniSettingsButtonClassName,
   buildSbtListRealtimeProgressInputPlan,
   buildSbtListRenderItemKey,
   buildSbtListRenderBuckets,
-  buildSbtListRootClassName,
   buildSbtListPassiveLatestLookupPlan,
   buildSbtListSessionRouteHref,
   buildSbtListSessionSelectorOptions,
@@ -166,9 +161,7 @@ const OnChainSBTsList = ({
   sessionConfig,
   sessionSlug,
   loginComplete,
-  miniaturized,
   toggleLoginModal,
-  viewMode = 'standard',
   sbtCacheRevision,
   onRequestSbtCacheRefresh,
   isSBTCacheReady,
@@ -184,8 +177,6 @@ const OnChainSBTsList = ({
   onNavigateToSbt,
   /* Embedded mode suppresses header and featured section to avoid duplication in SBTsPage */
   embeddedMode = false,
-  communityTabCompactSettings = false,
-  interactiveMiniCards = false,
 }: SBTsListProps) => {
   const { allSessionsMode, explicitRouteSessionConfig, routeSlug } = useMemo(
     () =>
@@ -676,13 +667,10 @@ const OnChainSBTsList = ({
     }
   }, []);
 
-  const usesTopLevelSessionSettingsSurface =
-    allSessionsMode &&
-    ((!miniaturized && !embeddedMode) || (miniaturized && viewMode === 'modal' && communityTabCompactSettings));
+  const usesTopLevelSessionSettingsSurface = allSessionsMode && !embeddedMode;
   const usesFallbackSessionSettingsToggle = allSessionsMode && !usesTopLevelSessionSettingsSurface;
   const isSessionSelectorOpen = usesTopLevelSessionSettingsSurface ? showAdminButtons : showLocalSessionSettings;
   const sessionSelectorPanelId = 'session-selector-panel';
-  const hideSessionUniverseSummary = !!(miniaturized && viewMode === 'modal' && communityTabCompactSettings);
 
   const clearChipProgressVisibilityTimeout = useCallback((slugIn: unknown): void => {
     const slug = normalizeSessionSlug(slugIn || '');
@@ -2432,7 +2420,6 @@ const OnChainSBTsList = ({
     const model = buildSbtListMetaRowModel({
       details,
       expandedSbtAddresses,
-      miniaturized,
       sbt,
     });
     if (!model) return null;
@@ -2452,64 +2439,6 @@ const OnChainSBTsList = ({
     );
   };
 
-  const renderCompactSbtLinkCard = (sbt: SbtListItem | null | undefined, keyPrefix = 'sbt'): React.ReactNode => {
-    const model = buildSbtListDisplayCardModel({
-      addressMode: 'raw',
-      getDescriptionText: getSbtDescriptionText,
-      getDisplayName: getSbtDisplayName,
-      isPasswordLocked,
-      keyPrefix,
-      resolveSbtSessionSlug,
-      sbt,
-      unnamedLabel: t('sbt'),
-    });
-    if (!model) return null;
-    const compactCardClassName = [styles.sbtItem, miniaturized && viewMode === 'modal' ? styles.modalMiniSbtItem : '']
-      .filter(Boolean)
-      .join(' ');
-
-    return (
-      <SbtListCompactLinkCard
-        key={model.key}
-        className={compactCardClassName}
-        href={buildSbtHref(model.sbtAddress, model.sessionSlug)}
-        imageStyle={resolveSbtListRelativeImageStyle()}
-        model={model}
-        onClick={(event) => handleSbtLinkClick(event, model.sbtAddress, model.sessionSlug)}
-        sbtLabel={t('sbt')}
-        styles={styles}
-      />
-    );
-  };
-
-  const renderInteractiveMiniSbtCard = (sbt: SbtListItem | null | undefined, keyPrefix = 'sbt'): React.ReactNode => {
-    const model = buildSbtListInteractiveMiniCardModel({
-      keyPrefix,
-      resolveSbtSessionSlug,
-      sbt,
-    });
-    if (!model) return null;
-    const { key, sbtAddress, sessionSlug } = model;
-
-    return (
-      <SBTPage
-        key={key}
-        miniaturized
-        miniMintable
-        SBTAddress={sbtAddress}
-        account={account}
-        provider={provider}
-        network={network}
-        loginComplete={loginComplete}
-        toggleLoginModal={toggleLoginModal}
-        sbtCacheRevision={sbtCacheRevision}
-        sessionSlug={sessionSlug}
-        isSBTCacheReady={isSBTCacheReady}
-        refreshSbtData={refreshSbtData}
-      />
-    );
-  };
-
   const renderFeaturedSBTCard = (sbt: SbtListItem): React.ReactNode => {
     const model = buildSbtListFeaturedCardModel({
       expandedSbtAddresses,
@@ -2521,10 +2450,6 @@ const OnChainSBTsList = ({
     if (!model) return null;
     const { detailsId, isExpanded, linkLabel, sbtAddress, sbtAddressLower, sessionSlug } = model;
     const details = getSbtCardDetails(sbt);
-
-    if (miniaturized && interactiveMiniCards) {
-      return renderInteractiveMiniSbtCard(sbt, 'featured-mini');
-    }
 
     const featuredCardLink = (
       <a
@@ -2552,10 +2477,7 @@ const OnChainSBTsList = ({
       </a>
     );
 
-    if (miniaturized && viewMode === 'modal') {
-      return renderCompactSbtLinkCard(sbt, 'featured-modal');
-    }
-    if (miniaturized || (!details.hasDetails && details.tags.length <= 0)) {
+    if (!details.hasDetails && details.tags.length <= 0) {
       return featuredCardLink;
     }
 
@@ -2614,13 +2536,6 @@ const OnChainSBTsList = ({
     const details = getSbtCardDetails(sbt);
     const detailsId = `sbt-details-${sbtAddressLower}`;
     const isExpanded = expandedSbtAddresses.has(sbtAddressLower);
-
-    if (miniaturized) {
-      if (interactiveMiniCards) {
-        return renderInteractiveMiniSbtCard(sbt, 'mini-list');
-      }
-      return renderCompactSbtLinkCard(sbt);
-    }
 
     return (
       <SbtListStandardCard
@@ -2699,7 +2614,6 @@ const OnChainSBTsList = ({
         canShowMoreSessions={canShowMoreSessions}
         chipLoadingStatusBySlug={chipLoadingStatusBySlug}
         chipProgressVisibilityBySlug={chipProgressVisibilityBySlug}
-        hideSessionUniverseSummary={hideSessionUniverseSummary}
         isOpen={isSessionSelectorOpen}
         isUniverseCollapsed={isUniverseCollapsed}
         labelForSessionSlug={labelForSessionSlug}
@@ -2735,139 +2649,9 @@ const OnChainSBTsList = ({
       createSessionCapabilities.isWorkerCanonical) ||
     claimsWorkerCanonicalAuthority(createSessionConfig);
 
-  const rootClassName = viewMode === 'modal' ? styles.modalViewContainer : undefined;
-
-  // Miniaturized mode
-  if (miniaturized) {
-    const isModal = viewMode === 'modal';
-    const showCommunityTabCompactSettings = isModal && communityTabCompactSettings;
-    const miniFeatured = displayedFeatured;
-    const miniMintingLive = mintingLiveListWithoutFeatured;
-    const miniExpired = expiredListWithoutFeatured;
-
-    return (
-      <div
-        className={buildSbtListRootClassName({
-          baseClassName: styles.miniaturizedBase,
-          rootClassName,
-        })}
-      >
-        {isModal &&
-          (showCommunityTabCompactSettings ? (
-            <>
-              <div className={styles.miniSettingsRow}>
-                <button
-                  type="button"
-                  className={buildSbtListMiniSettingsButtonClassName({
-                    activeClassName: styles.miniSettingsButtonActive,
-                    baseClassName: styles.miniSettingsButton,
-                    isActive: showAdminButtons || excludePasswordLocked,
-                  })}
-                  onClick={() => setShowAdminButtons(!showAdminButtons)}
-                  aria-label={`${t('sbt')} list settings`}
-                  aria-expanded={showAdminButtons}
-                  data-testid="sbt-mini-settings-button"
-                >
-                  <FontAwesomeIcon icon={faCog} />
-                </button>
-              </div>
-              {showAdminButtons && (
-                <div
-                  className={buildSbtListFilterContainerClassName({
-                    baseClassName: styles.filterContainer,
-                    panelClassName: styles.miniSettingsPanel,
-                  })}
-                  data-testid="sbt-mini-settings-panel"
-                >
-                  <div className={styles.filterRow}>
-                    <label
-                      className={buildSbtListFilterLabelClassName({
-                        activeClassName: styles.filterLabelActive,
-                        baseClassName: styles.filterLabel,
-                        isActive: excludePasswordLocked,
-                        toggleClassName: styles.filterLabelToggle,
-                      })}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={excludePasswordLocked}
-                        onChange={() => setExcludePasswordLocked(!excludePasswordLocked)}
-                      />
-                      {`No Password ${t('sbts')}`}
-                    </label>
-                  </div>
-                  {allSessionsMode && renderSessionUniverseSelector()}
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <div className={styles.filterContainer}>
-                <div className={styles.filterRow}>
-                  <label
-                    className={buildSbtListFilterLabelClassName({
-                      activeClassName: styles.filterLabelActive,
-                      baseClassName: styles.filterLabel,
-                      isActive: excludePasswordLocked,
-                      toggleClassName: styles.filterLabelToggle,
-                    })}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={excludePasswordLocked}
-                      onChange={() => setExcludePasswordLocked(!excludePasswordLocked)}
-                    />
-                    {`Exclude Password-Locked ${t('sbts')}`}
-                  </label>
-                </div>
-              </div>
-              {allSessionsMode && renderSessionUniverseSelector()}
-            </>
-          ))}
-        {allSessionsMode && !showCommunityTabCompactSettings && !isModal && renderSessionUniverseSelector()}
-        {allSessionsMode && showCommunityTabCompactSettings && !showAdminButtons && renderSessionUniverseSelector()}
-
-        {renderSectionTitle(`Featured ${t('sbts')}`, 'section-spinner-featured')}
-        <SbtListSectionBody
-          emptyLabel={`No featured ${t('sbtsLower')}.`}
-          hasItems={miniFeatured.length > 0}
-          loadingHint={showFeaturedSectionLoadingHint ? renderSectionLoadingHint() : null}
-          wrapClassName={styles.sbtGrid}
-        >
-          {miniFeatured.map(renderFeaturedSBTCard)}
-        </SbtListSectionBody>
-
-        {renderSectionTitle(`${t('minting')} Live`, 'section-spinner-live')}
-        <SbtListSectionBody
-          emptyLabel={`No live ${t('sbtsLower')}.`}
-          hasItems={miniMintingLive.length > 0}
-          loadingHint={showLiveSectionLoadingHint ? renderSectionLoadingHint() : null}
-          wrapClassName={styles.sbtGrid}
-        >
-          {miniMintingLive.map(renderSBTButton)}
-        </SbtListSectionBody>
-
-        {renderSectionTitle(`${t('minting')} Expired`, 'section-spinner-expired')}
-        <SbtListSectionBody
-          emptyLabel={`No expired ${t('sbtsLower')}.`}
-          hasItems={miniExpired.length > 0}
-          loadingHint={showExpiredSectionLoadingHint ? renderSectionLoadingHint() : null}
-          wrapClassName={styles.sbtGrid}
-        >
-          {miniExpired.map(renderSBTButton)}
-        </SbtListSectionBody>
-      </div>
-    );
-  }
-
   // Standard (full) mode
   return (
-    <div
-      className={buildSbtListRootClassName({
-        baseClassName: styles.standardBase,
-        rootClassName,
-      })}
-    >
+    <div className={styles.standardBase}>
       {/* If embeddedMode is true, suppress the header to avoid duplication in parent */}
       {!embeddedMode && (
         <div className={styles.header}>
