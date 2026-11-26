@@ -20,7 +20,6 @@ const renderBody = (props: Partial<Props>) => {
         account: '',
         handleLogout: jest.fn(),
         handlePasskeyWalletCreate: jest.fn(),
-        handlePasskeyWalletCreateOnAnotherDevice: jest.fn(),
         handleLoginFileChosen: jest.fn(),
         handleLoginFilePassword: jest.fn(),
         loginFileProtectedName: '',
@@ -49,7 +48,8 @@ const renderBody = (props: Partial<Props>) => {
 it('gives the passkey spinner a way out', () => {
   const handlePasskeyWalletCancel = jest.fn();
   renderBody({ loginInProgress: true, provider: 'passkey_eoa', passkeyMode: 'create', handlePasskeyWalletCancel });
-  expect(screen.getByText('creating passkey...')).toBeInTheDocument();
+  // Its colour is `#loadingIconContainer h3`'s, which themeContrast.test.ts checks: an id or class could outrank it.
+  expect(screen.getByRole('heading', { name: 'creating passkey...' }).attributes).toHaveLength(0);
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(handlePasskeyWalletCancel).toHaveBeenCalledTimes(1);
 });
@@ -136,7 +136,7 @@ describe('Copy my answers after a failed sign-in', () => {
       /^Create login file or Login with file ?to login without a passkeyAdd a password/,
     );
     expect(line).toHaveTextContent(
-      /^orCopy this link and open it on your phone to recover and submit responses\.(?: |$)/,
+      /^orCopy this link and open it on another device to recover and submit responses\.(?: |$)/,
     );
     expect(screen.getByRole('button', { name: 'About copying your answers' })).toHaveAccessibleDescription(
       /not sent to us/,
@@ -173,7 +173,7 @@ describe('Copy my answers after a failed sign-in', () => {
       expect(screen.getByRole('button', { name: 'Copy this link' })).toBe(button);
       expect(button.querySelector('[data-icon="check"]')).not.toBeNull();
       expect(screen.getByTestId('ce-passkey-copy-answers')).toHaveTextContent(
-        /^orCopy this link and open it on your phone to recover and submit responses\.(?: |$)/,
+        /^orCopy this link and open it on another device to recover and submit responses\.(?: |$)/,
       );
       expect(within(screen.getByRole('status')).getByText('Link copied.')).toBeInTheDocument();
     } finally {

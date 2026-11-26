@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.45] - 2026-11-26
+
+Sign-in shows its progress in every theme, and where a device's passkeys cannot be used it offers the login file instead of making the passkey on a phone. Only the site changes: no Worker update and no MCP change.
+
+### Site — available when the site deploys
+
+- **Sign-in progress shows in every theme.** "creating passkey..." and "logging in..." and their spinner were white on Minimal's white dialog, so the card looked blank; they now take the dialog's text colour in every theme. Classic 95's sign-in boxes, such as a failed Create and the login-file line, put red or white on navy and are now a white field. In Minimal the agent-token login panel and the "Advanced on-chain access" notice were white on white and now use the panel's text colour.
+- **A login file instead of a phone QR.** Where this device's passkeys cannot be used, Create no longer offers "Scan QR with phone" to make the passkey on a phone: the sign-in offers the login file and, with unsaved answers, "Copy this link and open it on another device to recover and submit responses." A passkey already on a phone still signs in; on a computer the browser's own prompt offers to use a phone.
+- **Deploy helper.** It deploys the 0.9.44 Worker bundles. A Worker updated from the site gets this release's.
+
+### Documentation
+
+- **The passkey guide drops the phone offer.** `docs/passkey-wallet.md` names the login file as the other way in after a Create whose passkey has no PRF, says how a passkey already on a phone still signs in, and gives the copy line's new words.
+
 ## [0.9.44] - 2026-11-25
 
 A Worker updated to this release no longer sends a request's body on through a redirect, so a custom AI or transcription endpoint that answers with one now fails with `403`, and it closes five smaller gaps: in logging, the Wrapped image, the analysis alarm, restores, and backups after a group is deleted. The site counts the wait for the Session Agent and for an analysis card, and says when saved answers did not load. No MCP change.

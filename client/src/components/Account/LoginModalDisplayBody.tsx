@@ -23,7 +23,6 @@ import {
   LOGIN_FILE_PASSWORD_NEEDED_TEXT,
   LOGIN_FILE_PASSWORD_WRONG_TEXT,
   LOGIN_FILE_UNREADABLE_TEXT,
-  PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE,
   PASSKEYS_UNAVAILABLE_MESSAGE,
   type PasskeyWalletActionMode,
 } from './loginAndSettingsPasskeyActions';
@@ -86,16 +85,14 @@ const COPY_ANSWERS_HELP =
 // is made ready as this shows, because a copy has to happen inside the tap itself. `where` names the place to open
 // it; `otherwise` shows where this browser cannot pack the answers. The button is the first words of its sentence,
 // so a copy that worked marks the button with a check rather than changing its words, and says so to screen readers.
-// `afterPhoneOffer` gives it the words that follow the phone offer; `withOr` puts an "or" above it.
+// `withOr` puts an "or" above it.
 const CopyMyAnswers = ({
   where,
   otherwise,
-  afterPhoneOffer = false,
   withOr = false,
 }: {
   where: string;
   otherwise: React.ReactNode;
-  afterPhoneOffer?: boolean;
   withOr?: boolean;
 }) => {
   const [text, setText] = useState<string | null | undefined>(undefined);
@@ -130,11 +127,11 @@ const CopyMyAnswers = ({
           {copied ? <FontAwesomeIcon icon={faCheck} className={styles.passkeyCopiedMark} /> : null}
           Copy this link
         </Button>{' '}
-        {afterPhoneOffer ? 'to' : 'and'}
+        and
       </span>{' '}
-      {afterPhoneOffer ? 'paste your responses on a different' : `open it ${where} to recover and submit`}{' '}
+      open it {where} to recover and submit{' '}
       <span className={styles.passkeyCopyAnswersUnbroken}>
-        {afterPhoneOffer ? 'device.' : 'responses.'}{' '}
+        responses.{' '}
         <button
           type="button"
           id="ce-passkey-copy-answers-help"
@@ -164,54 +161,6 @@ const CopyMyAnswers = ({
   );
 };
 
-const ANOTHER_DEVICE_HELP =
-  'This device shows a QR code. Scan it with your phone\u2019s camera and save the passkey on the phone. ' +
-  'After that, your phone signs you in on this device.';
-
-// After a Create whose passkey this site cannot use (Windows Hello on a Windows without PRF, or a passkey app
-// without it): the same Create, asked of a phone. It is the first of up to three options, an "or" between them:
-// "Scan QR with phone to login", "Create login file to login without a passkey", and, where answers are unsaved,
-// "Copy this link to paste your responses on a different device."
-const UseAnotherDevice = ({ onClick }: { onClick: () => void }) => (
-  <div className={styles.passkeyCopyAnswers} data-testid="ce-passkey-another-device">
-    <span className={styles.passkeyCopyAnswersUnbroken}>
-      <Button
-        type="button"
-        size="sm"
-        color="primary"
-        className={styles.passkeyCopyAnswersButton}
-        data-testid="ce-passkey-another-device-button"
-        onClick={() => onClick()}
-      >
-        Scan QR with phone
-      </Button>{' '}
-      to login{' '}
-      <button
-        type="button"
-        id="ce-passkey-another-device-help"
-        className={styles.passkeyWalletStatusHelp}
-        data-ce-control-appearance="frameless"
-        aria-label="About scanning with your phone"
-        aria-describedby="ce-passkey-another-device-about"
-      >
-        <FontAwesomeIcon icon={faQuestionCircle} />
-      </button>
-    </span>
-    <span id="ce-passkey-another-device-about" hidden>
-      {ANOTHER_DEVICE_HELP}
-    </span>
-    <UncontrolledTooltip
-      target="ce-passkey-another-device-help"
-      placement="top"
-      trigger="hover focus"
-      autohide={false}
-      className={styles.networkTooltip}
-    >
-      {ANOTHER_DEVICE_HELP}
-    </UncontrolledTooltip>
-  </div>
-);
-
 type AccountUserPageProps = {
   viewAddress?: string;
   account?: string;
@@ -232,7 +181,6 @@ type LoginModalDisplayBodyProps = {
   activeSessionSlug: string;
   handleLogout: () => void;
   handlePasskeyWalletCreate: () => void;
-  handlePasskeyWalletCreateOnAnotherDevice: () => void;
   handlePasskeyWalletSignIn: () => void;
   handlePasskeyWalletCancel: () => void;
   handleLoginFileChosen: (file: ChosenLoginFile) => void;
@@ -282,7 +230,6 @@ const LoginModalDisplayBody = ({
   activeSessionSlug,
   handleLogout,
   handlePasskeyWalletCreate,
-  handlePasskeyWalletCreateOnAnotherDevice,
   handlePasskeyWalletSignIn,
   handlePasskeyWalletCancel,
   handleLoginFileChosen,
@@ -310,7 +257,6 @@ const LoginModalDisplayBody = ({
   showWalletIdentity,
 }: LoginModalDisplayBodyProps) => {
   const passkeysUnavailable = passkeyWalletStatusMessage === PASSKEYS_UNAVAILABLE_MESSAGE;
-  const passkeyLacksPrf = passkeyWalletStatusMessage === PASSKEY_CREATE_PRF_UNSUPPORTED_MESSAGE;
   // After any sign-in that failed, the status is also the list of other ways in: it offers a login file, so
   // "Other options" is not shown beside it. A message about a login file itself stays in view on its own.
   const loginIssue = passkeyWalletStatusTone === 'error' && isLoginIssue(passkeyWalletStatusMessage);
@@ -384,17 +330,15 @@ const LoginModalDisplayBody = ({
               data-testid="ce-passkey-wallet-status"
             >
               {passkeyWalletStatusMessage}
-              {passkeyLacksPrf ? <UseAnotherDevice onClick={handlePasskeyWalletCreateOnAnotherDevice} /> : null}
-              {/* The order of the ways in: the phone, a login file, then the answers to take elsewhere. In a
-                  browser without passkeys the link to another browser is the way in, so it comes first. */}
-              {offersLoginFile && !passkeysUnavailable ? loginFileLine(passkeyLacksPrf, !copiesAnswers) : null}
+              {/* The order of the ways in: a login file, then the answers to take elsewhere. In a browser without
+                  passkeys the link to another browser is the way in, so it comes first. */}
+              {offersLoginFile && !passkeysUnavailable ? loginFileLine(false, !copiesAnswers) : null}
               {/* When the passkey itself is the problem, unsaved answers can leave with the person; the plain link
                   stays for a browser without passkeys that holds none. */}
               {copiesAnswers ? (
                 <CopyMyAnswers
-                  afterPhoneOffer={passkeyLacksPrf}
                   withOr={offersLoginFile && !passkeysUnavailable}
-                  where={passkeysUnavailable ? 'in Safari or Chrome' : 'on your phone'}
+                  where={passkeysUnavailable ? 'in Safari or Chrome' : 'on another device'}
                   otherwise={passkeysUnavailable ? <CopyPageLink /> : null}
                 />
               ) : passkeysUnavailable ? (
@@ -473,7 +417,7 @@ const LoginModalDisplayBody = ({
     return (
       <CardBody>
         <div id={styles.loadingIconContainer}>
-          <h3 id={styles.verifyingText}>{progressLabel}</h3>
+          <h3>{progressLabel}</h3>
           <FontAwesomeIcon icon={faSpinner} pulse id={styles.verifyingTXloadingIcon} />
         </div>
         {/* A passkey step can wait with nothing on screen (its prompt hidden, or the page waiting for focus). */}

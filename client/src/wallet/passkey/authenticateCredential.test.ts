@@ -33,4 +33,16 @@ describe('authenticatePasskeyCredential with the browser’s passkeys', () => {
     await authenticatePasskeyCredential({ config, salt: new Uint8Array(32) });
     expect(get).toHaveBeenCalledTimes(1);
   });
+
+  // A passkey kept on a phone still signs in, through the browser's own "use a phone" choice: Login names no kind of
+  // device, and a saved passkey is asked for over the phone's transport as well as this device's.
+  it('leaves a passkey kept on a phone reachable from the browser’s prompt', async () => {
+    jest.spyOn(document, 'hasFocus').mockReturnValue(true);
+    await authenticatePasskeyCredential({ config, salt: new Uint8Array(32) });
+    await authenticatePasskeyCredential({ config, salt: new Uint8Array(32), credentialId: 'AQID' });
+    const [[any], [saved]] = get.mock.calls as unknown as Array<[CredentialRequestOptions]>;
+    expect(any.publicKey).not.toHaveProperty('allowCredentials');
+    expect(any.publicKey).not.toHaveProperty('hints');
+    expect(saved.publicKey?.allowCredentials?.map(({ transports }) => transports)).toEqual([['internal', 'hybrid']]);
+  });
 });

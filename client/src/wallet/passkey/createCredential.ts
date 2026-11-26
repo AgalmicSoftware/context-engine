@@ -30,14 +30,11 @@ export const createPasskeyCredential = async ({
   salt,
   credentials = credentialClient(),
   excludeCredentialIds = [],
-  anotherDevice = false,
 }: {
   config: PasskeyWalletConfig;
   salt: Uint8Array;
   credentials?: PasskeyCredentialClient;
   excludeCredentialIds?: string[];
-  /** Asks for a passkey kept on a phone, reached by QR code, for a device whose own passkeys lack PRF. */
-  anotherDevice?: boolean;
 }): Promise<PublicKeyCredential> => {
   if (typeof PublicKeyCredential === 'undefined') {
     throw new PasskeysUnavailableError();
@@ -66,13 +63,11 @@ export const createPasskeyCredential = async ({
           { alg: -257, type: 'public-key' },
         ],
         authenticatorSelection: {
-          authenticatorAttachment: anotherDevice ? 'cross-platform' : 'platform',
+          authenticatorAttachment: 'platform',
           residentKey: 'required',
           requireResidentKey: true,
           userVerification: 'required',
         },
-        // Opens the browser's sheet on the phone's QR code where it reads hints; others ignore the field.
-        ...(anotherDevice ? { hints: ['hybrid'] } : {}),
         timeout: 60000,
         attestation: 'none',
         extensions: buildPrfExtension(salt),

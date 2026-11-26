@@ -257,10 +257,11 @@ describe('bundled app-theme contrast', () => {
   // Contracts on component stylesheets read the compiled rules, so a token meant for another surface fails them.
   const compileModule = (file: string) =>
     sass.compile(path.resolve(scssDir, file), { loadPaths: [scssDir], style: 'expanded' }).css;
-  const moduleRule = (moduleCss: string, selector: string) => {
+  // Given several selectors of one weight, as an element's classes, the later rule wins.
+  const moduleRule = (moduleCss: string, ...selectors: string[]) => {
     const found: Record<string, string> = {};
-    for (const [, selectors, body] of moduleCss.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-      if (!selectors.split(/,(?![^(]*\))/).some((candidate) => candidate.trim() === selector)) continue;
+    for (const [, list, body] of moduleCss.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!list.split(/,(?![^(]*\))/).some((candidate) => selectors.includes(candidate.trim()))) continue;
       for (const [, name, value] of body.matchAll(/([a-z-]+):\s*([^;]+);/g)) {
         found[name] = value.replace(/\s*!important$/, '').trim();
       }
@@ -320,6 +321,78 @@ describe('bundled app-theme contrast', () => {
         return [button, Number(contrastRatio(composite(paint(rule.color), fill), fill).toFixed(2))] as const;
       });
       expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
+    },
+  );
+
+  // A layout profile's view of a component stylesheet: the shared rules and its own container block, not the others'.
+  const forProfile = (moduleCss: string, layoutProfile: string) => {
+    let kept = '';
+    let from = 0;
+    for (const block of moduleCss.matchAll(/@container ce-theme style\(--ce-layout-profile: ([a-z-]+)\) \{/g)) {
+      if (block[1] === layoutProfile) continue;
+      let end = block.index + block[0].length;
+      for (let depth = 1; depth > 0; end += 1) depth += { '{': 1, '}': -1 }[moduleCss[end]] ?? 0;
+      kept += moduleCss.slice(from, block.index);
+      from = end;
+    }
+    return kept + moduleCss.slice(from);
+  };
+
+  // "creating passkey..." or "logging in...", and its spinner, on the log-in dialog's surface while a passkey step
+  // runs. White text and an overlay-coloured spinner were invisible there on Minimal's white dialog.
+  test.each(registry.themes.map(({ id, layoutProfile }) => [id, layoutProfile]))(
+    '%s keeps the log-in progress text and spinner readable',
+    (themeId, layoutProfile) => {
+      const values = themeValues(css, themeId);
+      const paint = painter(values);
+      const themedCss = forProfile(accountCss, layoutProfile);
+      const dialog = composite(parseColor(values.surface), parseColor(values.canvas));
+      const ratio = (selector: string) => {
+        const rule = moduleRule(themedCss, selector);
+        const [red, green, blue, alpha] = paint(rule.color);
+        const seen = composite([red, green, blue, alpha * Number(rule.opacity ?? 1)], dialog);
+        return Number(contrastRatio(seen, dialog).toFixed(2));
+      };
+      expect(ratio('#loadingIconContainer h3')).toBeGreaterThanOrEqual(4.5);
+      expect(ratio('#loadingIconContainer #verifyingTXloadingIcon')).toBeGreaterThanOrEqual(3);
+    },
+  );
+
+  // The log-in window's boxes and panels: each text, which a box's (?) and checkbox labels inherit, on the fills under
+  // it. Classic 95 filled the status boxes with its navy title bar, which left the red failure text at 1.68:1, and
+  // white text on the overlay fill vanished on Minimal's white.
+  test.each(registry.themes.map(({ id, layoutProfile }) => [id, layoutProfile]))(
+    '%s keeps the log-in boxes and panels readable',
+    (themeId, layoutProfile) => {
+      const values = themeValues(css, themeId);
+      const paint = painter(values);
+      const themedCss = forProfile(accountCss, layoutProfile);
+      const dialog = composite(parseColor(values.surface), parseColor(values.canvas));
+      const ratio = (text: string[], ...fills: string[][]) => {
+        const fill = fills.reduce(
+          (under, classes) => composite(paint(moduleRule(themedCss, ...classes).background), under),
+          dialog,
+        );
+        const { color } = moduleRule(themedCss, ...text);
+        return Number(contrastRatio(composite(paint(color), fill), fill).toFixed(2));
+      };
+      const status = ['.passkeyWalletStatus'];
+      const failure = ['.passkeyWalletStatus', '.passkeyWalletStatusError'];
+      const notice = ['.advancedWalletAccessNotice'];
+      const panel = ['.agentTokenLoginPanel'];
+      const ratios = {
+        status: ratio(status, status),
+        failure: ratio(failure, failure),
+        notice: ratio(notice, notice),
+        panel: ratio(panel, panel),
+        panelToggle: ratio(['.agentTokenLoginToggle'], panel, ['.agentTokenLoginToggle']),
+        panelCopy: ratio(['.agentTokenLoginCopy'], panel),
+        panelHint: ratio(['.agentTokenLoginHint'], panel),
+        panelLabel: ratio(['.agentTokenLoginLabel'], panel),
+        panelInput: ratio(['.agentTokenLoginInput'], panel, ['.agentTokenLoginInput']),
+        panelError: ratio(['.agentTokenLoginError'], panel, ['.agentTokenLoginError']),
+      };
+      expect(Object.entries(ratios).filter(([, value]) => value < 4.5)).toEqual([]);
     },
   );
 

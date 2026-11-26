@@ -259,11 +259,6 @@ h1 {
 
 /* --- LoginAndSettingsModal.tsx --- */
 
-#verifyingText {
-  color: var(--ce-color-white) !important;
-  opacity: 0.75 !important;
-}
-
 @media (min-width: 320px) and (max-width: 465px) {
   #accountModalCard {
     padding: 0px;
@@ -336,8 +331,9 @@ h1 {
   min-height: 200px;
   align-items: center;
   justify-content: center;
+  // "creating passkey..." and its spinner sit on the dialog's own surface, so they take its muted text colour.
   h3 {
-    color: var(--ce-overlay-surface);
+    color: var(--ce-panel-text-muted);
     text-transform: lowercase;
     font-size: 4em;
     margin-right: 0.5em;
@@ -345,7 +341,7 @@ h1 {
   }
 
   #verifyingTXloadingIcon {
-    color: var(--ce-overlay-surface);
+    color: var(--ce-panel-text-muted);
     font-size: 5em;
   }
 }
@@ -2333,11 +2329,6 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-// The line above another line with a button: apart enough that the two buttons' 44px tap areas do not meet.
-.passkeyAnotherDevice {
-  margin-bottom: 14px;
-}
-
 // "Create login file or Login with file": tall lines, so that where the two buttons wrap onto two lines their
 // 44px tap areas do not meet.
 .loginFilePair {
@@ -2925,6 +2916,27 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   .loginIcons {
     display: none;
   }
+
+  // The log-in window's boxes and panels: a sunken field like the box above them. The navy title-bar fill they had
+  // left the red failure text at 1.68:1.
+  .passkeyWalletStatus,
+  .advancedWalletAccessNotice,
+  .agentTokenLoginPanel,
+  .agentTokenLoginError {
+    border-color: var(--ce-border-inset);
+    border-width: var(--ce-border-control-width);
+    background: var(--ce-surface-sunken);
+    color: var(--ce-panel-text);
+  }
+
+  .agentTokenLoginLabel {
+    color: var(--ce-panel-text);
+  }
+
+  .passkeyWalletStatusError,
+  .agentTokenLoginError {
+    color: var(--ce-status-danger-text);
+  }
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
@@ -3000,8 +3012,16 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
 
   #closeModalIcon,
   .Web3SettingsModalTitle,
-  .passkeyWalletStatus {
+  .passkeyWalletStatus,
+  .advancedWalletAccessNotice,
+  .agentTokenLoginPanel,
+  .agentTokenLoginLabel {
     color: var(--ce-panel-text);
+  }
+
+  .agentTokenLoginToggle {
+    background: var(--ce-action-primary);
+    color: var(--ce-action-primary-text);
   }
 
   .passkeyButton,
