@@ -1,11 +1,15 @@
 jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
 import { buildSbtActivityCacheEntry } from '../../utilities/sbt/sbtActivityCacheEntry.js';
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { Provider, connect } from 'react-redux';
 import { applyMiddleware, combineReducers, createStore } from 'redux';
 import thunk from 'redux-thunk';
-import ConnectedCommunityTab, { CommunityTab, WORKER_LISTING_COUNTS_WAIT_MS } from './CommunityTab';
+import ConnectedCommunityTab, {
+  CommunityTab,
+  QUESTIONS_LOAD_LIMIT_MS,
+  WORKER_LISTING_COUNTS_WAIT_MS,
+} from './CommunityTab';
 import { LoginAndSettingsModal } from '../Account/LoginAndSettingsModal';
 import sessionStateReducer from '../../reducers/sessionStateReducer';
 import { updateGlobalSessionSelection } from '../../actions/sessionStateActions';
@@ -36,6 +40,13 @@ import {
   withWorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
 import { WORKER_GROUP_COUNT_TIMEOUT_MS, WORKER_GROUP_COUNT_WAIT_MS } from './communityWorkerGroupStats';
+import { CommunitySessionDialog } from './CommunitySessionDialogs';
+import { loadCommunityWorkerQuestions } from './communityWorkerQuestions';
+
+// An opened Worker session's questions are read only where this browser holds none; tests say what each read gives.
+jest.mock('./communityWorkerQuestions', () => ({
+  loadCommunityWorkerQuestions: jest.fn(() => new Promise(() => {})),
+}));
 
 // The Stats tiles count a Worker-hosted session from its listings. Tests name what each session's listings hold;
 // a session not named here lists nothing.
@@ -59,7 +70,8 @@ const settleListingCounts = async (instance) => {
   await instance._runStatsRefreshCycle({ force: true });
 };
 import BeeswarmPlot from '../Shared/BeeswarmPlot/BeeswarmPlot';
-import SBTsList from '../SBTs/SBTsList';
+import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath';
+import { buildWorkerGroupsPath } from '../../utilities/worker/workerGroupRoutes';
 import SBTFilter from '../SBTs/SBTFilter';
 import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 import demoSessions from '../../variables/demo/demo_sessions.json';
@@ -608,7 +620,7 @@ describe('CommunityTab helpers', () => {
     expect(collectTreeNodes(tree, (node) => node.type === Modal)[0].props.isOpen).toBe(true);
     if (modalType === 'questions') {
       const [body] = collectTreeNodes(tree, (node) => node.type === ModalBody);
-      expect(collectTreeNodes(body, (node) => node.type === 'table')).toHaveLength(1);
+      expect(collectTreeNodes(body, (node) => node.type === CommunitySessionDialog)).toHaveLength(1);
     }
   });
 
@@ -1953,17 +1965,6 @@ describe('CommunityTab helpers', () => {
         'noopener,noreferrer',
       );
 
-      instance.state = {
-        ...instance.state,
-        modalType: 'questions',
-      };
-      const [questionsTree] = collectTreeNodes(instance.render(), (node) => node.type === ModalHeader);
-      const [questionsAnchor] = collectTreeNodes(
-        questionsTree,
-        (node) => node?.type === 'a' && typeof node?.props?.href === 'string',
-      );
-      expect(questionsAnchor.props.href).toBe('/ce/session/edge');
-
       instance.handleUserClick({ username: '0xabc' });
       instance.handleUserClick({ username: 'ada' });
       expect(openSpy).toHaveBeenNthCalledWith(2, '/ce/u/0xabc', '_blank', 'noopener,noreferrer');
@@ -1978,304 +1979,552 @@ describe('CommunityTab helpers', () => {
     }
   });
 
-  it('lists scoped questions of every type with their own session report links', () => {
-    const previousPublicUrl = process.env.PUBLIC_URL;
-    process.env.PUBLIC_URL = '/ce/';
-    try {
-      const instance = new CommunityTab({ activeSessionSlug: 'active' });
-      instance.state.modalType = 'questions';
-      instance._iterScopeCaches = jest.fn(() => [
-        {
-          slug: '',
-          sessionConfig: {},
-          questionsCache: {
-            questions: {
-              repeated: { prompt: 'General freeform question', type: 'freeform' },
-              rating: { prompt: 'General rating question', type: 'rating' },
-            },
-          },
-        },
-        {
-          slug: 'edge session',
-          sessionConfig: { slug: 'edge session', sessionName: 'Edge discussion' },
-          questionsCache: {
-            questions: {
+  describe('Questions dialog', () => {
+    const chainEntry = (slug, questions, extra = {}) => ({
+      slug,
+      netKey: '84532',
+      isWorkerCanonical: false,
+      sessionConfig: {},
+      questionsCache: { questions },
+      surveysCache: {},
+      sbtCache: {},
+      ...extra,
+    });
+    beforeEach(() => {
+      loadCommunityWorkerQuestions.mockReset();
+      loadCommunityWorkerQuestions.mockImplementation(() => new Promise(() => {}));
+    });
+    const answers = (votes) =>
+      Object.fromEntries(votes.map((value, index) => [`0x${index + 1}`, { type: 'binary', answer: { value } }]));
+    const renderQuestions = (instance, entries) => {
+      instance._iterScopeCaches = jest.fn(() => entries);
+      return render(instance.renderQuestionsDialog());
+    };
+    const workerEntry = (instance, slug, { questions = 0, questionsCache = {}, sessionConfig } = {}) => {
+      const entry = {
+        slug,
+        netKey: 'worker',
+        isWorkerCanonical: true,
+        sessionConfig: sessionConfig || { ...WORKER_SESSION_CONFIG, slug, sessionName: `${slug} session` },
+        workerCanonicalIdentity: { workerOrigin: 'https://worker.example' },
+        questionsCache,
+        surveysCache: {},
+        sbtCache: {},
+      };
+      instance._workerListingCounts.set(instance._workerListingKey(entry), {
+        counts: { questions, surveys: 0, responders: [] },
+        failed: false,
+        loading: false,
+        at: Date.now(),
+      });
+      return entry;
+    };
+
+    it('lists each session with its count and opens one to its questions of every kind', () => {
+      const previousPublicUrl = process.env.PUBLIC_URL;
+      process.env.PUBLIC_URL = '/ce/';
+      try {
+        renderQuestions(new CommunityTab({ activeSessionSlug: 'active' }), [
+          chainEntry('', {
+            repeated: { prompt: 'General freeform question', type: 'freeform' },
+            rating: { prompt: 'General rating question', type: 'rating' },
+          }),
+          chainEntry(
+            'edge session',
+            {
               repeated: { prompt: 'Named session binary question', type: 'binary' },
               multi: { prompt: 'Named multiple choice question', type: 'multichoice' },
               quadratic: { prompt: 'Named allocation question', type: 'quadratic' },
             },
-          },
-        },
-      ]);
-      const tree = instance.renderModalContent();
-      const [table] = collectTreeNodes(tree, (node) => node.type === 'table');
-      expect(table.props['aria-label']).toBe('Questions by session');
-      expect(collectTreeNodes(table, (node) => node.type === 'th').map(collectNodeText)).toEqual([
-        'Session',
-        'Question',
-      ]);
-      const rows = collectTreeNodes(table, (node) => node.props?.['data-ce-question-id']);
-      expect(rows).toHaveLength(5);
-      expect(rows.map((row) => row.props['data-ce-session-slug'])).toEqual([
-        '',
-        '',
-        'edge session',
-        'edge session',
-        'edge session',
-      ]);
-      expect(
-        collectTreeNodes(rows, (node) => node.type === 'a').map((node) => [collectNodeText(node), node.props.href]),
-      ).toEqual([
-        ['General freeform question', '/ce/session#report'],
-        ['General rating question', '/ce/session#report'],
-        ['Named session binary question', '/ce/session/edge%20session#report'],
-        ['Named multiple choice question', '/ce/session/edge%20session#report'],
-        ['Named allocation question', '/ce/session/edge%20session#report'],
-      ]);
-      expect(collectNodeText(rows[0])).toContain('General');
-      expect(collectNodeText(rows[2])).toContain('Edge discussion');
-      expect(new Set(rows.map((row) => row.key)).size).toBe(5);
-      expect(collectTreeNodes(tree, (node) => node.type === BeeswarmPlot)).toHaveLength(0);
-    } finally {
-      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
-      else process.env.PUBLIC_URL = previousPublicUrl;
-    }
-  });
+            { sessionConfig: { slug: 'edge session', sessionName: 'Edge discussion' } },
+          ),
+          chainEntry('empty', {}),
+        ]);
+        const dialog = screen.getByTestId('ce-community-questions-dialog');
+        expect(dialog).toHaveTextContent('2 sessions, 5 questions');
+        expect(
+          within(dialog)
+            .getAllByRole('button')
+            .map((row) => row.textContent),
+        ).toEqual(['Edge discussion3 questions ', 'General2 questions ']);
 
-  it('refreshes open question titles as cached metadata arrives without recounting Stats', async () => {
-    class QuestionsTableView extends CommunityTab {
-      componentDidMount() {}
-      componentDidUpdate() {}
-      render() {
-        return this.renderQuestionsModalContent();
+        fireEvent.click(screen.getByRole('button', { name: /^Edge discussion/ }));
+        const opened = screen.getByTestId('ce-community-questions-dialog-session');
+        expect(within(opened).getByRole('heading')).toHaveTextContent('Edge discussion: 3 questions');
+        expect(opened).toHaveTextContent('1 agree/disagree, 1 choice, 1 quadratic');
+        // No answers to place: no chart to choose.
+        expect(within(opened).queryByRole('group', { name: 'Show questions as' })).not.toBeInTheDocument();
+        expect(
+          within(opened)
+            .getAllByRole('link')
+            .map((link) => [link.textContent, link.getAttribute('href')]),
+        ).toEqual([
+          ['Named session binary questionagree/disagree', '/ce/session/edge%20session#report'],
+          ['Named multiple choice questionchoice', '/ce/session/edge%20session#report'],
+          ['Named allocation questionquadratic', '/ce/session/edge%20session#report'],
+        ]);
+      } finally {
+        if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
+        else process.env.PUBLIC_URL = previousPublicUrl;
       }
-    }
-    const ref = React.createRef();
-    const view = render(<QuestionsTableView ref={ref} activeSessionSlug="" />);
-    const instance = ref.current;
-    const netKey = String(instance._resolveNetKeyForSlug(''));
-    const writeQuestion = (question) =>
-      writeCache('questionsCache', '', {
-        [netKey]: { questionsLatestBlock: 10, questions: { q1: question }, questionResponses: {} },
-      });
-    const refresh = () =>
-      act(async () => {
-        await instance._runStatsRefreshCycle({ force: false });
-      });
-    try {
-      await writeQuestion({ creator: '0xabc', type: 'freeform' });
-      act(() => instance.setState({ showModal: true, modalType: 'questions', initialLoadDone: true }));
-      await refresh();
-      expect(screen.getByRole('link', { name: 'Question q1' })).toBeVisible();
-      const originalStats = instance.state.stats;
-      const computeStats = jest.spyOn(instance, '_computeStatsSnapshot');
-      const renderTable = jest.spyOn(instance, 'renderQuestionsModalContent');
-      await writeQuestion({ creator: '0xabc', type: 'freeform', prompt: 'Hydrated question title' });
-      await refresh();
-      expect(screen.getByRole('link', { name: 'Hydrated question title' })).toHaveAttribute('href', '/session#report');
-      expect(instance.state.stats).toBe(originalStats);
-      expect(computeStats).not.toHaveBeenCalled();
-      renderTable.mockClear();
-      await refresh();
-      expect(renderTable).not.toHaveBeenCalled();
-      peekCacheSync('questionsCache', '', { clone: false })[netKey].questions.q1.prompt = 'Updated in place';
-      await refresh();
-      expect(screen.getByRole('link', { name: 'Updated in place' })).toBeVisible();
-      act(() => instance.setState({ showModal: false, modalType: null }));
-      renderTable.mockClear();
-      await writeQuestion({ creator: '0xabc', type: 'freeform', prompt: 'Changed while closed' });
-      await refresh();
-      expect(renderTable).not.toHaveBeenCalled();
-      act(() => instance.setState({ showModal: true, modalType: 'questions' }));
-      expect(screen.getByRole('link', { name: 'Changed while closed' })).toBeVisible();
-    } finally {
-      view.unmount();
-    }
-  });
+    });
 
-  it('uses identity-matched Worker questions without stale numeric metadata', async () => {
-    await writeWorkerStatsCaches();
-    const instance = new CommunityTab({ activeSessionSlug: 'demo-sh', sessionConfig: WORKER_SESSION_CONFIG });
-    instance.state.modalType = 'questions';
-    instance._getSelectedSessionSlugs = jest.fn(() => ['demo-sh']);
-    const content = instance.renderModalContent();
-    expect(collectNodeText(content)).toContain('Worker question');
-    expect(collectNodeText(content)).not.toContain('Stale numeric question');
-    expect(collectTreeNodes(content, (node) => node.type === 'a').map((node) => node.props.href)).toEqual([
-      '/session/demo-sh#report',
-    ]);
-  });
+    it('totals the questions as the Questions tile counts them', () => {
+      const instance = new CommunityTab({});
+      const chain = [
+        chainEntry('alpha', {
+          shared: { prompt: 'Asked in both', type: 'binary' },
+          own: { prompt: 'Alpha only', type: 'rating' },
+        }),
+        chainEntry('beta', { shared: { prompt: 'Asked in both', type: 'binary' } }),
+      ];
+      const entries = [
+        ...chain,
+        workerEntry(instance, 'wk', { questions: 4 }),
+        workerEntry(instance, 'w2', { questions: 7 }),
+      ];
+      renderQuestions(instance, entries);
 
-  it('keeps unknown session labels and empty scopes free of unrelated demo fallbacks', () => {
-    const instance = new CommunityTab({ activeSessionSlug: 'unknown' });
-    instance.state.modalType = 'questions';
-    jest
-      .spyOn(chainGateway, 'getDemoSessionConfigBySlug')
-      .mockReturnValue({ slug: 'demo', sessionName: 'Unrelated demo' });
-    instance._iterScopeCaches = jest.fn(() => [
-      {
-        slug: 'unknown',
-        sessionConfig: {},
-        questionsCache: {
-          questions: {
-            unnamed: {},
-            encrypted: { prompt: '[encrypted]' },
-          },
+      // As the tile adds them up: chain sessions from their caches, Worker sessions from their listings.
+      const tile = instance._getQuestionDetailsRows(chain).length + instance._workerListingTotals(entries).questions;
+      const shown = screen.getByTestId('ce-community-questions-dialog').textContent.match(/sessions, (\d+) questions?/);
+      expect(Number(shown?.[1])).toBe(tile);
+    });
+
+    it('leaves hidden questions out of the count and the list, as the session page does', () => {
+      const instance = new CommunityTab({});
+      const entry = chainEntry(
+        'alpha',
+        {
+          shown: { prompt: 'Shown question', type: 'binary' },
+          SettingsHidden: { prompt: 'Hidden in Settings', type: 'binary' },
+          marked: { prompt: 'Marked hidden', type: 'binary', hidden: true },
+          answeredOnly: { prompt: 'Named by an answer', type: 'binary', source: 'worker-response-payload' },
         },
-      },
-    ]);
-    const text = collectNodeText(instance.renderModalContent());
-    expect(text).toContain('unknown');
-    expect(text).not.toContain('Unrelated demo');
-    expect(text).toContain('Question unnamed');
-    expect(text).toContain('Encrypted question');
-    instance._iterScopeCaches.mockReturnValue([{ slug: 'unknown', sessionConfig: {}, questionsCache: {} }]);
-    const empty = instance.renderModalContent();
-    expect(collectNodeText(empty)).toContain('No questions available for the selected sessions.');
-    expect(collectTreeNodes(empty, (node) => node.type === 'a')).toHaveLength(0);
-  });
-
-  it('uses exact-session demo question names only when that demo has no cached questions', () => {
-    const instance = new CommunityTab({ activeSessionSlug: 'demo' });
-    instance.state.modalType = 'questions';
-    const exactDataset = { comments: [{ commentId: 'demo-1', commentBody: 'Exact demo question', type: 'rating' }] };
-    const lookup = jest
-      .spyOn(polisReportModule, 'getPolisDemoDatasetForSlug')
-      .mockImplementation((slug, options) =>
-        slug === 'demo' && options?.allowFallback === false
-          ? exactDataset
-          : { comments: [{ commentId: 'wrong', commentBody: 'Wrong fallback' }] },
+        { sessionConfig: { BLOCKED_QUESTION_IDS: ['settingshidden'] } },
       );
-    instance._iterScopeCaches = jest.fn(() => [
-      { slug: 'demo', sessionConfig: { slug: 'demo', sessionName: 'Demo Session' }, questionsCache: {} },
-      { slug: 'unknown', sessionConfig: {}, questionsCache: {} },
-      { slug: 'demo-sh', isWorkerCanonical: true, sessionConfig: WORKER_SESSION_CONFIG, questionsCache: {} },
-    ]);
-    const content = instance.renderModalContent();
-    expect(collectNodeText(content)).toContain('Exact demo question');
-    expect(collectNodeText(content)).not.toContain('Wrong fallback');
-    expect(collectTreeNodes(content, (node) => node.type === 'a').map((node) => node.props.href)).toEqual([
-      '/session/demo#report',
-    ]);
-    expect(lookup).toHaveBeenCalledWith('demo', { allowFallback: false });
-    expect(lookup).not.toHaveBeenCalledWith('demo-sh', expect.anything());
-  });
+      expect(instance._getQuestionDetailsRows([entry]).map(({ questionId }) => questionId)).toEqual(['shown']);
+      renderQuestions(instance, [entry]);
+      const opened = screen.getByTestId('ce-community-questions-dialog-session');
+      expect(within(opened).getByRole('heading')).toHaveTextContent('alpha: 1 question');
+      expect(
+        within(opened)
+          .getAllByRole('link')
+          .map((link) => link.textContent),
+      ).toEqual(['Shown questionagree/disagree']);
+    });
 
-  it('keeps the questions table in the body and links the active session from the Details header', () => {
-    const instance = new CommunityTab({ activeSessionSlug: 'edge' });
-    instance.state = {
-      ...instance.state,
-      modalType: 'questions',
-      modalTitle: 'Questions Details',
-    };
-    instance._getSelectedSessionSlugs = jest.fn(() => ['other-session', 'edge']);
-    instance._iterScopeCaches = jest.fn(() => [
-      {
-        slug: 'other-session',
-        sessionConfig: {},
-        questionsCache: { questions: { q1: { prompt: 'Prompt one' } } },
-      },
-    ]);
+    it('shows a chart first where three agree/disagree questions have answers, each dot opening the results', () => {
+      const instance = new CommunityTab({});
+      instance._openResults = jest.fn();
+      const questions = Object.fromEntries(
+        ['q1', 'q2', 'q3'].map((id) => [id, { prompt: `Binary ${id}`, type: 'binary' }]),
+      );
+      questions.q4 = { prompt: 'Written one', type: 'freeform' };
+      renderQuestions(instance, [
+        chainEntry('alpha', questions, {
+          questionsCache: {
+            questions,
+            questionResponses: {
+              q1: answers(['Agree', 'Agree']),
+              q2: answers(['Agree', 'Disagree']),
+              q3: answers(['Disagree', 'Unsure']),
+            },
+          },
+        }),
+      ]);
+      const opened = screen.getByTestId('ce-community-questions-dialog-session');
+      expect(opened).toHaveTextContent('3 agree/disagree, 1 written');
+      expect(within(opened).getByRole('button', { name: 'Chart' })).toHaveAttribute('aria-pressed', 'true');
+      expect(opened).toHaveTextContent('Click a dot to open its results.');
+      fireEvent.click(screen.getByTestId('ce-community-questions-plot-point-0'));
+      expect(instance._openResults).toHaveBeenCalledWith('/session/alpha#report');
 
-    const tree = instance.render();
-    const [header] = collectTreeNodes(tree, (node) => node.type === ModalHeader);
-    const [body] = collectTreeNodes(tree, (node) => node.type === ModalBody);
-    const [table] = collectTreeNodes(body, (node) => node.type === 'table');
-    const [anchorNode] = collectTreeNodes(header, (node) => node.type === 'a');
+      fireEvent.click(within(opened).getByRole('button', { name: 'List' }));
+      expect(within(opened).getByRole('button', { name: 'List' })).toHaveAttribute('aria-pressed', 'true');
+      expect(within(opened).getAllByRole('link')).toHaveLength(4);
+    });
 
-    expect(collectNodeText(table)).toContain('Prompt one');
-    expect(anchorNode).toBeTruthy();
-    expect(anchorNode.props.href).toBe('/session/edge');
-    expect(collectNodeText(anchorNode)).toBe('View Full Questions');
-    expect(anchorNode.props.target).toBeUndefined();
-    expect(anchorNode.props.rel).toBeUndefined();
-    expect(collectTreeNodes(header, (node) => node.type === 'h5').map(collectNodeText)).toEqual(['Questions Details']);
-    expect(header.props.tag).toBe('div');
-    expect(header.props.toggle).toBe(instance.toggleModal);
-    expect(collectTreeNodes(body, (node) => node.type === 'a')[0].props.href).toBe('/session/other-session#report');
-  });
+    it('shows the list first where fewer questions have answers, with the chart a click away', () => {
+      const questions = { q1: { prompt: 'Binary q1', type: 'binary' }, q2: { prompt: 'Binary q2', type: 'binary' } };
+      renderQuestions(new CommunityTab({}), [
+        chainEntry('alpha', questions, {
+          questionsCache: { questions, questionResponses: { q1: answers(['Agree']), q2: answers(['Disagree']) } },
+        }),
+      ]);
+      const opened = screen.getByTestId('ce-community-questions-dialog-session');
+      expect(within(opened).getByRole('button', { name: 'List' })).toHaveAttribute('aria-pressed', 'true');
+      fireEvent.click(within(opened).getByRole('button', { name: 'Chart' }));
+      expect(screen.getByTestId('ce-community-questions-plot-point-1')).toBeInTheDocument();
+    });
 
-  it.each([
-    ['', '', '/session'],
-    ['general', '/ce/', '/ce/session'],
-    [' Edge Session ', '/ce/', '/ce/session/edge%20session'],
-  ])('uses the active session route for %p under base path %p', (activeSessionSlug, publicUrl, expectedHref) => {
-    const previousPublicUrl = process.env.PUBLIC_URL;
-    process.env.PUBLIC_URL = publicUrl;
-    try {
-      const instance = new CommunityTab({ activeSessionSlug });
-      instance.state.modalType = 'questions';
-      instance._getSelectedSessionSlugs = jest.fn(() => ['different-session']);
-      const [header] = collectTreeNodes(instance.render(), (node) => node.type === ModalHeader);
-      expect(collectTreeNodes(header, (node) => node.type === 'a')[0].props.href).toBe(expectedHref);
-    } finally {
-      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
-      else process.env.PUBLIC_URL = previousPublicUrl;
-    }
-  });
+    it('counts a Worker session from its listing and opens it from what this browser holds', async () => {
+      await writeWorkerStatsCaches();
+      peekCacheSync('questionsCache', 'demo-sh', { clone: false })[
+        WORKER_CANONICAL_CACHE_SCOPE_KEY
+      ].workerMetadataHydrationStatus = 'complete';
+      const instance = new CommunityTab({ activeSessionSlug: 'demo-sh', sessionConfig: WORKER_SESSION_CONFIG });
+      instance._getSelectedSessionSlugs = jest.fn(() => ['demo-sh']);
+      const entry = instance._iterScopeCaches({ clone: false }).find(({ slug }) => slug === 'demo-sh');
+      instance._iterScopeCaches = jest.fn(() => [entry]);
+      instance._workerListingCounts.set(instance._workerListingKey(entry), {
+        counts: { questions: 1, surveys: 1, responders: [] },
+        failed: false,
+        loading: false,
+        at: Date.now(),
+      });
+      render(instance.renderQuestionsDialog());
+      const opened = screen.getByTestId('ce-community-questions-dialog-session');
+      expect(opened).toHaveTextContent('Worker question');
+      expect(opened).not.toHaveTextContent('Stale numeric question');
+      expect(
+        within(opened)
+          .getAllByRole('link')
+          .map((link) => link.getAttribute('href')),
+      ).toEqual(['/session/demo-sh#report']);
+      expect(loadCommunityWorkerQuestions).not.toHaveBeenCalled();
+    });
 
-  it.each(['users', 'surveys', 'sbtgroups', 'sessions'])(
-    'keeps the questions link out of the %s modal header',
-    (type) => {
-      const instance = new CommunityTab({ activeSessionSlug: 'edge' });
-      instance.state.modalType = type;
-      const [header] = collectTreeNodes(instance.render(), (node) => node.type === ModalHeader);
+    it('reads a Worker session this browser holds none of when it is opened, with a limit and Try again', async () => {
+      jest.useFakeTimers();
+      try {
+        const instance = attachMutableSetState(new CommunityTab({}));
+        const wk = workerEntry(instance, 'wk', { questions: 2 });
+        const other = chainEntry('alpha', { q: { prompt: 'Chain question', type: 'binary' } });
+        instance._iterScopeCaches = jest.fn(() => [wk, other]);
+        let resolveLoad;
+        loadCommunityWorkerQuestions.mockImplementation(() => new Promise(() => {}));
+        const view = render(instance.renderQuestionsDialog());
+        const rerender = () => view.rerender(instance.renderQuestionsDialog());
+
+        fireEvent.click(screen.getByRole('button', { name: /^wk session\s*2 questions/ }));
+        expect(screen.getByTestId('ce-community-questions-dialog-session')).toHaveTextContent('Reading questions…');
+        expect(loadCommunityWorkerQuestions).toHaveBeenCalledTimes(1);
+        expect(loadCommunityWorkerQuestions.mock.calls[0][0]).toMatchObject({ sessionSlug: 'wk' });
+
+        act(() => jest.advanceTimersByTime(QUESTIONS_LOAD_LIMIT_MS));
+        rerender();
+        expect(screen.getByRole('status')).toHaveTextContent('This is taking too long.');
+
+        loadCommunityWorkerQuestions.mockImplementation(
+          () =>
+            new Promise((resolve) => {
+              resolveLoad = resolve;
+            }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+        rerender();
+        expect(loadCommunityWorkerQuestions).toHaveBeenCalledTimes(2);
+        expect(loadCommunityWorkerQuestions.mock.calls[0][0].signal.aborted).toBe(true);
+        expect(screen.getByRole('status')).toHaveTextContent('Reading questions…');
+
+        await act(async () =>
+          resolveLoad({
+            questionsCache: {
+              questions: {
+                a: { prompt: 'Read question', type: 'binary' },
+                b: { prompt: '[encrypted]', type: 'binary' },
+              },
+              questionResponses: {},
+            },
+            answersPublic: false,
+          }),
+        );
+        rerender();
+        const opened = screen.getByTestId('ce-community-questions-dialog-session');
+        expect(
+          within(opened)
+            .getAllByRole('link')
+            .map((link) => link.textContent),
+        ).toEqual(['Read questionagree/disagree', 'Encrypted questionagree/disagree']);
+        expect(opened).toHaveTextContent('Answers to this session are not public.');
+        // Going back and opening it again reads nothing new.
+        fireEvent.click(within(opened).getByRole('button', { name: 'All sessions' }));
+        fireEvent.click(screen.getByRole('button', { name: /^wk session/ }));
+        expect(loadCommunityWorkerQuestions).toHaveBeenCalledTimes(2);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('says when a Worker session cannot be read, and when it has not been opened in this browser', async () => {
+      const instance = attachMutableSetState(new CommunityTab({}));
+      const wk = workerEntry(instance, 'wk', { questions: 2 });
+      const unopened = workerEntry(instance, 'far', { questions: 3, sessionConfig: { slug: 'far' } });
+      instance._iterScopeCaches = jest.fn(() => [wk, unopened]);
+      loadCommunityWorkerQuestions.mockRejectedValueOnce(new Error('refused'));
+      const view = render(instance.renderQuestionsDialog());
+
+      fireEvent.click(screen.getByRole('button', { name: /^far/ }));
+      const opened = screen.getByTestId('ce-community-questions-dialog-session');
+      expect(opened).toHaveTextContent('This session’s questions can be read here once it has been opened.');
+      expect(within(opened).getByRole('link', { name: /Open the session/ })).toHaveAttribute(
+        'href',
+        '/session/far#report',
+      );
+      expect(loadCommunityWorkerQuestions).not.toHaveBeenCalled();
+
+      fireEvent.click(within(opened).getByRole('button', { name: 'All sessions' }));
+      fireEvent.click(screen.getByRole('button', { name: /^wk/ }));
+      await act(async () => {});
+      view.rerender(instance.renderQuestionsDialog());
+      expect(screen.getByRole('status')).toHaveTextContent('This session’s questions can’t be read here.');
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    });
+
+    it('lists a Worker session still being counted, or whose listing could not be read, without opening it', () => {
+      const instance = new CommunityTab({});
+      const counting = workerEntry(instance, 'counting');
+      const unread = workerEntry(instance, 'unread');
+      instance._workerListingCounts.set(instance._workerListingKey(counting), { loading: true, counts: null });
+      instance._workerListingCounts.set(instance._workerListingKey(unread), {
+        loading: false,
+        failed: true,
+        counts: null,
+      });
+      renderQuestions(instance, [counting, unread, chainEntry('alpha', { q: { prompt: 'One', type: 'binary' } })]);
+      const dialog = screen.getByTestId('ce-community-questions-dialog');
+      expect(dialog).toHaveTextContent('3 sessions, 1 question');
+      expect(dialog).toHaveTextContent(/counting session.*counting/);
+      expect(dialog).toHaveTextContent('can’t be read here');
+      expect(
+        within(dialog)
+          .getAllByRole('button')
+          .map((row) => row.textContent),
+      ).toEqual(['alpha1 question ']);
+    });
+
+    it('keeps unknown session labels and empty sessions free of unrelated demo fallbacks', () => {
+      const instance = new CommunityTab({ activeSessionSlug: 'unknown' });
+      jest
+        .spyOn(chainGateway, 'getDemoSessionConfigBySlug')
+        .mockReturnValue({ slug: 'demo', sessionName: 'Unrelated demo' });
+      const view = renderQuestions(instance, [
+        chainEntry('unknown', { unnamed: {}, encrypted: { prompt: '[encrypted]' } }),
+      ]);
+      const opened = screen.getByTestId('ce-community-questions-dialog-session');
+      expect(opened).toHaveTextContent('unknown: 2 questions');
+      expect(opened).not.toHaveTextContent('Unrelated demo');
+      expect(opened).toHaveTextContent('Question unnamed');
+      expect(opened).toHaveTextContent('Encrypted question');
+      view.unmount();
+      renderQuestions(instance, [chainEntry('unknown', {})]);
+      expect(screen.getByTestId('ce-community-questions-dialog-session')).toHaveTextContent(
+        'No questions in this session yet.',
+      );
+    });
+
+    it('uses exact-session demo question names only when that demo has no cached questions', () => {
+      const lookup = jest
+        .spyOn(polisReportModule, 'getPolisDemoDatasetForSlug')
+        .mockImplementation((slug, options) =>
+          slug === 'demo' && options?.allowFallback === false
+            ? { comments: [{ commentId: 'demo-1', commentBody: 'Exact demo question', type: 'rating' }] }
+            : { comments: [{ commentId: 'wrong', commentBody: 'Wrong fallback' }] },
+        );
+      renderQuestions(new CommunityTab({ activeSessionSlug: 'demo' }), [
+        chainEntry('demo', {}, { sessionConfig: { slug: 'demo', sessionName: 'Demo Session' }, questionsCache: {} }),
+        chainEntry('unknown', {}, { questionsCache: {} }),
+      ]);
+      const opened = screen.getByTestId('ce-community-questions-dialog-session');
+      expect(opened).toHaveTextContent('Exact demo question');
+      expect(opened).not.toHaveTextContent('Wrong fallback');
+      expect(
+        within(opened)
+          .getAllByRole('link')
+          .map((link) => link.getAttribute('href')),
+      ).toEqual(['/session/demo#report']);
+      expect(lookup).toHaveBeenCalledWith('demo', { allowFallback: false });
+    });
+
+    it('opens in the Sessions dialog panel, titled Questions, with no link in its header', () => {
+      const instance = attachMutableSetState(new CommunityTab({ activeSessionSlug: 'edge' }));
+      const [counter] = collectTreeNodes(
+        instance.render(),
+        (node) => node.props?.['data-testid'] === 'ce-community-stat-questions',
+      );
+      counter.props.onClick();
+      const tree = instance.render();
+      const [modal] = collectTreeNodes(tree, (node) => node.type === Modal);
+      const [header] = collectTreeNodes(tree, (node) => node.type === ModalHeader);
+      expect(modal.props.className).toContain('sessionsModal');
+      expect(collectNodeText(header)).toBe('Questions');
+      expect(header.props.tag).toBe('h5');
       expect(collectTreeNodes(header, (node) => node.type === 'a')).toHaveLength(0);
-      expect(header.props.tag).toBe(type === 'sessions' ? 'div' : 'h5');
-    },
-  );
-
-  it('opts the CommunityTab SBT modal into compact SBT settings without affecting other SBTsList uses', () => {
-    const instance = new CommunityTab({
-      provider: 'mock-provider',
-      network: { id: 84532, name: 'Base Sepolia' },
-      account: '0xabc',
-      loginComplete: true,
-      toggleLoginModal: jest.fn(),
-      isSBTCacheReady: false,
-      sbtRealtimeCoverageBySlug: { alpha: true },
-      ensureLightSbtDiscovery: jest.fn(),
-      ensureLightSbtUniverse: jest.fn(),
     });
-    instance.state = {
-      ...instance.state,
-      modalType: 'sbts',
-    };
-
-    const tree = instance.renderModalContent();
-    const [sbtListNode] = collectTreeNodes(tree, (node) => node?.type === SBTsList);
-
-    expect(sbtListNode).toBeTruthy();
-    expect(sbtListNode.props.communityTabCompactSettings).toBe(true);
-    expect(sbtListNode.props.interactiveMiniCards).toBe(true);
-    expect(sbtListNode.props.miniaturized).toBe(true);
-    expect(sbtListNode.props.viewMode).toBe('modal');
-    expect(sbtListNode.props.sbtRealtimeCoverageBySlug).toEqual({ alpha: true });
   });
 
-  it('routes the Groups modal through the exact active Worker session', () => {
-    writeGlobalSessionSelection({ selectedSessionScope: 'active', primarySessionSlug: 'demo-sh' });
-    const instance = new CommunityTab({
-      activeSessionSlug: 'demo-sh',
-      sessionConfig: WORKER_SESSION_CONFIG,
-      provider: 'mock-provider',
-      network: { id: 11155420, name: 'OP Sepolia' },
-      account: '',
-      loginComplete: false,
-      toggleLoginModal: jest.fn(),
+  describe('Groups dialog', () => {
+    const chainEntry = (slug, sbtList, sessionName = '') => ({
+      slug,
+      netKey: '84532',
+      cacheScope: '84532',
+      isWorkerCanonical: false,
+      sessionConfig: { sessionName },
+      workerCanonicalIdentity: null,
+      workerGroupIds: [],
+      workerGroups: [],
+      workerVisibleUserIds: [],
+      workerGroupsCount: 0,
+      workerGroupsStatus: 'idle',
+      surveysCache: {},
+      questionsCache: {},
+      sbtCache: { sbtList },
     });
-    instance.state = {
-      ...instance.state,
-      modalType: 'groups',
+    const workerEntry = (slug, status, groups = [], identity = { workerOrigin: 'https://worker.example' }) => ({
+      ...chainEntry(slug, {}, `${slug} session`),
+      netKey: 'worker',
+      cacheScope: 'worker',
+      isWorkerCanonical: true,
+      workerCanonicalIdentity: identity,
+      workerGroupIds: groups.map(({ groupId }) => groupId),
+      workerGroups: groups,
+      workerGroupsCount: groups.length,
+      workerGroupsStatus: status,
+    });
+    const sbt = (address, sbtInfo) => ({ sbtAddress: address, sbtInfo, mintedAddresses: [], burnedAddresses: [] });
+    const renderGroupsDialog = (entries) => {
+      const instance = new CommunityTab({});
+      instance._iterScopeCaches = jest.fn(() => entries);
+      return render(instance.renderGroupsDialog());
     };
 
-    const tree = instance.renderModalContent();
-    const [sbtListNode] = collectTreeNodes(tree, (node) => node?.type === SBTsList);
+    it('lists each session in view with the groups the tile counts, counting shared ones once', () => {
+      const shared = sbt('0xA1', { name: 'Open badge', mintingEndTime: 0 });
+      renderGroupsDialog([
+        chainEntry(
+          'alpha',
+          {
+            '0xa1': shared,
+            '0xa2': sbt('0xa2', { name: 'Closed badge', mintingEndTime: 1 }),
+            '0xa3': sbt('0xa3', { name: 'Hidden badge', hidden: true }),
+          },
+          'Alpha session',
+        ),
+        chainEntry('beta', { '0xa1': shared }, 'Beta session'),
+        workerEntry('wk', 'ready', [{ groupId: 'g1', label: 'Breakout', open: true }]),
+        workerEntry('private-wk', 'unavailable'),
+        workerEntry('slow-wk', 'loading'),
+        workerEntry('dead-wk', 'error'),
+        workerEntry('never-opened', 'idle', [], null),
+      ]);
 
-    expect(sbtListNode.props.sessionSlug).toBe('demo-sh');
-    expect(sbtListNode.props.sessionConfig).toBe(WORKER_SESSION_CONFIG);
-    expect(sbtListNode.props.embeddedMode).toBe(true);
-    expect(sbtListNode.props.allSessionsMode).toBe(false);
+      const dialog = screen.getByTestId('ce-community-groups-dialog');
+      expect(dialog).toHaveTextContent('6 sessions, 3 groups');
+      expect(screen.getByRole('button', { name: 'About the group total' })).toBeInTheDocument();
+      expect(
+        within(dialog)
+          .getAllByRole('listitem')
+          .map((row) => row.textContent),
+      ).toEqual([
+        'Alpha session2 groups ',
+        'Beta session1 group ',
+        'wk session1 group ',
+        expect.stringMatching(/^dead-wk sessioncan’t be read here/),
+        expect.stringMatching(/^private-wk sessiongroups not public/),
+        expect.stringMatching(/^slow-wk session.*counting/),
+      ]);
+      expect(dialog).not.toHaveTextContent('never-opened');
+    });
+
+    it('lists the groups a failed re-read kept, as the tile still counts them', () => {
+      renderGroupsDialog([
+        chainEntry('alpha', { '0xa1': sbt('0xa1', { name: 'Open badge', mintingEndTime: 0 }) }, 'Alpha session'),
+        workerEntry('dead-wk', 'error', [{ groupId: 'g1', label: 'Kept group', open: false }]),
+      ]);
+      expect(screen.getByTestId('ce-community-groups-dialog')).toHaveTextContent('2 sessions, 2 groups');
+      fireEvent.click(screen.getByRole('button', { name: /^dead-wk/ }));
+
+      const opened = screen.getByTestId('ce-community-groups-dialog-session');
+      expect(within(opened).getByRole('heading')).toHaveTextContent('dead-wk session: 1 group');
+      expect(within(opened).getAllByRole('link')[0]).toHaveTextContent('Kept groupClosed');
+    });
+
+    it('totals the groups as the Groups tile counts them', () => {
+      const shared = sbt('0xA1', { name: 'Open badge', mintingEndTime: 0 });
+      const views = [
+        [
+          chainEntry('alpha', { '0xa1': shared, '0xa3': sbt('0xa3', { name: 'Hidden badge', hidden: true }) }),
+          chainEntry('beta', { '0xa1': shared, '0xb1': sbt('0xb1', { name: 'Beta badge' }) }),
+          workerEntry('wk', 'ready', [
+            { groupId: 'g1', label: 'Breakout', open: true },
+            { groupId: 'g2', label: 'Plenary', open: false },
+          ]),
+          workerEntry('dead-wk', 'error', [{ groupId: 'g1', label: 'Kept group', open: true }]),
+          workerEntry('private-wk', 'unavailable'),
+          workerEntry('slow-wk', 'loading'),
+          workerEntry('never-opened', 'idle', [], null),
+        ],
+        [workerEntry('wk', 'ready', [{ groupId: 'g1', label: 'Breakout', open: true }]), workerEntry('w2', 'error')],
+        [chainEntry('alpha', { '0xa1': shared }), chainEntry('beta', { '0xa1': shared })],
+      ];
+      views.forEach((entries) => {
+        const instance = new CommunityTab({});
+        instance._iterScopeCaches = jest.fn(() => entries);
+        const view = render(instance.renderGroupsDialog());
+        const tile = instance._computeStatsSnapshot(entries).sbtsCreatedCount;
+        const shown = screen.getByTestId('ce-community-groups-dialog').textContent.match(/sessions, (\d+) groups?/);
+        expect(Number(shown?.[1])).toBe(tile);
+        view.unmount();
+      });
+    });
+
+    it('opens an on-chain session to its groups, open or closed, each linking to its page', () => {
+      renderGroupsDialog([
+        chainEntry('alpha', {
+          '0xa1': sbt('0xa1', { name: 'Open badge', mintingEndTime: 0 }),
+          '0xa2': sbt('0xa2', { name: 'Closed badge', mintingEndTime: 1 }),
+        }),
+        chainEntry('beta', { '0xb1': sbt('0xb1', { name: 'Beta badge' }) }),
+      ]);
+      fireEvent.click(screen.getByRole('button', { name: /^alpha/ }));
+
+      const opened = screen.getByTestId('ce-community-groups-dialog-session');
+      expect(within(opened).getByRole('heading')).toHaveTextContent('alpha: 2 groups');
+      const links = within(opened).getAllByRole('link');
+      expect(links.map((link) => [link.textContent.trim(), link.getAttribute('href')])).toEqual([
+        ['Open badgeOpen to join', buildSbtDetailPath('0xa1', 'alpha')],
+        ['Closed badgeClosed', buildSbtDetailPath('0xa2', 'alpha')],
+        ['See all of this session’s groups', '/groups/alpha'],
+      ]);
+      fireEvent.click(within(opened).getByRole('button', { name: 'All sessions' }));
+      expect(screen.getByTestId('ce-community-groups-dialog')).toHaveTextContent('2 sessions, 3 groups');
+    });
+
+    it('opens straight to a lone Worker session, its groups linking through its Worker', () => {
+      renderGroupsDialog([
+        workerEntry('wk', 'ready', [
+          { groupId: 'g1', label: 'Breakout', open: true },
+          { groupId: 'g2', label: '', open: false },
+        ]),
+      ]);
+      const opened = screen.getByTestId('ce-community-groups-dialog-session');
+      expect(within(opened).queryByRole('button', { name: 'All sessions' })).not.toBeInTheDocument();
+      const workerUrl = 'https://worker.example';
+      expect(
+        within(opened)
+          .getAllByRole('link')
+          .map((link) => [link.textContent.trim(), link.getAttribute('href')]),
+      ).toEqual([
+        ['BreakoutOpen to join', buildWorkerGroupsPath({ groupId: 'g1', sessionSlug: 'wk', workerUrl })],
+        ['Unnamed groupClosed', buildWorkerGroupsPath({ groupId: 'g2', sessionSlug: 'wk', workerUrl })],
+        ['See all of this session’s groups', buildWorkerGroupsPath({ sessionSlug: 'wk', workerUrl })],
+      ]);
+    });
+
+    it('says so when no session in view has groups', () => {
+      renderGroupsDialog([chainEntry('alpha', {}), chainEntry('beta', {})]);
+      expect(screen.getByTestId('ce-community-groups-dialog')).toHaveTextContent('No sessions with groups yet.');
+    });
+
+    it('opens in the Sessions dialog panel', () => {
+      const instance = new CommunityTab({});
+      instance.state.showModal = true;
+      instance.state.modalType = 'groups';
+      instance._iterScopeCaches = jest.fn(() => []);
+      const [modal] = collectTreeNodes(instance.render(), (node) => node.type === Modal);
+      expect(modal.props.className).toContain('sessionsModal');
+    });
   });
 
   it('canonicalizes reserved session aliases in modal survey links', () => {
@@ -3240,6 +3489,11 @@ describe('CommunityTab helpers', () => {
       instance._workerGroupCountCache.set(instance._getWorkerGroupCountCacheKey(identity), {
         count: index + 1,
         groupIds: Array.from({ length: index + 1 }, (_, n) => `group-${n}`),
+        groups: Array.from({ length: index + 1 }, (_, n) => ({
+          groupId: `group-${n}`,
+          label: `Group ${n}`,
+          open: true,
+        })),
         visibleUserIds: [],
         status: 'ready',
         updatedAtMs: Date.now(),
@@ -3253,6 +3507,9 @@ describe('CommunityTab helpers', () => {
     expect(instance._iterScopeCaches().map(({ slug }) => slug)).toEqual(expect.arrayContaining(Object.keys(configs)));
     expect(instance.state.uniqueUsers).toEqual(['0x1', '0x2']);
     expect(instance.state.sbtsCreatedCount).toBe(3);
+    const groupsDialog = render(instance.renderGroupsDialog());
+    expect(screen.getByTestId('ce-community-groups-dialog')).toHaveTextContent('2 sessions, 3 groups');
+    groupsDialog.unmount();
     expect(instance.state.stats.find(({ label }) => label === 'Questions').count).toBe(3);
     instance.props = { ...instance.props, globalSessionSelection: { ...all, selectedSessionScope: 'general' } };
     await instance._runStatsRefreshCycle({ force: true });
@@ -3536,5 +3793,9 @@ describe('CommunityTab helpers', () => {
     const stats = instance._computeUniverseStatsSnapshot(entries);
     expect(stats.sbtsCreatedCount).toBe(count);
     expect(stats.uniqueUsers).toEqual(['0x123']);
+    // The Groups dialog's total is the tile's.
+    instance._iterScopeCaches = jest.fn(() => entries);
+    render(instance.renderGroupsDialog());
+    expect(screen.getByTestId('ce-community-groups-dialog')).toHaveTextContent(`2 sessions, ${count} group`);
   });
 });

@@ -428,7 +428,6 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
             modalView={true}
             loginComplete={host.props.loginComplete}
             toggleLoginModal={host.props.toggleLoginModal}
-            miniaturized={false}
             sessionSlug={routeSessionSlug || undefined}
             sessionConfig={routeSessionConfig}
             workerGroupId={workerGroupId || undefined}

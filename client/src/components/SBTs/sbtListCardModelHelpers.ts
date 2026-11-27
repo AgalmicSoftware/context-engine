@@ -5,17 +5,6 @@ export type SbtListRenderItemKeyOptions<T extends SbtListHelperItem = SbtListHel
   listSlug?: unknown;
   resolveSbtSessionSlug: (sbt: T) => unknown;
 };
-export type SbtListInteractiveMiniCardModel = {
-  key: string;
-  sbtAddress: string;
-  sbtAddressLower: string;
-  sessionSlug: string;
-};
-export type BuildSbtListInteractiveMiniCardModelOptions<T extends SbtListHelperItem = SbtListHelperItem> = {
-  keyPrefix?: unknown;
-  resolveSbtSessionSlug: (sbt: T) => unknown;
-  sbt?: T | null;
-};
 export type SbtListDisplayCardModel = {
   description: string;
   imageSrc: string | null;
@@ -47,7 +36,6 @@ export type SbtListMetaRowModel = {
 export type BuildSbtListMetaRowModelOptions<T extends SbtListHelperItem = SbtListHelperItem> = {
   details?: SbtCardDetails | null;
   expandedSbtAddresses?: ReadonlySet<string> | null;
-  miniaturized?: unknown;
   sbt?: T | null;
 };
 export type SbtListFeaturedCardModel = {
@@ -91,24 +79,6 @@ export const buildSbtListRenderItemKey = <T extends SbtListHelperItem>(
   return `${slugForKey}|${addrLower}`;
 };
 
-export const buildSbtListInteractiveMiniCardModel = <T extends SbtListHelperItem>({
-  keyPrefix = 'sbt',
-  resolveSbtSessionSlug,
-  sbt = null,
-}: BuildSbtListInteractiveMiniCardModelOptions<T>): SbtListInteractiveMiniCardModel | null => {
-  if (!sbt || !sbt.sbtAddress) return null;
-  const sessionSlug = String(resolveSbtSessionSlug(sbt) || '');
-  const sbtAddress = String(sbt.sbtAddress || '').trim();
-  const sbtAddressLower = sbtAddress.toLowerCase();
-  if (!sbtAddressLower) return null;
-  return {
-    key: `${keyPrefix}-${sessionSlug}|${sbtAddressLower}`,
-    sbtAddress,
-    sbtAddressLower,
-    sessionSlug,
-  };
-};
-
 export const buildSbtListDisplayCardModel = <T extends SbtListHelperItem>({
   addressMode = 'trimmed',
   getDescriptionText,
@@ -144,12 +114,11 @@ export const buildSbtListDisplayCardModel = <T extends SbtListHelperItem>({
 export const buildSbtListMetaRowModel = <T extends SbtListHelperItem>({
   details = null,
   expandedSbtAddresses = null,
-  miniaturized = false,
   sbt = null,
 }: BuildSbtListMetaRowModelOptions<T>): SbtListMetaRowModel | null => {
   const tags = Array.isArray(details?.tags) ? details.tags : [];
   const hasTags = tags.length > 0;
-  const hasDetailsToggle = !miniaturized && !!details?.hasDetails;
+  const hasDetailsToggle = !!details?.hasDetails;
   if (!hasTags && !hasDetailsToggle) return null;
 
   const sbtAddressLower = String(sbt?.sbtAddress || '').toLowerCase();

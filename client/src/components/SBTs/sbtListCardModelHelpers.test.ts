@@ -2,7 +2,6 @@ import {
   buildSbtListDisplayCardModel,
   buildSbtListExpandedAddressSetToggle,
   buildSbtListFeaturedCardModel,
-  buildSbtListInteractiveMiniCardModel,
   buildSbtListMetaRowModel,
   buildSbtListRenderItemKey,
   coerceSbtMintEndSeconds,
@@ -55,38 +54,6 @@ describe('sbtListCardModelHelpers', () => {
     expect(isModifiedSbtListPointerNavigation({ button: 1 })).toBe(true);
     expect(isModifiedSbtListPointerNavigation({ button: 0 })).toBe(false);
     expect(isModifiedSbtListPointerNavigation(null)).toBe(false);
-  });
-
-  it('builds interactive mini-card models from SBT list items', () => {
-    expect(
-      buildSbtListInteractiveMiniCardModel({
-        keyPrefix: 'featured-mini',
-        resolveSbtSessionSlug: (sbt) => sbt.slug,
-        sbt: {
-          sbtAddress: ' 0xABC ',
-          slug: 'alpha',
-        },
-      }),
-    ).toEqual({
-      key: 'featured-mini-alpha|0xabc',
-      sbtAddress: '0xABC',
-      sbtAddressLower: '0xabc',
-      sessionSlug: 'alpha',
-    });
-    expect(
-      buildSbtListInteractiveMiniCardModel({
-        resolveSbtSessionSlug: () => 'alpha',
-        sbt: {
-          sbtAddress: '',
-        },
-      }),
-    ).toBeNull();
-    expect(
-      buildSbtListInteractiveMiniCardModel({
-        resolveSbtSessionSlug: () => 'alpha',
-        sbt: null,
-      }),
-    ).toBeNull();
   });
 
   it('builds display card models with explicit address handling', () => {
@@ -160,22 +127,10 @@ describe('sbtListCardModelHelpers', () => {
     expect(
       buildSbtListMetaRowModel({
         details: {
-          documentUrls: [{ href: 'https://example.com/doc', label: 'https://example.com/doc' }],
-          hasDetails: true,
-          tags: [],
-        },
-        miniaturized: true,
-        sbt: { sbtAddress: '0xABC' },
-      }),
-    ).toBeNull();
-    expect(
-      buildSbtListMetaRowModel({
-        details: {
           documentUrls: [],
           hasDetails: false,
           tags: ['Research'],
         },
-        miniaturized: true,
         sbt: { sbtAddress: '0xABC' },
       }),
     ).toEqual(

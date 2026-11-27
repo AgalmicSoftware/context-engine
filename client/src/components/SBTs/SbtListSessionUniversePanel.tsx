@@ -18,7 +18,6 @@ type SbtListSessionUniversePanelProps = {
   canShowMoreSessions: boolean;
   chipLoadingStatusBySlug: Record<string, SbtListSessionUniversePanelChipLoadingStatus | null | undefined>;
   chipProgressVisibilityBySlug: Record<string, unknown>;
-  hideSessionUniverseSummary: boolean;
   isOpen: boolean;
   isUniverseCollapsed: boolean;
   labelForSessionSlug: (slug: string) => React.ReactNode;
@@ -41,7 +40,6 @@ const SbtListSessionUniversePanel = ({
   canShowMoreSessions,
   chipLoadingStatusBySlug,
   chipProgressVisibilityBySlug,
-  hideSessionUniverseSummary,
   isOpen,
   isUniverseCollapsed,
   labelForSessionSlug,
@@ -121,7 +119,7 @@ const SbtListSessionUniversePanel = ({
           <span>Sessions</span>
           {renderHeaderActions()}
         </div>
-        {!hideSessionUniverseSummary && renderCollapsedSummary('session-selector-summary')}
+        {renderCollapsedSummary('session-selector-summary')}
       </div>
     );
   }
@@ -132,9 +130,7 @@ const SbtListSessionUniversePanel = ({
         <span>Sessions</span>
         {renderHeaderActions()}
       </div>
-      {!hideSessionUniverseSummary &&
-        isUniverseCollapsed &&
-        renderCollapsedSummary('session-universe-collapsed-summary')}
+      {isUniverseCollapsed && renderCollapsedSummary('session-universe-collapsed-summary')}
       {!isUniverseCollapsed && (
         <div className={styles.sessionUniverseChips}>
           <SessionChipSelector

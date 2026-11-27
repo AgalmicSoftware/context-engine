@@ -352,7 +352,6 @@ describe('SBTsList card rendering and navigation', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -433,7 +432,6 @@ describe('SBTsList card rendering and navigation', () => {
       network: { id: 84532, name: 'Base Sepolia' },
       account: '',
       loginComplete: true,
-      miniaturized: false,
       toggleLoginModal: jest.fn(),
       sbtCacheRevision: 0,
       onRequestSbtCacheRefresh: jest.fn(),
@@ -583,7 +581,6 @@ describe('SBTsList card rendering and navigation', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -666,7 +663,6 @@ describe('SBTsList card rendering and navigation', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -728,7 +724,6 @@ describe('SBTsList card rendering and navigation', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -804,7 +799,6 @@ describe('SBTsList card rendering and navigation', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -885,7 +879,6 @@ describe('SBTsList card rendering and navigation', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -901,279 +894,6 @@ describe('SBTsList card rendering and navigation', () => {
 
     expect(screen.getByTestId('mock-tag-modal')).toHaveTextContent('Governance');
     expect(mockTagModal.mock.calls.at(-1)[0].sessionSlug).toBe('alpha');
-  });
-
-  it('renders modal featured cards as anchor cards instead of nested mini SBT pages', async () => {
-    const alphaAddress = '0x00000000000000000000000000000000000000c1';
-    mockGetSessionLists.mockReturnValue({
-      featured_SBTs_LIST: [alphaAddress],
-      ignored_SBTs_LIST: [],
-    });
-    mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '')
-        .trim()
-        .toLowerCase();
-      if (normalized !== 'alpha') {
-        return { 84532: { sbtList: {}, lastBlock: 0 } };
-      }
-      return {
-        84532: {
-          sbtList: {
-            [alphaAddress.toLowerCase()]: {
-              sbtAddress: alphaAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Alpha Modal Featured Badge',
-                description: 'modal anchor card',
-                sessionSlug: 'alpha',
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-          },
-          lastBlock: 1100,
-        },
-      };
-    });
-
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug="alpha"
-        loginComplete
-        miniaturized
-        viewMode="modal"
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        ensureLightSbtDiscovery={jest.fn()}
-      />,
-    );
-
-    const modalFeaturedLink = await screen.findByRole('link', { name: /Alpha Modal Featured Badge/i });
-    expect(modalFeaturedLink).toHaveAttribute('href', buildSbtDetailPath(alphaAddress, 'alpha'));
-    expect(screen.queryByTestId('mock-sbt-page')).not.toBeInTheDocument();
-  });
-
-  it('renders modal featured cards as interactive mini SBT pages when interactiveMiniCards is enabled', async () => {
-    const alphaAddress = '0x00000000000000000000000000000000000000c1';
-    mockGetSessionLists.mockReturnValue({
-      featured_SBTs_LIST: [alphaAddress],
-      ignored_SBTs_LIST: [],
-    });
-    mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '')
-        .trim()
-        .toLowerCase();
-      if (normalized !== 'alpha') {
-        return { 84532: { sbtList: {}, lastBlock: 0 } };
-      }
-      return {
-        84532: {
-          sbtList: {
-            [alphaAddress.toLowerCase()]: {
-              sbtAddress: alphaAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Alpha Interactive Featured Badge',
-                description: 'interactive featured card',
-                sessionSlug: 'alpha',
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-          },
-          lastBlock: 1100,
-        },
-      };
-    });
-
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug="alpha"
-        loginComplete
-        miniaturized
-        viewMode="modal"
-        interactiveMiniCards
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        ensureLightSbtDiscovery={jest.fn()}
-      />,
-    );
-
-    expect(await screen.findByTestId('mock-sbt-page')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Alpha Interactive Featured Badge/i })).not.toBeInTheDocument();
-    const renderedProps = mockSBTPage.mock.calls.map(([props]) => props).filter(Boolean);
-    expect(renderedProps).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          SBTAddress: alphaAddress,
-          sessionSlug: 'alpha',
-          miniaturized: true,
-          miniMintable: true,
-        }),
-      ]),
-    );
-  });
-
-  it('renders modal live and expired cards as interactive mini SBT pages when interactiveMiniCards is enabled', async () => {
-    const liveAddress = '0x00000000000000000000000000000000000000c2';
-    const expiredAddress = '0x00000000000000000000000000000000000000c3';
-    mockGetSessionLists.mockReturnValue({
-      featured_SBTs_LIST: [],
-      ignored_SBTs_LIST: [],
-    });
-    mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '')
-        .trim()
-        .toLowerCase();
-      if (normalized !== 'alpha') {
-        return { 84532: { sbtList: {}, lastBlock: 0 } };
-      }
-      return {
-        84532: {
-          sbtList: {
-            [liveAddress.toLowerCase()]: {
-              sbtAddress: liveAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Alpha Interactive Live Badge',
-                description: 'interactive live card',
-                sessionSlug: 'alpha',
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-            [expiredAddress.toLowerCase()]: {
-              sbtAddress: expiredAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Alpha Interactive Expired Badge',
-                description: 'interactive expired card',
-                sessionSlug: 'alpha',
-                mintingEndTime: 1,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-          },
-          lastBlock: 1100,
-        },
-      };
-    });
-
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug="alpha"
-        loginComplete
-        miniaturized
-        viewMode="modal"
-        interactiveMiniCards
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        ensureLightSbtDiscovery={jest.fn()}
-      />,
-    );
-
-    await waitFor(() => {
-      const renderedAddresses = mockSBTPage.mock.calls.map(([props]) => props?.SBTAddress).filter(Boolean);
-      expect(renderedAddresses).toEqual(expect.arrayContaining([liveAddress, expiredAddress]));
-    });
-    expect(screen.getAllByTestId('mock-sbt-page').length).toBeGreaterThanOrEqual(2);
-  });
-
-  it('does not use list-level navigation when interactiveMiniCards is enabled', async () => {
-    const alphaAddress = '0x00000000000000000000000000000000000000c4';
-    mockGetSessionLists.mockReturnValue({
-      featured_SBTs_LIST: [alphaAddress],
-      ignored_SBTs_LIST: [],
-    });
-    mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '')
-        .trim()
-        .toLowerCase();
-      if (normalized !== 'alpha') {
-        return { 84532: { sbtList: {}, lastBlock: 0 } };
-      }
-      return {
-        84532: {
-          sbtList: {
-            [alphaAddress.toLowerCase()]: {
-              sbtAddress: alphaAddress,
-              slug: 'alpha',
-              sbtInfo: {
-                name: 'Alpha Interactive Nested Controls Badge',
-                description: 'interactive nested controls card',
-                sessionSlug: 'alpha',
-                mintingEndTime: 0,
-              },
-              mintedAddresses: [],
-              burnedAddresses: [],
-              countsLoaded: true,
-              blockNumber: 1100,
-            },
-          },
-          lastBlock: 1100,
-        },
-      };
-    });
-    const onNavigateToSbt = jest.fn();
-
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug="alpha"
-        loginComplete
-        miniaturized
-        viewMode="modal"
-        interactiveMiniCards
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        onNavigateToSbt={onNavigateToSbt}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        ensureLightSbtDiscovery={jest.fn()}
-      />,
-    );
-
-    fireEvent.click(await screen.findByTestId('mock-sbt-nested-button'));
-    fireEvent.keyDown(screen.getByTestId('mock-sbt-ignore-nav'), { key: 'Enter' });
-
-    expect(onNavigateToSbt).not.toHaveBeenCalled();
   });
 
   it('does not navigate when pressing Enter on a nested featured-card control', async () => {
@@ -1220,7 +940,6 @@ describe('SBTsList card rendering and navigation', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -1281,7 +1000,6 @@ describe('SBTsList card rendering and navigation', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}

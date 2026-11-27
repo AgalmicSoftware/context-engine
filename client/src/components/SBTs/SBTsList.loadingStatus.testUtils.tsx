@@ -276,7 +276,6 @@ export const buildSBTsListProps = (overrides = {}) => ({
   account: '',
   sessionSlug: '',
   loginComplete: true,
-  miniaturized: false,
   toggleLoginModal: jest.fn(),
   sbtCacheRevision: 0,
   onRequestSbtCacheRefresh: jest.fn(),

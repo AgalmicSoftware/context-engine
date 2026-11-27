@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import { SbtListCompactLinkCard, SbtListStandardCard } from './SbtListDisplayCards';
+import { SbtListStandardCard } from './SbtListDisplayCards';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 
 const styles = {
@@ -29,23 +29,6 @@ const model = {
 };
 
 describe('SbtListDisplayCards', () => {
-  it('renders compact link card contents from the display model', () => {
-    render(
-      <SbtListCompactLinkCard
-        className="compact"
-        href="/groups/0xabc"
-        model={model}
-        onClick={jest.fn()}
-        sbtLabel="Group"
-        styles={styles}
-      />,
-    );
-
-    expect(screen.getByRole('link', { name: /Badge/ })).toHaveAttribute('href', '/groups/0xabc');
-    expect(screen.getByRole('img', { name: 'Group Thumbnail' })).toHaveAttribute('src', model.imageSrc);
-    expect(screen.getByText('Badge description')).toBeInTheDocument();
-  });
-
   it('renders standard card meta row and expanded details', () => {
     const { rerender } = render(
       <SbtListStandardCard
@@ -100,12 +83,12 @@ describe('SbtListDisplayCards', () => {
 
   it('falls back to the default badge image when a metadata image fails to load', () => {
     render(
-      <SbtListCompactLinkCard
-        className="compact"
+      <SbtListStandardCard
         href="/groups/0xabc"
         model={model}
         onClick={jest.fn()}
         sbtLabel="Group"
+        shellClassName="standard"
         styles={styles}
       />,
     );

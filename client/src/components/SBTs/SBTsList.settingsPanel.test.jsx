@@ -275,7 +275,6 @@ describe('SBTsList settings panel', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -307,7 +306,6 @@ describe('SBTsList settings panel', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -328,139 +326,5 @@ describe('SBTsList settings panel', () => {
 
     expect(await screen.findByTestId('session-selector-panel')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Alpha' })).toBeInTheDocument();
-  });
-
-  it('keeps the legacy password filter visible by default in modal mini mode unless CommunityTab opts into compact settings', async () => {
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized
-        viewMode="modal"
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />,
-    );
-
-    expect(await screen.findByText(/Exclude Password-Locked Groups/i)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Group list settings/i })).not.toBeInTheDocument();
-    expect(screen.getByTestId('session-selector-toggle')).toHaveAttribute('aria-label', 'Show session selector');
-    expect(screen.queryByTestId('session-selector-panel')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId('session-selector-toggle'));
-
-    expect(await screen.findByTestId('session-selector-panel')).toBeInTheDocument();
-    expect(screen.getByText(/Exclude Password-Locked Groups/i)).toBeInTheDocument();
-  });
-
-  it('renders a compact settings cog only for the CommunityTab mini modal path', async () => {
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized
-        viewMode="modal"
-        communityTabCompactSettings
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />,
-    );
-
-    const settingsButton = await screen.findByRole('button', { name: /Group list settings/i });
-    expect(screen.queryByText(/Exclude Password-Locked Groups/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^No Password Groups$/i)).not.toBeInTheDocument();
-    expect(screen.queryByTestId('session-selector-toggle')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('session-selector-panel')).not.toBeInTheDocument();
-
-    fireEvent.click(settingsButton);
-
-    expect(screen.getByText(/^No Password Groups$/i)).toBeInTheDocument();
-    expect(screen.getByTestId('session-selector-panel')).toBeInTheDocument();
-    expect(settingsButton).toHaveAttribute('aria-expanded', 'true');
-  });
-
-  it('renders the compact settings cog above the session universe section in the CommunityTab mini modal path', async () => {
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized
-        viewMode="modal"
-        communityTabCompactSettings
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />,
-    );
-
-    const settingsButton = await screen.findByRole('button', { name: /Group list settings/i });
-    const universeLabel = screen.getByText(/^Sessions$/i);
-    const position = settingsButton.compareDocumentPosition(universeLabel);
-
-    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it('hides the session summary when the CommunityTab mini modal session universe is collapsed', async () => {
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized
-        viewMode="modal"
-        communityTabCompactSettings
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />,
-    );
-
-    const settingsButton = await screen.findByRole('button', { name: /Group list settings/i });
-    fireEvent.click(settingsButton);
-
-    await screen.findByTestId('session-selector-panel');
-    expect(screen.queryByTestId('session-selector-summary')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /Collapse session universe/i }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Expand session universe/i })).toBeInTheDocument();
-    });
-    expect(screen.queryByTestId('session-universe-collapsed-summary')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('session-collapsed-chip-alpha')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('session-collapsed-chip-beta')).not.toBeInTheDocument();
   });
 });

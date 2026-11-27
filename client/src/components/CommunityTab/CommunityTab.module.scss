@@ -616,91 +616,6 @@
   }
 }
 
-.questionsModalContent {
-  display: grid;
-  gap: 18px;
-}
-
-.modal .questionsModalHeader {
-  :global(.modal-title) {
-    display: flex;
-    flex: 1;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    min-width: 0;
-  }
-
-  h5 {
-    font-size: 1em;
-  }
-}
-
-.questionsTable {
-  width: 100%;
-  table-layout: fixed;
-  border-collapse: collapse;
-  color: var(--ce-overlay-text);
-
-  th,
-  td {
-    padding: 12px;
-    border-bottom: 1px solid var(--ce-document-border);
-    text-align: left;
-    vertical-align: top;
-    overflow-wrap: anywhere;
-  }
-
-  th:first-child,
-  td:first-child {
-    width: 30%;
-  }
-
-  th {
-    font-weight: 700;
-  }
-
-  a {
-    color: var(--ce-link);
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-
-  a:focus-visible {
-    outline: 2px solid var(--ce-focus-ring);
-    outline-offset: 3px;
-  }
-}
-
-.questionsModalLink {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 10px 18px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 22%, transparent);
-  border-radius: var(--ce-radius-pill);
-  background: color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-  color: var(--ce-color-white);
-  font-size: 1rem;
-  font-weight: 700;
-  text-decoration: none;
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    transform 0.2s ease;
-
-  &:hover,
-  &:focus {
-    background: color-mix(in srgb, var(--ce-action-accent) 20%, transparent);
-    border-color: color-mix(in srgb, var(--ce-action-accent) 38%, transparent);
-    color: var(--ce-color-white);
-    text-decoration: none;
-    transform: translateY(-1px);
-  }
-}
-
 .usersControls {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -907,10 +822,7 @@
     color: var(--ce-panel-text);
   }
 
-  .modal .userItem a,
-  .questionsModalLink,
-  .questionsModalLink:hover,
-  .questionsModalLink:focus {
+  .modal .userItem a {
     color: var(--ce-panel-text);
   }
 }
@@ -1115,6 +1027,115 @@
 .sessionKind {
   flex: 0 0 auto;
   font-size: 0.8rem;
+}
+
+// The Groups and Questions dialogs list sessions as the Sessions dialog does; a row that opens one is a button.
+button.sessionLink {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dialogNote,
+.dialogHeading {
+  margin: 0;
+  color: var(--ce-panel-text);
+}
+
+.dialogHeading {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.dialogSession {
+  display: grid;
+  gap: 12px;
+}
+
+.dialogMore {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  color: var(--ce-link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 3px;
+  }
+}
+
+// Chart or List: two buttons, the one shown pressed.
+.dialogToggle {
+  justify-self: start;
+  display: inline-flex;
+  border: 1px solid var(--ce-input-border);
+  border-radius: var(--ce-radius-6);
+  overflow: hidden;
+
+  button {
+    min-height: 44px;
+    min-width: 72px;
+    padding: 8px 14px;
+    border: 0;
+    background: var(--ce-control-face);
+    color: var(--ce-control-text);
+    font: inherit;
+    cursor: pointer;
+
+    &.dialogTogglePressed {
+      background: var(--ce-action-accent);
+      color: var(--ce-action-accent-text);
+      font-weight: 700;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: -2px;
+    }
+  }
+
+  button + button {
+    border-left: 1px solid var(--ce-input-border);
+  }
+}
+
+.dialogPlot {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--ce-radius-6);
+  background: var(--ce-data-viz-surface);
+  // Drawn at the width it is given, as the report draws its own, so the chart shrinks to a phone.
+  --ce-beeswarm-axis-label-size: 14px;
+
+  svg {
+    min-width: 0;
+  }
+}
+
+.dialogBack {
+  justify-self: start;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--ce-input-border);
+  border-radius: var(--ce-radius-6);
+  background: var(--ce-control-face);
+  color: var(--ce-control-text);
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--ce-border-strong);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
 }
 
 @media (max-width: 420px) {

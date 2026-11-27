@@ -921,9 +921,15 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     await page.getByTestId('ce-community-stat-sessions').waitFor({ state: 'visible' });
     await page.getByTestId('ce-community-stat-questions').click();
     await page.getByRole('dialog').waitFor({ state: 'visible' });
-    const table = page.getByTestId('ce-community-questions-table');
-    await table.waitFor({ state: 'visible' });
-    await table.getByRole('link').first().waitFor({ state: 'visible' });
+    // The demo session's questions, as a list: opened from the session list unless it is the one session in view.
+    const session = page.getByTestId('ce-community-questions-dialog-session');
+    const sessions = page.getByTestId('ce-community-questions-dialog');
+    await session.or(sessions).first().waitFor({ state: 'visible' });
+    if (!(await session.isVisible())) await sessions.locator('button[data-ce-session-slug="demo-sh"]').click();
+    await session.locator('ul a, [aria-label="Show questions as"]').first().waitFor({ state: 'visible' });
+    const list = session.getByRole('button', { name: 'List', exact: true });
+    if (await list.count()) await list.click();
+    await session.locator('ul a').first().waitFor({ state: 'visible' });
   }
 
   if (routeCase.requiresReadableAuthoring) {
@@ -1606,21 +1612,22 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           const style = window.getComputedStyle(element);
           return ratio(style[colorProperty], backgroundFor(element));
         };
-        const table = document.querySelector('[data-testid="ce-community-questions-table"]');
-        const links = Array.from(table?.querySelectorAll('tbody a') || []);
-        const tableRect = table?.getBoundingClientRect();
-        const bodyRect = table?.closest('.modal-body')?.getBoundingClientRect();
+        const sessionSelector = '[data-testid="ce-community-questions-dialog-session"]';
+        const session = document.querySelector(sessionSelector);
+        const links = Array.from(session?.querySelectorAll('ul a') || []);
+        const listRect = session?.querySelector('ul')?.getBoundingClientRect();
+        const bodyRect = session?.closest('.modal-body')?.getBoundingClientRect();
         return {
-          questionCount: table?.querySelectorAll('tbody [data-ce-question-id]').length || 0,
+          questionCount: links.length,
           reportLinksValid: links.length > 0 && links.every((link) => link.getAttribute('href')?.endsWith('#report')),
-          tableFitsModal: Boolean(tableRect && bodyRect && tableRect.width > 0 &&
-            tableRect.left >= bodyRect.left && tableRect.right <= bodyRect.right),
+          listFitsModal: Boolean(listRect && bodyRect && listRect.width > 0 &&
+            listRect.left >= bodyRect.left && listRect.right <= bodyRect.right),
           statIconRatio: textRatio('[class*="statIcon"]'),
           statCountRatio: textRatio('[class*="statCount"]'),
           statLabelRatio: textRatio('[class*="statLabel"]'),
-          tableHeadingRatio: textRatio('[data-testid="ce-community-questions-table"] th'),
-          tableSessionRatio: textRatio('[data-testid="ce-community-questions-table"] td'),
-          tableLinkRatio: textRatio('[data-testid="ce-community-questions-table"] a'),
+          questionHeadingRatio: textRatio(`${sessionSelector} h6`),
+          questionKindRatio: textRatio(`${sessionSelector} ul a span`),
+          questionLinkRatio: textRatio(`${sessionSelector} ul a`),
         };
       })
     : null;
@@ -3169,16 +3176,16 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     );
   }
   if (statsContrastState) {
-    assert.ok(statsContrastState.questionCount > 0, 'Questions Details lists scoped questions');
+    assert.ok(statsContrastState.questionCount > 0, 'The Questions dialog lists the session\'s questions');
     assert.equal(statsContrastState.reportLinksValid, true, 'Questions link to their session Report');
-    assert.equal(statsContrastState.tableFitsModal, true, 'Questions table fits its modal');
+    assert.equal(statsContrastState.listFitsModal, true, 'The question list fits its dialog');
     [
       ['stat icon', statsContrastState.statIconRatio, 3],
       ['stat count', statsContrastState.statCountRatio, 4.5],
       ['stat label', statsContrastState.statLabelRatio, 4.5],
-      ['question table heading', statsContrastState.tableHeadingRatio, 4.5],
-      ['question table session', statsContrastState.tableSessionRatio, 4.5],
-      ['question table link', statsContrastState.tableLinkRatio, 4.5],
+      ['question heading', statsContrastState.questionHeadingRatio, 4.5],
+      ['question kind', statsContrastState.questionKindRatio, 4.5],
+      ['question link', statsContrastState.questionLinkRatio, 4.5],
     ].forEach(([label, received, minimum]) => {
       assert.ok(received >= minimum,
         `Classic 95 ${label} contrast should be at least ${minimum}:1; received ${received.toFixed(2)}:1`);

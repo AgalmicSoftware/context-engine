@@ -31,9 +31,23 @@ import contractScripts, {
   getSessionChainId,
   getSessionLists,
 } from '../../utilities/web3/chainGateway.js';
-import SBTsList from '../SBTs/SBTsList';
 import SBTFilter from '../SBTs/SBTFilter';
-import BeeswarmPlot from '../Shared/BeeswarmPlot/BeeswarmPlot';
+import BeeswarmPlot, { type BeeswarmPoint } from '../Shared/BeeswarmPlot/BeeswarmPlot';
+import {
+  CommunityGroupsSession,
+  CommunityQuestionsSession,
+  CommunitySessionDialog,
+  dialogSessionList,
+  type CommunityDialogGroup,
+  type CommunityDialogSession,
+  type CommunityQuestionsState,
+} from './CommunitySessionDialogs';
+import { loadCommunityWorkerQuestions, type CommunityWorkerQuestions } from './communityWorkerQuestions';
+import { isWorkerCanonicalSessionConfig } from '../../utilities/survey/workerResponseHydration';
+import { coerceSbtMintEndSeconds } from '../SBTs/sbtListCardModelHelpers';
+import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames';
+import { buildWorkerGroupsPath } from '../../utilities/worker/workerGroupRoutes';
+import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath';
 import CETooltip from '../Shared/CETooltip';
 import GlobalSessionSelector from '../Shared/GlobalSessionSelector';
 import { buildSettingsSessionHref } from '../Account/loginSettingsRouteHelpers';
@@ -55,7 +69,7 @@ import {
   readStoredGlobalSessionSelection,
   resolveScopedSessionSlugsFromSelection,
 } from '../../utilities/session/globalSessionState.js';
-import { t } from '../../utilities/ui/terminology.js';
+import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 import { buildRatingMatrixFromDemo, getPolisDemoDatasetForSlug } from '../PolisReport/PolisReport';
 import { persistCommunitySbtHolderHydrationResults } from './communitySbtHolderHydrationCache.js';
@@ -75,6 +89,7 @@ import {
   pickCommunityWorkerCanonicalCache,
   resolveCommunityScopeAuthority,
   type CommunityWorkerGroupCountCacheEntry,
+  type CommunityWorkerGroupSummary,
 } from './communityWorkerGroupStats';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SESSION_REGISTRY_CACHE_UPDATED_EVENT } from '../../utilities/web3/sessionRegistry';
@@ -107,8 +122,18 @@ const WORKER_LISTING_COUNTS_TTL_MS = 5 * 60000;
 // A listing read with no answer by then counts as unread, so one slow or dead Worker does not hold the others' sums.
 export const WORKER_LISTING_COUNTS_WAIT_MS = 15000;
 const COMMUNITY_BEESWARM_DOMAIN = [0, 1] as const;
+// The dialogs that list sessions, which share the Sessions dialog's panel.
+const SESSION_LIST_DIALOGS = ['sessions', 'sbtgroups', 'sbts', 'groups', 'questions'];
+// A session opened in the Questions dialog that is still being read by then says so, with a way to try again.
+export const QUESTIONS_LOAD_LIMIT_MS = 10000;
 type CacheReadOptions = { clone?: boolean };
+type CommunityQuestionLoad = {
+  state: CommunityQuestionsState;
+  result: CommunityWorkerQuestions | null;
+  controller: AbortController;
+};
 type CommunityQuestionRow = {
+  type: string;
   sessionSlug: string;
   sessionName: string;
   questionId: string;
@@ -123,6 +148,7 @@ type ScopeCacheEntry = {
   sessionConfig: Record<string, unknown>;
   workerCanonicalIdentity: WorkerCanonicalCacheIdentity | null;
   workerGroupIds: string[];
+  workerGroups: CommunityWorkerGroupSummary[];
   workerVisibleUserIds: string[];
   workerGroupsCount: number;
   workerGroupsStatus: string;
@@ -213,7 +239,7 @@ export class CommunityTab extends Component<any, any> {
       loadingSurveyData: true,
       surveysList: [],
       questionsList: [],
-      questionsTableSignature: '',
+      questionsDialogSignature: '',
       filteredUsers: [], // Initialize as empty, will be set when modal opens
       loadingFilter: false,
       usersSnapshotSelectionKey: null,
@@ -1679,10 +1705,10 @@ export class CommunityTab extends Component<any, any> {
       if (!isCurrent()) return null;
       const next: Record<string, any> = {};
       if (prevState.showModal && prevState.modalType === 'questions') {
-        // Prompt hydration does not change counter signatures, but the open table must still refresh.
-        const questionsTableSignature = JSON.stringify(this._getQuestionDetailsRows(scopeEntries));
-        if (questionsTableSignature !== prevState.questionsTableSignature) {
-          next.questionsTableSignature = questionsTableSignature;
+        // Prompt hydration does not change counter signatures, but the open dialog must still refresh.
+        const questionsDialogSignature = JSON.stringify(this._getQuestionDetailsRows(scopeEntries));
+        if (questionsDialogSignature !== prevState.questionsDialogSignature) {
+          next.questionsDialogSignature = questionsDialogSignature;
         }
       }
       if (changed && snapshot) {
@@ -1879,6 +1905,7 @@ export class CommunityTab extends Component<any, any> {
 
   componentWillUnmount() {
     this._isUnmounted = true;
+    this._questionLoads.forEach(({ controller }) => controller.abort());
     if (typeof window !== 'undefined') {
       window.removeEventListener(SESSION_REGISTRY_CACHE_UPDATED_EVENT, this._refreshSessionCatalog);
       window.removeEventListener(SESSION_WORKER_CONFIG_CACHE_UPDATED_EVENT, this._handleWorkerSessionCatalogUpdate);
@@ -2013,7 +2040,7 @@ export class CommunityTab extends Component<any, any> {
       });
     } else {
       this.setState({
-        modalTitle: `${stat.label} Details`,
+        modalTitle: labelKey === 'questions' ? stat.label : `${stat.label} Details`,
         modalType: labelKey,
         showModal: true,
       });
@@ -2028,11 +2055,6 @@ export class CommunityTab extends Component<any, any> {
       modalType: !prevState.showModal ? prevState.modalType : null,
       modalTitle: !prevState.showModal ? prevState.modalTitle : '',
     }));
-  };
-
-  _getSingleSelectedWorkerScope = (): ScopeCacheEntry | null => {
-    const scopeEntries = this._iterScopeCaches({ clone: false });
-    return scopeEntries.length === 1 && scopeEntries[0].isWorkerCanonical ? scopeEntries[0] : null;
   };
 
   _buildLeaderboardUsersSignature = (users: any = []) =>
@@ -2220,12 +2242,15 @@ export class CommunityTab extends Component<any, any> {
     if (this._shouldUseDemoBeeswarmData()) {
       return this._buildDemoBeeswarmPoints();
     }
+    return this._beeswarmPointsFromEntries(
+      Array.isArray(scopeEntriesOverride) ? scopeEntriesOverride : this._iterScopeCaches({ clone: false }),
+    );
+  };
 
+  // The agree/disagree questions these sessions' caches hold, placed by how divided their answers are.
+  _beeswarmPointsFromEntries = (scopeEntries: ScopeCacheEntry[]) => {
     const questionMap: any = new Map();
     const combinedResponses: any = new Map();
-    const scopeEntries = Array.isArray(scopeEntriesOverride)
-      ? scopeEntriesOverride
-      : this._iterScopeCaches({ clone: false });
 
     scopeEntries.forEach(({ questionsCache }: any) => {
       Object.entries(questionsCache?.questions || {}).forEach(([questionId, question]: any) => {
@@ -2524,14 +2549,18 @@ export class CommunityTab extends Component<any, any> {
       const sessionSlug = normalizeSessionSlug(scope.slug);
       // Scope authority already requires an exact config slug; never reuse a demo label for an unknown session.
       const sessionName = String(scope.sessionConfig?.sessionName || '').trim() || sessionSlug || 'General';
+      const hidden = new Set(this._settingsHiddenQuestionIds(scope));
       const addQuestion = (id: unknown, rawQuestion: unknown) => {
         const questionId = String(id ?? '').trim();
         const key = JSON.stringify([sessionSlug, questionId]);
-        if (!questionId || seen.has(key)) return;
+        if (!questionId || seen.has(key) || hidden.has(questionId.toLowerCase())) return;
         seen.add(key);
         const question = this._parseCachedJson(rawQuestion);
+        // Hidden, or only named by an answer: not one of the questions the session shows.
+        if (question?.hidden === true || question?.source === 'worker-response-payload') return;
         const prompt = typeof question?.prompt === 'string' ? question.prompt.trim() : '';
         rows.push({
+          type: typeof question?.type === 'string' ? question.type : '',
           sessionSlug,
           sessionName,
           questionId,
@@ -2553,7 +2582,7 @@ export class CommunityTab extends Component<any, any> {
         comments.forEach((rawComment, index) => {
           const comment = this._parseCachedJson(rawComment);
           if (typeof comment?.commentBody === 'string') {
-            addQuestion(comment.commentId ?? index, { prompt: comment.commentBody });
+            addQuestion(comment.commentId ?? index, { prompt: comment.commentBody, type: comment.type || 'binary' });
           }
         });
       }
@@ -2561,42 +2590,120 @@ export class CommunityTab extends Component<any, any> {
     return rows;
   };
 
-  renderQuestionsModalContent = () => {
-    const rows = this._getQuestionDetailsRows();
+  // A Worker session's questions read for the Questions dialog where this browser holds none, by listing key.
+  _questionLoads = new Map<string, CommunityQuestionLoad>();
+
+  // The config a Worker session's own reads take: the Worker's, once the session has been opened here.
+  _workerReadConfig = (scopeEntry: ScopeCacheEntry): Record<string, unknown> =>
+    getWorkerCanonicalSessionBootstrapBySlug(scopeEntry.slug) || scopeEntry.sessionConfig;
+
+  // Reads an opened session once, or again on Try again. A read that outlasts the limit is shown as slow; if it
+  // lands later it still shows.
+  _ensureQuestionLoad = (scopeEntry: ScopeCacheEntry, retry = false) => {
+    const key = this._workerListingKey(scopeEntry);
+    const held = this._questionLoads.get(key);
+    if (held && !retry) return;
+    held?.controller.abort();
+    const load: CommunityQuestionLoad = { state: 'loading', result: null, controller: new AbortController() };
+    this._questionLoads.set(key, load);
+    const settle = (patch: Partial<CommunityQuestionLoad>) => {
+      if (this._questionLoads.get(key) !== load) return;
+      Object.assign(load, patch);
+      if (!this._isUnmounted) {
+        this.setState((state: Readonly<CommunityTab['state']>) => ({ questionLoads: (state.questionLoads || 0) + 1 }));
+      }
+    };
+    const timer = setTimeout(() => load.state === 'loading' && settle({ state: 'slow' }), QUESTIONS_LOAD_LIMIT_MS);
+    void loadCommunityWorkerQuestions({
+      sessionSlug: normalizeSessionSlug(scopeEntry.slug),
+      sessionConfig: this._workerReadConfig(scopeEntry),
+      signal: load.controller.signal,
+    })
+      .then((result) => settle({ state: 'ready', result }))
+      .catch(() => load.controller.signal.aborted || settle({ state: 'failed' }))
+      .finally(() => clearTimeout(timer));
+    if (retry) settle({});
+  };
+
+  // An opened session in the Questions dialog: its questions and answered agree/disagree questions, from what this
+  // browser holds, or for a Worker session it holds none of, from a read made when the session is opened.
+  _questionsSessionView = (scopeEntry: ScopeCacheEntry) => {
+    const slug = normalizeSessionSlug(scopeEntry.slug);
+    let source = scopeEntry;
+    let state: CommunityQuestionsState = 'ready';
+    let answersPublic = true;
+    let onOpen;
+    if (scopeEntry.isWorkerCanonical) {
+      const config = this._workerReadConfig(scopeEntry);
+      answersPublic = listsEveryAnswer(config);
+      if (scopeEntry.questionsCache?.workerMetadataHydrationStatus !== 'complete') {
+        const load = this._questionLoads.get(this._workerListingKey(scopeEntry));
+        if (!isWorkerCanonicalSessionConfig(config)) state = 'unopened';
+        else if (load?.result) {
+          source = { ...scopeEntry, questionsCache: load.result.questionsCache, surveysCache: {} };
+          answersPublic = load.result.answersPublic;
+        } else state = load?.state || 'loading';
+        if (state !== 'unopened') onOpen = () => this._ensureQuestionLoad(scopeEntry);
+      }
+    }
+    const questions = this._getQuestionDetailsRows([source]).map(({ questionId, prompt, type }) => ({
+      key: questionId,
+      prompt,
+      type,
+    }));
+    const shown = new Set(questions.map(({ key }) => key.toLowerCase()));
+    const demo =
+      !scopeEntry.isWorkerCanonical &&
+      !this._countKeys(scopeEntry.questionsCache?.questions) &&
+      POLIS_DEMO_DATA_AUTOLOAD_SLUGS.includes(slug);
+    const points = (demo ? this._buildDemoBeeswarmPoints(slug) : this._beeswarmPointsFromEntries([source])).filter(
+      (point: BeeswarmPoint) => shown.has(String(point.questionId).toLowerCase()) && Number(point.total) > 0,
+    );
+    const href = `${buildSettingsSessionHref(slug)}#report`;
+    return {
+      questions,
+      points,
+      href,
+      state,
+      answersNote: answersPublic || points.length ? '' : 'Answers to this session are not public.',
+      onOpen,
+      onRetry: () => this._ensureQuestionLoad(scopeEntry, true),
+      onOpenResults: () => this._openResults(href),
+    };
+  };
+
+  _openResults = (href: string) => window.location.assign(href);
+
+  // The Questions dialog: each session in view with the count its tile adds (a Worker session's own listing).
+  renderQuestionsDialog = () => {
+    const entries = new Map<string, ScopeCacheEntry>();
+    const sessions = this._iterScopeCaches({ clone: false }).map((scopeEntry): CommunityDialogSession => {
+      const slug = normalizeSessionSlug(scopeEntry.slug);
+      entries.set(slug, scopeEntry);
+      const name = sessionListName(slug, String(scopeEntry.sessionConfig?.sessionName || ''));
+      if (!scopeEntry.isWorkerCanonical) {
+        return { slug, name, count: this._getQuestionDetailsRows([scopeEntry]).length, state: 'ready' };
+      }
+      const held = this._workerListingCounts.get(this._workerListingKey(scopeEntry));
+      const count = held?.counts?.questions;
+      if (typeof count === 'number') return { slug, name, count, state: 'ready' };
+      return { slug, name, count: 0, state: !held || held.loading ? 'loading' : 'unread' };
+    });
+    const listed = dialogSessionList(sessions);
     return (
-      <div className={styles.questionsModalContent}>
-        <table
-          className={styles.questionsTable}
-          aria-label="Questions by session"
-          data-testid={E2E_TESTIDS.COMMUNITY_QUESTIONS_TABLE}
-        >
-          <thead>
-            <tr>
-              <th scope="col">Session</th>
-              <th scope="col">Question</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(({ sessionSlug, sessionName, questionId, prompt }) => (
-              <tr
-                key={JSON.stringify([sessionSlug, questionId])}
-                data-ce-session-slug={sessionSlug}
-                data-ce-question-id={questionId}
-              >
-                <td>{sessionName}</td>
-                <td>
-                  <a href={`${buildSettingsSessionHref(sessionSlug)}#report`}>{prompt}</a>
-                </td>
-              </tr>
-            ))}
-            {!rows.length && (
-              <tr>
-                <td colSpan={2}>No questions available for the selected sessions.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <CommunitySessionDialog
+        noun="question"
+        sessions={listed}
+        total={listed.reduce((sum, session) => sum + session.count, 0)}
+        emptyText="No sessions with questions yet."
+        testId={E2E_TESTIDS.COMMUNITY_QUESTIONS_DIALOG}
+        renderSession={(session) => {
+          const scopeEntry = entries.get(session.slug);
+          return scopeEntry ? (
+            <CommunityQuestionsSession session={session} {...this._questionsSessionView(scopeEntry)} />
+          ) : null;
+        }}
+      />
     );
   };
 
@@ -2735,42 +2842,98 @@ export class CommunityTab extends Component<any, any> {
     );
   };
 
+  // A session's groups page, or with `groupId` one Worker group's page. Worker links carry the session's Worker,
+  // as that session's own group links do.
+  _sessionGroupsHref = (scopeEntry: ScopeCacheEntry, groupId = ''): string => {
+    const slug = normalizeSessionSlug(scopeEntry.slug);
+    if (scopeEntry.isWorkerCanonical) {
+      const workerUrl = scopeEntry.workerCanonicalIdentity?.workerOrigin;
+      return buildWorkerGroupsPath({ groupId, sessionSlug: slug, workerUrl });
+    }
+    return buildPublicRoute(slug ? `${sbtsListPath()}/${encodeURIComponent(slug)}` : sbtsListPath());
+  };
+
+  // The Groups dialog: each session in view with the groups the Groups tile counts for it, read from the same place.
+  renderGroupsDialog = () => {
+    const counted = new Set<string>();
+    const opened = new Map<string, { groups: CommunityDialogGroup[]; href: string }>();
+    const sessions: CommunityDialogSession[] = [];
+    const nowSec = Math.floor(Date.now() / 1000);
+    this._iterScopeCaches({ clone: false }).forEach((scopeEntry) => {
+      const slug = normalizeSessionSlug(scopeEntry.slug);
+      const name = sessionListName(slug, String(scopeEntry.sessionConfig?.sessionName || ''));
+      let groups: CommunityDialogGroup[];
+      if (scopeEntry.isWorkerCanonical) {
+        // A Worker session never opened here has no identity: its groups are not read, nor counted.
+        if (!scopeEntry.workerCanonicalIdentity) return;
+        const status = scopeEntry.workerGroupsStatus;
+        // A failed re-read keeps the groups it last had, and the tile still counts them: so does the dialog.
+        const heldThroughError = status === 'error' && scopeEntry.workerGroups.length > 0;
+        if (status !== 'ready' && !heldThroughError) {
+          const state = status === 'unavailable' ? 'private' : status === 'error' ? 'unread' : 'loading';
+          sessions.push({ slug, name, count: 0, state });
+          return;
+        }
+        groups = scopeEntry.workerGroups.map(({ groupId, label, open }) => {
+          counted.add(`${slug}:${groupId}`);
+          const href = this._sessionGroupsHref(scopeEntry, groupId);
+          return { key: groupId, name: label || `Unnamed ${t('sbtLower')}`, open, href };
+        });
+      } else {
+        const sbtList = (scopeEntry.sbtCache?.sbtList || {}) as Record<string, CommunitySbtCacheEntry>;
+        groups = Object.values(sbtList)
+          .filter((entry) => this._shouldCountSbt(entry, slug))
+          .map((entry) => {
+            const address = String(entry.sbtAddress).toLowerCase();
+            counted.add(`${scopeEntry.netKey}:${address}`);
+            const info = entry.sbtInfo && typeof entry.sbtInfo === 'object' ? entry.sbtInfo : {};
+            // As the groups page reads it: no end time means minting never closes.
+            const endSec = coerceSbtMintEndSeconds((info as Record<string, unknown>).mintingEndTime);
+            const shownName = getSbtDisplayName(info) || String(getShortenedAddress(address, false));
+            const href = buildSbtDetailPath(address, slug);
+            return { key: address, name: shownName, open: endSec === 0 || endSec > nowSec, href };
+          });
+      }
+      opened.set(slug, { groups, href: this._sessionGroupsHref(scopeEntry) });
+      sessions.push({ slug, name, count: groups.length, state: 'ready' });
+    });
+    const listed = dialogSessionList(sessions);
+    const listedSum = listed.reduce((sum, session) => sum + session.count, 0);
+    return (
+      <CommunitySessionDialog
+        noun={t('sbtLower')}
+        sessions={listed}
+        total={counted.size}
+        totalHelp={
+          listedSum > counted.size
+            ? `A ${t('sbtLower')} used by more than one session is listed under each and counted once here.`
+            : ''
+        }
+        emptyText={`No sessions with ${t('sbtsLower')} yet.`}
+        testId={E2E_TESTIDS.COMMUNITY_GROUPS_DIALOG}
+        renderSession={(session) => (
+          <CommunityGroupsSession
+            session={session}
+            groups={opened.get(session.slug)?.groups || []}
+            href={opened.get(session.slug)?.href || ''}
+            noun={t('sbtLower')}
+          />
+        )}
+      />
+    );
+  };
+
   renderModalContent = () => {
     const { modalType, surveysList, filteredUsers, loadingFilter } = this.state;
-    const { provider, network, account, loginComplete, toggleLoginModal } = this.props;
+    const { provider, network } = this.props;
 
     switch (modalType) {
       case 'sessions':
         return this.renderSessionsModalContent();
       case 'sbtgroups':
       case 'sbts':
-      case 'groups': {
-        // Keep the modal on the selected session's authority boundary. The
-        // wrapper projects Worker-native Groups only when it receives the
-        // exact Worker-canonical slug/config pair.
-        const workerScope = this._getSingleSelectedWorkerScope();
-        return (
-          <SBTsList
-            provider={provider}
-            network={network}
-            account={account}
-            loginComplete={loginComplete}
-            miniaturized={true}
-            toggleLoginModal={toggleLoginModal}
-            viewMode="modal" // Important: Set view mode for modal styling
-            isSBTCacheReady={this.props.isSBTCacheReady}
-            sbtRealtimeCoverageBySlug={this.props.sbtRealtimeCoverageBySlug}
-            ensureLightSbtDiscovery={this.props.ensureLightSbtDiscovery}
-            ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
-            sessionSlug={workerScope?.slug}
-            sessionConfig={workerScope?.sessionConfig}
-            communityTabCompactSettings
-            interactiveMiniCards
-            embeddedMode={!!workerScope}
-            allSessionsMode={!workerScope}
-          />
-        );
-      }
+      case 'groups':
+        return this.renderGroupsDialog();
       case 'users': {
         const selectionKey = this._statsSelectionKey();
         const generation = this._usersFilterGeneration;
@@ -2885,7 +3048,7 @@ export class CommunityTab extends Component<any, any> {
           </div>
         );
       case 'questions':
-        return this.renderQuestionsModalContent();
+        return this.renderQuestionsDialog();
       default:
         return <p>No content specified.</p>;
     }
@@ -2979,15 +3142,15 @@ export class CommunityTab extends Component<any, any> {
         <Modal
           isOpen={showModal}
           toggle={this.toggleModal}
-          className={`${styles.modal} ${this.state.modalType === 'sessions' ? styles.sessionsModal : ''}`}
+          className={`${styles.modal} ${SESSION_LIST_DIALOGS.includes(this.state.modalType) ? styles.sessionsModal : ''}`}
           size="lg"
           centered
           scrollable
         >
           <ModalHeader
             toggle={this.toggleModal}
-            className={`${styles.modalHeader} ${this.state.modalType === 'questions' ? styles.questionsModalHeader : ''}`}
-            tag={['sessions', 'questions'].includes(this.state.modalType) ? 'div' : 'h5'}
+            className={styles.modalHeader}
+            tag={this.state.modalType === 'sessions' ? 'div' : 'h5'}
           >
             {this.state.modalType === 'sessions' ? (
               <div className={styles.sessionModalHeading}>
@@ -3007,17 +3170,6 @@ export class CommunityTab extends Component<any, any> {
                   <FontAwesomeIcon icon={faFilter} />
                 </button>
               </div>
-            ) : this.state.modalType === 'questions' ? (
-              <>
-                <h5>{modalTitle}</h5>
-                <a
-                  href={buildSettingsSessionHref(this._resolveRouteSlug())}
-                  className={styles.questionsModalLink}
-                  data-testid="ce-community-questions-session-link"
-                >
-                  View Full Questions
-                </a>
-              </>
             ) : (
               modalTitle
             )}

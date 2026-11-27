@@ -35,7 +35,8 @@ export const WorkerGroupJoinModeOptions = ({ modes }: { modes: WorkerGroupJoinMo
   </>
 );
 
-const HelpButton = ({ label, children }: { label: string; children: React.ReactNode }) => {
+/** A "?" that explains what is beside it, on hover or focus. */
+export const HelpButton = ({ label, children }: { label: string; children: React.ReactNode }) => {
   const id = `worker-group-help-${React.useId().replace(/:/g, '')}`;
   return (
     <>

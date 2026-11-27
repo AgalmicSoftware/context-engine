@@ -154,6 +154,19 @@ export async function inspectCivicExplorer(page) {
   await page.getByRole('tab', { name: 'Tools', exact: true }).click();
 }
 
+// The Questions dialog's fixture session, opened as a list: straight away when it is the one session in view.
+async function openQuestionsSession(dialog) {
+  const session = dialog.getByTestId('ce-community-questions-dialog-session');
+  const sessions = dialog.getByTestId('ce-community-questions-dialog');
+  await session.or(sessions).first().waitFor({ state: 'visible' });
+  if (!(await session.isVisible())) await sessions.locator('button[data-ce-session-slug="demo-sh"]').click();
+  await session.locator('ul a, [aria-label="Show questions as"]').first().waitFor({ state: 'visible' });
+  const list = session.getByRole('button', { name: 'List', exact: true });
+  if (await list.count()) await list.click();
+  await session.locator('ul a').first().waitFor({ state: 'visible' });
+  return session;
+}
+
 export async function inspectCivicStats(page) {
   await page.getByRole('tab', { name: 'Stats', exact: true }).click();
   const stats = page.locator('[class*="communityTab_"]');
@@ -166,12 +179,10 @@ export async function inspectCivicStats(page) {
     const dialog = page.getByRole('dialog');
     await assertReadable(dialog);
     if (name === 'Questions') {
-      const table = dialog.getByTestId('ce-community-questions-table');
-      await table.waitFor({ state: 'visible' });
-      assert.deepEqual(await table.getByRole('columnheader').allTextContents(), ['Session', 'Question']);
-      reportHref = await table.getByRole('link').first().getAttribute('href');
+      const session = await openQuestionsSession(dialog);
+      await assertReadable(dialog);
+      reportHref = await session.locator('ul a').first().getAttribute('href');
       assert(reportHref?.endsWith('#report'), 'Question links target their session report');
-      await dialog.getByTestId('ce-community-questions-session-link').waitFor({ state: 'visible' });
     }
     if (name === 'Users') {
       const usersSelector = dialog.getByTestId('ce-community-users-session-select');
@@ -204,7 +215,7 @@ export async function inspectCivicStats(page) {
     await dialog.waitFor({ state: 'hidden' });
   }
   await inspectSessionDirectory(page);
-  assert(reportHref, 'Questions Details exposes a report link');
+  assert(reportHref, 'The Questions dialog links to a session report');
   const reportPage = await page.context().newPage();
   try {
     await reportPage.goto(new URL(reportHref, page.url()).href, { waitUntil: 'domcontentloaded' });
@@ -519,7 +530,8 @@ export async function runSmoke() {
         await page.getByTestId('ce-community-session-select').selectOption({ label: 'ALL' });
         await page.getByTestId('ce-community-stat-groups').click();
         const dialog = page.getByRole('dialog');
-        await dialog.getByRole('heading', { name: 'Featured Groups', exact: true }).waitFor({ state: 'visible' });
+        // The session list, or the one session in view opened straight away.
+        await dialog.locator('[data-testid^="ce-community-groups-dialog"]').first().waitFor({ state: 'visible' });
         await assertReadable(dialog);
         await dialog.getByRole('button', { name: 'Close', exact: true }).click();
         await page.goto(`${baseUrl}/session/new`, { waitUntil: 'domcontentloaded' });

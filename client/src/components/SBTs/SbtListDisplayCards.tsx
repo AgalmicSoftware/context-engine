@@ -9,16 +9,6 @@ type SbtListDisplayCardStyles = Record<string, string>;
 
 type SbtListAnchorClickHandler = React.MouseEventHandler<HTMLAnchorElement>;
 
-type SbtListCompactLinkCardProps = {
-  className: string;
-  href: string;
-  imageStyle?: React.CSSProperties;
-  model: SbtListDisplayCardModel;
-  onClick: SbtListAnchorClickHandler;
-  sbtLabel: string;
-  styles: SbtListDisplayCardStyles;
-};
-
 type SbtListStandardCardProps = {
   detailsPanel?: React.ReactNode;
   href: string;
@@ -38,37 +28,6 @@ const handleSbtListCardImageError: React.ReactEventHandler<HTMLImageElement> = (
   const image = event.currentTarget;
   if (image.src.endsWith(defaultSbtImage)) return;
   image.src = defaultSbtImage;
-};
-
-export const SbtListCompactLinkCard = ({
-  className,
-  href,
-  imageStyle,
-  model,
-  onClick,
-  sbtLabel,
-  styles,
-}: SbtListCompactLinkCardProps): React.ReactElement => {
-  const { description, imageSrc, key, locked, name } = model;
-
-  return (
-    <a key={key} className={className} href={href} onClick={onClick}>
-      <div className={styles.sbtImage} style={imageStyle}>
-        <img
-          src={resolveSbtListCardImageSrc(imageSrc)}
-          alt={`${sbtLabel} Thumbnail`}
-          onError={handleSbtListCardImageError}
-        />
-      </div>
-      <div className={styles.sbtInfo}>
-        <p className={styles.sbtName}>
-          {name}
-          {locked && <FontAwesomeIcon icon={faLock} className={styles.lockIcon} />}
-        </p>
-        <p className={styles.sbtDescription}>{description || 'No description.'}</p>
-      </div>
-    </a>
-  );
 };
 
 export const SbtListStandardCard = ({

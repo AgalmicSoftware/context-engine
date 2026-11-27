@@ -940,7 +940,6 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
             litHooks={this.props.litHooks}
             loginComplete={loginComplete}
             toggleLoginModal={toggleLoginModal}
-            miniaturized={false}
             sbtCacheRevision={sbtCacheRevision}
             onRequestSbtCacheRefresh={this.props.onRequestSbtCacheRefresh}
             isSBTCacheReady={isSBTCacheReady}

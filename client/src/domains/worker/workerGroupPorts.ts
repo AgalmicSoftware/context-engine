@@ -58,6 +58,11 @@ export const isWorkerGroupListed = ({
   memberVisibility,
 }: Pick<WorkerGroup, 'listed' | 'joinMode' | 'memberVisibility'>): boolean =>
   joinMode === 'open' || (listed ?? memberVisibility === 'session');
+export const workerGroupJoinHasEnded = ({ joinEndsAt }: Pick<WorkerGroup, 'joinEndsAt'>): boolean =>
+  Boolean(joinEndsAt && Date.parse(joinEndsAt) <= Date.now());
+/** A person can still join it: by link, or with a password or claim code. */
+export const isWorkerGroupJoinable = (group: Pick<WorkerGroup, 'joinMode' | 'joinEndsAt'>): boolean =>
+  group.joinMode !== 'admin_add' && !workerGroupJoinHasEnded(group);
 /** Joining needs a group password or a one-use claim code. */
 export const workerGroupNeedsSecret = ({ joinMode }: Pick<WorkerGroup, 'joinMode'>): boolean =>
   joinMode === 'one_use' || joinMode === 'group_password';

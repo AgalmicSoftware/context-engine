@@ -18,29 +18,10 @@ type BuildSbtListExpandedCardShellClassNameArgs = {
   expandedClassName?: unknown;
   isExpanded?: unknown;
 };
-type BuildSbtListRootClassNameArgs = {
-  baseClassName?: unknown;
-  rootClassName?: unknown;
-};
 type BuildSbtListSessionUniversePanelClassNameArgs = {
   baseClassName?: unknown;
   closedClassName?: unknown;
   isClosed?: unknown;
-};
-type BuildSbtListMiniSettingsButtonClassNameArgs = {
-  activeClassName?: unknown;
-  baseClassName?: unknown;
-  isActive?: unknown;
-};
-type BuildSbtListFilterContainerClassNameArgs = {
-  baseClassName?: unknown;
-  panelClassName?: unknown;
-};
-type BuildSbtListFilterLabelClassNameArgs = {
-  activeClassName?: unknown;
-  baseClassName?: unknown;
-  isActive?: unknown;
-  toggleClassName?: unknown;
 };
 type SbtListClosestTarget = EventTarget & {
   closest: (selector: string) => Element | null;
@@ -95,41 +76,12 @@ export const buildSbtListExpandedCardShellClassName = ({
 }: BuildSbtListExpandedCardShellClassNameArgs = {}): string =>
   [String(baseClassName || ''), isExpanded ? String(expandedClassName || '') : ''].filter(Boolean).join(' ');
 
-export const buildSbtListRootClassName = ({
-  baseClassName = '',
-  rootClassName = '',
-}: BuildSbtListRootClassNameArgs = {}): string =>
-  [String(baseClassName || ''), String(rootClassName || '')].filter(Boolean).join(' ');
-
 export const buildSbtListSessionUniversePanelClassName = ({
   baseClassName = '',
   closedClassName = '',
   isClosed = false,
 }: BuildSbtListSessionUniversePanelClassNameArgs = {}): string =>
   [String(baseClassName || ''), isClosed ? String(closedClassName || '') : ''].filter(Boolean).join(' ');
-
-export const buildSbtListMiniSettingsButtonClassName = ({
-  activeClassName = '',
-  baseClassName = '',
-  isActive = false,
-}: BuildSbtListMiniSettingsButtonClassNameArgs = {}): string =>
-  [String(baseClassName || ''), isActive ? String(activeClassName || '') : ''].filter(Boolean).join(' ');
-
-export const buildSbtListFilterContainerClassName = ({
-  baseClassName = '',
-  panelClassName = '',
-}: BuildSbtListFilterContainerClassNameArgs = {}): string =>
-  [String(baseClassName || ''), String(panelClassName || '')].filter(Boolean).join(' ');
-
-export const buildSbtListFilterLabelClassName = ({
-  activeClassName = '',
-  baseClassName = '',
-  isActive = false,
-  toggleClassName = '',
-}: BuildSbtListFilterLabelClassNameArgs = {}): string =>
-  [String(baseClassName || ''), String(toggleClassName || ''), isActive ? String(activeClassName || '') : '']
-    .filter(Boolean)
-    .join(' ');
 
 export const findSbtListInteractiveAncestor = (
   target: EventTarget | null | undefined,

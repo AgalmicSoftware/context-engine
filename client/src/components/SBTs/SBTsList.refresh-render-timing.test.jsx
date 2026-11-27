@@ -344,7 +344,6 @@ describe('SBTsList refresh render timing', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         embeddedMode
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
@@ -367,7 +366,6 @@ describe('SBTsList refresh render timing', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         embeddedMode
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={1}
@@ -461,7 +459,6 @@ describe('SBTsList refresh render timing', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -489,7 +486,6 @@ describe('SBTsList refresh render timing', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={1}
         onRequestSbtCacheRefresh={jest.fn()}
@@ -544,7 +540,6 @@ describe('SBTsList refresh render timing', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         embeddedMode
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
@@ -573,7 +568,6 @@ describe('SBTsList refresh render timing', () => {
         account=""
         sessionSlug="alpha"
         loginComplete
-        miniaturized={false}
         embeddedMode
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={1}
@@ -625,7 +619,6 @@ describe('SBTsList refresh render timing', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         embeddedMode
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
@@ -688,7 +681,6 @@ describe('SBTsList refresh render timing', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         embeddedMode
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={0}
@@ -715,7 +707,6 @@ describe('SBTsList refresh render timing', () => {
         account=""
         sessionSlug=""
         loginComplete
-        miniaturized={false}
         embeddedMode
         toggleLoginModal={jest.fn()}
         sbtCacheRevision={1}
